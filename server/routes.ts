@@ -6,7 +6,7 @@ import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
-import { checkAndResetEnergy, deductEnergy, getNextResetTime } from "./lib/energy";
+import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation } from "./lib/openai";
@@ -168,17 +168,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/natal", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const deductResult = await deductEnergy(storage, userId, "natal");
-
-      if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
-      }
-
+      
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      const cost = ENERGY_COSTS.natal;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+
+      // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate), user.birthTime || undefined);
       const interpretation = await getAstrologyInterpretation("natal", chart);
 
@@ -188,6 +191,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aspects: chart.aspects,
         interpretation,
       });
+
+      // Only deduct energy after successful execution
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "natal", cost });
 
       res.json({
         ok: true,
@@ -205,19 +212,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/solar", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const deductResult = await deductEnergy(storage, userId, "solar");
-
-      if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
-      }
-
+      
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      const cost = ENERGY_COSTS.solar;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+
+      // Execute the reading
       const solar = calculateSolarReturn(new Date(user.birthdayDate));
       const interpretation = await getAstrologyInterpretation("solar", solar);
+
+      // Only deduct energy after successful execution
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "solar", cost });
 
       res.json({
         ok: true,
@@ -241,17 +255,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { period } = req.body;
 
-      const deductResult = await deductEnergy(storage, userId, "horoscope");
-
-      if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
-      }
-
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      const cost = ENERGY_COSTS.horoscope;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+
+      // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate));
       const forecast = await getAstrologyInterpretation("horoscope", { chart, period });
 
@@ -260,6 +276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         period: period || "daily",
         forecast,
       });
+
+      // Only deduct energy after successful execution
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "horoscope", cost });
 
       res.json({
         ok: true,
@@ -283,17 +303,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { partner } = req.body;
 
-      const deductResult = await deductEnergy(storage, userId, "compatibility");
-
-      if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
-      }
-
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      const cost = ENERGY_COSTS.compatibility;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+
+      // Execute the reading
       const person1Chart = calculateNatalChart(new Date(user.birthdayDate));
       const person2Chart = calculateNatalChart(new Date(partner.date));
 
@@ -308,6 +330,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         partnerDate: new Date(partner.date),
         analysis,
       });
+
+      // Only deduct energy after successful execution
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "compatibility", cost });
 
       res.json({
         ok: true,
@@ -335,17 +361,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { question } = req.body;
 
-      const deductResult = await deductEnergy(storage, userId, "ask");
-
-      if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
-      }
-
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      const cost = ENERGY_COSTS.ask;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+
+      // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate));
       const answer = await getAstrologyInterpretation("ask", { chart, question });
 
@@ -354,6 +382,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         question,
         answer,
       });
+
+      // Only deduct energy after successful execution
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "ask", cost });
 
       res.json({ ok: true, data: { answer } });
     } catch (error: any) {
