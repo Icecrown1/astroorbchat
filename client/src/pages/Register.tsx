@@ -112,15 +112,17 @@ export default function Register() {
         response = await apiRequest('POST', '/api/auth/telegram', { initData, ...finalData });
       }
 
-      if (response.ok && response.data) {
-        setAuth(response.data.user, response.data.token);
+      const result = await response.json();
+
+      if (result.ok && result.data) {
+        setAuth(result.data.user, result.data.token);
         toast({
           title: 'Welcome to Astro Orb!',
           description: 'Your cosmic journey begins now.',
         });
         navigate('/dashboard');
       } else {
-        throw new Error(response.error || 'Registration failed');
+        throw new Error(result.error || 'Registration failed');
       }
     } catch (error: any) {
       toast({
