@@ -14,10 +14,12 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/contexts/LocaleContext';
 
 export default function Horoscope() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [horoscopeData, setHoroscopeData] = useState<any>(null);
 
@@ -30,14 +32,14 @@ export default function Horoscope() {
       setHoroscopeData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
-        title: 'Horoscope Generated',
-        description: 'Your cosmic forecast is ready',
+        title: t.horoscope.generated,
+        description: t.horoscope.forecastReady,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Generation Failed',
-        description: error.message || 'Please try again',
+        title: t.horoscope.generationFailed,
+        description: error.message || t.compatibility.tryAgain,
         variant: 'destructive',
       });
     },
@@ -56,8 +58,8 @@ export default function Horoscope() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Horoscope</h1>
-            <p className="text-muted-foreground">Your cosmic forecast</p>
+            <h1 className="text-2xl font-display font-bold">{t.horoscope.title}</h1>
+            <p className="text-muted-foreground">{t.horoscope.subtitle}</p>
           </div>
         </div>
 
@@ -67,24 +69,24 @@ export default function Horoscope() {
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
                 <Sparkles className="w-12 h-12 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold mb-4">Generate Horoscope</h2>
+              <h2 className="text-xl font-semibold mb-4">{t.horoscope.generateTitle}</h2>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Time Period</label>
+                <label className="block text-sm font-medium mb-2">{t.horoscope.timePeriod}</label>
                 <Select value={period} onValueChange={(value: any) => setPeriod(value)}>
                   <SelectTrigger data-testid="select-period">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="day">Daily</SelectItem>
-                    <SelectItem value="week">Weekly</SelectItem>
-                    <SelectItem value="month">Monthly</SelectItem>
+                    <SelectItem value="day">{t.horoscope.daily}</SelectItem>
+                    <SelectItem value="week">{t.horoscope.weekly}</SelectItem>
+                    <SelectItem value="month">{t.horoscope.monthly}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <p className="text-sm text-primary font-medium mb-6">
-                Cost: 1 Energy Orb
+                {t.horoscope.costOne}
               </p>
 
               <Button
@@ -97,12 +99,12 @@ export default function Horoscope() {
                 {mutation.isPending ? (
                   <>
                     <Loader className="mr-2" size="sm" />
-                    Generating...
+                    {t.horoscope.generating}
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate Horoscope
+                    {t.horoscope.generate}
                   </>
                 )}
               </Button>
@@ -115,9 +117,9 @@ export default function Horoscope() {
             <Card className="p-6">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold">
-                  {period === 'day' && 'Daily Horoscope'}
-                  {period === 'week' && 'Weekly Horoscope'}
-                  {period === 'month' && 'Monthly Horoscope'}
+                  {period === 'day' && t.horoscope.dailyTitle}
+                  {period === 'week' && t.horoscope.weeklyTitle}
+                  {period === 'month' && t.horoscope.monthlyTitle}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {horoscopeData.period || period}
@@ -132,7 +134,7 @@ export default function Horoscope() {
 
             {horoscopeData.highlights && horoscopeData.highlights.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Highlights</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.horoscope.highlights}</h2>
                 <div className="space-y-2">
                   {horoscopeData.highlights.map((highlight: string, index: number) => (
                     <div
@@ -153,7 +155,7 @@ export default function Horoscope() {
               onClick={() => setHoroscopeData(null)}
               data-testid="button-regenerate"
             >
-              Generate New Horoscope
+              {t.horoscope.generateNew}
             </Button>
           </div>
         )}

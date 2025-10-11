@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,18 +12,20 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Heart } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-
-const compatibilitySchema = z.object({
-  partnerName: z.string().min(1, 'Partner name is required'),
-  partnerDate: z.string().min(1, 'Birth date is required'),
-  partnerTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
-  partnerPlace: z.string().optional(),
-});
+import { useTranslation } from '@/contexts/LocaleContext';
 
 export default function Compatibility() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t, locale } = useTranslation();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
+
+  const compatibilitySchema = useMemo(() => z.object({
+    partnerName: z.string().min(1, locale === 'ru' ? 'Имя партнера обязательно' : 'Partner name is required'),
+    partnerDate: z.string().min(1, locale === 'ru' ? 'Дата рождения партнера обязательна' : 'Partner birth date is required'),
+    partnerTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
+    partnerPlace: z.string().optional(),
+  }), [locale]);
 
   const form = useForm({
     resolver: zodResolver(compatibilitySchema),
@@ -51,14 +53,14 @@ export default function Compatibility() {
       setCompatibilityData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
-        title: 'Compatibility Analysis Complete',
-        description: 'Your relationship insights are ready',
+        title: t.compatibility.complete,
+        description: t.compatibility.completeDesc,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Analysis Failed',
-        description: error.message || 'Please try again',
+        title: t.compatibility.failed,
+        description: error.message || t.compatibility.tryAgain,
         variant: 'destructive',
       });
     },
@@ -77,8 +79,8 @@ export default function Compatibility() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Compatibility</h1>
-            <p className="text-muted-foreground">Analyze your relationship</p>
+            <h1 className="text-2xl font-display font-bold">{t.nav.compatibility}</h1>
+            <p className="text-muted-foreground">{t.compatibility.analyzeRelationship}</p>
           </div>
         </div>
 
@@ -88,22 +90,22 @@ export default function Compatibility() {
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-5/20 to-chart-2/20 mb-4">
                 <Heart className="w-12 h-12 text-chart-5" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Relationship Analysis</h2>
+              <h2 className="text-xl font-semibold mb-2">{t.compatibility.relationshipAnalysis}</h2>
               <p className="text-muted-foreground mb-4">
-                Discover the cosmic dynamics between you and another person
+                {t.compatibility.cosmicDynamics}
               </p>
               <p className="text-sm text-primary font-medium mb-6">
-                Cost: 2 Energy Orbs
+                {t.compatibility.cost}
               </p>
             </div>
 
             <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
               <div>
-                <Label htmlFor="partnerName">Partner's Name</Label>
+                <Label htmlFor="partnerName">{t.compatibility.partnerName}</Label>
                 <Input
                   id="partnerName"
                   {...form.register('partnerName')}
-                  placeholder="Enter partner's name"
+                  placeholder={t.compatibility.partnerNamePlaceholder}
                   data-testid="input-partner-name"
                 />
                 {form.formState.errors.partnerName && (
@@ -114,7 +116,7 @@ export default function Compatibility() {
               </div>
 
               <div>
-                <Label htmlFor="partnerDate">Birth Date</Label>
+                <Label htmlFor="partnerDate">{t.auth.birthDate}</Label>
                 <Input
                   id="partnerDate"
                   type="date"
@@ -129,7 +131,7 @@ export default function Compatibility() {
               </div>
 
               <div>
-                <Label htmlFor="partnerTime">Birth Time (Optional)</Label>
+                <Label htmlFor="partnerTime">{t.auth.birthTime}</Label>
                 <Input
                   id="partnerTime"
                   type="time"
@@ -139,11 +141,11 @@ export default function Compatibility() {
               </div>
 
               <div>
-                <Label htmlFor="partnerPlace">Birth Place (Optional)</Label>
+                <Label htmlFor="partnerPlace">{t.compatibility.partnerBirthPlace}</Label>
                 <Input
                   id="partnerPlace"
                   {...form.register('partnerPlace')}
-                  placeholder="City, Country"
+                  placeholder={t.compatibility.placePlaceholder}
                   data-testid="input-partner-place"
                 />
               </div>
@@ -158,12 +160,12 @@ export default function Compatibility() {
                 {mutation.isPending ? (
                   <>
                     <Loader className="mr-2" size="sm" />
-                    Analyzing...
+                    {t.compatibility.analyzing}
                   </>
                 ) : (
                   <>
                     <Heart className="w-4 h-4 mr-2" />
-                    Analyze Compatibility
+                    {t.compatibility.analyze}
                   </>
                 )}
               </Button>
@@ -175,9 +177,9 @@ export default function Compatibility() {
           <div className="space-y-6">
             <Card className="p-6">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">Compatibility Analysis</h2>
+                <h2 className="text-lg font-semibold">{t.compatibility.result}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {compatibilityData.partners || 'You and your partner'}
+                  {compatibilityData.partners || t.compatibility.youAndPartner}
                 </p>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -189,7 +191,7 @@ export default function Compatibility() {
 
             {compatibilityData.strengths && compatibilityData.strengths.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Strengths</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.compatibility.strengths}</h2>
                 <div className="space-y-2">
                   {compatibilityData.strengths.map((strength: string, index: number) => (
                     <div
@@ -206,7 +208,7 @@ export default function Compatibility() {
 
             {compatibilityData.challenges && compatibilityData.challenges.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Challenges</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.compatibility.challenges}</h2>
                 <div className="space-y-2">
                   {compatibilityData.challenges.map((challenge: string, index: number) => (
                     <div
@@ -229,7 +231,7 @@ export default function Compatibility() {
               }}
               data-testid="button-new-analysis"
             >
-              Analyze Another Relationship
+              {t.compatibility.analyzeAnother}
             </Button>
           </div>
         )}

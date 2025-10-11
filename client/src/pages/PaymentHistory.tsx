@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Receipt, Wallet, Calendar, TrendingUp, ArrowUpRight } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/contexts/LocaleContext";
 
 interface Payment {
   id: string;
@@ -18,6 +19,7 @@ interface Payment {
 }
 
 export default function PaymentHistory() {
+  const { t } = useTranslation();
   const { data, isLoading, error } = useQuery<{ ok: boolean; data: Payment[] }>({
     queryKey: ["/api/payments/history"],
   });
@@ -30,10 +32,10 @@ export default function PaymentHistory() {
 
   const getPaymentLabel = (payment: Payment) => {
     if (payment.kind === "subscription") {
-      return `${payment.tier?.toUpperCase()} Subscription`;
+      return `${payment.tier?.toUpperCase()} ${t.paymentHistory.subscription}`;
     }
     if (payment.kind === "energy" || payment.kind === "energy_pack") {
-      return `${payment.energyAmount} Energy Orbs`;
+      return `${payment.energyAmount} ${t.paymentHistory.energyOrbs}`;
     }
     return payment.kind;
   };
@@ -49,6 +51,21 @@ export default function PaymentHistory() {
         return "destructive";
       default:
         return "secondary";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return t.paymentHistory.completed;
+      case "confirmed":
+        return t.paymentHistory.confirmed;
+      case "pending":
+        return t.paymentHistory.pending;
+      case "failed":
+        return t.paymentHistory.failed;
+      default:
+        return status;
     }
   };
 
@@ -78,10 +95,10 @@ export default function PaymentHistory() {
               <div className="text-center py-12">
                 <Receipt className="h-12 w-12 mx-auto text-destructive mb-4" />
                 <p className="text-destructive font-medium" data-testid="text-error">
-                  Failed to load payment history
+                  {t.paymentHistory.loadFailed}
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Please try again later
+                  {t.paymentHistory.tryAgainLater}
                 </p>
               </div>
             </CardContent>
@@ -97,9 +114,9 @@ export default function PaymentHistory() {
     <div className="min-h-screen bg-background p-6 space-y-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Payment History</h1>
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">{t.paymentHistory.title}</h1>
           <p className="text-muted-foreground mt-1" data-testid="text-page-description">
-            View all your transactions and purchases
+            {t.paymentHistory.viewAll}
           </p>
         </div>
 
@@ -109,10 +126,10 @@ export default function PaymentHistory() {
               <div className="text-center py-12">
                 <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground" data-testid="text-no-payments">
-                  No payment history yet
+                  {t.paymentHistory.noPayments}
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Your purchases will appear here
+                  {t.paymentHistory.noPurchases}
                 </p>
               </div>
             </CardContent>
@@ -140,13 +157,13 @@ export default function PaymentHistory() {
                       </div>
                     </div>
                     <Badge variant={getStatusColor(payment.status)} data-testid={`badge-status-${payment.id}`}>
-                      {payment.status}
+                      {getStatusLabel(payment.status)}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Amount</span>
+                    <span className="text-muted-foreground">{t.paymentHistory.amount}</span>
                     <div className="flex items-center gap-3">
                       <span className="font-medium" data-testid={`text-amount-usd-${payment.id}`}>
                         ${payment.amountUSD}
@@ -165,7 +182,7 @@ export default function PaymentHistory() {
                       onClick={() => openTxExplorer(payment.txHash)}
                       data-testid={`button-view-tx-${payment.id}`}
                     >
-                      <span>View on Blockchain</span>
+                      <span>{t.paymentHistory.viewOnBlockchain}</span>
                       <ArrowUpRight className="h-4 w-4" />
                     </Button>
                   )}

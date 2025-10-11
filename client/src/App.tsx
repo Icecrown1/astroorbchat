@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import NotFound from '@/pages/not-found';
@@ -62,12 +63,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TonConnectUIProvider manifestUrl={manifestUrl}>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </TonConnectUIProvider>
+      <LocaleProvider>
+        <TonConnectUIProvider manifestUrl={manifestUrl}>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </TonConnectUIProvider>
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }

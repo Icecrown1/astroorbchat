@@ -5,6 +5,7 @@ import { FeatureCard } from '@/components/FeatureCard';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
+import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Sparkles,
@@ -21,48 +22,50 @@ import {
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
 
-const FEATURES = [
-  {
-    icon: Moon,
-    title: 'Natal Chart',
-    description: 'Explore your complete birth chart with planetary positions and aspects',
-    energyCost: 2,
-    path: '/natal-chart',
-  },
-  {
-    icon: Sun,
-    title: 'Solar Return',
-    description: 'Your personalized solar chart for today',
-    energyCost: 1,
-    path: '/solar-today',
-  },
-  {
-    icon: Sparkles,
-    title: 'Horoscope',
-    description: 'Daily, weekly, or monthly cosmic forecast',
-    energyCost: 1,
-    path: '/horoscope',
-  },
-  {
-    icon: Heart,
-    title: 'Compatibility',
-    description: 'Analyze relationship dynamics with another person',
-    energyCost: 2,
-    path: '/compatibility',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Ask AI',
-    description: 'Get personalized astrological insights for any question',
-    energyCost: 1,
-    path: '/ask',
-  },
-];
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { energy, setEnergy, setResetAt } = useEnergy();
+  const { t } = useTranslation();
+
+  const FEATURES = [
+    {
+      icon: Moon,
+      title: t.dashboard.natalChart,
+      description: t.dashboard.natalChartDesc,
+      energyCost: 2,
+      path: '/natal-chart',
+    },
+    {
+      icon: Sun,
+      title: t.dashboard.solarReturn,
+      description: t.dashboard.solarReturnDesc,
+      energyCost: 1,
+      path: '/solar-today',
+    },
+    {
+      icon: Sparkles,
+      title: t.dashboard.horoscope,
+      description: t.dashboard.horoscopeDesc,
+      energyCost: 1,
+      path: '/horoscope',
+    },
+    {
+      icon: Heart,
+      title: t.dashboard.compatibility,
+      description: t.dashboard.compatibilityDesc,
+      energyCost: 2,
+      path: '/compatibility',
+    },
+    {
+      icon: MessageCircle,
+      title: t.dashboard.askOracle,
+      description: t.dashboard.askOracleDesc,
+      energyCost: 1,
+      path: '/ask',
+    },
+  ];
 
   const { data, isLoading } = useQuery({
     queryKey: ['/api/user/me'],
@@ -95,10 +98,10 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">
-              Welcome, {user?.name || 'Cosmic Traveler'}
+              {t.auth.welcome.replace('Astro Orb', user?.name || t.dashboard.title)}
             </h1>
             <p className="text-muted-foreground">
-              Your cosmic journey awaits
+              {t.dashboard.subtitle}
             </p>
           </div>
           <Button
@@ -140,7 +143,7 @@ export default function Dashboard() {
             data-testid="button-buy-energy"
           >
             <ShoppingBag className="w-4 h-4 mr-2" />
-            Buy Energy
+            {t.nav.buyEnergy}
           </Button>
           <Button
             variant="outline"
@@ -149,7 +152,7 @@ export default function Dashboard() {
             data-testid="button-subscribe"
           >
             <CreditCard className="w-4 h-4 mr-2" />
-            Subscribe
+            {t.nav.subscribe}
           </Button>
           <Button
             variant="outline"
@@ -158,7 +161,7 @@ export default function Dashboard() {
             data-testid="button-referral"
           >
             <Users className="w-4 h-4 mr-2" />
-            Referrals
+            {t.nav.referral}
           </Button>
           <Button
             variant="outline"
@@ -167,7 +170,7 @@ export default function Dashboard() {
             data-testid="button-payment-history"
           >
             <Receipt className="w-4 h-4 mr-2" />
-            Payments
+            {t.nav.paymentHistory}
           </Button>
         </div>
       </div>

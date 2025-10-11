@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,7 @@ import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/contexts/LocaleContext';
 import { getInitData } from '@/lib/telegram';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
@@ -29,28 +30,33 @@ dayjs.extend(timezone);
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
-const step1Schema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  gender: z.enum(['male', 'female', 'other']),
-  age: z.string().transform((val) => parseInt(val, 10)).pipe(z.number().min(1).max(150)),
-});
-
-const step2Schema = z.object({
-  birthdayDate: z.string().min(1, 'Birth date is required'),
-  birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
-  birthPlace: z.string().optional(),
-});
-
-const step3Schema = z.object({
-  timezone: z.string().min(1, 'Timezone is required'),
-});
-
 export default function Register() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<any>({});
   const [, navigate] = useLocation();
   const { setAuth } = useAuth();
   const { toast } = useToast();
+  const { t, locale } = useTranslation();
+
+  const step1Schema = useMemo(() => z.object({
+    name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),
+    gender: z.enum(['male', 'female', 'other']),
+    age: z.string().transform((val) => parseInt(val, 10)).pipe(
+      z.number()
+        .min(1, locale === 'ru' ? 'Возраст должен быть не менее 1 года' : 'Age must be at least 1')
+        .max(150, locale === 'ru' ? 'Возраст должен быть не более 150 лет' : 'Age must be at most 150')
+    ),
+  }), [locale]);
+
+  const step2Schema = useMemo(() => z.object({
+    birthdayDate: z.string().min(1, locale === 'ru' ? 'Дата рождения обязательна' : 'Birth date is required'),
+    birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
+    birthPlace: z.string().optional(),
+  }), [locale]);
+
+  const step3Schema = useMemo(() => z.object({
+    timezone: z.string().min(1, locale === 'ru' ? 'Часовой пояс обязателен' : 'Timezone is required'),
+  }), [locale]);
 
   const step1Form = useForm({
     resolver: zodResolver(step1Schema),
@@ -121,14 +127,18 @@ export default function Register() {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        throw new Error(locale === 'ru' 
+          ? `Сервер вернул не-JSON ответ: ${text.substring(0, 100)}` 
+          : `Server returned non-JSON response: ${text.substring(0, 100)}`);
       }
 
       const result = await response.json();
       console.log('Registration result:', result);
 
       if (!response.ok) {
-        throw new Error(result.error || `Request failed with status ${response.status}`);
+        throw new Error(result.error || (locale === 'ru' 
+          ? `Запрос не удался со статусом ${response.status}` 
+          : `Request failed with status ${response.status}`));
       }
 
       if (result.ok && result.data) {
@@ -140,17 +150,17 @@ export default function Register() {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         toast({
-          title: 'Welcome to Astro Orb!',
-          description: 'Your cosmic journey begins now.',
+          title: t.auth.welcome,
+          description: t.dashboard.subtitle,
         });
         navigate('/dashboard');
       } else {
-        throw new Error(result.error || 'Registration failed');
+        throw new Error(result.error || (locale === 'ru' ? 'Регистрация не удалась' : 'Registration failed'));
       }
     } catch (error: any) {
       toast({
-        title: 'Registration failed',
-        description: error.message || 'Please try again',
+        title: t.common.error,
+        description: error.message || t.errors.invalidInput,
         variant: 'destructive',
       });
     }
@@ -168,10 +178,10 @@ export default function Register() {
             </div>
           </div>
           <h1 className="text-2xl font-display font-bold text-center mb-2">
-            Welcome to Astro Orb
+            {t.auth.welcome}
           </h1>
           <p className="text-center text-muted-foreground">
-            Step {step} of 3
+            {t.common.next} {step} {t.common.back} 3
           </p>
         </div>
 
@@ -180,11 +190,11 @@ export default function Register() {
         {step === 1 && (
           <form onSubmit={step1Form.handleSubmit(handleStep1)} className="space-y-4">
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t.auth.firstName}</Label>
               <Input
                 id="name"
                 {...step1Form.register('name')}
-                placeholder="Enter your name"
+                placeholder={t.auth.firstName}
                 data-testid="input-name"
               />
               {step1Form.formState.errors.name && (
@@ -195,7 +205,7 @@ export default function Register() {
             </div>
 
             <div>
-              <Label htmlFor="gender">Gender</Label>
+              <Label htmlFor="gender">{t.settings.personalInfo}</Label>
               <Select
                 onValueChange={(value) => step1Form.setValue('gender', value as any)}
                 defaultValue="other"
@@ -204,20 +214,20 @@ export default function Register() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="male">{locale === 'ru' ? 'Мужской' : 'Male'}</SelectItem>
+                  <SelectItem value="female">{locale === 'ru' ? 'Женский' : 'Female'}</SelectItem>
+                  <SelectItem value="other">{locale === 'ru' ? 'Другое' : 'Other'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="age">Age</Label>
+              <Label htmlFor="age">{locale === 'ru' ? 'Возраст' : 'Age'}</Label>
               <Input
                 id="age"
                 type="number"
                 {...step1Form.register('age')}
-                placeholder="Enter your age"
+                placeholder={locale === 'ru' ? 'Введите возраст' : 'Enter your age'}
                 data-testid="input-age"
               />
               {step1Form.formState.errors.age && (
@@ -228,7 +238,7 @@ export default function Register() {
             </div>
 
             <Button type="submit" className="w-full" data-testid="button-next-step1">
-              Next
+              {t.common.next}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </form>
@@ -237,7 +247,7 @@ export default function Register() {
         {step === 2 && (
           <form onSubmit={step2Form.handleSubmit(handleStep2)} className="space-y-4">
             <div>
-              <Label htmlFor="birthdayDate">Birth Date</Label>
+              <Label htmlFor="birthdayDate">{t.auth.birthDate}</Label>
               <Input
                 id="birthdayDate"
                 type="date"
@@ -252,7 +262,7 @@ export default function Register() {
             </div>
 
             <div>
-              <Label htmlFor="birthTime">Birth Time (Optional)</Label>
+              <Label htmlFor="birthTime">{t.auth.birthTime}</Label>
               <Input
                 id="birthTime"
                 type="time"
@@ -263,11 +273,11 @@ export default function Register() {
             </div>
 
             <div>
-              <Label htmlFor="birthPlace">Birth Place (Optional)</Label>
+              <Label htmlFor="birthPlace">{t.auth.birthPlace}</Label>
               <Input
                 id="birthPlace"
                 {...step2Form.register('birthPlace')}
-                placeholder="City, Country"
+                placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
                 data-testid="input-birthplace"
               />
             </div>
@@ -281,10 +291,10 @@ export default function Register() {
                 data-testid="button-back-step2"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                {t.common.back}
               </Button>
               <Button type="submit" className="flex-1" data-testid="button-next-step2">
-                Next
+                {t.common.next}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -294,7 +304,7 @@ export default function Register() {
         {step === 3 && (
           <form onSubmit={step3Form.handleSubmit(handleStep3)} className="space-y-4">
             <div>
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label htmlFor="timezone">{locale === 'ru' ? 'Часовой пояс' : 'Timezone'}</Label>
               <Select
                 onValueChange={(value) => step3Form.setValue('timezone', value)}
                 defaultValue={dayjs.tz.guess()}
@@ -321,10 +331,10 @@ export default function Register() {
                 data-testid="button-back-step3"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                {t.common.back}
               </Button>
               <Button type="submit" className="flex-1" data-testid="button-complete-registration">
-                Complete
+                {locale === 'ru' ? 'Завершить' : 'Complete'}
                 <Sparkles className="w-4 h-4 ml-2" />
               </Button>
             </div>

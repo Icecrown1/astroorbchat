@@ -7,10 +7,12 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sun } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/contexts/LocaleContext';
 
 export default function SolarToday() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [solarData, setSolarData] = useState<any>(null);
 
   const mutation = useMutation({
@@ -22,14 +24,14 @@ export default function SolarToday() {
       setSolarData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
-        title: 'Solar Chart Generated',
-        description: 'Your daily solar return is ready',
+        title: t.solarToday.generated,
+        description: t.solarToday.solarReady,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Generation Failed',
-        description: error.message || 'Please try again',
+        title: t.solarToday.generationFailed,
+        description: error.message || t.compatibility.tryAgain,
         variant: 'destructive',
       });
     },
@@ -48,8 +50,8 @@ export default function SolarToday() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Solar Return</h1>
-            <p className="text-muted-foreground">Today's cosmic energy</p>
+            <h1 className="text-2xl font-display font-bold">{t.solarToday.title}</h1>
+            <p className="text-muted-foreground">{t.solarToday.subtitle}</p>
           </div>
         </div>
 
@@ -59,12 +61,12 @@ export default function SolarToday() {
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-4/20 to-chart-2/20 mb-4">
                 <Sun className="w-12 h-12 text-chart-4" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Generate Solar Return</h2>
+              <h2 className="text-xl font-semibold mb-2">{t.solarToday.generateTitle}</h2>
               <p className="text-muted-foreground mb-4">
-                Discover how the Sun's position influences your day
+                {t.solarToday.generateDescription}
               </p>
               <p className="text-sm text-primary font-medium">
-                Cost: 1 Energy Orb
+                {t.solarToday.costOne}
               </p>
             </div>
             <Button
@@ -76,12 +78,12 @@ export default function SolarToday() {
               {mutation.isPending ? (
                 <>
                   <Loader className="mr-2" size="sm" />
-                  Calculating...
+                  {t.solarToday.calculating}
                 </>
               ) : (
                 <>
                   <Sun className="w-4 h-4 mr-2" />
-                  Generate Chart
+                  {t.solarToday.generate}
                 </>
               )}
             </Button>
@@ -91,7 +93,7 @@ export default function SolarToday() {
         {solarData && (
           <div className="space-y-6">
             <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Today's Solar Influence</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.solarToday.todaysInfluence}</h2>
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <p className="text-foreground leading-relaxed whitespace-pre-line">
                   {solarData.interpretation}
@@ -101,7 +103,7 @@ export default function SolarToday() {
 
             {solarData.insights && solarData.insights.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Key Insights</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.solarToday.keyInsights}</h2>
                 <div className="space-y-3">
                   {solarData.insights.map((insight: string, index: number) => (
                     <div
@@ -122,7 +124,7 @@ export default function SolarToday() {
               onClick={() => setSolarData(null)}
               data-testid="button-regenerate"
             >
-              Refresh Solar Return
+              {t.solarToday.refresh}
             </Button>
           </div>
         )}

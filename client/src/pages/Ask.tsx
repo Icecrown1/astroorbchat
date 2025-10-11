@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,15 +12,19 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-
-const askSchema = z.object({
-  question: z.string().min(10, 'Question must be at least 10 characters'),
-});
+import { useTranslation } from '@/contexts/LocaleContext';
 
 export default function Ask() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t, locale } = useTranslation();
   const [answer, setAnswer] = useState<string | null>(null);
+
+  const askSchema = useMemo(() => z.object({
+    question: z.string()
+      .min(1, locale === 'ru' ? 'Пожалуйста, введите ваш вопрос' : 'Please enter your question')
+      .min(10, locale === 'ru' ? 'Вопрос должен содержать минимум 10 символов' : 'Question must be at least 10 characters'),
+  }), [locale]);
 
   const form = useForm({
     resolver: zodResolver(askSchema),
@@ -40,14 +44,14 @@ export default function Ask() {
       setAnswer(data.answer);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
-        title: 'Answer Received',
-        description: 'Your cosmic guidance is ready',
+        title: t.ask.answerReceived,
+        description: t.ask.answerReady,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Request Failed',
-        description: error.message || 'Please try again',
+        title: t.ask.requestFailed,
+        description: error.message || t.ask.tryAgain,
         variant: 'destructive',
       });
     },
@@ -66,8 +70,8 @@ export default function Ask() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Ask AI</h1>
-            <p className="text-muted-foreground">Get personalized insights</p>
+            <h1 className="text-2xl font-display font-bold">{t.ask.askAI}</h1>
+            <p className="text-muted-foreground">{t.ask.getInsights}</p>
           </div>
         </div>
 
@@ -76,22 +80,22 @@ export default function Ask() {
             <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
               <MessageCircle className="w-12 h-12 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Ask Your Question</h2>
+            <h2 className="text-xl font-semibold mb-2">{t.ask.askYourQuestion}</h2>
             <p className="text-muted-foreground mb-4">
-              Get AI-powered astrological insights for any question
+              {t.ask.aiInsights}
             </p>
             <p className="text-sm text-primary font-medium mb-6">
-              Cost: 1 Energy Orb
+              {t.ask.costOne}
             </p>
           </div>
 
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <div>
-              <Label htmlFor="question">Your Question</Label>
+              <Label htmlFor="question">{t.ask.yourQuestion}</Label>
               <Textarea
                 id="question"
                 {...form.register('question')}
-                placeholder="Ask anything about your life, relationships, career, or future..."
+                placeholder={t.ask.questionPlaceholder}
                 rows={6}
                 data-testid="textarea-question"
               />
@@ -112,12 +116,12 @@ export default function Ask() {
               {mutation.isPending ? (
                 <>
                   <Loader className="mr-2" size="sm" />
-                  Thinking...
+                  {t.ask.thinking}
                 </>
               ) : (
                 <>
                   <MessageCircle className="w-4 h-4 mr-2" />
-                  Get Answer
+                  {t.ask.getAnswer}
                 </>
               )}
             </Button>
@@ -126,7 +130,7 @@ export default function Ask() {
 
         {answer && (
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Cosmic Guidance</h2>
+            <h2 className="text-lg font-semibold mb-4">{t.ask.cosmicGuidance}</h2>
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <p className="text-foreground leading-relaxed whitespace-pre-line">
                 {answer}
@@ -141,7 +145,7 @@ export default function Ask() {
               }}
               data-testid="button-ask-another"
             >
-              Ask Another Question
+              {t.ask.askAnother}
             </Button>
           </Card>
         )}

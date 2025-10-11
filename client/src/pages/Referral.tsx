@@ -8,11 +8,13 @@ import { ArrowLeft, Users, Copy, Share2, Gift } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
+import { useTranslation } from '@/contexts/LocaleContext';
 
 export default function Referral() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t, locale } = useTranslation();
 
   const { data, isLoading } = useQuery({
     queryKey: ['/api/referral/code'],
@@ -27,15 +29,17 @@ export default function Referral() {
       await navigator.clipboard.writeText(referralLink);
       hapticFeedback('success');
       toast({
-        title: 'Copied!',
-        description: 'Referral link copied to clipboard',
+        title: t.referral.copied,
+        description: locale === 'ru' ? 'Реферальная ссылка скопирована' : 'Referral link copied to clipboard',
       });
     }
   };
 
   const handleShare = () => {
     if (referralLink) {
-      const text = `Join me on Astro Orb for AI-powered astrology readings! ${referralLink}`;
+      const text = locale === 'ru' 
+        ? `Присоединяйся ко мне в Astro Orb для астрологических прогнозов с ИИ! ${referralLink}`
+        : `Join me on Astro Orb for AI-powered astrology readings! ${referralLink}`;
       if (navigator.share) {
         navigator.share({
           title: 'Astro Orb',
@@ -70,8 +74,8 @@ export default function Referral() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Referrals</h1>
-            <p className="text-muted-foreground">Share the cosmic love</p>
+            <h1 className="text-2xl font-display font-bold">{t.referral.title}</h1>
+            <p className="text-muted-foreground">{t.referral.subtitle}</p>
           </div>
         </div>
 
@@ -80,9 +84,9 @@ export default function Referral() {
             <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
               <Users className="w-12 h-12 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Invite Friends</h2>
+            <h2 className="text-xl font-semibold mb-2">{t.referral.step1}</h2>
             <p className="text-muted-foreground">
-              Share Astro Orb and earn energy orbs for every friend who joins
+              {t.referral.step1Desc}
             </p>
           </div>
 
@@ -92,7 +96,7 @@ export default function Referral() {
                 <Gift className="w-8 h-8 text-chart-3" />
                 <div>
                   <p className="text-2xl font-bold">+5</p>
-                  <p className="text-sm text-muted-foreground">Per signup</p>
+                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'За регистрацию' : 'Per signup'}</p>
                 </div>
               </div>
             </Card>
@@ -101,7 +105,7 @@ export default function Referral() {
                 <Gift className="w-8 h-8 text-chart-4" />
                 <div>
                   <p className="text-2xl font-bold">+10</p>
-                  <p className="text-sm text-muted-foreground">Per subscription</p>
+                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'За подписку' : 'Per subscription'}</p>
                 </div>
               </div>
             </Card>
@@ -119,14 +123,14 @@ export default function Referral() {
                   data-testid="button-copy-link"
                 >
                   <Copy className="w-4 h-4 mr-2" />
-                  Copy Link
+                  {t.referral.copy}
                 </Button>
                 <Button
                   onClick={handleShare}
                   data-testid="button-share-link"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
-                  Share
+                  {locale === 'ru' ? 'Поделиться' : 'Share'}
                 </Button>
               </div>
             </div>
@@ -135,7 +139,7 @@ export default function Referral() {
 
         {data?.data?.referrals && data.data.referrals.length > 0 && (
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Your Referrals</h2>
+            <h2 className="text-lg font-semibold mb-4">{t.referral.yourReferrals}</h2>
             <div className="space-y-2">
               {data.data.referrals.map((referral: any, index: number) => (
                 <div
@@ -145,11 +149,11 @@ export default function Referral() {
                   <div>
                     <p className="font-medium">{referral.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Joined {new Date(referral.createdAt).toLocaleDateString()}
+                      {locale === 'ru' ? 'Регистрация' : 'Joined'} {new Date(referral.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <Badge>
-                    +{referral.subscription ? '15' : '5'} orbs
+                    +{referral.subscription ? '15' : '5'} {t.common.orbs}
                   </Badge>
                 </div>
               ))}

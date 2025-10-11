@@ -7,6 +7,7 @@ import { Loader2, Users, DollarSign, CreditCard, TrendingUp, Zap, Settings } fro
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/contexts/LocaleContext";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ interface User {
 }
 
 export default function Admin() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [energyAmount, setEnergyAmount] = useState("");
@@ -60,12 +62,12 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Energy updated successfully" });
+      toast({ title: t.admin.energyUpdatedSuccess });
       setSelectedUser(null);
       setEnergyAmount("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update energy", description: error.message, variant: "destructive" });
+      toast({ title: t.admin.energyUpdateFailed, description: error.message, variant: "destructive" });
     },
   });
 
@@ -75,13 +77,13 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Subscription updated successfully" });
+      toast({ title: t.admin.subscriptionUpdatedSuccess });
       setSelectedUser(null);
       setSubscriptionTier("");
       setSubscriptionStatus("");
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update subscription", description: error.message, variant: "destructive" });
+      toast({ title: t.admin.subscriptionUpdateFailed, description: error.message, variant: "destructive" });
     },
   });
 
@@ -101,15 +103,15 @@ export default function Admin() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-admin-title">Admin Panel</h1>
-            <p className="text-muted-foreground mt-1">Manage users and view system statistics</p>
+            <h1 className="text-3xl font-bold" data-testid="text-admin-title">{t.admin.title}</h1>
+            <p className="text-muted-foreground mt-1">{t.admin.subtitle}</p>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-total-users">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.admin.totalUsers}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -119,7 +121,7 @@ export default function Admin() {
 
           <Card data-testid="card-total-revenue">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.admin.totalRevenue}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -129,7 +131,7 @@ export default function Admin() {
 
           <Card data-testid="card-active-subs">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.admin.activeSubscriptions}</CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -139,7 +141,7 @@ export default function Admin() {
 
           <Card data-testid="card-total-payments">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Payments</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.admin.totalPayments}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -150,8 +152,8 @@ export default function Admin() {
 
         <Card>
           <CardHeader>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>View and manage all users</CardDescription>
+            <CardTitle>{t.admin.userManagement}</CardTitle>
+            <CardDescription>{t.admin.viewManageUsers}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -164,7 +166,7 @@ export default function Admin() {
                   <div className="flex-1">
                     <p className="font-medium" data-testid={`text-user-name-${user.id}`}>{user.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Energy: <span data-testid={`text-user-energy-${user.id}`}>{user.energy}</span> orbs
+                      {t.common.energy}: <span data-testid={`text-user-energy-${user.id}`}>{user.energy}</span> {t.common.orbs}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -177,18 +179,18 @@ export default function Admin() {
                           data-testid={`button-edit-energy-${user.id}`}
                         >
                           <Zap className="h-4 w-4 mr-1" />
-                          Energy
+                          {t.common.energy}
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Update Energy</DialogTitle>
-                          <DialogDescription>Set new energy amount for {user.name}</DialogDescription>
+                          <DialogTitle>{t.admin.updateEnergy}</DialogTitle>
+                          <DialogDescription>{t.admin.setEnergyAmount} {user.name}</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <Input
                             type="number"
-                            placeholder="Energy amount"
+                            placeholder={t.common.energy}
                             value={energyAmount}
                             onChange={(e) => setEnergyAmount(e.target.value)}
                             data-testid="input-energy-amount"
@@ -206,7 +208,7 @@ export default function Admin() {
                             disabled={updateEnergyMutation.isPending}
                             data-testid="button-save-energy"
                           >
-                            {updateEnergyMutation.isPending ? "Updating..." : "Update Energy"}
+                            {updateEnergyMutation.isPending ? t.admin.updating : t.admin.updateEnergy}
                           </Button>
                         </div>
                       </DialogContent>
@@ -221,28 +223,28 @@ export default function Admin() {
                           data-testid={`button-edit-subscription-${user.id}`}
                         >
                           <Settings className="h-4 w-4 mr-1" />
-                          Subscription
+                          {t.common.subscription}
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Update Subscription</DialogTitle>
-                          <DialogDescription>Manage subscription for {user.name}</DialogDescription>
+                          <DialogTitle>{t.admin.updateSubscription}</DialogTitle>
+                          <DialogDescription>{t.admin.manageSubscription} {user.name}</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <Select value={subscriptionTier} onValueChange={setSubscriptionTier}>
                             <SelectTrigger data-testid="select-subscription-tier">
-                              <SelectValue placeholder="Select tier" />
+                              <SelectValue placeholder={t.admin.selectTier} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="standard">Standard</SelectItem>
-                              <SelectItem value="pro">Pro</SelectItem>
+                              <SelectItem value="standard">{t.subscribe.standard}</SelectItem>
+                              <SelectItem value="pro">{t.subscribe.pro}</SelectItem>
                             </SelectContent>
                           </Select>
 
                           <Select value={subscriptionStatus} onValueChange={setSubscriptionStatus}>
                             <SelectTrigger data-testid="select-subscription-status">
-                              <SelectValue placeholder="Select status" />
+                              <SelectValue placeholder={t.admin.selectStatus} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="active">Active</SelectItem>
@@ -265,7 +267,7 @@ export default function Admin() {
                             disabled={updateSubscriptionMutation.isPending}
                             data-testid="button-save-subscription"
                           >
-                            {updateSubscriptionMutation.isPending ? "Updating..." : "Update Subscription"}
+                            {updateSubscriptionMutation.isPending ? t.admin.updating : t.admin.updateSubscription}
                           </Button>
                         </div>
                       </DialogContent>
@@ -276,7 +278,7 @@ export default function Admin() {
 
               {users.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground" data-testid="text-no-users">
-                  No users found
+                  {t.admin.noUsers}
                 </div>
               )}
             </div>

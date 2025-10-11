@@ -9,6 +9,7 @@ import { ArrowLeft, ShoppingBag, Sparkles, Check } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction } from '@/lib/ton';
+import { useTranslation } from '@/contexts/LocaleContext';
 
 const ENERGY_PACKS = [
   { amount: 20, usdPrice: 2.99, popular: false },
@@ -19,6 +20,7 @@ const ENERGY_PACKS = [
 export default function BuyEnergy() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
 
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
@@ -32,7 +34,7 @@ export default function BuyEnergy() {
         energyAmount: pack.amount,
         amountUSD: pack.usdPrice,
       });
-      if (!response.ok) throw new Error(response.error || 'Failed to create payment');
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
     onSuccess: async (data, pack) => {
@@ -44,22 +46,22 @@ export default function BuyEnergy() {
         );
         queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
         toast({
-          title: 'Purchase Successful',
-          description: `${pack.amount} energy orbs added to your account`,
+          title: t.common.success,
+          description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
         });
         navigate('/dashboard');
       } catch (error: any) {
         toast({
-          title: 'Transaction Failed',
-          description: error.message || 'Please try again',
+          title: t.common.error,
+          description: error.message || t.errors.calculationFailed,
           variant: 'destructive',
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: 'Payment Failed',
-        description: error.message || 'Please try again',
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
         variant: 'destructive',
       });
     },
@@ -85,8 +87,8 @@ export default function BuyEnergy() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Buy Energy</h1>
-            <p className="text-muted-foreground">Recharge your cosmic power</p>
+            <h1 className="text-2xl font-display font-bold">{t.buyEnergy.title}</h1>
+            <p className="text-muted-foreground">{t.buyEnergy.subtitle}</p>
           </div>
         </div>
 
@@ -96,7 +98,7 @@ export default function BuyEnergy() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
-            {ENERGY_PACKS.map((pack) => (
+            {ENERGY_PACKS.map((pack, index) => (
               <Card
                 key={pack.amount}
                 className={`p-6 cursor-pointer transition-all hover-elevate ${
@@ -107,7 +109,7 @@ export default function BuyEnergy() {
               >
                 {pack.popular && (
                   <Badge className="absolute -top-2 -right-2 bg-chart-4">
-                    Best Value
+                    {t.subscribe.mostPopular}
                   </Badge>
                 )}
 
@@ -116,7 +118,7 @@ export default function BuyEnergy() {
                     <Sparkles className="w-8 h-8 text-chart-3" />
                   </div>
                   <h3 className="text-3xl font-bold mb-1">{pack.amount}</h3>
-                  <p className="text-sm text-muted-foreground">Energy Orbs</p>
+                  <p className="text-sm text-muted-foreground">{t.common.energy} {t.common.orbs}</p>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -141,13 +143,13 @@ export default function BuyEnergy() {
                   {mutation.isPending && selectedPack === pack.amount ? (
                     <>
                       <Loader className="mr-2" size="sm" />
-                      Processing...
+                      {t.buyEnergy.purchasing}
                     </>
                   ) : (
                     <>
                       {selectedPack === pack.amount && <Check className="w-4 h-4 mr-2" />}
                       <ShoppingBag className="w-4 h-4 mr-2" />
-                      Buy Now
+                      {t.buyEnergy.purchaseWith}
                     </>
                   )}
                 </Button>
@@ -158,7 +160,12 @@ export default function BuyEnergy() {
 
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
-            Payments are processed securely via TON blockchain. Your energy will be added instantly after confirmation.
+            {t.subscribe.mostPopular === t.subscribe.mostPopular ? 
+              (t.common.energy === 'Energy' ? 
+                'Payments are processed securely via TON blockchain. Your energy will be added instantly after confirmation.' :
+                'Платежи обрабатываются безопасно через блокчейн TON. Ваша энергия будет добавлена мгновенно после подтверждения.'
+              ) : ''
+            }
           </p>
         </Card>
       </div>

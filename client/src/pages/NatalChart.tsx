@@ -8,6 +8,7 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/contexts/LocaleContext';
 import {
   Accordion,
   AccordionContent,
@@ -18,6 +19,7 @@ import {
 export default function NatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [chartData, setChartData] = useState<any>(null);
 
   const mutation = useMutation({
@@ -29,14 +31,14 @@ export default function NatalChart() {
       setChartData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
-        title: 'Natal Chart Generated',
-        description: 'Your cosmic blueprint is ready',
+        title: t.natalChart.generated,
+        description: t.natalChart.blueprintReady,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Generation Failed',
-        description: error.message || 'Please try again',
+        title: t.natalChart.generationFailed,
+        description: error.message || t.compatibility.tryAgain,
         variant: 'destructive',
       });
     },
@@ -55,8 +57,8 @@ export default function NatalChart() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Natal Chart</h1>
-            <p className="text-muted-foreground">Your cosmic blueprint</p>
+            <h1 className="text-2xl font-display font-bold">{t.natalChart.title}</h1>
+            <p className="text-muted-foreground">{t.natalChart.subtitle}</p>
           </div>
         </div>
 
@@ -66,12 +68,12 @@ export default function NatalChart() {
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
                 <Sparkles className="w-12 h-12 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Generate Your Natal Chart</h2>
+              <h2 className="text-xl font-semibold mb-2">{t.natalChart.generateTitle}</h2>
               <p className="text-muted-foreground mb-4">
-                Discover the planetary positions at the moment of your birth
+                {t.natalChart.generateDescription}
               </p>
               <p className="text-sm text-primary font-medium">
-                Cost: 2 Energy Orbs
+                {t.natalChart.costTwo}
               </p>
             </div>
             <Button
@@ -83,12 +85,12 @@ export default function NatalChart() {
               {mutation.isPending ? (
                 <>
                   <Loader className="mr-2" size="sm" />
-                  Calculating...
+                  {t.natalChart.calculating}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Generate Chart
+                  {t.natalChart.generate}
                 </>
               )}
             </Button>
@@ -98,7 +100,7 @@ export default function NatalChart() {
         {chartData && (
           <div className="space-y-6">
             <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Chart Visualization</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.natalChart.chartVisualization}</h2>
               <ChartCanvas
                 planets={chartData.planets || []}
                 aspects={chartData.aspects || []}
@@ -106,7 +108,7 @@ export default function NatalChart() {
             </Card>
 
             <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Interpretation</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.natalChart.interpretation}</h2>
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <p className="text-foreground leading-relaxed whitespace-pre-line">
                   {chartData.interpretation}
@@ -116,7 +118,7 @@ export default function NatalChart() {
 
             {chartData.planets && chartData.planets.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Planetary Positions</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.natalChart.planetaryPositions}</h2>
                 <Accordion type="single" collapsible>
                   {chartData.planets.map((planet: any, index: number) => (
                     <AccordionItem key={index} value={`planet-${index}`}>
@@ -130,7 +132,7 @@ export default function NatalChart() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <p className="text-sm text-muted-foreground">
-                          {planet.meaning || 'Planetary influence in your chart'}
+                          {planet.meaning || t.natalChart.planetaryInfluence}
                         </p>
                       </AccordionContent>
                     </AccordionItem>
@@ -141,7 +143,7 @@ export default function NatalChart() {
 
             {chartData.aspects && chartData.aspects.length > 0 && (
               <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Major Aspects</h2>
+                <h2 className="text-lg font-semibold mb-4">{t.natalChart.majorAspects}</h2>
                 <div className="space-y-2">
                   {chartData.aspects.map((aspect: any, index: number) => (
                     <div
@@ -166,7 +168,7 @@ export default function NatalChart() {
               onClick={() => setChartData(null)}
               data-testid="button-regenerate"
             >
-              Generate New Chart
+              {t.natalChart.generateNew}
             </Button>
           </div>
         )}

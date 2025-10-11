@@ -9,6 +9,7 @@ import { ArrowLeft, CreditCard, Check, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction } from '@/lib/ton';
+import { useTranslation } from '@/contexts/LocaleContext';
 
 const SUBSCRIPTION_TIERS = [
   {
@@ -31,6 +32,7 @@ const SUBSCRIPTION_TIERS = [
 export default function Subscribe() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t, locale } = useTranslation();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
@@ -50,7 +52,7 @@ export default function Subscribe() {
         tier: tier.tier,
         amountUSD: tier.price,
       });
-      if (!response.ok) throw new Error(response.error || 'Failed to create payment');
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
     onSuccess: async (data, tier) => {
@@ -62,22 +64,22 @@ export default function Subscribe() {
         );
         queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
         toast({
-          title: 'Subscription Activated',
-          description: `Welcome to ${tier.name}! Enjoy ${tier.dailyEnergy} orbs daily.`,
+          title: t.common.success,
+          description: `${tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}! ${tier.dailyEnergy} ${t.common.orbs}`,
         });
         navigate('/dashboard');
       } catch (error: any) {
         toast({
-          title: 'Transaction Failed',
-          description: error.message || 'Please try again',
+          title: t.common.error,
+          description: error.message || t.errors.calculationFailed,
           variant: 'destructive',
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: 'Subscription Failed',
-        description: error.message || 'Please try again',
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
         variant: 'destructive',
       });
     },
@@ -88,6 +90,36 @@ export default function Subscribe() {
       return (usdPrice / pricesData.data.tonRate).toFixed(2);
     }
     return (usdPrice / 7.5).toFixed(2);
+  };
+
+  const getLocalizedFeatures = (tier: string) => {
+    if (tier === 'standard') {
+      return locale === 'ru' ? [
+        '100 сфер энергии ежедневно',
+        'Все функции астрологии',
+        'Ежедневный гороскоп',
+        'Базовая поддержка'
+      ] : [
+        '100 energy orbs daily',
+        'All astrology features',
+        'Daily horoscope',
+        'Basic support'
+      ];
+    } else {
+      return locale === 'ru' ? [
+        '250 сфер энергии ежедневно',
+        'Все функции астрологии',
+        'Приоритетные ответы ИИ',
+        'Премиум поддержка',
+        'Продвинутые прозрения'
+      ] : [
+        '250 energy orbs daily',
+        'All astrology features',
+        'Priority AI responses',
+        'Premium support',
+        'Advanced insights'
+      ];
+    }
   };
 
   return (
@@ -103,8 +135,8 @@ export default function Subscribe() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">Subscription</h1>
-            <p className="text-muted-foreground">Unlock unlimited cosmic power</p>
+            <h1 className="text-2xl font-display font-bold">{t.subscribe.title}</h1>
+            <p className="text-muted-foreground">{t.subscribe.subtitle}</p>
           </div>
         </div>
 
@@ -112,12 +144,12 @@ export default function Subscribe() {
           <Card className="p-4 mb-6 bg-chart-3/10 border-chart-3/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">Current Plan: {currentSubscription.tier}</p>
+                <p className="font-medium">{t.subscribe.currentPlan}: {currentSubscription.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}</p>
                 <p className="text-sm text-muted-foreground">
-                  Active until {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
+                  {locale === 'ru' ? 'Активна до' : 'Active until'} {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
                 </p>
               </div>
-              <Badge className="bg-chart-3">Active</Badge>
+              <Badge className="bg-chart-3">{locale === 'ru' ? 'Активна' : 'Active'}</Badge>
             </div>
           </Card>
         )}
@@ -139,27 +171,29 @@ export default function Subscribe() {
               >
                 {tier.popular && (
                   <Badge className="absolute -top-2 -right-2 bg-primary">
-                    Most Popular
+                    {t.subscribe.mostPopular}
                   </Badge>
                 )}
 
                 <div className="mb-6">
-                  <h3 className="text-2xl font-display font-bold mb-2">{tier.name}</h3>
+                  <h3 className="text-2xl font-display font-bold mb-2">
+                    {tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}
+                  </h3>
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-4xl font-bold">${tier.price}</span>
-                    <span className="text-muted-foreground">/month</span>
+                    <span className="text-muted-foreground">{t.subscribe.perMonth}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    ≈ {getTonPrice(tier.price)} TON/month
+                    ≈ {getTonPrice(tier.price)} TON{t.subscribe.perMonth}
                   </p>
                 </div>
 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
                     <Sparkles className="w-5 h-5 text-chart-3" />
-                    <span className="font-bold">{tier.dailyEnergy} orbs daily</span>
+                    <span className="font-bold">{tier.dailyEnergy} {t.common.orbs} {locale === 'ru' ? 'ежедневно' : 'daily'}</span>
                   </div>
-                  {tier.features.map((feature, index) => (
+                  {getLocalizedFeatures(tier.tier).map((feature, index) => (
                     <div key={index} className="flex items-start gap-2">
                       <Check className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
                       <span className="text-sm">{feature}</span>
@@ -180,14 +214,14 @@ export default function Subscribe() {
                   {mutation.isPending && selectedTier === tier.tier ? (
                     <>
                       <Loader className="mr-2" size="sm" />
-                      Processing...
+                      {t.subscribe.subscribing}
                     </>
                   ) : currentSubscription?.tier === tier.tier ? (
-                    'Current Plan'
+                    t.subscribe.currentPlan
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4 mr-2" />
-                      Subscribe
+                      {t.subscribe.subscribeWith}
                     </>
                   )}
                 </Button>
@@ -198,7 +232,10 @@ export default function Subscribe() {
 
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
-            Subscriptions are billed monthly via TON blockchain. Cancel anytime. Energy resets daily at midnight.
+            {locale === 'ru' 
+              ? 'Подписка оплачивается ежемесячно через блокчейн TON. Отмена в любое время. Энергия обновляется ежедневно в полночь.'
+              : 'Subscriptions are billed monthly via TON blockchain. Cancel anytime. Energy resets daily at midnight.'
+            }
           </p>
         </Card>
       </div>
