@@ -18,25 +18,13 @@ export function calculateNatalChart(birthDate: Date, birthTime?: string) {
   const aspects: Array<{ planet1: string; planet2: string; type: string; angle: number }> = [];
 
   try {
-    const jd = julian.CalendarGregorianToJD(
-      birthDate.getFullYear(),
-      birthDate.getMonth() + 1,
-      birthDate.getDate()
-    );
-
     PLANETS.forEach((planetName) => {
       try {
-        let bodyName = planetName as any;
-        if (planetName === 'Sun') bodyName = 'Sun';
-        else if (planetName === 'Moon') bodyName = 'Moon';
-        else if (planetName === 'Mercury') bodyName = 'Mercury';
-        else if (planetName === 'Venus') bodyName = 'Venus';
-        else if (planetName === 'Mars') bodyName = 'Mars';
-        else if (planetName === 'Jupiter') bodyName = 'Jupiter';
-        else if (planetName === 'Saturn') bodyName = 'Saturn';
-
-        const equ = (AstronomyEngine as any).Equator((AstronomyEngine as any).Body[bodyName], birthDate);
-        const longitude = (equ.ra * 15) % 360;
+        const bodyName = planetName as keyof typeof AstronomyEngine.Body;
+        const body = AstronomyEngine.Body[bodyName];
+        
+        const ecliptic = AstronomyEngine.Ecliptic(body, birthDate);
+        const longitude = (ecliptic.elon + 360) % 360;
 
         planets.push({
           name: planetName,
@@ -104,8 +92,8 @@ export function calculateSolarReturn(birthDate: Date) {
   const solarDate = new Date(solarYear, birthDate.getMonth(), birthDate.getDate());
 
   try {
-    const equ = (AstronomyEngine as any).Equator((AstronomyEngine as any).Body.Sun, solarDate);
-    const longitude = (equ.ra * 15) % 360;
+    const ecliptic = AstronomyEngine.Ecliptic(AstronomyEngine.Body.Sun, solarDate);
+    const longitude = (ecliptic.elon + 360) % 360;
 
     return {
       position: longitude,
