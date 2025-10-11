@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
+import { useEffect } from 'react';
 
 dayjs.extend(timezone);
 
@@ -58,15 +59,31 @@ export default function Settings() {
   const form = useForm({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      name: user?.name || '',
-      gender: (user?.gender as any) || 'other',
-      age: user?.age?.toString() || '',
-      birthdayDate: user?.birthdayDate ? dayjs(user.birthdayDate).format('YYYY-MM-DD') : '',
-      birthTime: user?.birthTime || '',
-      birthPlace: user?.birthPlace || '',
-      timezone: user?.timezone || dayjs.tz.guess(),
+      name: '',
+      gender: 'other' as any,
+      age: '',
+      birthdayDate: '',
+      birthTime: '',
+      birthPlace: '',
+      timezone: dayjs.tz.guess(),
     },
   });
+
+  // Update form when data is loaded
+  useEffect(() => {
+    if (data?.data) {
+      const userData = data.data;
+      form.reset({
+        name: userData.name || '',
+        gender: (userData.gender as any) || 'other',
+        age: userData.age?.toString() || '',
+        birthdayDate: userData.birthdayDate ? dayjs(userData.birthdayDate).format('YYYY-MM-DD') : '',
+        birthTime: userData.birthTime || '',
+        birthPlace: userData.birthPlace || '',
+        timezone: userData.timezone || dayjs.tz.guess(),
+      });
+    }
+  }, [data, form.reset]);
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
@@ -143,7 +160,7 @@ export default function Settings() {
               <Label htmlFor="gender">Gender</Label>
               <Select
                 onValueChange={(value) => form.setValue('gender', value as any)}
-                defaultValue={user?.gender || 'other'}
+                value={form.watch('gender')}
               >
                 <SelectTrigger id="gender" data-testid="select-gender">
                   <SelectValue />
@@ -211,7 +228,7 @@ export default function Settings() {
               <Label htmlFor="timezone">Timezone</Label>
               <Select
                 onValueChange={(value) => form.setValue('timezone', value)}
-                defaultValue={user?.timezone || dayjs.tz.guess()}
+                value={form.watch('timezone')}
               >
                 <SelectTrigger id="timezone" data-testid="select-timezone">
                   <SelectValue />
