@@ -98,7 +98,19 @@ export default function Register() {
 
     try {
       const initData = getInitData();
-      const response = await apiRequest('POST', '/api/auth/telegram', { initData, ...finalData });
+      
+      // Use test endpoint in development or when no valid initData
+      const isProduction = import.meta.env.PROD;
+      const hasValidInitData = initData && initData.length > 0;
+      
+      let response;
+      if (!isProduction || !hasValidInitData) {
+        // Development mode - use test endpoint
+        response = await apiRequest('POST', '/api/auth/test', finalData);
+      } else {
+        // Production mode with valid Telegram data
+        response = await apiRequest('POST', '/api/auth/telegram', { initData, ...finalData });
+      }
 
       if (response.ok && response.data) {
         setAuth(response.data.user, response.data.token);
