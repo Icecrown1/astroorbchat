@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, LogOut, Trash2 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
@@ -39,7 +39,17 @@ const settingsSchema = z.object({
 export default function Settings() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, clearAuth } = useAuth();
+
+  const handleLogoutAndClear = () => {
+    clearAuth();
+    queryClient.clear();
+    toast({
+      title: 'Logged Out',
+      description: 'You can now test registration again',
+    });
+    navigate('/register');
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['/api/user/me'],
@@ -237,6 +247,32 @@ export default function Settings() {
             </Button>
           </form>
         </Card>
+
+        {!import.meta.env.PROD && (
+          <Card className="p-6 mt-6 border-destructive/50">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-destructive">Development Panel</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tools for testing and development
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                variant="destructive"
+                onClick={handleLogoutAndClear}
+                className="w-full"
+                data-testid="button-dev-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout & Clear Data
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                This will log you out and clear all local data. Use this to test registration again.
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
