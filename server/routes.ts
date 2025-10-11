@@ -42,6 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthPlace: birthPlace || null,
           timezone: timezone || "Europe/Moscow",
           referralCode,
+          energy: 10,
           energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
         });
 
@@ -91,6 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthPlace: birthPlace || null,
           timezone: timezone || "America/New_York",
           referralCode,
+          energy: 10,
           energyResetAt: getNextResetTime(timezone || "America/New_York"),
         };
 
