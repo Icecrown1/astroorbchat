@@ -1,16 +1,55 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
+import { Switch, Route, useLocation } from 'wouter';
+import { useEffect } from 'react';
+import { queryClient } from './lib/queryClient';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { initTelegram } from '@/lib/telegram';
+import { useAuth } from '@/store/useAuth';
+import NotFound from '@/pages/not-found';
+import Register from '@/pages/Register';
+import Dashboard from '@/pages/Dashboard';
+import NatalChart from '@/pages/NatalChart';
+import SolarToday from '@/pages/SolarToday';
+import Horoscope from '@/pages/Horoscope';
+import Compatibility from '@/pages/Compatibility';
+import Ask from '@/pages/Ask';
+import BuyEnergy from '@/pages/BuyEnergy';
+import Subscribe from '@/pages/Subscribe';
+import Referral from '@/pages/Referral';
+import Settings from '@/pages/Settings';
+
+const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
 function Router() {
+  const { isAuthenticated } = useAuth();
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    initTelegram();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated && location !== '/register') {
+      navigate('/register');
+    }
+  }, [isAuthenticated, location, navigate]);
+
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/register" component={Register} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/natal-chart" component={NatalChart} />
+      <Route path="/solar-today" component={SolarToday} />
+      <Route path="/horoscope" component={Horoscope} />
+      <Route path="/compatibility" component={Compatibility} />
+      <Route path="/ask" component={Ask} />
+      <Route path="/buy-energy" component={BuyEnergy} />
+      <Route path="/subscribe" component={Subscribe} />
+      <Route path="/referral" component={Referral} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/" component={isAuthenticated ? Dashboard : Register} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -19,10 +58,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <TonConnectUIProvider manifestUrl={manifestUrl}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </TonConnectUIProvider>
     </QueryClientProvider>
   );
 }

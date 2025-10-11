@@ -1,0 +1,299 @@
+import { useState } from 'react';
+import { useLocation } from 'wouter';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/store/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { getInitData } from '@/lib/telegram';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONES = Intl.supportedValuesOf('timeZone');
+
+const step1Schema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  gender: z.enum(['male', 'female', 'other']),
+  age: z.string().transform((val) => parseInt(val, 10)).pipe(z.number().min(1).max(150)),
+});
+
+const step2Schema = z.object({
+  birthdayDate: z.string().min(1, 'Birth date is required'),
+  birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
+  birthPlace: z.string().optional(),
+});
+
+const step3Schema = z.object({
+  timezone: z.string().min(1, 'Timezone is required'),
+});
+
+export default function Register() {
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState<any>({});
+  const [, navigate] = useLocation();
+  const { setAuth } = useAuth();
+  const { toast } = useToast();
+
+  const step1Form = useForm({
+    resolver: zodResolver(step1Schema),
+    defaultValues: {
+      name: '',
+      gender: 'other' as const,
+      age: '',
+    },
+  });
+
+  const step2Form = useForm({
+    resolver: zodResolver(step2Schema),
+    defaultValues: {
+      birthdayDate: '',
+      birthTime: '',
+      birthPlace: '',
+    },
+  });
+
+  const step3Form = useForm({
+    resolver: zodResolver(step3Schema),
+    defaultValues: {
+      timezone: dayjs.tz.guess(),
+    },
+  });
+
+  const handleStep1 = (data: any) => {
+    setFormData({ ...formData, ...data });
+    setStep(2);
+  };
+
+  const handleStep2 = (data: any) => {
+    setFormData({ ...formData, ...data });
+    setStep(3);
+  };
+
+  const handleStep3 = async (data: any) => {
+    const finalData = {
+      ...formData,
+      ...data,
+      age: parseInt(formData.age, 10),
+      birthTime: formData.birthTime || null,
+      birthPlace: formData.birthPlace || null,
+    };
+
+    try {
+      const initData = getInitData();
+      const response = await apiRequest('POST', '/api/auth/telegram', { initData, ...finalData });
+
+      if (response.ok && response.data) {
+        setAuth(response.data.user, response.data.token);
+        toast({
+          title: 'Welcome to Astro Orb!',
+          description: 'Your cosmic journey begins now.',
+        });
+        navigate('/dashboard');
+      } else {
+        throw new Error(response.error || 'Registration failed');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Registration failed',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const progress = (step / 3) * 100;
+
+  return (
+    <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+      <Card className="w-full max-w-md p-6">
+        <div className="mb-6">
+          <div className="flex items-center justify-center mb-4">
+            <div className="p-3 rounded-full bg-gradient-to-br from-primary to-chart-2">
+              <Sparkles className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-display font-bold text-center mb-2">
+            Welcome to Astro Orb
+          </h1>
+          <p className="text-center text-muted-foreground">
+            Step {step} of 3
+          </p>
+        </div>
+
+        <Progress value={progress} className="mb-6" />
+
+        {step === 1 && (
+          <form onSubmit={step1Form.handleSubmit(handleStep1)} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                {...step1Form.register('name')}
+                placeholder="Enter your name"
+                data-testid="input-name"
+              />
+              {step1Form.formState.errors.name && (
+                <p className="text-sm text-destructive mt-1">
+                  {step1Form.formState.errors.name.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="gender">Gender</Label>
+              <Select
+                onValueChange={(value) => step1Form.setValue('gender', value as any)}
+                defaultValue="other"
+              >
+                <SelectTrigger id="gender" data-testid="select-gender">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                {...step1Form.register('age')}
+                placeholder="Enter your age"
+                data-testid="input-age"
+              />
+              {step1Form.formState.errors.age && (
+                <p className="text-sm text-destructive mt-1">
+                  {step1Form.formState.errors.age.message}
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" className="w-full" data-testid="button-next-step1">
+              Next
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </form>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={step2Form.handleSubmit(handleStep2)} className="space-y-4">
+            <div>
+              <Label htmlFor="birthdayDate">Birth Date</Label>
+              <Input
+                id="birthdayDate"
+                type="date"
+                {...step2Form.register('birthdayDate')}
+                data-testid="input-birthday"
+              />
+              {step2Form.formState.errors.birthdayDate && (
+                <p className="text-sm text-destructive mt-1">
+                  {step2Form.formState.errors.birthdayDate.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="birthTime">Birth Time (Optional)</Label>
+              <Input
+                id="birthTime"
+                type="time"
+                {...step2Form.register('birthTime')}
+                placeholder="HH:mm"
+                data-testid="input-birthtime"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="birthPlace">Birth Place (Optional)</Label>
+              <Input
+                id="birthPlace"
+                {...step2Form.register('birthPlace')}
+                placeholder="City, Country"
+                data-testid="input-birthplace"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(1)}
+                className="flex-1"
+                data-testid="button-back-step2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <Button type="submit" className="flex-1" data-testid="button-next-step2">
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {step === 3 && (
+          <form onSubmit={step3Form.handleSubmit(handleStep3)} className="space-y-4">
+            <div>
+              <Label htmlFor="timezone">Timezone</Label>
+              <Select
+                onValueChange={(value) => step3Form.setValue('timezone', value)}
+                defaultValue={dayjs.tz.guess()}
+              >
+                <SelectTrigger id="timezone" data-testid="select-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(2)}
+                className="flex-1"
+                data-testid="button-back-step3"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <Button type="submit" className="flex-1" data-testid="button-complete-registration">
+                Complete
+                <Sparkles className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </form>
+        )}
+      </Card>
+    </div>
+  );
+}

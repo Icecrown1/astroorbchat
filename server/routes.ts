@@ -1,15 +1,504 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
 import { storage } from "./storage";
+import { requireAuth } from "./middleware/auth";
+import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
+import { generateToken } from "./lib/jwt";
+import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
+import { checkAndResetEnergy, deductEnergy, getNextResetTime } from "./lib/energy";
+import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
+import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
+import { getAstrologyInterpretation } from "./lib/openai";
+import { z } from "zod";
+import dayjs from 'dayjs';
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  app.use(express.json());
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  app.post("/api/auth/telegram", async (req, res) => {
+    try {
+      const { initData, name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
+
+      if (!validateTelegramInitData(initData)) {
+        return res.status(401).json({ ok: false, error: "Invalid Telegram data" });
+      }
+
+      const tgUser = parseTelegramInitData(initData);
+      if (!tgUser) {
+        return res.status(401).json({ ok: false, error: "Invalid Telegram user" });
+      }
+
+      let user = await storage.getUserByTgId(tgUser.id.toString());
+
+      if (!user) {
+        const referralCode = generateReferralCode();
+        user = await storage.createUser({
+          tgId: tgUser.id.toString(),
+          username: tgUser.username || null,
+          name: name || tgUser.first_name || "User",
+          gender: gender || "other",
+          age: age || 25,
+          birthdayDate: new Date(birthdayDate || new Date()),
+          birthTime: birthTime || null,
+          birthPlace: birthPlace || null,
+          timezone: timezone || "Europe/Moscow",
+          referralCode,
+          energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
+        });
+
+        if (req.body.referralCode) {
+          await applyReferralBonus(storage, user.id, req.body.referralCode);
+        }
+      }
+
+      const token = generateToken(user.id);
+
+      res.json({ ok: true, data: { user, token } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/test", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ ok: false, error: "Test auth only available in development" });
+      }
+
+      const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone, referralCode: inputReferralCode } = req.body;
+      const testUsername = `test_user_${Date.now()}`;
+      const testTgId = `test_${Date.now()}`;
+
+      let user = await storage.getUserByTgId(testTgId);
+
+      if (!user) {
+        const referralCode = generateReferralCode();
+        const newUser = {
+          tgId: testTgId,
+          username: testUsername,
+          name: name || "Test User",
+          gender: gender || "other",
+          age: age || 25,
+          birthdayDate: new Date(birthdayDate || new Date()),
+          birthTime: birthTime || null,
+          birthPlace: birthPlace || null,
+          timezone: timezone || "America/New_York",
+          referralCode,
+          energyResetAt: getNextResetTime(timezone || "America/New_York"),
+        };
+
+        user = await storage.createUser(newUser);
+
+        if (inputReferralCode) {
+          await applyReferralBonus(storage, user.id, inputReferralCode);
+        }
+      }
+
+      const token = generateToken(user.id);
+
+      res.json({ ok: true, data: { user, token } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/user/me", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      await checkAndResetEnergy(storage, userId);
+      
+      const user = await storage.getUser(userId);
+      const subscription = await storage.getSubscription(userId);
+
+      res.json({ ok: true, data: { ...user, subscription } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/user/update", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
+
+      const user = await storage.updateUser(userId, {
+        name,
+        gender,
+        age,
+        birthdayDate: new Date(birthdayDate),
+        birthTime,
+        birthPlace,
+        timezone,
+      });
+
+      res.json({ ok: true, data: user });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/energy", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      await checkAndResetEnergy(storage, userId);
+      
+      const user = await storage.getUser(userId);
+
+      res.json({
+        ok: true,
+        data: {
+          energy: user?.energy || 0,
+          resetAt: user?.energyResetAt || new Date(),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/natal", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const deductResult = await deductEnergy(storage, userId, "natal");
+
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const chart = calculateNatalChart(new Date(user.birthdayDate), user.birthTime || undefined);
+      const interpretation = await getAstrologyInterpretation("natal", chart);
+
+      res.json({
+        ok: true,
+        data: {
+          planets: chart.planets,
+          aspects: chart.aspects,
+          interpretation,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/solar", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const deductResult = await deductEnergy(storage, userId, "solar");
+
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const solar = calculateSolarReturn(new Date(user.birthdayDate));
+      const interpretation = await getAstrologyInterpretation("solar", solar);
+
+      res.json({
+        ok: true,
+        data: {
+          solar,
+          interpretation,
+          insights: [
+            "Today's cosmic energy supports new beginnings",
+            "Focus on personal growth and self-expression",
+            "Trust your intuition in decision-making",
+          ],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/horoscope", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { period } = req.body;
+
+      const deductResult = await deductEnergy(storage, userId, "horoscope");
+
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const chart = calculateNatalChart(new Date(user.birthdayDate));
+      const forecast = await getAstrologyInterpretation("horoscope", { chart, period });
+
+      res.json({
+        ok: true,
+        data: {
+          period,
+          forecast,
+          highlights: [
+            "Opportunities for growth and expansion",
+            "Focus on relationships and communication",
+            "Trust your inner wisdom",
+          ],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/compatibility", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { partner } = req.body;
+
+      const deductResult = await deductEnergy(storage, userId, "compatibility");
+
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const person1Chart = calculateNatalChart(new Date(user.birthdayDate));
+      const person2Chart = calculateNatalChart(new Date(partner.date));
+
+      const analysis = await getAstrologyInterpretation("compatibility", {
+        person1: person1Chart,
+        person2: person2Chart,
+      });
+
+      res.json({
+        ok: true,
+        data: {
+          partners: `${user.name} & ${partner.name}`,
+          analysis,
+          strengths: [
+            "Strong emotional connection and understanding",
+            "Shared values and life goals",
+            "Excellent communication and trust",
+          ],
+          challenges: [
+            "Different approaches to conflict resolution",
+            "Balance independence with togetherness",
+          ],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/ask", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { question } = req.body;
+
+      const deductResult = await deductEnergy(storage, userId, "ask");
+
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const chart = calculateNatalChart(new Date(user.birthdayDate));
+      const answer = await getAstrologyInterpretation("ask", { chart, question });
+
+      res.json({ ok: true, data: { answer } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/referral/code", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const referrals = [];
+
+      res.json({
+        ok: true,
+        data: {
+          referralCode: user.referralCode,
+          referrals,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/payments/price", async (req, res) => {
+    try {
+      const tonRate = await getTonPrice();
+
+      res.json({
+        ok: true,
+        data: {
+          tonRate,
+          subscriptions: {
+            standard: { usd: 9, ton: (9 / tonRate).toFixed(2) },
+            pro: { usd: 15, ton: (15 / tonRate).toFixed(2) },
+          },
+          energyPacks: {
+            small: { amount: 20, usd: 2.99, ton: (2.99 / tonRate).toFixed(2) },
+            medium: { amount: 50, usd: 5.99, ton: (5.99 / tonRate).toFixed(2) },
+            large: { amount: 120, usd: 11.99, ton: (11.99 / tonRate).toFixed(2) },
+          },
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { kind, tier, energyAmount, amountUSD } = req.body;
+
+      if (!process.env.TON_WALLET_ADDRESS) {
+        return res.status(500).json({ 
+          ok: false, 
+          error: "Payment system not configured. Please contact support." 
+        });
+      }
+
+      const tonRate = await getTonPrice();
+      const amountTON = convertUSDToTON(amountUSD, tonRate);
+
+      const payment = await storage.createPayment({
+        userId,
+        kind,
+        tier,
+        energyAmount,
+        amountUSD: amountUSD.toString(),
+        amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
+        txHash: `pending_${Date.now()}`,
+        status: "pending",
+      });
+
+      res.json({
+        ok: true,
+        data: {
+          paymentId: payment.id,
+          walletAddress: process.env.TON_WALLET_ADDRESS,
+          amountTON,
+          payload: payment.id,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/payments/ton/webhook", async (req, res) => {
+    try {
+      const { txHash, paymentId } = req.body;
+
+      const payment = await storage.getPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ ok: false, error: "Payment not found" });
+      }
+
+      if (payment.status === "confirmed") {
+        return res.status(400).json({ ok: false, error: "Payment already confirmed" });
+      }
+
+      const existingPayment = await storage.getPaymentByTxHash(txHash);
+      if (existingPayment && existingPayment.id !== paymentId && existingPayment.status === "confirmed") {
+        await storage.updatePayment(paymentId, {
+          txHash,
+          status: "failed",
+        });
+        return res.status(400).json({ ok: false, error: "Transaction hash already used" });
+      }
+
+      if (!process.env.TON_WALLET_ADDRESS) {
+        return res.status(500).json({ ok: false, error: "TON wallet address not configured" });
+      }
+
+      const isValid = await verifyTonTransaction(
+        txHash,
+        (parseFloat(payment.amountTON) * 1_000_000_000).toFixed(0),
+        process.env.TON_WALLET_ADDRESS
+      );
+
+      if (!isValid) {
+        await storage.updatePayment(paymentId, {
+          txHash,
+          status: "failed",
+        });
+        return res.status(400).json({ ok: false, error: "Invalid transaction" });
+      }
+
+      await storage.updatePayment(paymentId, {
+        txHash,
+        status: "confirmed",
+      });
+
+      if (payment.kind === "energy_pack" && payment.energyAmount) {
+        const user = await storage.getUser(payment.userId);
+        if (user) {
+          await storage.updateUser(payment.userId, {
+            energy: user.energy + payment.energyAmount,
+          });
+        }
+      } else if (payment.kind === "subscription" && payment.tier) {
+        const startedAt = new Date();
+        const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+
+        const existingSub = await storage.getSubscription(payment.userId);
+        
+        if (existingSub) {
+          await storage.updateSubscription(existingSub.id, {
+            tier: payment.tier,
+            status: "active",
+            currentPeriodEnd,
+          });
+        } else {
+          await storage.createSubscription({
+            userId: payment.userId,
+            tier: payment.tier,
+            status: "active",
+            startedAt,
+            currentPeriodEnd,
+          });
+        }
+
+        await handleSubscriptionReferralBonus(storage, payment.userId);
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/.well-known/tonconnect-manifest.json", (req, res) => {
+    res.json({
+      url: process.env.SERVER_URL || "https://astro-orb.replit.app",
+      name: "Astro Orb",
+      iconUrl: `${process.env.SERVER_URL || "https://astro-orb.replit.app"}/icon.png`,
+    });
+  });
 
   const httpServer = createServer(app);
-
   return httpServer;
 }
