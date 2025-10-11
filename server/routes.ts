@@ -319,6 +319,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const person1Chart = calculateNatalChart(new Date(user.birthdayDate));
       const person2Chart = calculateNatalChart(new Date(partner.date));
 
+      console.log('Person 1 chart planets:', person1Chart.planets.length);
+      console.log('Person 2 chart planets:', person2Chart.planets.length);
+
       const analysis = await getAstrologyInterpretation("compatibility", {
         person1: person1Chart,
         person2: person2Chart,

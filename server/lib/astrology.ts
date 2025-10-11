@@ -18,19 +18,28 @@ export function calculateNatalChart(birthDate: Date, birthTime?: string) {
   const aspects: Array<{ planet1: string; planet2: string; type: string; angle: number }> = [];
 
   try {
+    const astroTime = AstronomyEngine.MakeTime(birthDate);
+    
     PLANETS.forEach((planetName) => {
       try {
-        const bodyName = planetName as keyof typeof AstronomyEngine.Body;
-        const body = AstronomyEngine.Body[bodyName];
+        let longitude: number | undefined;
         
-        const ecliptic = AstronomyEngine.Ecliptic(body, birthDate);
-        const longitude = (ecliptic.elon + 360) % 360;
-
-        planets.push({
-          name: planetName,
-          position: longitude,
-          sign: getZodiacSign(longitude),
-        });
+        if (planetName === 'Sun') {
+          const sunPos = AstronomyEngine.SunPosition(astroTime);
+          longitude = sunPos.elon;
+        } else {
+          const bodyName = planetName as keyof typeof AstronomyEngine.Body;
+          const body = AstronomyEngine.Body[bodyName];
+          longitude = AstronomyEngine.EclipticLongitude(body, birthDate);
+        }
+        
+        if (longitude !== undefined && !isNaN(longitude)) {
+          planets.push({
+            name: planetName,
+            position: (longitude + 360) % 360,
+            sign: getZodiacSign((longitude + 360) % 360),
+          });
+        }
       } catch (err) {
         console.error(`Error calculating ${planetName}:`, err);
       }
@@ -83,6 +92,8 @@ export function calculateNatalChart(birthDate: Date, birthTime?: string) {
     console.error('Natal chart calculation error:', error);
   }
 
+  console.log('Calculated planets:', planets.length, planets);
+  console.log('Calculated aspects:', aspects.length);
   return { planets, aspects };
 }
 
@@ -92,14 +103,19 @@ export function calculateSolarReturn(birthDate: Date) {
   const solarDate = new Date(solarYear, birthDate.getMonth(), birthDate.getDate());
 
   try {
-    const ecliptic = AstronomyEngine.Ecliptic(AstronomyEngine.Body.Sun, solarDate);
-    const longitude = (ecliptic.elon + 360) % 360;
-
-    return {
-      position: longitude,
-      sign: getZodiacSign(longitude),
-      date: solarDate,
-    };
+    const astroTime = AstronomyEngine.MakeTime(solarDate);
+    const sunPos = AstronomyEngine.SunPosition(astroTime);
+    const longitude = sunPos.elon;
+    
+    if (longitude !== undefined && !isNaN(longitude)) {
+      return {
+        position: (longitude + 360) % 360,
+        sign: getZodiacSign((longitude + 360) % 360),
+        date: solarDate,
+      };
+    }
+    
+    return null;
   } catch (error) {
     console.error('Solar return calculation error:', error);
     return null;
