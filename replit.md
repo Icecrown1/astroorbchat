@@ -33,6 +33,34 @@ Astro Orb is a Telegram Mini App that provides AI-powered astrology readings wit
   - `/api/astrology/ask/history` - Get AI question history
 - Implemented pagination with configurable limits for history retrieval
 
+**Payment History Dashboard:**
+- Created `/payment-history` page with transaction tracking
+- Displays all user payments with kind, amounts (USD/TON), status, and timestamps
+- Status-based color coding (completed/confirmed = default, pending = secondary, failed = destructive)
+- Handles both "completed" and "confirmed" payment statuses
+- Recognizes both "energy" and "energy_pack" payment kinds
+- Blockchain explorer links for confirmed TON transactions
+- Empty state and error handling
+- Accessible from Dashboard quick actions
+
+**Admin Panel:**
+- Added `isAdmin` boolean field to users table
+- Created `requireAdmin` middleware for protected admin routes
+- Admin API endpoints:
+  - `GET /api/admin/stats` - System statistics (users, revenue, subscriptions, payments)
+  - `GET /api/admin/users` - List all users
+  - `POST /api/admin/users/:userId/energy` - Update user energy (validated 0-1000)
+  - `POST /api/admin/users/:userId/subscription` - Manage user subscriptions
+- Zod validation for admin operations:
+  - Energy: integer between 0-1000
+  - Tier: enum ["standard", "pro"]
+  - Status: enum ["active", "cancelled", "expired"]
+- Admin frontend at `/admin` with:
+  - Dashboard showing key metrics
+  - User management with energy and subscription editing
+  - Dialog-based editing with validation
+  - Proper error handling and loading states
+
 **Test Infrastructure:**
 - Added `/api/auth/test` endpoint for development testing (NODE_ENV=development only)
 - Creates test users without requiring Telegram initData
