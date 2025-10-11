@@ -46,6 +46,7 @@ export default function Compatibility() {
           time: data.partnerTime || null,
           place: data.partnerPlace || null,
         },
+        locale,
       });
       return response.data;
     },

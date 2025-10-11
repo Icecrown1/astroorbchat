@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, CreditCard, Check, Sparkles } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Sparkles, Wallet } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { sendTransaction } from '@/lib/ton';
+import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
 import { useTranslation } from '@/contexts/LocaleContext';
 
 const SUBSCRIPTION_TIERS = [
@@ -34,6 +34,16 @@ export default function Subscribe() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [walletConnected, setWalletConnected] = useState(false);
+
+  useEffect(() => {
+    const checkWallet = () => {
+      setWalletConnected(isWalletConnected());
+    };
+    checkWallet();
+    const interval = setInterval(checkWallet, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
     queryKey: ['/api/payments/price'],
@@ -204,9 +214,23 @@ export default function Subscribe() {
                 <Button
                   className="w-full"
                   variant={selectedTier === tier.tier ? 'default' : 'outline'}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    mutation.mutate(tier);
+                    if (!walletConnected) {
+                      try {
+                        await connectWallet();
+                        setWalletConnected(true);
+                        mutation.mutate(tier);
+                      } catch (error: any) {
+                        toast({
+                          title: t.common.error,
+                          description: error.message || 'Failed to connect wallet',
+                          variant: 'destructive',
+                        });
+                      }
+                    } else {
+                      mutation.mutate(tier);
+                    }
                   }}
                   disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
                   data-testid={`button-subscribe-${tier.tier}`}
@@ -218,6 +242,11 @@ export default function Subscribe() {
                     </>
                   ) : currentSubscription?.tier === tier.tier ? (
                     t.subscribe.currentPlan
+                  ) : !walletConnected ? (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
+                    </>
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4 mr-2" />

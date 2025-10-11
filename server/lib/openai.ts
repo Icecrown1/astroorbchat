@@ -10,10 +10,17 @@ export const openai = new OpenAI({
 
 export async function getAstrologyInterpretation(
   type: 'natal' | 'solar' | 'horoscope' | 'compatibility' | 'ask',
-  data: any
+  data: any,
+  locale: string = 'en'
 ): Promise<string> {
+  const languageInstruction = locale === 'ru' 
+    ? 'ВАЖНО: Ответь полностью на русском языке.' 
+    : 'Respond in English.';
+  
   const prompts = {
-    natal: `You are an expert astrologer. Based on the following natal chart data, provide a comprehensive interpretation in 250-400 words. Be specific, practical, and insightful without esoteric jargon.
+    natal: `${languageInstruction}
+
+You are an expert astrologer. Based on the following natal chart data, provide a comprehensive interpretation in 250-400 words. Be specific, practical, and insightful without esoteric jargon.
 
 Planetary Positions:
 ${JSON.stringify(data.planets, null, 2)}
@@ -23,21 +30,27 @@ ${JSON.stringify(data.aspects, null, 2)}
 
 Provide clear insights about personality, strengths, challenges, and life themes.`,
 
-    solar: `You are an expert astrologer. Based on the solar return position for today, provide practical daily guidance in 200-300 words.
+    solar: `${languageInstruction}
+
+You are an expert astrologer. Based on the solar return position for today, provide practical daily guidance in 200-300 words.
 
 Solar Data:
 ${JSON.stringify(data, null, 2)}
 
 Focus on today's energy, opportunities, and practical advice.`,
 
-    horoscope: `You are an expert astrologer. Create a ${data.period} horoscope based on the user's chart. Provide 200-300 words of practical guidance.
+    horoscope: `${languageInstruction}
+
+You are an expert astrologer. Create a ${data.period} horoscope based on the user's chart. Provide 200-300 words of practical guidance.
 
 Chart Data:
 ${JSON.stringify(data.chart, null, 2)}
 
 Be specific and actionable. Focus on the ${data.period === 'day' ? 'day' : data.period === 'week' ? 'week' : 'month'} ahead.`,
 
-    compatibility: `You are an expert relationship astrologer. Analyze compatibility between two people based on their charts. Provide 250-400 words covering strengths and challenges.
+    compatibility: `${languageInstruction}
+
+You are an expert relationship astrologer. Analyze compatibility between two people based on their charts. Provide 250-400 words covering strengths and challenges.
 
 Person 1:
 ${JSON.stringify(data.person1, null, 2)}
@@ -47,7 +60,9 @@ ${JSON.stringify(data.person2, null, 2)}
 
 Be balanced, practical, and insightful about relationship dynamics.`,
 
-    ask: `You are an expert astrologer. Answer the following question based on the user's natal chart. Provide 200-350 words of clear, practical guidance.
+    ask: `${languageInstruction}
+
+You are an expert astrologer. Answer the following question based on the user's natal chart. Provide 200-350 words of clear, practical guidance.
 
 User's Chart:
 ${JSON.stringify(data.chart, null, 2)}
@@ -57,12 +72,16 @@ Question: ${data.question}
 Provide insightful, actionable advice grounded in astrological wisdom.`
   };
 
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог, который предоставляет четкие, практичные и проницательные чтения без эзотерического жаргона. Твои советы конкретны, действенны и основаны на астрологических принципах. Всегда отвечай на русском языке."
+    : "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles.";
+
   const completion = await openai.chat.completions.create({
     model: "gpt-5",
     messages: [
       {
         role: "system",
-        content: "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles."
+        content: systemMessage
       },
       {
         role: "user",

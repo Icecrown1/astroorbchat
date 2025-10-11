@@ -37,6 +37,7 @@ export default function Ask() {
     mutationFn: async (data: any) => {
       const response = await apiRequest('POST', '/api/astrology/ask', {
         question: data.question,
+        locale,
       });
       return response.data;
     },

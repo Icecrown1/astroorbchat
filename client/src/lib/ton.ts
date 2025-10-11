@@ -62,5 +62,5 @@ export function getWalletAddress(): string | null {
 
 export function isWalletConnected(): boolean {
   const ui = getTonConnectUI();
-  return ui.connected;
+  return !!ui.wallet;
 }

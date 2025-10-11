@@ -15,6 +15,22 @@ Astro Orb is a Telegram Mini App that provides AI-powered astrology readings wit
 - Form validation messages switch languages dynamically
 - Locale persists in localStorage for user preference
 
+**Russian AI Content Generation:**
+- All astrology API endpoints now accept locale parameter from frontend
+- Backend routes (natal, solar, horoscope, compatibility, ask) forward locale to getAstrologyInterpretation()
+- OpenAI prompts include "ВАЖНО: Ответь полностью на русском языке" when locale='ru'
+- System message localized: "Ты опытный астролог..." for Russian users
+- AI generates responses in user's language automatically based on locale setting
+
+**One-Click TON Wallet Connection:**
+- BuyEnergy and Subscribe pages check wallet connection before payment
+- Added isWalletConnected() helper function in lib/ton.ts
+- Wallet polling (1s interval) updates UI state automatically
+- One-click flow: connectWallet() → setWalletConnected(true) → mutation.mutate()
+- No second click required - purchase proceeds immediately after wallet connection
+- Localized button text: "Подключить кошелек" (RU) / "Connect Wallet" (EN)
+- Error handling with toast notifications for connection failures
+
 **Canvas Chart Rendering Fix:**
 - Fixed "string did not match expected pattern" error in ChartCanvas component
 - Canvas 2D API does not support CSS variables directly (var(--color))

@@ -19,12 +19,12 @@ import {
 export default function NatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [chartData, setChartData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/astrology/natal', {});
+      const response = await apiRequest('POST', '/api/astrology/natal', { locale });
       return response.data;
     },
     onSuccess: (data) => {

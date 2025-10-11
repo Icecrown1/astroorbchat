@@ -12,12 +12,12 @@ import { useTranslation } from '@/contexts/LocaleContext';
 export default function SolarToday() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [solarData, setSolarData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/astrology/solar', {});
+      const response = await apiRequest('POST', '/api/astrology/solar', { locale });
       return response.data;
     },
     onSuccess: (data) => {

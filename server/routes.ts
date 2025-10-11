@@ -168,6 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/natal", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const locale = req.body.locale || 'en';
       
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -183,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate), user.birthTime || undefined);
-      const interpretation = await getAstrologyInterpretation("natal", chart);
+      const interpretation = await getAstrologyInterpretation("natal", chart, locale);
 
       await storage.createNatalReading({
         userId,
@@ -212,6 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/solar", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const locale = req.body.locale || 'en';
       
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -227,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading
       const solar = calculateSolarReturn(new Date(user.birthdayDate));
-      const interpretation = await getAstrologyInterpretation("solar", solar);
+      const interpretation = await getAstrologyInterpretation("solar", solar, locale);
 
       // Only deduct energy after successful execution
       await storage.updateUser(userId, { energy: user.energy - cost });
@@ -254,6 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).userId;
       const { period } = req.body;
+      const locale = req.body.locale || 'en';
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -269,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate));
-      const forecast = await getAstrologyInterpretation("horoscope", { chart, period });
+      const forecast = await getAstrologyInterpretation("horoscope", { chart, period }, locale);
 
       await storage.createHoroscopeReading({
         userId,
@@ -302,6 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).userId;
       const { partner } = req.body;
+      const locale = req.body.locale || 'en';
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -325,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysis = await getAstrologyInterpretation("compatibility", {
         person1: person1Chart,
         person2: person2Chart,
-      });
+      }, locale);
 
       await storage.createCompatibilityReading({
         userId,
@@ -363,6 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).userId;
       const { question } = req.body;
+      const locale = req.body.locale || 'en';
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -378,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate));
-      const answer = await getAstrologyInterpretation("ask", { chart, question });
+      const answer = await getAstrologyInterpretation("ask", { chart, question }, locale);
 
       await storage.createAiQuestion({
         userId,

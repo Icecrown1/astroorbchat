@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, ShoppingBag, Sparkles, Check } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { sendTransaction } from '@/lib/ton';
+import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
 import { useTranslation } from '@/contexts/LocaleContext';
 
 const ENERGY_PACKS = [
@@ -20,8 +20,18 @@ const ENERGY_PACKS = [
 export default function BuyEnergy() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
+  const [walletConnected, setWalletConnected] = useState(false);
+
+  useEffect(() => {
+    const checkWallet = () => {
+      setWalletConnected(isWalletConnected());
+    };
+    checkWallet();
+    const interval = setInterval(checkWallet, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
     queryKey: ['/api/payments/price'],
@@ -133,9 +143,24 @@ export default function BuyEnergy() {
                 <Button
                   className="w-full"
                   variant={selectedPack === pack.amount ? 'default' : 'outline'}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    mutation.mutate(pack);
+                    if (!walletConnected) {
+                      try {
+                        await connectWallet();
+                        setWalletConnected(true);
+                        // Immediately proceed with purchase after successful connection
+                        mutation.mutate(pack);
+                      } catch (error: any) {
+                        toast({
+                          title: t.common.error,
+                          description: error.message || 'Failed to connect wallet',
+                          variant: 'destructive',
+                        });
+                      }
+                    } else {
+                      mutation.mutate(pack);
+                    }
                   }}
                   disabled={mutation.isPending}
                   data-testid={`button-buy-pack-${pack.amount}`}
@@ -144,6 +169,11 @@ export default function BuyEnergy() {
                     <>
                       <Loader className="mr-2" size="sm" />
                       {t.buyEnergy.purchasing}
+                    </>
+                  ) : !walletConnected ? (
+                    <>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
                     </>
                   ) : (
                     <>

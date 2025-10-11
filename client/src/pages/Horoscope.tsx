@@ -19,13 +19,13 @@ import { useTranslation } from '@/contexts/LocaleContext';
 export default function Horoscope() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [horoscopeData, setHoroscopeData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/astrology/horoscope', { period });
+      const response = await apiRequest('POST', '/api/astrology/horoscope', { period, locale });
       return response.data;
     },
     onSuccess: (data) => {
