@@ -43,6 +43,13 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Get computed CSS colors
+    const computedStyle = getComputedStyle(document.documentElement);
+    const borderColor = `hsl(${computedStyle.getPropertyValue('--border').trim()})`;
+    const mutedForeground = `hsl(${computedStyle.getPropertyValue('--muted-foreground').trim()})`;
+    const primaryColor = `hsl(${computedStyle.getPropertyValue('--primary').trim()})`;
+    const foregroundColor = `hsl(${computedStyle.getPropertyValue('--foreground').trim()})`;
+
     const size = canvas.width;
     const center = size / 2;
     const outerRadius = size / 2 - 20;
@@ -53,7 +60,7 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
     ctx.clearRect(0, 0, size, size);
 
     // Draw zodiac wheel
-    ctx.strokeStyle = 'hsl(var(--border))';
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
@@ -82,7 +89,7 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       const labelX = center + Math.cos(labelAngle) * labelRadius;
       const labelY = center + Math.sin(labelAngle) * labelRadius;
 
-      ctx.fillStyle = 'hsl(var(--muted-foreground))';
+      ctx.fillStyle = mutedForeground;
       ctx.font = '12px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -121,15 +128,16 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       const y = center + Math.sin(angle) * planetRadius;
 
       // Planet dot
-      ctx.fillStyle = 'hsl(var(--primary))';
+      ctx.fillStyle = primaryColor;
       ctx.beginPath();
       ctx.arc(x, y, 6, 0, 2 * Math.PI);
       ctx.fill();
 
       // Planet glow
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, 12);
-      gradient.addColorStop(0, 'hsla(var(--primary), 0.5)');
-      gradient.addColorStop(1, 'hsla(var(--primary), 0)');
+      const primaryHsl = computedStyle.getPropertyValue('--primary').trim().split(' ');
+      gradient.addColorStop(0, `hsla(${primaryHsl[0]}, ${primaryHsl[1]}, ${primaryHsl[2]}, 0.5)`);
+      gradient.addColorStop(1, `hsla(${primaryHsl[0]}, ${primaryHsl[1]}, ${primaryHsl[2]}, 0)`);
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(x, y, 12, 0, 2 * Math.PI);
@@ -138,7 +146,7 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       // Planet label
       const labelX = center + Math.cos(angle) * (planetRadius - 20);
       const labelY = center + Math.sin(angle) * (planetRadius - 20);
-      ctx.fillStyle = 'hsl(var(--foreground))';
+      ctx.fillStyle = foregroundColor;
       ctx.font = 'bold 11px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
