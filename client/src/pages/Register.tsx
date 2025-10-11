@@ -103,16 +103,32 @@ export default function Register() {
       const isProduction = import.meta.env.PROD;
       const hasValidInitData = initData && initData.length > 0;
       
-      let response;
-      if (!isProduction || !hasValidInitData) {
-        // Development mode - use test endpoint
-        response = await apiRequest('POST', '/api/auth/test', finalData);
-      } else {
-        // Production mode with valid Telegram data
-        response = await apiRequest('POST', '/api/auth/telegram', { initData, ...finalData });
+      let url = '/api/auth/test';
+      let body = finalData;
+      
+      if (isProduction && hasValidInitData) {
+        url = '/api/auth/telegram';
+        body = { initData, ...finalData };
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
       }
 
       const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Request failed with status ${response.status}`);
+      }
 
       if (result.ok && result.data) {
         setAuth(result.data.user, result.data.token);

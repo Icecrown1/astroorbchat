@@ -14,8 +14,6 @@ import { z } from "zod";
 import dayjs from 'dayjs';
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.use(express.json());
-
   app.post("/api/auth/telegram", async (req, res) => {
     try {
       const { initData, name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
@@ -61,8 +59,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/test", async (req, res) => {
+    console.log('=== /api/auth/test endpoint hit ===');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    
     try {
-      if (process.env.NODE_ENV !== 'development') {
+      // Allow test endpoint in development or when NODE_ENV is not set (development default)
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        console.log('Blocked: in production mode');
         return res.status(403).json({ ok: false, error: "Test auth only available in development" });
       }
 
