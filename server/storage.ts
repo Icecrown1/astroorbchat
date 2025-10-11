@@ -4,6 +4,10 @@ import {
   subscriptions,
   payments,
   usageLogs,
+  natalReadings,
+  horoscopeReadings,
+  compatibilityReadings,
+  aiQuestions,
   type User, 
   type InsertUser,
   type Subscription,
@@ -11,7 +15,15 @@ import {
   type Payment,
   type InsertPayment,
   type UsageLog,
-  type InsertUsageLog
+  type InsertUsageLog,
+  type NatalReading,
+  type InsertNatalReading,
+  type HoroscopeReading,
+  type InsertHoroscopeReading,
+  type CompatibilityReading,
+  type InsertCompatibilityReading,
+  type AiQuestion,
+  type InsertAiQuestion
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -39,6 +51,22 @@ export interface IStorage {
   // Usage log operations
   createUsageLog(log: InsertUsageLog): Promise<UsageLog>;
   getUsageLogsByUserId(userId: string, limit?: number): Promise<UsageLog[]>;
+  
+  // Natal reading operations
+  createNatalReading(reading: InsertNatalReading): Promise<NatalReading>;
+  getNatalReadingsByUserId(userId: string, limit?: number): Promise<NatalReading[]>;
+  
+  // Horoscope reading operations
+  createHoroscopeReading(reading: InsertHoroscopeReading): Promise<HoroscopeReading>;
+  getHoroscopeReadingsByUserId(userId: string, limit?: number): Promise<HoroscopeReading[]>;
+  
+  // Compatibility reading operations
+  createCompatibilityReading(reading: InsertCompatibilityReading): Promise<CompatibilityReading>;
+  getCompatibilityReadingsByUserId(userId: string, limit?: number): Promise<CompatibilityReading[]>;
+  
+  // AI question operations
+  createAiQuestion(question: InsertAiQuestion): Promise<AiQuestion>;
+  getAiQuestionsByUserId(userId: string, limit?: number): Promise<AiQuestion[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -158,6 +186,78 @@ export class DatabaseStorage implements IStorage {
       .from(usageLogs)
       .where(eq(usageLogs.userId, userId))
       .orderBy(desc(usageLogs.createdAt))
+      .limit(limit);
+  }
+
+  // Natal reading operations
+  async createNatalReading(insertReading: InsertNatalReading): Promise<NatalReading> {
+    const [reading] = await db
+      .insert(natalReadings)
+      .values(insertReading)
+      .returning();
+    return reading;
+  }
+
+  async getNatalReadingsByUserId(userId: string, limit: number = 10): Promise<NatalReading[]> {
+    return await db
+      .select()
+      .from(natalReadings)
+      .where(eq(natalReadings.userId, userId))
+      .orderBy(desc(natalReadings.createdAt))
+      .limit(limit);
+  }
+
+  // Horoscope reading operations
+  async createHoroscopeReading(insertReading: InsertHoroscopeReading): Promise<HoroscopeReading> {
+    const [reading] = await db
+      .insert(horoscopeReadings)
+      .values(insertReading)
+      .returning();
+    return reading;
+  }
+
+  async getHoroscopeReadingsByUserId(userId: string, limit: number = 10): Promise<HoroscopeReading[]> {
+    return await db
+      .select()
+      .from(horoscopeReadings)
+      .where(eq(horoscopeReadings.userId, userId))
+      .orderBy(desc(horoscopeReadings.createdAt))
+      .limit(limit);
+  }
+
+  // Compatibility reading operations
+  async createCompatibilityReading(insertReading: InsertCompatibilityReading): Promise<CompatibilityReading> {
+    const [reading] = await db
+      .insert(compatibilityReadings)
+      .values(insertReading)
+      .returning();
+    return reading;
+  }
+
+  async getCompatibilityReadingsByUserId(userId: string, limit: number = 10): Promise<CompatibilityReading[]> {
+    return await db
+      .select()
+      .from(compatibilityReadings)
+      .where(eq(compatibilityReadings.userId, userId))
+      .orderBy(desc(compatibilityReadings.createdAt))
+      .limit(limit);
+  }
+
+  // AI question operations
+  async createAiQuestion(insertQuestion: InsertAiQuestion): Promise<AiQuestion> {
+    const [question] = await db
+      .insert(aiQuestions)
+      .values(insertQuestion)
+      .returning();
+    return question;
+  }
+
+  async getAiQuestionsByUserId(userId: string, limit: number = 20): Promise<AiQuestion[]> {
+    return await db
+      .select()
+      .from(aiQuestions)
+      .where(eq(aiQuestions.userId, userId))
+      .orderBy(desc(aiQuestions.createdAt))
       .limit(limit);
   }
 }

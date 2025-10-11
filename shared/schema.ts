@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -103,6 +103,76 @@ export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
   }),
 }));
 
+export const natalReadings = pgTable("natal_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  planets: jsonb("planets").notNull(),
+  aspects: jsonb("aspects").notNull(),
+  interpretation: text("interpretation").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("natal_readings_user_id_idx").on(table.userId),
+}));
+
+export const natalReadingsRelations = relations(natalReadings, ({ one }) => ({
+  user: one(users, {
+    fields: [natalReadings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const horoscopeReadings = pgTable("horoscope_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  period: varchar("period", { length: 20 }).notNull(),
+  forecast: text("forecast").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("horoscope_readings_user_id_idx").on(table.userId),
+}));
+
+export const horoscopeReadingsRelations = relations(horoscopeReadings, ({ one }) => ({
+  user: one(users, {
+    fields: [horoscopeReadings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const compatibilityReadings = pgTable("compatibility_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  partnerName: text("partner_name").notNull(),
+  partnerDate: timestamp("partner_date").notNull(),
+  analysis: text("analysis").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("compatibility_readings_user_id_idx").on(table.userId),
+}));
+
+export const compatibilityReadingsRelations = relations(compatibilityReadings, ({ one }) => ({
+  user: one(users, {
+    fields: [compatibilityReadings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const aiQuestions = pgTable("ai_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("ai_questions_user_id_idx").on(table.userId),
+}));
+
+export const aiQuestionsRelations = relations(aiQuestions, ({ one }) => ({
+  user: one(users, {
+    fields: [aiQuestions.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users, {
   tgId: z.string().min(1),
@@ -158,6 +228,44 @@ export const insertUsageLogSchema = createInsertSchema(usageLogs, {
   createdAt: true,
 });
 
+export const insertNatalReadingSchema = createInsertSchema(natalReadings, {
+  userId: z.string(),
+  planets: z.any(),
+  aspects: z.any(),
+  interpretation: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHoroscopeReadingSchema = createInsertSchema(horoscopeReadings, {
+  userId: z.string(),
+  period: z.string(),
+  forecast: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompatibilityReadingSchema = createInsertSchema(compatibilityReadings, {
+  userId: z.string(),
+  partnerName: z.string(),
+  partnerDate: z.date().or(z.string()),
+  analysis: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAiQuestionSchema = createInsertSchema(aiQuestions, {
+  userId: z.string(),
+  question: z.string(),
+  answer: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -170,3 +278,15 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type UsageLog = typeof usageLogs.$inferSelect;
 export type InsertUsageLog = z.infer<typeof insertUsageLogSchema>;
+
+export type NatalReading = typeof natalReadings.$inferSelect;
+export type InsertNatalReading = z.infer<typeof insertNatalReadingSchema>;
+
+export type HoroscopeReading = typeof horoscopeReadings.$inferSelect;
+export type InsertHoroscopeReading = z.infer<typeof insertHoroscopeReadingSchema>;
+
+export type CompatibilityReading = typeof compatibilityReadings.$inferSelect;
+export type InsertCompatibilityReading = z.infer<typeof insertCompatibilityReadingSchema>;
+
+export type AiQuestion = typeof aiQuestions.$inferSelect;
+export type InsertAiQuestion = z.infer<typeof insertAiQuestionSchema>;

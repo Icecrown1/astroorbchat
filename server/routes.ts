@@ -174,6 +174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chart = calculateNatalChart(new Date(user.birthdayDate), user.birthTime || undefined);
       const interpretation = await getAstrologyInterpretation("natal", chart);
 
+      await storage.createNatalReading({
+        userId,
+        planets: chart.planets,
+        aspects: chart.aspects,
+        interpretation,
+      });
+
       res.json({
         ok: true,
         data: {
@@ -240,6 +247,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chart = calculateNatalChart(new Date(user.birthdayDate));
       const forecast = await getAstrologyInterpretation("horoscope", { chart, period });
 
+      await storage.createHoroscopeReading({
+        userId,
+        period: period || "daily",
+        forecast,
+      });
+
       res.json({
         ok: true,
         data: {
@@ -279,6 +292,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysis = await getAstrologyInterpretation("compatibility", {
         person1: person1Chart,
         person2: person2Chart,
+      });
+
+      await storage.createCompatibilityReading({
+        userId,
+        partnerName: partner.name,
+        partnerDate: new Date(partner.date),
+        analysis,
       });
 
       res.json({
@@ -321,7 +341,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chart = calculateNatalChart(new Date(user.birthdayDate));
       const answer = await getAstrologyInterpretation("ask", { chart, question });
 
+      await storage.createAiQuestion({
+        userId,
+        question,
+        answer,
+      });
+
       res.json({ ok: true, data: { answer } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/astrology/natal/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const readings = await storage.getNatalReadingsByUserId(userId, limit);
+      res.json({ ok: true, data: readings });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/astrology/horoscope/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const readings = await storage.getHoroscopeReadingsByUserId(userId, limit);
+      res.json({ ok: true, data: readings });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/astrology/compatibility/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const readings = await storage.getCompatibilityReadingsByUserId(userId, limit);
+      res.json({ ok: true, data: readings });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/astrology/ask/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const questions = await storage.getAiQuestionsByUserId(userId, limit);
+      res.json({ ok: true, data: questions });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }

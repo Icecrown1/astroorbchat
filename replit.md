@@ -18,6 +18,21 @@ Astro Orb is a Telegram Mini App that provides AI-powered astrology readings wit
 - Normalized address handling for both raw (0:...) and friendly (EQ...) formats
 - Proper error handling with detailed logging for payment debugging
 
+**Reading Persistence System:**
+- Added 4 new database tables for storing astrology readings:
+  - `natal_readings`: Natal chart data with planets (JSONB), aspects (JSONB), and AI interpretations
+  - `horoscope_readings`: Horoscope forecasts with period and generated content
+  - `compatibility_readings`: Compatibility analyses with partner information
+  - `ai_questions`: User questions and AI-generated answers
+- Updated storage interface with methods to create and retrieve reading history
+- All astrology endpoints now persist readings to database
+- Added GET endpoints for retrieving reading history:
+  - `/api/astrology/natal/history` - Get past natal chart readings
+  - `/api/astrology/horoscope/history` - Get horoscope history
+  - `/api/astrology/compatibility/history` - Get compatibility readings
+  - `/api/astrology/ask/history` - Get AI question history
+- Implemented pagination with configurable limits for history retrieval
+
 **Test Infrastructure:**
 - Added `/api/auth/test` endpoint for development testing (NODE_ENV=development only)
 - Creates test users without requiring Telegram initData
