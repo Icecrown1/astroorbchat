@@ -125,13 +125,20 @@ export default function Register() {
       }
 
       const result = await response.json();
+      console.log('Registration result:', result);
 
       if (!response.ok) {
         throw new Error(result.error || `Request failed with status ${response.status}`);
       }
 
       if (result.ok && result.data) {
+        console.log('Setting auth with user:', result.data.user);
+        console.log('Token:', result.data.token);
         setAuth(result.data.user, result.data.token);
+        
+        // Wait a bit for auth to be saved
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         toast({
           title: 'Welcome to Astro Orb!',
           description: 'Your cosmic journey begins now.',
