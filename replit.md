@@ -6,6 +6,22 @@ Astro Orb is a Telegram Mini App that provides AI-powered astrology readings wit
 
 ## Recent Changes (October 11, 2025)
 
+**Russian Localization (Complete):**
+- Implemented full bilingual support (English/Russian) using LocaleContext and translations.ts
+- Language switcher in Settings page allows instant language switching
+- All 14 pages fully localized with useTranslation hook
+- Zod validation schemas use useMemo with locale-dependent error messages
+- Toast notifications and error messages localized
+- Form validation messages switch languages dynamically
+- Locale persists in localStorage for user preference
+
+**Canvas Chart Rendering Fix:**
+- Fixed "string did not match expected pattern" error in ChartCanvas component
+- Canvas 2D API does not support CSS variables directly (var(--color))
+- Implemented getComputedStyle to retrieve actual CSS color values
+- All chart colors now properly computed from theme tokens
+- Natal chart visualization renders correctly with theme colors
+
 **Navigation System Updates:**
 - Fixed wouter v3 compatibility: All pages now use `const [, navigate] = useLocation()` instead of deprecated `useNavigate()`
 - Updated all 11 page components to use correct navigation pattern
