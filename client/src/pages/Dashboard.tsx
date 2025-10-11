@@ -16,6 +16,7 @@ import {
   CreditCard,
   Users,
   Settings as SettingsIcon,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
@@ -131,7 +132,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-3 mt-8">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-8">
           <Button
             variant="outline"
             className="w-full"
@@ -158,6 +159,15 @@ export default function Dashboard() {
           >
             <Users className="w-4 h-4 mr-2" />
             Referrals
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate('/payment-history')}
+            data-testid="button-payment-history"
+          >
+            <Receipt className="w-4 h-4 mr-2" />
+            Payments
           </Button>
         </div>
       </div>

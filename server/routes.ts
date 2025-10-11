@@ -401,6 +401,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/payments/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const payments = await storage.getPaymentsByUserId(userId);
+      res.json({ ok: true, data: payments });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/referral/code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
