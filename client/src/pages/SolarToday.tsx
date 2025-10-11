@@ -7,23 +7,19 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sun } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useEnergy } from '@/store/useEnergy';
 
 export default function SolarToday() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { decreaseEnergy } = useEnergy();
   const [solarData, setSolarData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/solar', {});
-      if (!response.ok) throw new Error(response.error || 'Failed to generate solar chart');
       return response.data;
     },
     onSuccess: (data) => {
       setSolarData(data);
-      decreaseEnergy(1);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Solar Chart Generated',

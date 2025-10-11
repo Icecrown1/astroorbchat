@@ -2,8 +2,16 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    try {
+      const json = await res.json();
+      throw new Error(json.error || json.message || res.statusText);
+    } catch (e) {
+      if (e instanceof Error && e.message !== res.statusText) {
+        throw e;
+      }
+      const text = res.statusText || `Request failed with status ${res.status}`;
+      throw new Error(text);
+    }
   }
 }
 
@@ -30,7 +38,7 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
+): Promise<any> {
   const headers = {
     ...getAuthHeaders(),
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -44,7 +52,10 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return res;
+  
+  // Parse and return JSON response
+  const json = await res.json();
+  return json;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

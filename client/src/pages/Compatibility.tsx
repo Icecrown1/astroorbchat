@@ -12,7 +12,6 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Heart } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useEnergy } from '@/store/useEnergy';
 
 const compatibilitySchema = z.object({
   partnerName: z.string().min(1, 'Partner name is required'),
@@ -24,7 +23,6 @@ const compatibilitySchema = z.object({
 export default function Compatibility() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { decreaseEnergy } = useEnergy();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
 
   const form = useForm({
@@ -47,12 +45,10 @@ export default function Compatibility() {
           place: data.partnerPlace || null,
         },
       });
-      if (!response.ok) throw new Error(response.error || 'Failed to generate compatibility analysis');
       return response.data;
     },
     onSuccess: (data) => {
       setCompatibilityData(data);
-      decreaseEnergy(2);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Compatibility Analysis Complete',

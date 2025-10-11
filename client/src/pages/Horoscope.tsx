@@ -14,24 +14,20 @@ import {
 } from '@/components/ui/select';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useEnergy } from '@/store/useEnergy';
 
 export default function Horoscope() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { decreaseEnergy } = useEnergy();
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [horoscopeData, setHoroscopeData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/horoscope', { period });
-      if (!response.ok) throw new Error(response.error || 'Failed to generate horoscope');
       return response.data;
     },
     onSuccess: (data) => {
       setHoroscopeData(data);
-      decreaseEnergy(1);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Horoscope Generated',

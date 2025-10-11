@@ -12,7 +12,6 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useEnergy } from '@/store/useEnergy';
 
 const askSchema = z.object({
   question: z.string().min(10, 'Question must be at least 10 characters'),
@@ -21,7 +20,6 @@ const askSchema = z.object({
 export default function Ask() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { decreaseEnergy } = useEnergy();
   const [answer, setAnswer] = useState<string | null>(null);
 
   const form = useForm({
@@ -36,12 +34,10 @@ export default function Ask() {
       const response = await apiRequest('POST', '/api/astrology/ask', {
         question: data.question,
       });
-      if (!response.ok) throw new Error(response.error || 'Failed to get answer');
       return response.data;
     },
     onSuccess: (data) => {
       setAnswer(data.answer);
-      decreaseEnergy(1);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Answer Received',

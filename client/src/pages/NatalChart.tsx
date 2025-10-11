@@ -8,7 +8,6 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useEnergy } from '@/store/useEnergy';
 import {
   Accordion,
   AccordionContent,
@@ -19,18 +18,15 @@ import {
 export default function NatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { decreaseEnergy } = useEnergy();
   const [chartData, setChartData] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/natal', {});
-      if (!response.ok) throw new Error(response.error || 'Failed to generate chart');
       return response.data;
     },
     onSuccess: (data) => {
       setChartData(data);
-      decreaseEnergy(2);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Natal Chart Generated',
