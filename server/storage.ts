@@ -67,6 +67,12 @@ export interface IStorage {
   // AI question operations
   createAiQuestion(question: InsertAiQuestion): Promise<AiQuestion>;
   getAiQuestionsByUserId(userId: string, limit?: number): Promise<AiQuestion[]>;
+  
+  // Admin operations
+  getAllUsers(): Promise<User[]>;
+  getAllPayments(): Promise<Payment[]>;
+  getAllSubscriptions(): Promise<Subscription[]>;
+  updateUserEnergy(userId: string, energy: number): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -259,6 +265,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(aiQuestions.userId, userId))
       .orderBy(desc(aiQuestions.createdAt))
       .limit(limit);
+  }
+
+  // Admin operations
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getAllPayments(): Promise<Payment[]> {
+    return await db
+      .select()
+      .from(payments)
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async getAllSubscriptions(): Promise<Subscription[]> {
+    return await db
+      .select()
+      .from(subscriptions)
+      .orderBy(desc(subscriptions.createdAt));
+  }
+
+  async updateUserEnergy(userId: string, energy: number): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ energy, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
   }
 }
 

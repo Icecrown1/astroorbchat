@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import { storage } from "./storage";
-import { requireAuth } from "./middleware/auth";
+import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
@@ -488,6 +488,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/stats", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allPayments = await storage.getAllPayments();
+      const allSubscriptions = await storage.getAllSubscriptions();
+      
+      const totalRevenue = allPayments
+        .filter(p => p.status === "confirmed" || p.status === "completed")
+        .reduce((sum, p) => sum + parseFloat(p.amountUSD), 0);
+
+      const activeSubscriptions = allSubscriptions.filter(s => s.status === "active").length;
+      
+      const stats = {
+        totalUsers: allUsers.length,
+        totalRevenue: totalRevenue.toFixed(2),
+        activeSubscriptions,
+        totalPayments: allPayments.length,
+        recentUsers: allUsers.slice(0, 10),
+      };
+
+      res.json({ ok: true, data: stats });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json({ ok: true, data: users });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  const updateEnergySchema = z.object({
+    energy: z.number().int().min(0).max(1000),
+  });
+
+  app.post("/api/admin/users/:userId/energy", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const validated = updateEnergySchema.parse(req.body);
+      
+      await storage.updateUserEnergy(userId, validated.energy);
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  const updateSubscriptionSchema = z.object({
+    tier: z.enum(["standard", "pro"]),
+    status: z.enum(["active", "cancelled", "expired"]),
+  });
+
+  app.post("/api/admin/users/:userId/subscription", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const validated = updateSubscriptionSchema.parse(req.body);
+      
+      const existingSub = await storage.getSubscription(userId);
+      const startedAt = new Date();
+      const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+      
+      if (existingSub) {
+        await storage.updateSubscription(existingSub.id, {
+          tier: validated.tier,
+          status: validated.status,
+          currentPeriodEnd,
+        });
+      } else {
+        await storage.createSubscription({
+          userId,
+          tier: validated.tier,
+          status: validated.status,
+          startedAt,
+          currentPeriodEnd,
+        });
+      }
+      
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
       res.status(500).json({ ok: false, error: error.message });
     }
   });

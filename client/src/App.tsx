@@ -20,6 +20,7 @@ import Subscribe from '@/pages/Subscribe';
 import Referral from '@/pages/Referral';
 import Settings from '@/pages/Settings';
 import PaymentHistory from '@/pages/PaymentHistory';
+import Admin from '@/pages/Admin';
 
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/subscribe" component={Subscribe} />
       <Route path="/referral" component={Referral} />
       <Route path="/payment-history" component={PaymentHistory} />
+      <Route path="/admin" component={Admin} />
       <Route path="/settings" component={Settings} />
       <Route path="/" component={isAuthenticated ? Dashboard : Register} />
       <Route component={NotFound} />

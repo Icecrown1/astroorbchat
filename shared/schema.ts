@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   energyResetAt: timestamp("energy_reset_at").notNull().defaultNow(),
   referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
   referredById: varchar("referred_by_id", { length: 255 }),
+  isAdmin: boolean("is_admin").notNull().default(false),
 }, (table) => ({
   tgIdIdx: index("users_tg_id_idx").on(table.tgId),
   referralCodeIdx: index("users_referral_code_idx").on(table.referralCode),
