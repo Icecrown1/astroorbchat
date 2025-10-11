@@ -1,0 +1,399 @@
+MEGA PROMPT ДЛЯ REPLIT — СОЗДАТЬ TELEGRAM MINI APP «ASTRO ORB»
+
+Создай полностью рабочий Telegram Mini App «Astro Orb» с оплатами через TON, ChatGPT-движком для астрологии и геймификацией. Делай монорепозиторий со следующими требованиями — без заглушек, без «TODO», без недостающих файлов. Все ключи и конфиги — через .env (а в репозитории — файл .env.sample с примерами значений). Добавь авто-проверки, линтинг и базовое покрытие тестами.
+
+1) Технологический стек
+
+Frontend: React + Vite + TypeScript + Telegram WebApp SDK, Zustand (стейт), React Router, TanStack Query, TonConnect UI (@tonconnect/ui-react), Day.js (таймзоны), Zod (валидация).
+
+Backend: Node.js 20 + TypeScript + Express + Zod, OpenAI API (модель gpt-4o-mini), astronomia и astronomy-engine для карт; собственная реализация Ba Zi (Небесные стволы/Земные ветви), Prisma ORM.
+
+DB: PostgreSQL (таблицы ниже), миграции Prisma.
+
+Auth: Telegram initData (проверка подписи) + сессии по JWT (short-lived, refresh).
+
+Payments: TonConnect (основной флоу), поддержка on-chain платежей в TON; прайс в USD, конвертируем в TON через TonAPI (публичные эндпойнты). Фоллбек: фиксированный курс в .env.
+
+Deploy: Docker + docker-compose (web, api, db, nginx), готовность к Railway/Render/Fly.io.
+
+Код-стайл: ESLint, Prettier, Husky + lint-staged, commitlint (Conventional Commits).
+
+Тесты: Vitest (frontend), Jest (backend) + Supertest для API.
+
+2) Бизнес-логика и геймдизайн
+
+Ежедневная энергия: 10 «гадальных шаров» (energy). Стандартная подписка: 100 шаров/день, «Хорошая» подписка: 250 шаров/день.
+
+Цена подписок: Standard = 9 USD/месяц, Pro = 15 USD/месяц (в TON по курсу TonAPI). Разовый докуп шаров пакетами: 20 / 50 / 120.
+
+Реферальная система: уникальный ref_code у каждого пользователя. Бонус пригласившему: +5 шаров за подтверждённую регистрацию и +10 шаров при оплате подписки приглашённым.
+
+Траты энергии:
+
+Натальная карта: 2 шара
+
+Соляр на день: 1 шар
+
+Прогноз/гороскоп: 1 шар
+
+Совместимость: 2 шара
+
+Запрос «любой вопрос к ИИ»: 1 шар
+
+Дневной ресет энергии в 00:00 локального времени пользователя (хранить timezone).
+
+3) Фичи астрологии (конкретика)
+
+Регистрация: имя, дата рождения (YYYY-MM-DD), время (HH:mm, опционально), место (город/страна, опционально), пол, возраст.
+
+Натальная карта: вычислить положения планет (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn) и основных аспектов (конъюнкция, секстиль, квадрат, тригон, оппозиция) с орбисом 6°. Использовать astronomia/astronomy-engine.
+
+Солярная карта «на сегодня»: вычислить солнечное возвращение относительно текущей даты пользователя.
+
+Совместимость: сопоставление двух натальных карт + краткий отчёт.
+
+Ba Zi (четыре столпа судьбы): вычисление Небесных стволов и Земных ветвей по дате рождения; не использовать внешние API — реализовать локально.
+
+Формирование текстов: OpenAI (gpt-4o-mini) с function-calling. Модели получают структурированные входы (JSON из расчётов) и возвращают консистентные, короткие и прикладные ответы (до 250–400 слов), без эзотерической «воды», с чёткими тезисами и советами.
+
+4) Структура монорепозитория
+astro-orb/
+  apps/
+    web/                    # React + Vite мини-приложение (Telegram WebApp)
+      index.html
+      vite.config.ts
+      src/
+        main.tsx
+        App.tsx
+        routes/
+          Home.tsx
+          Register.tsx
+          Dashboard.tsx
+          NatalChart.tsx
+          SolarToday.tsx
+          Horoscope.tsx
+          Compatibility.tsx
+          BuyEnergy.tsx
+          Subscribe.tsx
+          Referral.tsx
+          Settings.tsx
+        components/
+          Layout.tsx
+          EnergyBadge.tsx
+          PayTonButton.tsx
+          ChartCanvas.tsx          # отрисовка простых круговых диаграмм домов/аспектов (canvas)
+          Input.tsx
+          Select.tsx
+          DateTimePicker.tsx
+          Loader.tsx
+          Toast.tsx
+        store/useAuth.ts
+        store/useEnergy.ts
+        lib/telegram.ts
+        lib/ton.ts
+        lib/api.ts
+        styles.css
+    api/                    # Express + Prisma
+      src/
+        index.ts
+        env.ts
+        prisma.ts
+        auth/
+          verifyTelegram.ts
+          jwt.ts
+        payments/
+          tonconnect.ts
+          webhooks.ts
+          price.ts
+        astrology/
+          natal.ts
+          solar.ts
+          bazi.ts
+          compatibility.ts
+          openai.ts
+          prompts/
+            natal.md
+            solar.md
+            horoscope.md
+            compatibility.md
+            ask.md
+        referrals/
+          referrals.ts
+        routes/
+          auth.ts
+          user.ts
+          energy.ts
+          astrology.ts
+          payments.ts
+          referrals.ts
+        middleware/
+          requireAuth.ts
+          error.ts
+        tests/
+          api.spec.ts
+      package.json
+      tsconfig.json
+      jest.config.ts
+  packages/
+    ui/                      # общие компоненты (если нужно)
+  prisma/
+    schema.prisma
+    seed.ts
+  .env.sample
+  docker-compose.yml
+  Dockerfile.api
+  Dockerfile.web
+  nginx.conf
+  package.json
+  README.md
+
+5) Переменные окружения (.env.sample) — укажи реальные ключи как ПРИМЕРЫ ФОРМАТА, но не боевые
+# Server
+NODE_ENV=development
+PORT=8787
+JWT_SECRET=dev_super_secret_jwt_please_change
+CLIENT_URL=http://localhost:5173
+SERVER_URL=http://localhost:8787
+
+# Database
+DATABASE_URL=postgresql://postgres:postgres@db:5432/astro_orb?schema=public
+
+# OpenAI
+OPENAI_API_KEY=sk_live_or_test_key_example_only
+
+# Telegram
+TELEGRAM_BOT_TOKEN=1234567890:AAExampleBotTokenValue
+TELEGRAM_BOT_USERNAME=astro_orb_bot
+
+# TON / pricing
+TON_NETWORK=mainnet
+TON_PRICE_FALLBACK_USD_PER_TON=7.50
+TON_WALLET_ADDRESS=EQCexampleTonAddressxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TON_CONNECT_MANIFEST_URL=${SERVER_URL}/.well-known/tonconnect-manifest.json
+TON_WEBHOOK_SECRET=change_me_webhook_secret
+
+6) Схема БД (Prisma) — создай миграции
+model User {
+  id               String   @id @default(cuid())
+  tgId             String   @unique
+  username         String?
+  name             String
+  gender           String   // "male" | "female" | "other"
+  age              Int
+  birthdayDate     DateTime
+  birthTime        String?  // "HH:mm" or null
+  birthPlace       String?  // free text
+  timezone         String   @default("Europe/Moscow")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  energy           Int      @default(10)
+  energyResetAt    DateTime
+  subscription     Subscription?
+  referralCode     String   @unique
+  referredById     String?
+  referredBy       User?    @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals        User[]   @relation("UserReferrals")
+  payments         Payment[]
+}
+
+model Subscription {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @unique
+  tier          String   // "standard" | "pro"
+  status        String   // "active" | "canceled" | "expired"
+  startedAt     DateTime
+  currentPeriodEnd DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  kind          String   // "subscription" | "energy_pack"
+  tier          String?  // "standard" | "pro" | null
+  energyAmount  Int?     // for packs
+  amountUSD     Decimal  @db.Decimal(10,2)
+  amountTON     Decimal  @db.Decimal(18,9)
+  txHash        String   @unique
+  status        String   // "pending" | "confirmed" | "failed"
+  createdAt     DateTime @default(now())
+}
+
+model UsageLog {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  feature   String   // "natal" | "solar" | "horoscope" | "compatibility" | "ask"
+  cost      Int
+  createdAt DateTime @default(now())
+}
+
+
+Создай индексы по User.tgId, User.referralCode, Payment.txHash, Subscription.userId.
+
+В seed.ts: создай тестового пользователя, несколько оплат, активную подписку, и стартовые тарифы в README.
+
+7) API (Express) — маршруты и контракты
+
+Все входы валидируй через Zod. Все ответы — JSON { ok: boolean, data?: any, error?: string }.
+
+POST /auth/telegram — принимает initData из Telegram WebApp, валидирует подпись, создаёт/обновляет пользователя, возвращает JWT + профиль с энергией.
+
+GET /user/me — профиль, энергия, подписка, рефералы.
+
+POST /user/update — обновление профиля (имя, пол, возраст, birthday, time, place, timezone).
+
+GET /energy — текущее количество, дата ресета.
+
+POST /energy/use — { feature } списывает энергию по таблице затрат и пишет UsageLog. Ошибки: недостаточно энергии.
+
+POST /astrology/natal — считает натал по данным пользователя, вызывает OpenAI с промптом prompts/natal.md, возвращает структурированный отчёт + короткий текст.
+
+POST /astrology/solar — соляр «на сегодня».
+
+POST /astrology/horoscope — общий/по знаку, на день/неделю. Вход: period: 'day'|'week'|'month'.
+
+POST /astrology/compatibility — вход: partner { name, date, time?, place? }.
+
+POST /astrology/ask — свободный вопрос, вход: question: string.
+
+GET /referral/code — отдаёт ref_code.
+
+POST /referral/apply — применяет ref_code другого пользователя (один раз); начисляет бонусы.
+
+GET /payments/price — возвращает цены: USD и эквивалент в TON (через TonAPI; фоллбек — .env курс).
+
+POST /payments/ton/create — генерирует payload для TonConnect, ожидаем on-chain оплату.
+
+POST /payments/ton/webhook — принимает подтверждение, верифицирует подпись/txHash, активирует подписку или начисляет энергию.
+
+GET /.well-known/tonconnect-manifest.json — отдает манифест TonConnect.
+
+8) Frontend — экраны и UX
+
+Использовать Telegram WebApp SDK: адаптивные цвета, MainButton, BackButton, HapticFeedback.
+
+Регистрация (Register): пошаговая форма (имя → дата/время/место → пол/возраст → часовой пояс). Валидация Zod, локаль RU.
+
+Dashboard: карточки «Натальная», «Соляр сегодня», «Гороскоп», «Совместимость», «Задать вопрос», «Купить шары», «Подписка», «Рефералы». Вверху — EnergyBadge.
+
+Платежи: компонент PayTonButton — инициализация TonConnect, отображение цены в TON, проверка статуса платежа, обработка успеха/ошибки.
+
+Рефералы: показывать личный ref_code, кнопку «Поделиться»; ввод кода друга.
+
+Мини-графики: ChartCanvas — рисует упрощённую круговую схему домов и аспекты (без внешних зависимостей).
+
+Локализация RU (простая), все тексты — конкретные.
+
+9) Астрология — алгоритмы (без магии слов)
+
+Натал:
+
+Получить JDE даты/времени рождения (если нет времени — считать полудень).
+
+Вычислить эклиптические долготы планет (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn).
+
+Рассчитать аспекты между ними (орбис 6°, точность до 0.1°).
+
+Определить знак Солнца/Луны, дом для Солнца (упрощённо — Placidus либо равные дома; выбери равные дома для стабильности).
+
+Соляр:
+
+Найти момент, когда солнечная долгота равна натальной солнечной долготе в текущем году пользователя; использовать ближайшее UTC-время к «сегодня».
+
+Ba Zi:
+
+Реализовать вычисление стволов/ветвей для года, месяца, дня (и часа, если дан) по григорианской дате. Вернуть четыре столпа и стихии.
+
+Все вычисления — в отдельных модулях astrology/*.ts. Покрой unit-тестами базовые кейсы (ожидаемые ветви/стволы для нескольких дат).
+
+10) OpenAI — промпты (создай файлы с готовым текстом)
+
+prompts/natal.md — «Ты — строгий практичный астролог-аналитик. У тебя есть структурированные расчёты… Верни: 5 ключевых черт личности, 3 сильные стороны, 3 риски, 3 практических совета».
+
+prompts/solar.md — «Сформируй краткий прогноз на сегодня по соляру… фокус на действиях и таймингах».
+
+prompts/horoscope.md — «Сделай прикладной гороскоп на период … без общих фраз, перечисление в пунктах».
+
+prompts/compatibility.md — «Сопоставь две карты… верни совместимость по 10-балльной шкале + 5 конкретных советов».
+
+prompts/ask.md — «Отвечай как астролог-практик, используй предоставленные расчёты, никаких эзотерических штампов».
+
+Реализуй function calling: функция принимает JSON расчётов и метаданные пользователя; модель возвращает структурированный JSON + короткое объяснение.
+
+11) Энергия, подписки, пакеты
+
+Крон-таск (node-cron) ресета энергии по таймзоне пользователя.
+
+energy.use(feature) — атомарно в транзакции: проверить подписку (если активна — игнорировать лимит? НЕТ; по ТЗ подписки увеличивают дневной лимит до 100/250), списать, записать лог.
+
+Пакеты: 20/50/120 шаров за 2/4/8 USD (конверсия в TON на лету).
+
+12) Оплата TON (TonConnect)
+
+Поддержи отправку на указанный TON_WALLET_ADDRESS с payload (для сопоставления платежа).
+
+Проверка статуса (webhook + периодический поллинг TonAPI по txHash).
+
+Безопасность: подпись вебхука по TON_WEBHOOK_SECRET. Отсекай повторные уведомления.
+
+13) Безопасность и защита
+
+Верификация Telegram initData по документации.
+
+JWT: access 15 мин, refresh 30 дней; роут для обновления.
+
+Rate limit: 60 rph по IP и 600 rph по tgId.
+
+Валидация Zod на всех входах. Санитизация строк.
+
+Логи (pino), CORS только с CLIENT_URL.
+
+14) Тесты
+
+Бэкенд: Jest + Supertest для /auth/telegram, /energy/use, /payments/ton/webhook, /astrology/natal.
+
+Фронт: Vitest для сторов и утилит.
+
+Добавь GitHub Actions: build, lint, test.
+
+15) Docker / Dev Experience
+
+docker-compose up поднимет db, api на 8787, web на 5173, nginx на 8080 (проксирует /api).
+
+README.md: пошаговый запуск локально и в Docker, инструкция как подключить Mini App к боту (команда /setdomain у @BotFather, Web App URL).
+
+Сгенерируй nginx.conf с кешем статики и прокси на API.
+
+16) UI детали
+
+Светлая/тёмная темы, адаптация под Telegram theme params.
+
+Визуал энергии: иконка «магического шара», badge с числом, анимация при списании.
+
+Тексты на русском, чёткие, без эзотерической воды.
+
+Экран «Профиль»: дата/время/место рождения редактируемы.
+
+17) Готовые демо-данные
+
+В seed.ts создай пользователя @demo_user с валидным профилем и 25 шарами, активной подпиской standard, рефкодом DEMO25, и 3 логами использования. Объясни в README, как зайти через тестовый initData.
+
+18) Никаких заглушек
+
+Все файлы, описанные выше, реально создать и наполнить кодом. Не оставлять незаполненных компонент и «TODO».
+
+Все промпты в prompts/*.md — с готовыми текстами.
+
+.env.sample — с примерами корректных форматов значений.
+
+Проект должен собираться и стартовать «из коробки» командой:
+
+Dev: docker-compose up --build
+
+Local (без Docker): pnpm i && pnpm -r build && pnpm -r dev
+
+Сгенерируй код сейчас.
