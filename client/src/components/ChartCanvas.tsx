@@ -25,7 +25,8 @@ const ZODIAC_SIGNS = [
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
 ];
 
-const ZODIAC_SYMBOLS = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+// Используем текстовые символы без вариационных селекторов для правильного цвета
+const ZODIAC_SYMBOLS = ['♈︎', '♉︎', '♊︎', '♋︎', '♌︎', '♍︎', '♎︎', '♏︎', '♐︎', '♑︎', '♒︎', '♓︎'];
 
 const PLANET_SYMBOLS: Record<string, string> = {
   'Sun': '☉',
@@ -114,7 +115,7 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Draw zodiac sign labels with symbols and element colors
+      // Draw zodiac sign labels with element colors
       const labelAngle = ((i * 30 + 15) - 90) * (Math.PI / 180);
       const labelRadius = (outerRadius + innerRadius) / 2;
       const labelX = center + Math.cos(labelAngle) * labelRadius;
@@ -124,8 +125,17 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       const element = SIGN_ELEMENTS[signName];
       const elementColor = ELEMENT_COLORS[element];
 
+      // Рисуем цветной круг за символом
       ctx.fillStyle = elementColor;
-      ctx.font = '18px Inter';
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.arc(labelX, labelY, 16, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Рисуем символ
+      ctx.fillStyle = elementColor;
+      ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(ZODIAC_SYMBOLS[i], labelX, labelY);
@@ -156,37 +166,47 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       }
     });
 
-    // Draw planets
-    planets.forEach((planet) => {
+    // Умное размещение планет - если близко друг к другу, размещаем на разных радиусах
+    const sortedPlanets = [...planets].sort((a, b) => a.position - b.position);
+    const planetPositions: { planet: Planet; radius: number; layer: number }[] = [];
+    
+    sortedPlanets.forEach((planet, index) => {
+      let layer = 0;
+      let tooClose = true;
+      
+      // Проверяем, не слишком ли близко к уже размещенным планетам
+      while (tooClose && layer < 3) {
+        tooClose = false;
+        for (const placed of planetPositions) {
+          if (placed.layer === layer) {
+            const angleDiff = Math.abs(planet.position - placed.planet.position);
+            const minAngleDiff = angleDiff > 180 ? 360 - angleDiff : angleDiff;
+            if (minAngleDiff < 15) { // Если ближе 15 градусов
+              tooClose = true;
+              break;
+            }
+          }
+        }
+        if (tooClose) layer++;
+      }
+      
+      const radius = planetRadius - (layer * 25);
+      planetPositions.push({ planet, radius, layer });
+    });
+
+    // Рисуем планеты только как символы
+    planetPositions.forEach(({ planet, radius }) => {
       const angle = (planet.position - 90) * (Math.PI / 180);
-      const x = center + Math.cos(angle) * planetRadius;
-      const y = center + Math.sin(angle) * planetRadius;
+      const x = center + Math.cos(angle) * radius;
+      const y = center + Math.sin(angle) * radius;
 
-      // Planet dot
+      // Символ планеты
+      const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 1);
       ctx.fillStyle = primaryColor;
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Planet glow
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, 12);
-      const primaryHsl = computedStyle.getPropertyValue('--primary').trim().split(' ');
-      gradient.addColorStop(0, `hsla(${primaryHsl[0]}, ${primaryHsl[1]}, ${primaryHsl[2]}, 0.5)`);
-      gradient.addColorStop(1, `hsla(${primaryHsl[0]}, ${primaryHsl[1]}, ${primaryHsl[2]}, 0)`);
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(x, y, 12, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Planet label with symbol
-      const labelX = center + Math.cos(angle) * (planetRadius - 20);
-      const labelY = center + Math.sin(angle) * (planetRadius - 20);
-      ctx.fillStyle = foregroundColor;
-      ctx.font = 'bold 16px Inter';
+      ctx.font = 'bold 20px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 3);
-      ctx.fillText(planetSymbol, labelX, labelY);
+      ctx.fillText(planetSymbol, x, y);
     });
 
   }, [planets, aspects]);
