@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
+import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -21,6 +22,7 @@ export default function NatalChart() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [chartData, setChartData] = useState<any>(null);
+  const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
 
   // Загружаем профиль пользователя, чтобы проверить есть ли сохранённая натальная карта
   const { data: userData, isLoading: userLoading } = useQuery<any>({
@@ -117,9 +119,15 @@ export default function NatalChart() {
           <div className="space-y-6">
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">{t.natalChart.chartVisualization}</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                {locale === 'ru' 
+                  ? 'Нажмите на планету для подробной интерпретации' 
+                  : 'Click on a planet for detailed interpretation'}
+              </p>
               <ChartCanvas
                 planets={chartData.planets || []}
                 aspects={chartData.aspects || []}
+                onPlanetClick={setSelectedPlanet}
               />
             </Card>
 
@@ -189,6 +197,11 @@ export default function NatalChart() {
           </div>
         )}
       </div>
+
+      <PlanetModal 
+        planet={selectedPlanet} 
+        onClose={() => setSelectedPlanet(null)} 
+      />
     </div>
   );
 }

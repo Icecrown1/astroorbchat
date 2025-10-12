@@ -9,7 +9,7 @@ import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBon
 import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
-import { getAstrologyInterpretation } from "./lib/openai";
+import { getAstrologyInterpretation, getPlanetInterpretation, type PlanetInterpretationData } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { z } from "zod";
 import dayjs from 'dayjs';
@@ -287,6 +287,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('Natal chart calculation error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Роут для интерпретации отдельной планеты (БЕЗ списания энергии)
+  app.post("/api/astrology/planet-interpretation", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { planet, locale = 'ru' } = req.body;
+      
+      // Валидация планеты
+      const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
+      if (!planet || !validPlanets.includes(planet)) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: 'Invalid planet. Must be one of: ' + validPlanets.join(', ') 
+        });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // Получаем сохраненную натальную карту пользователя
+      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: 'Natal chart not found. Please generate your natal chart first.' 
+        });
+      }
+
+      const savedChart = user.natalChart as NatalChartResult;
+      const planetData = savedChart.planets[planet];
+      
+      if (!planetData) {
+        return res.status(404).json({ 
+          ok: false, 
+          error: `Planet ${planet} not found in your natal chart` 
+        });
+      }
+
+      // Определяем дом, в котором находится планета
+      const findHouse = (longitude: number): number => {
+        if (!savedChart.houses || !Array.isArray(savedChart.houses.cusps)) return 1;
+        
+        const cusps = savedChart.houses.cusps;
+        
+        // Перебираем дома и находим, в какой попадает планета
+        for (let i = 0; i < 12; i++) {
+          const houseStart = cusps[i];
+          const nextHouseStart = cusps[(i + 1) % 12];
+          
+          // Учитываем переход через 0 градусов
+          if (houseStart > nextHouseStart) {
+            if (longitude >= houseStart || longitude < nextHouseStart) {
+              return i + 1;
+            }
+          } else {
+            if (longitude >= houseStart && longitude < nextHouseStart) {
+              return i + 1;
+            }
+          }
+        }
+        return 1; // Fallback
+      };
+
+      const house = findHouse(planetData.longitude);
+
+      // Получаем аспекты планеты (если они есть)
+      const chartAspects = (savedChart as any).aspects || [];
+      const planetAspects = chartAspects.filter((aspect: any) => 
+        aspect.planet1 === planet || aspect.planet2 === planet
+      ).map((aspect: any) => ({
+        to: aspect.planet1 === planet ? aspect.planet2 : aspect.planet1,
+        type: aspect.type,
+        orb_deg: aspect.orb
+      }));
+
+      // Формируем данные для интерпретации
+      const interpretationData: PlanetInterpretationData = {
+        planet: {
+          name: planet,
+          sign: planetData.sign,
+          house,
+          aspects: planetAspects
+        },
+        profile: {
+          name: user.name,
+          age: user.birthdayDate ? new Date().getFullYear() - new Date(user.birthdayDate).getFullYear() : undefined,
+          gender: user.gender || undefined
+        }
+      };
+
+      // Получаем интерпретацию от AI
+      const interpretation = await getPlanetInterpretation(interpretationData, locale);
+
+      res.json({
+        ok: true,
+        data: interpretation
+      });
+    } catch (error: any) {
+      console.error('Planet interpretation error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

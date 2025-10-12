@@ -1,0 +1,155 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: добавить интерактивные пояснения к положениям планет в натальной карте Astro Orb. При клике по планете в визуализации открывается модальное окно с персональным объяснением вида «Солнце в Скорпионе — что это значит для тебя», с учётом знака и дома. Никаких заглушек и TODO.
+
+## Контекст проекта
+- Фронтенд: apps/web (React + Vite + TS), компонент визуализации `src/components/ChartCanvas.tsx` и экран `src/routes/NatalChart.tsx`.
+- Бэкенд: apps/api (Express + TS), расчёты в `src/astrology/*`, OpenAI в `src/astrology/openai.ts`, существующие промпты в `src/astrology/prompts/*`.
+- БД: Postgres/Prisma (изменений схемы нет).
+- Энергия: действие «натальная карта» уже списывает энергию. Пояснения по кликнутым планетам в рамках текущей натальной сессии — **без дополнительного списания**.
+
+## Изменить
+
+### Backend (apps/api)
+
+1) Новый промпт:
+   - Создать файл `apps/api/src/astrology/prompts/planet.md` со следующим содержимым (полный текст, без заглушек):
+     ```
+     Ты — строгий прикладной астролог. На входе у тебя структура:
+     {
+       "profile": { "name": string, "age": number, "gender": string },
+       "planet": { "name": "Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn", "sign": string, "house": number, "aspects": [{ "to": string, "type": "conjunction|sextile|square|trine|opposition", "orb_deg": number }] },
+       "context": { "timezone": string, "locale": "ru" }
+     }
+
+     ЗАДАЧА: Кратко и прикладно объяснить, что значит это положение планеты ДЛЯ КОНКРЕТНОГО ЧЕЛОВЕКА.
+     Формат ответа JSON:
+     {
+       "title": "Солнце в Скорпионе",
+       "summary": "3–4 предложения по сути без воды",
+       "strengths": ["пункт 1", "пункт 2", "пункт 3"],
+       "risks": ["пункт 1", "пункт 2"],
+       "advice": ["конкретный шаг 1", "конкретный шаг 2", "конкретный шаг 3"],
+       "house_note": "1 коротная фраза, как дом модифицирует значение"
+     }
+
+     Правила:
+     - Ни единой эзотерической воды, только практическая польза.
+     - Если аспектов нет, поле aspects игнорируй.
+     - Пиши на русском, просто и по делу.
+     ```
+
+2) Новый use-case в OpenAI-обёртке:
+   - В `apps/api/src/astrology/openai.ts` добавить экспортируемую функцию `interpretPlanet(input)`, которая:
+     - валидирует вход (Zod),
+     - читает `prompts/planet.md`,
+     - вызывает модель `gpt-4o-mini` с function-calling ОТКЛЮЧЕНЫМ (прямой JSON-парсинг по `response_format: "json_object"` или аналог),
+     - возвращает строго распарсенный объект `{ title, summary, strengths, risks, advice, house_note }`.
+     - При ошибке валидации/парсинга — выбрасывает HTTP 400 с понятным сообщением.
+
+3) Новый роут:
+   - В `apps/api/src/routes/astrology.ts` добавить `POST /astrology/planet`:
+     - **Auth**: требуется JWT.
+     - Тело запроса Zod:
+       ```ts
+       {
+         planet: z.enum(["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn"])
+       }
+       ```
+     - Логика:
+       - Получить пользователя из JWT (`req.user.id`).
+       - По данным пользователя вычислить или получить из уже существующей функции `computeNatal(user)` положения планет, знак и дом.
+       - Найти объект по `planet` и построить вход `interpretPlanet`.
+       - Вызвать `interpretPlanet` и вернуть `{ ok: true, data }`.
+     - **Списание энергии**: не списывать (эта операция считается детализацией уже построенной натальной карты в текущий день).
+     - Обработать ошибки: 404 если планета не найдена; 429 если превышен rate limit (использовать общий middleware); 500 — общий.
+
+4) Тесты:
+   - В `apps/api/src/tests/api.spec.ts` добавить кейсы:
+     - `POST /astrology/planet` c валидным JWT и `{"planet":"Sun"}` → `200`, содержит поля `title, summary, strengths, risks, advice, house_note`.
+     - Невалидный `planet` → `400`.
+     - Без JWT → `401`.
+
+### Frontend (apps/web)
+
+1) Доработка hit-testing в канвасе:
+   - В `apps/web/src/components/ChartCanvas.tsx`:
+     - Хранить массив экранных координат всех планет: `{ name: "Sun|Moon|Mercury|Venus|Mars|Jupiter|Saturn", x, y, sign: string, house: number }`.
+     - Добавить обработчик `onClick`:
+       - определить ближайшую планету к точке клика (по евклидовой дистанции) с допуском радиуса попадания ~16–20px,
+       - если попали — вызвать `props.onPlanetClick(planetName)`.
+     - Обеспечить, что визуальные изменения из предыдущей задачи (контрастные символы/полные заливки/границы) сохранены.
+
+2) Модальное окно с пояснением:
+   - Создать `apps/web/src/components/PlanetModal.tsx` (полный файл):
+     - Пропсы: `{ planet: "Sun"|"Moon"|...|null, onClose: () => void }`.
+     - При `planet != null` — делать запрос `POST /api/astrology/planet` с `{ planet }` (через `lib/api.ts` с авторизацией).
+     - Состояния: loading, error, data.
+     - Рендер:
+       - Заголовок `data.title`
+       - Блоки:
+         - Кратко (`data.summary`)
+         - Сильные стороны (список `strengths`)
+         - Риски (список `risks`)
+         - Советы (список `advice`)
+         - Примечание по дому (`house_note`)
+       - Кнопка закрытия.
+     - Доступность: закрытие по Esc и клику по бэкдропу; фокус-ловушка.
+
+3) Связка на экране натальной карты:
+   - В `apps/web/src/routes/NatalChart.tsx`:
+     - Ввести локальный `const [activePlanet, setActivePlanet] = useState<...>(null);`
+     - Передать в `ChartCanvas` проп `onPlanetClick={setActivePlanet}`.
+     - Подключить `<PlanetModal planet={activePlanet} onClose={() => setActivePlanet(null)} />`.
+
+4) Клиент API:
+   - В `apps/web/src/lib/api.ts` добавить метод:
+     ```ts
+     export async function fetchPlanetInterpretation(planet: "Sun"|"Moon"|"Mercury"|"Venus"|"Mars"|"Jupiter"|"Saturn") {
+       return http.post('/astrology/planet', { planet }); // http — уже существующая обёртка с JWT
+     }
+     ```
+   - Использовать его в `PlanetModal`.
+
+5) UI-детали:
+   - Заголовок модалки стилизовать под выбранную золотую/бронзовую гамму из натальной карты (использовать те же константы THEME_COLORS).
+   - В мобильной версии — рендер как bottom-sheet с высотой 75% экрана, скролл содержимого, фиксированная панель заголовка.
+
+6) Тесты (Vitest):
+   - Снапшот-тест `PlanetModal` для состояний loading/success/error.
+   - E2E-подобный тест рендера `ChartCanvas` клика и вызова `onPlanetClick` (можно замокать контекст canvas с `jest-canvas-mock` или аналогом для Vitest).
+
+### README
+- В `README.md` добавить раздел «Пояснения по планетам»:
+  - Как это работает (клик по планете → модальное пояснение).
+  - Энергия не списывается повторно, если уже построена натальная карта сегодня.
+  - Снимок экрана (добавить ссылку `docs/planet-modal.png` — сгенерировать простой мок в репозитории).
+
+## Правила выполнения
+1) Все изменённые и новые файлы вывести ПОЛНОСТЬЮ (не diff).
+2) Без заглушек и TODO. Рабочий код.
+3) Никаких изменений в схеме БД.
+4) Пройти `pnpm -r build && pnpm -r test` локально.
+5) Соблюсти существующие линтеры/форматтеры.
+
+## Acceptance Criteria
+- Клик по любой планете на натальной карте открывает модалку/боттом-шит с персональным объяснением.
+- Бэкенд-роут `POST /astrology/planet` возвращает корректный JSON с полями `title, summary, strengths, risks, advice, house_note`.
+- Энергия не списывается при запросе пояснения.
+- Покрыты тестами: API-роут (успех/ошибки) и UI-компонент (загрузки/успех/ошибка).
+- Визуальные настройки натальной карты (полная заливка секторов, контрастные знаки, равномерная жирность) сохранены.
+- Никаких TODO/заглушек.
+
+## Вывести полный список затронутых файлов
+- apps/api/src/astrology/prompts/planet.md
+- apps/api/src/astrology/openai.ts
+- apps/api/src/routes/astrology.ts
+- apps/api/src/tests/api.spec.ts
+- apps/web/src/components/ChartCanvas.tsx
+- apps/web/src/components/PlanetModal.tsx
+- apps/web/src/routes/NatalChart.tsx
+- apps/web/src/lib/api.ts
+- README.md
+- docs/planet-modal.png (добавить демонстрационный файл-изображение)
+
+[END REPLIT PROMPT]

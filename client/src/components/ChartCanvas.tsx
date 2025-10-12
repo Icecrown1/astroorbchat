@@ -14,10 +14,18 @@ interface Aspect {
   angle: number;
 }
 
+interface PlanetPosition {
+  name: string;
+  x: number;
+  y: number;
+  sign: string;
+}
+
 interface ChartCanvasProps {
   planets: Planet[];
   aspects: Aspect[];
   className?: string;
+  onPlanetClick?: (planetName: string) => void;
 }
 
 const ZODIAC_SIGNS = [
@@ -73,8 +81,9 @@ const ASPECT_COLORS: Record<string, string> = {
   opposition: '#f59e0b', // amber
 };
 
-export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
+export function ChartCanvas({ planets, aspects, className, onPlanetClick }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const planetPositionsRef = useRef<PlanetPosition[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,6 +100,9 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
 
     // Clear canvas
     ctx.clearRect(0, 0, size, size);
+    
+    // Сбрасываем позиции планет
+    planetPositionsRef.current = [];
 
     // 1. Рисуем центральную заливку
     const centerGradient = ctx.createRadialGradient(center, center, 0, center, center, innerRadius * 0.3);
@@ -225,6 +237,14 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       const x = center + Math.cos(angle) * radius;
       const y = center + Math.sin(angle) * radius;
 
+      // Сохраняем координаты для обработчика кликов
+      planetPositionsRef.current.push({
+        name: planet.name,
+        x,
+        y,
+        sign: planet.sign
+      });
+
       // Свечение планеты
       ctx.shadowColor = 'rgba(147, 51, 234, 0.6)';
       ctx.shadowBlur = 8;
@@ -242,12 +262,48 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
 
   }, [planets, aspects]);
 
+  // Обработчик кликов по canvas
+  const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onPlanetClick || planetPositionsRef.current.length === 0) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Находим ближайшую планету
+    const hitRadius = 20; // Радиус попадания в пикселях
+    let closestPlanet: PlanetPosition | undefined;
+    let minDistance = hitRadius;
+
+    for (const planet of planetPositionsRef.current) {
+      const distance = Math.sqrt(
+        Math.pow(clickX - planet.x, 2) + Math.pow(clickY - planet.y, 2)
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPlanet = planet;
+      }
+    }
+
+    if (closestPlanet) {
+      onPlanetClick(closestPlanet.name);
+    }
+  };
+
   return (
     <canvas
       ref={canvasRef}
       width={400}
       height={400}
-      className={cn('w-full h-auto', className)}
+      onClick={handleClick}
+      className={cn('w-full h-auto cursor-pointer', className)}
       data-testid="canvas-natal-chart"
     />
   );

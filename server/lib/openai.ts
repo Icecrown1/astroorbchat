@@ -93,3 +93,106 @@ Provide insightful, actionable advice grounded in astrological wisdom.`
 
   return completion.choices[0]?.message?.content || "Unable to generate interpretation at this time.";
 }
+
+export interface PlanetInterpretationData {
+  planet: {
+    name: string;
+    sign: string;
+    house: number;
+    aspects?: Array<{
+      to: string;
+      type: string;
+      orb_deg: number;
+    }>;
+  };
+  profile: {
+    name: string;
+    age?: number;
+    gender?: string;
+  };
+}
+
+export interface PlanetInterpretationResult {
+  title: string;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  advice: string[];
+  house_note: string;
+}
+
+export async function getPlanetInterpretation(
+  data: PlanetInterpretationData,
+  locale: string = 'ru'
+): Promise<PlanetInterpretationResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const prompt = `${languageInstruction}
+
+Ты — строгий прикладной астролог. На входе данные:
+
+Планета: ${data.planet.name}
+Знак: ${data.planet.sign}
+Дом: ${data.planet.house}
+${data.planet.aspects && data.planet.aspects.length > 0 ? `Аспекты: ${JSON.stringify(data.planet.aspects)}` : ''}
+
+Профиль: ${data.profile.name}${data.profile.age ? `, ${data.profile.age} лет` : ''}${data.profile.gender ? `, ${data.profile.gender}` : ''}
+
+ЗАДАЧА: Кратко и прикладно объясни, что значит это положение планеты ДЛЯ КОНКРЕТНОГО ЧЕЛОВЕКА.
+
+Верни ТОЛЬКО валидный JSON в формате:
+{
+  "title": "${data.planet.name} в ${data.planet.sign}",
+  "summary": "3-4 предложения по сути без воды",
+  "strengths": ["пункт 1", "пункт 2", "пункт 3"],
+  "risks": ["пункт 1", "пункт 2"],
+  "advice": ["конкретный шаг 1", "конкретный шаг 2", "конкретный шаг 3"],
+  "house_note": "1 короткая фраза, как ${data.planet.house}-й дом модифицирует значение"
+}
+
+Правила:
+- Ни единой эзотерической воды, только практическая польза
+- Пиши на ${locale === 'ru' ? 'русском' : 'английском'}, просто и по делу
+- Только JSON, никакого дополнительного текста`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик. Объясняешь положения планет конкретно и без воды. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer. You explain planetary positions concretely without fluff. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 2000
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate planet interpretation');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    return {
+      title: result.title || `${data.planet.name} в ${data.planet.sign}`,
+      summary: result.summary || '',
+      strengths: Array.isArray(result.strengths) ? result.strengths : [],
+      risks: Array.isArray(result.risks) ? result.risks : [],
+      advice: Array.isArray(result.advice) ? result.advice : [],
+      house_note: result.house_note || ''
+    };
+  } catch (e) {
+    throw new Error('Failed to parse planet interpretation response');
+  }
+}
