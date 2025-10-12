@@ -181,10 +181,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Если карта уже есть - просто генерируем новую интерпретацию
         const interpretation = await getAstrologyInterpretation("natal", user.natalChart, locale);
         
+        const savedChart = user.natalChart as any;
+        // Преобразуем planets из объекта в массив для фронтенда
+        const planetsArray = Object.entries(savedChart.planets).map(([name, data]: [string, any]) => ({
+          name,
+          ...data,
+        }));
+        
         res.json({
           ok: true,
           data: {
-            ...(user.natalChart as any),
+            planets: planetsArray,
+            houses: savedChart.houses,
+            angles: savedChart.angles,
+            aspects: [], // Python версия пока не рассчитывает аспекты
             interpretation,
           },
         });
@@ -218,6 +228,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         house_system: 'Placidus',
       });
 
+      // Преобразуем planets из объекта в массив для фронтенда
+      const planetsArray = Object.entries(pythonChart.planets).map(([name, data]) => ({
+        name,
+        ...data,
+      }));
+
       // Генерируем AI интерпретацию
       const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale);
 
@@ -237,7 +253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ok: true,
         data: {
-          ...pythonChart,
+          planets: planetsArray,
+          houses: pythonChart.houses,
+          angles: pythonChart.angles,
+          aspects: [], // Python версия пока не рассчитывает аспекты
           interpretation,
         },
       });
