@@ -185,7 +185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Преобразуем planets из объекта в массив для фронтенда
         const planetsArray = Object.entries(savedChart.planets).map(([name, data]: [string, any]) => ({
           name,
-          ...data,
+          sign: data.sign,
+          position: data.longitude, // Python возвращает longitude, фронтенд ожидает position
+          longitude: data.longitude,
+          latitude: data.latitude,
+          degree_in_sign: data.degree_in_sign,
         }));
         
         res.json({
@@ -229,17 +233,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Преобразуем planets из объекта в массив для фронтенда
-      const planetsArray = Object.entries(pythonChart.planets).map(([name, data]) => ({
+      const planetsArray = Object.entries(pythonChart.planets).map(([name, data]: [string, any]) => ({
         name,
-        ...data,
+        sign: data.sign,
+        position: data.longitude, // Python возвращает longitude, фронтенд ожидает position
+        longitude: data.longitude,
+        latitude: data.latitude,
+        degree_in_sign: data.degree_in_sign,
       }));
 
       // Генерируем AI интерпретацию
       const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale);
 
-      // Сохраняем натальную карту в профиле пользователя (бесплатно, навсегда)
+      // Сохраняем натальную карту С ИНТЕРПРЕТАЦИЕЙ в профиле пользователя (бесплатно, навсегда)
+      const chartToSave = {
+        ...pythonChart,
+        interpretation, // Добавляем интерпретацию в сохранённые данные
+      };
+      
       await storage.updateUser(userId, { 
-        natalChart: pythonChart as any 
+        natalChart: chartToSave as any 
       });
 
       // Также сохраняем в историю чтений

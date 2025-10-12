@@ -23,7 +23,7 @@ export default function NatalChart() {
   const [chartData, setChartData] = useState<any>(null);
 
   // Загружаем профиль пользователя, чтобы проверить есть ли сохранённая натальная карта
-  const { data: userData } = useQuery<any>({
+  const { data: userData, isLoading: userLoading } = useQuery<any>({
     queryKey: ['/api/user/me'],
   });
 
@@ -35,7 +35,8 @@ export default function NatalChart() {
     onSuccess: (data) => {
       setChartData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      if (!userData?.natalChart) {
+      const hadCachedChart = userData?.natalChart;
+      if (!hadCachedChart) {
         toast({
           title: t.natalChart.generated,
           description: t.natalChart.blueprintReady,
@@ -53,11 +54,11 @@ export default function NatalChart() {
 
   // Автоматически загружаем карту при открытии страницы (если она есть в профиле)
   useEffect(() => {
-    if (userData?.natalChart && !chartData && !mutation.isPending) {
+    if (!userLoading && userData?.natalChart && !chartData && !mutation.isPending) {
       mutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData?.natalChart]);
+  }, [userLoading, userData]);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
