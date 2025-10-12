@@ -10,9 +10,13 @@ import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } fro
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation } from "./lib/openai";
-import { calculateNatalChartPython } from "./lib/pythonNatal";
+import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { z } from "zod";
 import dayjs from 'dayjs';
+
+interface StoredNatalChart extends NatalChartResult {
+  interpretation?: string;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/telegram", async (req, res) => {
@@ -184,13 +188,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Проверяем, есть ли уже сохранённая натальная карта
-      if (user.natalChart) {
-        // Если карта уже есть - просто генерируем новую интерпретацию
-        const interpretation = await getAstrologyInterpretation("natal", user.natalChart, locale);
+      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
+        const savedChart = user.natalChart as NatalChartResult;
         
-        const savedChart = user.natalChart as any;
+        // Если карта уже есть - просто генерируем новую интерпретацию
+        const interpretation = await getAstrologyInterpretation("natal", savedChart, locale);
+        
         // Преобразуем planets из объекта в массив для фронтенда
-        const planetsArray = Object.entries(savedChart.planets).map(([name, data]: [string, any]) => ({
+        const planetsArray = Object.entries(savedChart.planets).map(([name, data]) => ({
           name,
           sign: data.sign,
           position: data.longitude, // Python возвращает longitude, фронтенд ожидает position
@@ -240,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Преобразуем planets из объекта в массив для фронтенда
-      const planetsArray = Object.entries(pythonChart.planets).map(([name, data]: [string, any]) => ({
+      const planetsArray = Object.entries(pythonChart.planets).map(([name, data]) => ({
         name,
         sign: data.sign,
         position: data.longitude, // Python возвращает longitude, фронтенд ожидает position
@@ -253,13 +258,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale);
 
       // Сохраняем натальную карту С ИНТЕРПРЕТАЦИЕЙ в профиле пользователя (бесплатно, навсегда)
-      const chartToSave = {
+      const chartToSave: StoredNatalChart = {
         ...pythonChart,
         interpretation, // Добавляем интерпретацию в сохранённые данные
       };
       
       await storage.updateUser(userId, { 
-        natalChart: chartToSave as any 
+        natalChart: chartToSave 
       });
 
       // Также сохраняем в историю чтений
@@ -374,9 +379,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Execute the reading using Swiss Ephemeris (use cached natal chart or calculate)
-      let chartData: any;
-      if (user.natalChart) {
-        chartData = user.natalChart;
+      let chartData: NatalChartResult;
+      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
+        chartData = user.natalChart as NatalChartResult;
       } else {
         const birthDate = new Date(user.birthdayDate);
         const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
@@ -397,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Transform for AI interpretation
       const chart = {
-        planets: Object.entries(chartData.planets).map(([name, data]: [string, any]) => ({
+        planets: Object.entries(chartData.planets).map(([name, data]) => ({
           name,
           sign: data.sign,
           position: data.longitude,
@@ -454,9 +459,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading using Swiss Ephemeris for both charts
       // User's chart (use cached if available, or calculate from profile data)
-      let person1ChartData: any;
-      if (user.natalChart) {
-        person1ChartData = user.natalChart;
+      let person1ChartData: NatalChartResult;
+      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
+        person1ChartData = user.natalChart as NatalChartResult;
       } else {
         // Parse birth time
         const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
@@ -497,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Transform for AI interpretation (convert to array format expected by AI)
       const person1Chart = {
-        planets: Object.entries(person1ChartData.planets).map(([name, data]: [string, any]) => ({
+        planets: Object.entries(person1ChartData.planets).map(([name, data]) => ({
           name,
           sign: data.sign,
           position: data.longitude,
@@ -506,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const person2Chart = {
-        planets: Object.entries(person2ChartData.planets).map(([name, data]: [string, any]) => ({
+        planets: Object.entries(person2ChartData.planets).map(([name, data]) => ({
           name,
           sign: data.sign,
           position: data.longitude,
@@ -691,10 +696,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const createPaymentSchema = z.object({
+    kind: z.enum(["energy_pack", "subscription"]),
+    tier: z.enum(["standard", "pro"]).optional(),
+    energyAmount: z.number().optional(),
+    amountUSD: z.number(),
+  });
+
   app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { kind, tier, energyAmount, amountUSD } = req.body;
+      const validated = createPaymentSchema.parse(req.body);
 
       if (!process.env.TON_WALLET_ADDRESS) {
         return res.status(500).json({ 
@@ -704,14 +716,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const tonRate = await getTonPrice();
-      const amountTON = convertUSDToTON(amountUSD, tonRate);
+      const amountTON = convertUSDToTON(validated.amountUSD, tonRate);
 
       const payment = await storage.createPayment({
         userId,
-        kind,
-        tier,
-        energyAmount,
-        amountUSD: amountUSD.toString(),
+        kind: validated.kind,
+        tier: validated.tier || null,
+        energyAmount: validated.energyAmount || null,
+        amountUSD: validated.amountUSD.toString(),
         amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
         txHash: `pending_${Date.now()}`,
         status: "pending",
@@ -727,6 +739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
       res.status(500).json({ ok: false, error: error.message });
     }
   });
@@ -877,6 +892,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else if (payment.kind === "subscription" && payment.tier) {
+        // Validate tier is correct type
+        if (payment.tier !== "standard" && payment.tier !== "pro") {
+          return res.status(400).json({ ok: false, error: "Invalid subscription tier" });
+        }
+        
         const startedAt = new Date();
         const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
 
@@ -891,7 +911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           await storage.createSubscription({
             userId: payment.userId,
-            tier: payment.tier as "standard" | "pro",
+            tier: payment.tier,
             status: "active",
             startedAt,
             currentPeriodEnd,

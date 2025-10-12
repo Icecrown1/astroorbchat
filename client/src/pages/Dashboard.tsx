@@ -21,7 +21,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
+import type { User, Subscription } from '@shared/schema';
 
+interface UserMeResponse {
+  ok: boolean;
+  data: User & {
+    subscription?: Subscription | null;
+  };
+}
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -67,7 +74,7 @@ export default function Dashboard() {
     },
   ];
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
 
