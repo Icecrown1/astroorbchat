@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +48,7 @@ export async function calculateNatalChartPython(birthData: BirthData): Promise<N
     const scriptPath = path.join(process.cwd(), 'server', 'natal_chart_api.py');
     
     console.log('Python script path:', scriptPath);
-    console.log('Script exists:', require('fs').existsSync(scriptPath));
+    console.log('Script exists:', fs.existsSync(scriptPath));
     console.log('Current working directory:', process.cwd());
     
     // Запускаем Python-скрипт
