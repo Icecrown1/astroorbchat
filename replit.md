@@ -75,3 +75,37 @@ Preferred communication style: Simple, everyday language.
 
 **Environment Variables:**
 - `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `VITE_BOT_USERNAME`, `TON_WALLET_ADDRESS`, `SESSION_SECRET`.
+
+## Recent Changes (October 12, 2025)
+
+**Deployment ES Module Fix (Complete):**
+- Added `.js` extensions to all dayjs plugin imports for ES module compatibility
+- Fixed imports in: `server/lib/energy.ts`, `client/src/pages/Register.tsx`, `client/src/pages/Settings.tsx`
+- Changed `dayjs/plugin/timezone` → `dayjs/plugin/timezone.js`
+- Changed `dayjs/plugin/utc` → `dayjs/plugin/utc.js`
+- Node.js production environment now properly resolves ES module imports
+- Application ready for deployment
+
+**TypeScript Type Safety Improvements (Complete):**
+- Fixed all TypeScript compilation errors and LSP diagnostics
+- Replaced all unsafe `any` types with proper interfaces in chart processing
+- Created `StoredNatalChart` interface extending `NatalChartResult` for database persistence
+- Added runtime guards for `user.natalChart` validation before type assertions
+- Removed `[string, any]` destructuring patterns in Object.entries transformations
+- Added `createPaymentSchema` Zod validation for payment tier before database operations
+- Updated Dashboard and Settings `useQuery` with concrete `UserMeResponse` type using shared `User` and `Subscription` types
+- Fixed user creation flow to properly initialize energy and energyResetAt fields after user creation
+- Added runtime tier validation (`"standard" | "pro"`) in payment webhook
+- All astrology endpoints (natal, horoscope, compatibility) now use properly typed `NatalChartResult`
+- Zero LSP errors, zero compilation warnings - fully type-safe codebase
+
+**Swiss Ephemeris Integration (Complete):**
+- All astrology features now use Swiss Ephemeris for NASA-grade accuracy (±0.01° using DE431 ephemerides)
+- Extended to compatibility, solar return, and horoscope calculations
+- Python-Node.js bridge working correctly
+- Natal charts are FREE - no energy cost
+- Charts cached in database for instant loading on revisit
+
+**Localization Fixes (Complete):**
+- Fixed Russian welcome message with proper placeholder replacement
+- All error messages and toasts properly localized

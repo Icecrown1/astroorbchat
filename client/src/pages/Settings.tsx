@@ -21,13 +21,21 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Locale } from '@/lib/translations';
+import type { User, Subscription } from '@shared/schema';
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone';
+import timezone from 'dayjs/plugin/timezone.js';
 import { useEffect, useMemo } from 'react';
 
 dayjs.extend(timezone);
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone');
+
+interface UserMeResponse {
+  ok: boolean;
+  data: User & {
+    subscription?: Subscription | null;
+  };
+}
 
 export default function Settings() {
   const [, navigate] = useLocation();
@@ -45,7 +53,7 @@ export default function Settings() {
     navigate('/register');
   };
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
 
