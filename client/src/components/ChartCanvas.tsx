@@ -25,6 +25,37 @@ const ZODIAC_SIGNS = [
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
 ];
 
+const ZODIAC_SYMBOLS = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
+
+const PLANET_SYMBOLS: Record<string, string> = {
+  'Sun': '☉',
+  'Moon': '☽',
+  'Mercury': '☿',
+  'Venus': '♀',
+  'Mars': '♂',
+  'Jupiter': '♃',
+  'Saturn': '♄',
+  'Uranus': '♅',
+  'Neptune': '♆',
+  'Pluto': '♇'
+};
+
+// Цвета стихий
+const ELEMENT_COLORS: Record<string, string> = {
+  'fire': '#f97316',    // оранжевый - Овен, Лев, Стрелец
+  'earth': '#22c55e',   // зеленый - Телец, Дева, Козерог
+  'air': '#3b82f6',     // синий - Близнецы, Весы, Водолей
+  'water': '#06b6d4'    // голубой - Рак, Скорпион, Рыбы
+};
+
+// Маппинг знаков к стихиям
+const SIGN_ELEMENTS: Record<string, string> = {
+  'Aries': 'fire', 'Leo': 'fire', 'Sagittarius': 'fire',
+  'Taurus': 'earth', 'Virgo': 'earth', 'Capricorn': 'earth',
+  'Gemini': 'air', 'Libra': 'air', 'Aquarius': 'air',
+  'Cancer': 'water', 'Scorpio': 'water', 'Pisces': 'water'
+};
+
 const ASPECT_COLORS: Record<string, string> = {
   conjunction: '#9333ea', // primary
   sextile: '#06b6d4', // cyan
@@ -83,17 +114,21 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Draw zodiac sign labels
+      // Draw zodiac sign labels with symbols and element colors
       const labelAngle = ((i * 30 + 15) - 90) * (Math.PI / 180);
       const labelRadius = (outerRadius + innerRadius) / 2;
       const labelX = center + Math.cos(labelAngle) * labelRadius;
       const labelY = center + Math.sin(labelAngle) * labelRadius;
 
-      ctx.fillStyle = mutedForeground;
-      ctx.font = '12px Inter';
+      const signName = ZODIAC_SIGNS[i];
+      const element = SIGN_ELEMENTS[signName];
+      const elementColor = ELEMENT_COLORS[element];
+
+      ctx.fillStyle = elementColor;
+      ctx.font = '18px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(ZODIAC_SIGNS[i].substring(0, 3), labelX, labelY);
+      ctx.fillText(ZODIAC_SYMBOLS[i], labelX, labelY);
     }
 
     // Draw aspects
@@ -143,14 +178,15 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
       ctx.arc(x, y, 12, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Planet label
+      // Planet label with symbol
       const labelX = center + Math.cos(angle) * (planetRadius - 20);
       const labelY = center + Math.sin(angle) * (planetRadius - 20);
       ctx.fillStyle = foregroundColor;
-      ctx.font = 'bold 11px Inter';
+      ctx.font = 'bold 16px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(planet.name.substring(0, 3), labelX, labelY);
+      const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 3);
+      ctx.fillText(planetSymbol, labelX, labelY);
     });
 
   }, [planets, aspects]);
