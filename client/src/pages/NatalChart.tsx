@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -23,7 +23,7 @@ export default function NatalChart() {
   const [chartData, setChartData] = useState<any>(null);
 
   // Загружаем профиль пользователя, чтобы проверить есть ли сохранённая натальная карта
-  const { data: userData } = useQuery({
+  const { data: userData } = useQuery<any>({
     queryKey: ['/api/user/me'],
   });
 

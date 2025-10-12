@@ -4,6 +4,19 @@
 
 Astro Orb is a Telegram Mini App that provides AI-powered astrology readings with natal charts, solar returns, horoscopes, and personalized insights. The application features a gamified energy system, TON blockchain payment integration, and referral mechanics. Built as a full-stack TypeScript application with React frontend and Express backend, it leverages OpenAI for astrological interpretations and astronomical calculations for chart generation.
 
+## Recent Changes (October 12, 2025)
+
+**Free Natal Charts with Swiss Ephemeris (Complete):**
+- Natal charts are now completely FREE - no energy cost
+- Integrated professional Swiss Ephemeris (pyswisseph) for NASA-grade accuracy (±0.01° using DE431 ephemerides)
+- Created Python-Node.js bridge: `server/natal_chart_api.py` called via `server/lib/pythonNatal.ts` using child_process
+- Natal chart calculated once and saved permanently to user profile (natalChart JSONB field)
+- Subsequent visits auto-load cached chart with fresh AI interpretation (no re-calculation)
+- Fixed ES modules __dirname issue using import.meta.url and fileURLToPath
+- Frontend shows "✨ Free forever" instead of energy cost
+- Falls back to Moscow coordinates (55.7558, 37.6173) when birthPlace not parsed
+- Calculations persist in user profile and reading history
+
 ## Recent Changes (October 11, 2025)
 
 **Russian Localization (Complete):**
