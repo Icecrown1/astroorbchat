@@ -41,20 +41,28 @@ const PLANET_SYMBOLS: Record<string, string> = {
   'Pluto': '♇'
 };
 
-// Цвета стихий
-const ELEMENT_COLORS: Record<string, string> = {
-  'fire': '#f97316',    // оранжевый - Овен, Лев, Стрелец
-  'earth': '#22c55e',   // зеленый - Телец, Дева, Козерог
-  'air': '#3b82f6',     // синий - Близнецы, Весы, Водолей
-  'water': '#06b6d4'    // голубой - Рак, Скорпион, Рыбы
-};
-
-// Маппинг знаков к стихиям
-const SIGN_ELEMENTS: Record<string, string> = {
-  'Aries': 'fire', 'Leo': 'fire', 'Sagittarius': 'fire',
-  'Taurus': 'earth', 'Virgo': 'earth', 'Capricorn': 'earth',
-  'Gemini': 'air', 'Libra': 'air', 'Aquarius': 'air',
-  'Cancer': 'water', 'Scorpio': 'water', 'Pisces': 'water'
+// Цветовая тема карты
+const THEME_COLORS = {
+  // Пастельные оттенки для секторов зодиака (по 12 знакам)
+  zodiacSectors: [
+    '#f2d7d7', // Овен - светло-красный
+    '#d8f0e1', // Телец - мятный
+    '#f5e0c9', // Близнецы - песочный
+    '#d0e6f5', // Рак - голубой
+    '#f5ead3', // Лев - золотистый
+    '#e7f4d5', // Дева - светло-зеленый
+    '#f6e7c7', // Весы - бежевый
+    '#d9f0f3', // Скорпион - бирюзовый
+    '#f2d2e0', // Стрелец - розовый
+    '#dcd3f2', // Козерог - лавандовый
+    '#e2e0f0', // Водолей - серо-лиловый
+    '#dfeaf2'  // Рыбы - небесный
+  ],
+  zodiacSymbol: '#b87333',      // Бронзовый для символов знаков
+  planetSymbol: '#9333ea',      // Фиолетовый для планет
+  border: 'rgba(0, 0, 0, 0.25)',
+  centerGradientStart: '#f5e0b0',
+  centerGradientEnd: 'rgba(245, 224, 176, 0)'
 };
 
 const ASPECT_COLORS: Record<string, string> = {
@@ -75,73 +83,88 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Get computed CSS colors
-    const computedStyle = getComputedStyle(document.documentElement);
-    const borderColor = `hsl(${computedStyle.getPropertyValue('--border').trim()})`;
-    const mutedForeground = `hsl(${computedStyle.getPropertyValue('--muted-foreground').trim()})`;
-    const primaryColor = `hsl(${computedStyle.getPropertyValue('--primary').trim()})`;
-    const foregroundColor = `hsl(${computedStyle.getPropertyValue('--foreground').trim()})`;
-
     const size = canvas.width;
     const center = size / 2;
-    const outerRadius = size / 2 - 20;
-    const innerRadius = outerRadius - 30;
-    const planetRadius = innerRadius - 40;
+    const outerRadius = size / 2 - 10;
+    const innerRadius = outerRadius - 50;
+    const planetRadius = innerRadius - 50;
 
     // Clear canvas
     ctx.clearRect(0, 0, size, size);
 
-    // Draw zodiac wheel
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 2;
+    // 1. Рисуем центральную заливку
+    const centerGradient = ctx.createRadialGradient(center, center, 0, center, center, innerRadius * 0.3);
+    centerGradient.addColorStop(0, THEME_COLORS.centerGradientStart);
+    centerGradient.addColorStop(1, THEME_COLORS.centerGradientEnd);
+    ctx.fillStyle = centerGradient;
+    ctx.beginPath();
+    ctx.arc(center, center, innerRadius * 0.3, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 2. Рисуем заполненные сектора зодиака
+    for (let i = 0; i < 12; i++) {
+      const startAngle = (i * 30 - 90) * (Math.PI / 180);
+      const endAngle = ((i + 1) * 30 - 90) * (Math.PI / 180);
+
+      // Заливка сектора
+      ctx.fillStyle = THEME_COLORS.zodiacSectors[i];
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.arc(center, center, outerRadius, startAngle, endAngle);
+      ctx.lineTo(center, center);
+      ctx.closePath();
+      ctx.fill();
+
+      // Граница сектора
+      ctx.strokeStyle = THEME_COLORS.border;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.lineTo(
+        center + Math.cos(startAngle) * outerRadius,
+        center + Math.sin(startAngle) * outerRadius
+      );
+      ctx.stroke();
+    }
+
+    // 3. Внешний круг
+    ctx.strokeStyle = THEME_COLORS.border;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(center, center, outerRadius, 0, 2 * Math.PI);
     ctx.stroke();
 
+    // 4. Внутренний круг
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.beginPath();
     ctx.arc(center, center, innerRadius, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = THEME_COLORS.border;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Draw zodiac divisions
+    // 5. Символы знаков зодиака (золотые/бронзовые)
     for (let i = 0; i < 12; i++) {
-      const angle = (i * 30 - 90) * (Math.PI / 180);
-      const x1 = center + Math.cos(angle) * innerRadius;
-      const y1 = center + Math.sin(angle) * innerRadius;
-      const x2 = center + Math.cos(angle) * outerRadius;
-      const y2 = center + Math.sin(angle) * outerRadius;
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-
-      // Draw zodiac sign labels with element colors
       const labelAngle = ((i * 30 + 15) - 90) * (Math.PI / 180);
       const labelRadius = (outerRadius + innerRadius) / 2;
       const labelX = center + Math.cos(labelAngle) * labelRadius;
       const labelY = center + Math.sin(labelAngle) * labelRadius;
 
-      const signName = ZODIAC_SIGNS[i];
-      const element = SIGN_ELEMENTS[signName];
-      const elementColor = ELEMENT_COLORS[element];
-
-      // Рисуем цветной круг за символом
-      ctx.fillStyle = elementColor;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(labelX, labelY, 16, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Рисуем символ
-      ctx.fillStyle = elementColor;
-      ctx.font = 'bold 16px Arial';
+      // Свечение
+      ctx.shadowColor = 'rgba(184, 115, 51, 0.5)';
+      ctx.shadowBlur = 6;
+      
+      // Символ знака
+      ctx.fillStyle = THEME_COLORS.zodiacSymbol;
+      ctx.font = 'bold 22px "Noto Sans Symbols2", "Symbola", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(ZODIAC_SYMBOLS[i], labelX, labelY);
+      
+      ctx.shadowBlur = 0;
     }
 
-    // Draw aspects
+    // 6. Аспекты (линии между планетами)
     aspects.forEach((aspect) => {
       const planet1 = planets.find(p => p.name === aspect.planet1);
       const planet2 = planets.find(p => p.name === aspect.planet2);
@@ -150,27 +173,29 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
         const angle1 = (planet1.position - 90) * (Math.PI / 180);
         const angle2 = (planet2.position - 90) * (Math.PI / 180);
 
-        const x1 = center + Math.cos(angle1) * planetRadius;
-        const y1 = center + Math.sin(angle1) * planetRadius;
-        const x2 = center + Math.cos(angle2) * planetRadius;
-        const y2 = center + Math.sin(angle2) * planetRadius;
+        const x1 = center + Math.cos(angle1) * (planetRadius - 10);
+        const y1 = center + Math.sin(angle1) * (planetRadius - 10);
+        const x2 = center + Math.cos(angle2) * (planetRadius - 10);
+        const y2 = center + Math.sin(angle2) * (planetRadius - 10);
 
-        ctx.strokeStyle = ASPECT_COLORS[aspect.type] || '#666';
+        ctx.strokeStyle = ASPECT_COLORS[aspect.type] || '#999';
         ctx.lineWidth = 1;
-        ctx.setLineDash([5, 5]);
+        ctx.setLineDash([4, 4]);
+        ctx.globalAlpha = 0.5;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
       }
     });
 
-    // Умное размещение планет - если близко друг к другу, размещаем на разных радиусах
+    // 7. Умное размещение планет - если близко друг к другу, размещаем на разных радиусах
     const sortedPlanets = [...planets].sort((a, b) => a.position - b.position);
     const planetPositions: { planet: Planet; radius: number; layer: number }[] = [];
     
-    sortedPlanets.forEach((planet, index) => {
+    sortedPlanets.forEach((planet) => {
       let layer = 0;
       let tooClose = true;
       
@@ -190,23 +215,29 @@ export function ChartCanvas({ planets, aspects, className }: ChartCanvasProps) {
         if (tooClose) layer++;
       }
       
-      const radius = planetRadius - (layer * 25);
+      const radius = planetRadius - (layer * 30);
       planetPositions.push({ planet, radius, layer });
     });
 
-    // Рисуем планеты только как символы
+    // 8. Рисуем планеты - символы с свечением
     planetPositions.forEach(({ planet, radius }) => {
       const angle = (planet.position - 90) * (Math.PI / 180);
       const x = center + Math.cos(angle) * radius;
       const y = center + Math.sin(angle) * radius;
 
+      // Свечение планеты
+      ctx.shadowColor = 'rgba(147, 51, 234, 0.6)';
+      ctx.shadowBlur = 8;
+
       // Символ планеты
       const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 1);
-      ctx.fillStyle = primaryColor;
-      ctx.font = 'bold 20px Inter';
+      ctx.fillStyle = THEME_COLORS.planetSymbol;
+      ctx.font = '600 20px "Noto Sans Symbols2", "Symbola", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(planetSymbol, x, y);
+      
+      ctx.shadowBlur = 0;
     });
 
   }, [planets, aspects]);
