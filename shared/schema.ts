@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
   referredById: varchar("referred_by_id", { length: 255 }),
   isAdmin: boolean("is_admin").notNull().default(false),
+  natalChart: jsonb("natal_chart"),
 }, (table) => ({
   tgIdIdx: index("users_tg_id_idx").on(table.tgId),
   referralCodeIdx: index("users_referral_code_idx").on(table.referralCode),

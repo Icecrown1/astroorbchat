@@ -10,6 +10,7 @@ import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } fro
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation } from "./lib/openai";
+import { calculateNatalChartPython } from "./lib/pythonNatal";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -170,42 +171,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const locale = req.body.locale || 'en';
       
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      const cost = ENERGY_COSTS.natal;
-      if (user.energy < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      // Проверяем, есть ли уже сохранённая натальная карта
+      if (user.natalChart) {
+        // Если карта уже есть - просто генерируем новую интерпретацию
+        const interpretation = await getAstrologyInterpretation("natal", user.natalChart, locale);
+        
+        res.json({
+          ok: true,
+          data: {
+            ...(user.natalChart as any),
+            interpretation,
+          },
+        });
+        return;
       }
 
-      // Execute the reading
-      const chart = calculateNatalChart(new Date(user.birthdayDate), user.birthTime || undefined);
-      const interpretation = await getAstrologyInterpretation("natal", chart, locale);
+      // Если карты нет - рассчитываем через Python (Swiss Ephemeris)
+      if (!user.birthTime) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: "Birth time is required for natal chart calculation" 
+        });
+      }
 
-      await storage.createNatalReading({
-        userId,
-        planets: chart.planets,
-        aspects: chart.aspects,
-        interpretation,
+      const birthDate = new Date(user.birthdayDate);
+      const [hours, minutes] = user.birthTime.split(':').map(Number);
+      
+      // Парсим координаты из birthPlace (если есть) или используем дефолтные
+      // TODO: В будущем нужно сохранять latitude/longitude отдельно
+      const latitude = 55.7558; // Москва по умолчанию
+      const longitude = 37.6173;
+
+      const pythonChart = await calculateNatalChartPython({
+        year: birthDate.getFullYear(),
+        month: birthDate.getMonth() + 1,
+        day: birthDate.getDate(),
+        hour: hours,
+        minute: minutes,
+        latitude,
+        longitude,
+        house_system: 'Placidus',
       });
 
-      // Only deduct energy after successful execution
-      await storage.updateUser(userId, { energy: user.energy - cost });
-      await storage.createUsageLog({ userId, feature: "natal", cost });
+      // Генерируем AI интерпретацию
+      const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale);
+
+      // Сохраняем натальную карту в профиле пользователя (бесплатно, навсегда)
+      await storage.updateUser(userId, { 
+        natalChart: pythonChart as any 
+      });
+
+      // Также сохраняем в историю чтений
+      await storage.createNatalReading({
+        userId,
+        planets: pythonChart.planets,
+        aspects: [], // Python версия пока не рассчитывает аспекты
+        interpretation,
+      });
 
       res.json({
         ok: true,
         data: {
-          planets: chart.planets,
-          aspects: chart.aspects,
+          ...pythonChart,
           interpretation,
         },
       });
     } catch (error: any) {
+      console.error('Natal chart calculation error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

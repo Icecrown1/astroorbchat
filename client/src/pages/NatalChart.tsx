@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -22,6 +22,11 @@ export default function NatalChart() {
   const { t, locale } = useTranslation();
   const [chartData, setChartData] = useState<any>(null);
 
+  // Загружаем профиль пользователя, чтобы проверить есть ли сохранённая натальная карта
+  const { data: userData } = useQuery({
+    queryKey: ['/api/user/me'],
+  });
+
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/natal', { locale });
@@ -30,10 +35,12 @@ export default function NatalChart() {
     onSuccess: (data) => {
       setChartData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      toast({
-        title: t.natalChart.generated,
-        description: t.natalChart.blueprintReady,
-      });
+      if (!userData?.natalChart) {
+        toast({
+          title: t.natalChart.generated,
+          description: t.natalChart.blueprintReady,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -43,6 +50,14 @@ export default function NatalChart() {
       });
     },
   });
+
+  // Автоматически загружаем карту при открытии страницы (если она есть в профиле)
+  useEffect(() => {
+    if (userData?.natalChart && !chartData && !mutation.isPending) {
+      mutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData?.natalChart]);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -73,7 +88,7 @@ export default function NatalChart() {
                 {t.natalChart.generateDescription}
               </p>
               <p className="text-sm text-primary font-medium">
-                {t.natalChart.costTwo}
+                {locale === 'ru' ? '✨ Бесплатно навсегда' : '✨ Free forever'}
               </p>
             </div>
             <Button
