@@ -43,7 +43,12 @@ export interface NatalChartResult {
  */
 export async function calculateNatalChartPython(birthData: BirthData): Promise<NatalChartResult> {
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(__dirname, '..', 'natal_chart_api.py');
+    // Всегда используем путь относительно корня проекта
+    const scriptPath = path.join(process.cwd(), 'server', 'natal_chart_api.py');
+    
+    console.log('Python script path:', scriptPath);
+    console.log('Script exists:', require('fs').existsSync(scriptPath));
+    console.log('Current working directory:', process.cwd());
     
     // Запускаем Python-скрипт
     const pythonProcess = spawn('python3', [scriptPath]);
