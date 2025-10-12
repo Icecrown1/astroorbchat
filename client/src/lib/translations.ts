@@ -34,7 +34,8 @@ export const translations = {
       admin: 'Admin',
     },
     auth: {
-      welcome: 'Welcome to Astro Orb',
+      welcome: 'Welcome, {name}!',
+      welcomeDefault: 'Welcome to Astro Orb',
       getStarted: 'Get Started',
       enterBirthData: 'Enter your birth data',
       firstName: 'First Name',
@@ -366,7 +367,8 @@ export const translations = {
       admin: 'Админ',
     },
     auth: {
-      welcome: 'Добро пожаловать в Astro Orb',
+      welcome: 'Добро пожаловать, {name}!',
+      welcomeDefault: 'Добро пожаловать в Astro Orb',
       getStarted: 'Начать',
       enterBirthData: 'Введите данные о рождении',
       firstName: 'Имя',

@@ -150,7 +150,7 @@ export default function Register() {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         toast({
-          title: t.auth.welcome,
+          title: t.auth.welcomeDefault,
           description: t.dashboard.subtitle,
         });
         navigate('/dashboard');
@@ -178,7 +178,7 @@ export default function Register() {
             </div>
           </div>
           <h1 className="text-2xl font-display font-bold text-center mb-2">
-            {t.auth.welcome}
+            {t.auth.welcomeDefault}
           </h1>
           <p className="text-center text-muted-foreground">
             {t.common.next} {step} {t.common.back} 3

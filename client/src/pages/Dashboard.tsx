@@ -98,7 +98,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">
-              {t.auth.welcome.replace('Astro Orb', user?.name || t.dashboard.title)}
+              {user?.name ? t.auth.welcome.replace('{name}', user.name) : t.auth.welcomeDefault}
             </h1>
             <p className="text-muted-foreground">
               {t.dashboard.subtitle}
