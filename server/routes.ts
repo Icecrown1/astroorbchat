@@ -43,6 +43,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthPlace: birthPlace || null,
           timezone: timezone || "Europe/Moscow",
           referralCode,
+        });
+
+        // Set initial energy and reset time
+        await storage.updateUser(user.id, {
           energy: 10,
           energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
         });
@@ -50,6 +54,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.referralCode) {
           await applyReferralBonus(storage, user.id, req.body.referralCode);
         }
+        
+        // Refetch user with energy fields
+        user = await storage.getUser(user.id) || user;
       }
 
       const token = generateToken(user.id);
@@ -296,8 +303,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
-      // Execute the reading
-      const solar = calculateSolarReturn(new Date(user.birthdayDate));
+      // Execute the reading using Swiss Ephemeris (calculate solar return chart for today)
+      const today = new Date();
+      const solarYear = today.getFullYear();
+      const birthDate = new Date(user.birthdayDate);
+      const solarDate = new Date(solarYear, birthDate.getMonth(), birthDate.getDate());
+      
+      const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
+      const latitude = 55.7558; // Moscow fallback
+      const longitude = 37.6173; // Moscow fallback
+      
+      const solarChartData = await calculateNatalChartPython({
+        year: solarDate.getFullYear(),
+        month: solarDate.getMonth() + 1,
+        day: solarDate.getDate(),
+        hour: hours,
+        minute: minutes,
+        latitude,
+        longitude,
+        house_system: 'Placidus',
+      });
+      
+      // Extract Sun position from chart
+      const sunData = solarChartData.planets['Sun'];
+      const solar = {
+        position: sunData.longitude,
+        sign: sunData.sign,
+        date: solarDate,
+      };
+      
       const interpretation = await getAstrologyInterpretation("solar", solar, locale);
 
       // Only deduct energy after successful execution
@@ -339,8 +373,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
-      // Execute the reading
-      const chart = calculateNatalChart(new Date(user.birthdayDate));
+      // Execute the reading using Swiss Ephemeris (use cached natal chart or calculate)
+      let chartData: any;
+      if (user.natalChart) {
+        chartData = user.natalChart;
+      } else {
+        const birthDate = new Date(user.birthdayDate);
+        const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
+        const latitude = 55.7558; // Moscow fallback
+        const longitude = 37.6173; // Moscow fallback
+        
+        chartData = await calculateNatalChartPython({
+          year: birthDate.getFullYear(),
+          month: birthDate.getMonth() + 1,
+          day: birthDate.getDate(),
+          hour: hours,
+          minute: minutes,
+          latitude,
+          longitude,
+          house_system: 'Placidus',
+        });
+      }
+      
+      // Transform for AI interpretation
+      const chart = {
+        planets: Object.entries(chartData.planets).map(([name, data]: [string, any]) => ({
+          name,
+          sign: data.sign,
+          position: data.longitude,
+        })),
+        aspects: [],
+      };
+      
       const forecast = await getAstrologyInterpretation("horoscope", { chart, period }, locale);
 
       await storage.createHoroscopeReading({
@@ -388,9 +452,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
-      // Execute the reading
-      const person1Chart = calculateNatalChart(new Date(user.birthdayDate));
-      const person2Chart = calculateNatalChart(new Date(partner.date));
+      // Execute the reading using Swiss Ephemeris for both charts
+      // User's chart (use cached if available, or calculate from profile data)
+      let person1ChartData: any;
+      if (user.natalChart) {
+        person1ChartData = user.natalChart;
+      } else {
+        // Parse birth time
+        const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
+        const birthDate = new Date(user.birthdayDate);
+        
+        // Use Moscow as fallback coordinates if birthPlace not available
+        const latitude = 55.7558; // Moscow
+        const longitude = 37.6173; // Moscow
+        
+        person1ChartData = await calculateNatalChartPython({
+          year: birthDate.getFullYear(),
+          month: birthDate.getMonth() + 1,
+          day: birthDate.getDate(),
+          hour: hours,
+          minute: minutes,
+          latitude,
+          longitude,
+          house_system: 'Placidus',
+        });
+      }
+
+      // Partner's chart (always calculate fresh, this is what costs energy)
+      const partnerDate = new Date(partner.date);
+      const [partnerHours = 12, partnerMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
+      const partnerLatitude = 55.7558; // Moscow fallback
+      const partnerLongitude = 37.6173; // Moscow fallback
+      
+      const person2ChartData = await calculateNatalChartPython({
+        year: partnerDate.getFullYear(),
+        month: partnerDate.getMonth() + 1,
+        day: partnerDate.getDate(),
+        hour: partnerHours,
+        minute: partnerMinutes,
+        latitude: partnerLatitude,
+        longitude: partnerLongitude,
+        house_system: 'Placidus',
+      });
+
+      // Transform for AI interpretation (convert to array format expected by AI)
+      const person1Chart = {
+        planets: Object.entries(person1ChartData.planets).map(([name, data]: [string, any]) => ({
+          name,
+          sign: data.sign,
+          position: data.longitude,
+        })),
+        aspects: [], // Aspects calculated by Python
+      };
+
+      const person2Chart = {
+        planets: Object.entries(person2ChartData.planets).map(([name, data]: [string, any]) => ({
+          name,
+          sign: data.sign,
+          position: data.longitude,
+        })),
+        aspects: [],
+      };
 
       console.log('Person 1 chart planets:', person1Chart.planets.length);
       console.log('Person 2 chart planets:', person2Chart.planets.length);
@@ -531,7 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/referral/code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
-      const referrals = [];
+      const referrals: any[] = [];
 
       res.json({
         ok: true,
@@ -665,7 +787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const updateSubscriptionSchema = z.object({
     tier: z.enum(["standard", "pro"]),
-    status: z.enum(["active", "cancelled", "expired"]),
+    status: z.enum(["active", "canceled", "expired"]),
   });
 
   app.post("/api/admin/users/:userId/subscription", requireAdmin, async (req, res) => {
@@ -769,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           await storage.createSubscription({
             userId: payment.userId,
-            tier: payment.tier,
+            tier: payment.tier as "standard" | "pro",
             status: "active",
             startedAt,
             currentPeriodEnd,

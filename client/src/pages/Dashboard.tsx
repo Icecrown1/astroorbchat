@@ -67,7 +67,7 @@ export default function Dashboard() {
     },
   ];
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ['/api/user/me'],
   });
 
