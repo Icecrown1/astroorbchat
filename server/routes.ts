@@ -192,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const savedChart = user.natalChart as NatalChartResult;
         
         // Если карта уже есть - просто генерируем новую интерпретацию
-        const interpretation = await getAstrologyInterpretation("natal", savedChart, locale);
+        const interpretation = await getAstrologyInterpretation("natal", savedChart, locale, user.gender);
         
         // Преобразуем planets из объекта в массив для фронтенда
         const planetsArray = Object.entries(savedChart.planets).map(([name, data]) => ({
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Генерируем AI интерпретацию
-      const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale);
+      const interpretation = await getAstrologyInterpretation("natal", pythonChart, locale, user.gender);
 
       // Сохраняем натальную карту С ИНТЕРПРЕТАЦИЕЙ в профиле пользователя (бесплатно, навсегда)
       const chartToSave: StoredNatalChart = {
@@ -442,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: solarDate,
       };
       
-      const interpretation = await getAstrologyInterpretation("solar", solar, locale);
+      const interpretation = await getAstrologyInterpretation("solar", solar, locale, user.gender);
 
       // Only deduct energy after successful execution
       await storage.updateUser(userId, { energy: user.energy - cost });
@@ -515,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aspects: [],
       };
       
-      const forecast = await getAstrologyInterpretation("horoscope", { chart, period }, locale);
+      const forecast = await getAstrologyInterpretation("horoscope", { chart, period }, locale, user.gender);
 
       await storage.createHoroscopeReading({
         userId,
@@ -630,7 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysis = await getAstrologyInterpretation("compatibility", {
         person1: person1Chart,
         person2: person2Chart,
-      }, locale);
+      }, locale, user.gender);
 
       await storage.createCompatibilityReading({
         userId,
@@ -684,7 +684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the reading
       const chart = calculateNatalChart(new Date(user.birthdayDate));
-      const answer = await getAstrologyInterpretation("ask", { chart, question }, locale);
+      const answer = await getAstrologyInterpretation("ask", { chart, question }, locale, user.gender);
 
       await storage.createAiQuestion({
         userId,

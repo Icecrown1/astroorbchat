@@ -1,5 +1,7 @@
 // Reference: blueprint:javascript_openai_ai_integrations
 import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -8,69 +10,73 @@ export const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
+/**
+ * Персонализирует тональность текста в зависимости от пола пользователя
+ */
+export function personalizeTone(gender: string): string {
+  switch (gender) {
+    case "female":
+      return "Пиши мягко, с теплотой и участием. Делай акцент на понимании, поддержке и внутренней гармонии. Избегай холодных оценок и сухих выводов. Создавай ощущение, что читателя действительно понимают.";
+    case "male":
+      return "Пиши конкретно и по делу, с уважительным и уверенным тоном. Сохраняй человеческое тепло, но без излишней эмоциональности. Помогай видеть суть и действовать, избегай пустых слов.";
+    default:
+      return "Пиши нейтрально, с балансом между теплом и конкретикой, избегай предположений о поле.";
+  }
+}
+
+/**
+ * Загружает и обрабатывает markdown промпт с заменой плейсхолдеров
+ */
+function loadPrompt(promptName: string, replacements: Record<string, string> = {}): string {
+  const promptPath = path.join(process.cwd(), 'server', 'lib', 'prompts', `${promptName}.md`);
+  let content = fs.readFileSync(promptPath, 'utf-8');
+  
+  // Заменяем плейсхолдеры
+  for (const [key, value] of Object.entries(replacements)) {
+    content = content.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  }
+  
+  return content;
+}
+
 export async function getAstrologyInterpretation(
   type: 'natal' | 'solar' | 'horoscope' | 'compatibility' | 'ask',
   data: any,
-  locale: string = 'en'
+  locale: string = 'en',
+  gender: string = 'other'
 ): Promise<string> {
   const languageInstruction = locale === 'ru' 
     ? 'ВАЖНО: Ответь полностью на русском языке.' 
     : 'Respond in English.';
   
-  const prompts = {
-    natal: `${languageInstruction}
-
-You are an expert astrologer. Based on the following natal chart data, provide a comprehensive interpretation in 250-400 words. Be specific, practical, and insightful without esoteric jargon.
-
-Planetary Positions:
-${JSON.stringify(data.planets, null, 2)}
-
-Aspects:
-${JSON.stringify(data.aspects, null, 2)}
-
-Provide clear insights about personality, strengths, challenges, and life themes.`,
-
-    solar: `${languageInstruction}
-
-You are an expert astrologer. Based on the solar return position for today, provide practical daily guidance in 200-300 words.
-
-Solar Data:
-${JSON.stringify(data, null, 2)}
-
-Focus on today's energy, opportunities, and practical advice.`,
-
-    horoscope: `${languageInstruction}
-
-You are an expert astrologer. Create a ${data.period} horoscope based on the user's chart. Provide 200-300 words of practical guidance.
-
-Chart Data:
-${JSON.stringify(data.chart, null, 2)}
-
-Be specific and actionable. Focus on the ${data.period === 'day' ? 'day' : data.period === 'week' ? 'week' : 'month'} ahead.`,
-
-    compatibility: `${languageInstruction}
-
-You are an expert relationship astrologer. Analyze compatibility between two people based on their charts. Provide 250-400 words covering strengths and challenges.
-
-Person 1:
-${JSON.stringify(data.person1, null, 2)}
-
-Person 2:
-${JSON.stringify(data.person2, null, 2)}
-
-Be balanced, practical, and insightful about relationship dynamics.`,
-
-    ask: `${languageInstruction}
-
-You are an expert astrologer. Answer the following question based on the user's natal chart. Provide 200-350 words of clear, practical guidance.
-
-User's Chart:
-${JSON.stringify(data.chart, null, 2)}
-
-Question: ${data.question}
-
-Provide insightful, actionable advice grounded in astrological wisdom.`
+  const toneInstruction = personalizeTone(gender);
+  
+  // Подготовка замен для каждого типа промпта
+  const replacements: Record<string, Record<string, string>> = {
+    natal: {
+      planets: JSON.stringify(data.planets, null, 2),
+      aspects: JSON.stringify(data.aspects, null, 2)
+    },
+    solar: {
+      data: JSON.stringify(data, null, 2)
+    },
+    horoscope: {
+      period: data.period,
+      chart: JSON.stringify(data.chart, null, 2),
+      period_text: data.period === 'day' ? 'day' : data.period === 'week' ? 'week' : 'month'
+    },
+    compatibility: {
+      person1: JSON.stringify(data.person1, null, 2),
+      person2: JSON.stringify(data.person2, null, 2)
+    },
+    ask: {
+      chart: JSON.stringify(data.chart, null, 2),
+      question: data.question
+    }
   };
+
+  const promptText = loadPrompt(type, replacements[type]);
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}`;
 
   const systemMessage = locale === 'ru'
     ? "Ты опытный астролог, который предоставляет четкие, практичные и проницательные чтения без эзотерического жаргона. Твои советы конкретны, действенны и основаны на астрологических принципах. Всегда отвечай на русском языке."
@@ -85,7 +91,7 @@ Provide insightful, actionable advice grounded in astrological wisdom.`
       },
       {
         role: "user",
-        content: prompts[type]
+        content: finalPrompt
       }
     ],
     max_completion_tokens: 8192
@@ -129,33 +135,26 @@ export async function getPlanetInterpretation(
     ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
     : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
 
-  const prompt = `${languageInstruction}
+  const toneInstruction = personalizeTone(data.profile.gender || 'other');
 
-Ты — строгий прикладной астролог. На входе данные:
+  const aspectsText = data.planet.aspects && data.planet.aspects.length > 0 
+    ? `Аспекты: ${JSON.stringify(data.planet.aspects)}`
+    : '';
+  
+  const profileAge = data.profile.age ? `, ${data.profile.age} лет` : '';
+  const profileGender = data.profile.gender ? `, ${data.profile.gender}` : '';
 
-Планета: ${data.planet.name}
-Знак: ${data.planet.sign}
-Дом: ${data.planet.house}
-${data.planet.aspects && data.planet.aspects.length > 0 ? `Аспекты: ${JSON.stringify(data.planet.aspects)}` : ''}
+  const promptText = loadPrompt('planet', {
+    planet_name: data.planet.name,
+    planet_sign: data.planet.sign,
+    planet_house: String(data.planet.house),
+    planet_aspects: aspectsText,
+    profile_name: data.profile.name,
+    profile_age: profileAge,
+    profile_gender: profileGender
+  });
 
-Профиль: ${data.profile.name}${data.profile.age ? `, ${data.profile.age} лет` : ''}${data.profile.gender ? `, ${data.profile.gender}` : ''}
-
-ЗАДАЧА: Кратко и прикладно объясни, что значит это положение планеты ДЛЯ КОНКРЕТНОГО ЧЕЛОВЕКА.
-
-Верни ТОЛЬКО валидный JSON в формате:
-{
-  "title": "${data.planet.name} в ${data.planet.sign}",
-  "summary": "3-4 предложения по сути без воды",
-  "strengths": ["пункт 1", "пункт 2", "пункт 3"],
-  "risks": ["пункт 1", "пункт 2"],
-  "advice": ["конкретный шаг 1", "конкретный шаг 2", "конкретный шаг 3"],
-  "house_note": "1 короткая фраза, как ${data.planet.house}-й дом модифицирует значение"
-}
-
-Правила:
-- Ни единой эзотерической воды, только практическая польза
-- Пиши на ${locale === 'ru' ? 'русском' : 'английском'}, просто и по делу
-- Только JSON, никакого дополнительного текста`;
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}`;
 
   const systemMessage = locale === 'ru'
     ? "Ты опытный астролог-практик. Объясняешь положения планет конкретно и без воды. Возвращаешь только валидный JSON."
@@ -170,7 +169,7 @@ ${data.planet.aspects && data.planet.aspects.length > 0 ? `Аспекты: ${JSO
       },
       {
         role: "user",
-        content: prompt
+        content: finalPrompt
       }
     ],
     response_format: { type: "json_object" },
