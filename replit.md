@@ -157,3 +157,4 @@ Preferred communication style: Simple, everyday language.
 - **Auto-Regeneration**: Profile changes trigger automatic interpretation regeneration with `recomputeIfProfileChanged()` using updated locale
 - **UI Display**: Interpretation shown in collapsible Accordion component (defaultValue="interpretation") with dangerouslySetInnerHTML for HTML formatting
 - **First-Time UX**: MyNatalChart page shows "Create Chart" button if natal chart doesn't exist, triggering POST /api/natal/init with locale and interpretation generation
+- **Authorization Fix**: Fixed 401 error in GET /api/natal/me by adding Authorization header with JWT token from localStorage in custom queryFn; handles 409 NATAL_NOT_INITIALIZED by returning null to show creation UI
