@@ -158,3 +158,11 @@ Preferred communication style: Simple, everyday language.
 - **UI Display**: Interpretation shown in collapsible Accordion component (defaultValue="interpretation") with dangerouslySetInnerHTML for HTML formatting
 - **First-Time UX**: MyNatalChart page shows "Create Chart" button if natal chart doesn't exist, triggering POST /api/natal/init with locale and interpretation generation
 - **Authorization Fix**: Fixed 401 error in GET /api/natal/me by adding Authorization header with JWT token from localStorage in custom queryFn; handles 409 NATAL_NOT_INITIALIZED by returning null to show creation UI
+
+**Guest Chart AI Interpretation & Viewing (Complete):**
+- **Guest Chart Interpretation**: POST /api/natal/external now generates AI interpretation using `getAstrologyInterpretation()` with locale and guest's gender; takes ~20-30 seconds like user's own chart
+- **Guest Chart Viewing**: Created GET /api/natal/external/:id endpoint with ownership verification (403 if not owner, 404 if not found)
+- **GuestNatalChartView Page**: New route /guest-chart/:id displays full chart details including visualization, interpretation (accordion), planets, houses, and aspects
+- **UI Enhancement**: NatalChart.tsx guest card now has "Посмотреть/View" button (navigates to detail page) and "Совместимость/Compatibility" button
+- **Locale Integration**: GuestChartForm passes locale parameter when creating chart for language-specific interpretation
+- **Field Name Fix**: Corrected guest chart date display from `birthDate` to `birthdayDate` matching database schema
