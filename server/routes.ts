@@ -11,6 +11,7 @@ import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, type PlanetInterpretationData } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
+import { ensureUserNatalChart, computeNatalFromUser } from "./lib/natalService";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -130,8 +131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUser(userId);
       const subscription = await storage.getSubscription(userId);
+      const natalChart = await storage.getNatalChart(userId);
 
-      res.json({ ok: true, data: { ...user, subscription } });
+      res.json({ ok: true, data: { ...user, subscription, natalInitialized: !!natalChart } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
@@ -153,6 +155,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ ok: true, data: user });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Natal chart init (FREE - creates user's own natal chart)
+  app.post("/api/natal/init", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const chart = await ensureUserNatalChart(userId);
+      res.json({ ok: true, data: chart });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get user's own natal chart
+  app.get("/api/natal/me", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const chart = await storage.getNatalChart(userId);
+      
+      if (!chart) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+      
+      res.json({ ok: true, data: chart });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Create external natal chart (costs 1 orb)
+  app.post("/api/natal/external", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      const externalNatalSchema = z.object({
+        name: z.string().min(1),
+        gender: z.enum(["male", "female", "other"]),
+        birthdayDate: z.string(),
+        birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+        birthPlace: z.string().optional().nullable(),
+        timezone: z.string().default("Europe/Moscow"),
+      });
+      
+      const data = externalNatalSchema.parse(req.body);
+      
+      await checkAndResetEnergy(storage, userId);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+      
+      const cost = ENERGY_COSTS.natal_external;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+      
+      const birthDate = new Date(data.birthdayDate);
+      const birthTimeStr = data.birthTime || "12:00";
+      const [hours, minutes] = birthTimeStr.split(":").map(Number);
+      
+      const latitude = 55.7558; // Moscow fallback
+      const longitude = 37.6173;
+      
+      const natalData = await calculateNatalChartPython({
+        year: birthDate.getFullYear(),
+        month: birthDate.getMonth() + 1,
+        day: birthDate.getDate(),
+        hour: hours,
+        minute: minutes,
+        latitude,
+        longitude,
+      });
+      
+      const externalNatal = await storage.createExternalNatal({
+        ownerId: userId,
+        name: data.name,
+        gender: data.gender,
+        birthdayDate: birthDate,
+        birthTime: data.birthTime || null,
+        birthPlace: data.birthPlace || null,
+        timezone: data.timezone,
+        data: natalData,
+      });
+      
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "natal_external", cost });
+      
+      res.json({ ok: true, data: externalNatal });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get list of external natal charts
+  app.get("/api/natal/external", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const charts = await storage.getExternalNatalsByOwnerId(userId);
+      res.json({ ok: true, data: charts });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
