@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
+import { GuestChartForm } from '@/components/GuestChartForm';
 import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -194,6 +195,11 @@ export default function NatalChart() {
             >
               {t.natalChart.generateNew}
             </Button>
+
+            {/* Guest Charts Section */}
+            <div className="mt-8">
+              <GuestChartForm />
+            </div>
           </div>
         )}
       </div>

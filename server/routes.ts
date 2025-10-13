@@ -292,37 +292,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Проверяем, есть ли уже сохранённая натальная карта
-      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
-        const savedChart = user.natalChart as NatalChartResult;
-        
-        // Если карта уже есть - просто генерируем новую интерпретацию
-        const interpretation = await getAstrologyInterpretation("natal", savedChart, locale, user.gender);
-        
-        // Преобразуем planets из объекта в массив для фронтенда
-        const planetsArray = Object.entries(savedChart.planets).map(([name, data]) => ({
-          name,
-          sign: data.sign,
-          position: data.longitude, // Python возвращает longitude, фронтенд ожидает position
-          longitude: data.longitude,
-          latitude: data.latitude,
-          degree_in_sign: data.degree_in_sign,
-        }));
-        
-        res.json({
-          ok: true,
-          data: {
-            planets: planetsArray,
-            houses: savedChart.houses,
-            angles: savedChart.angles,
-            aspects: [], // Python версия пока не рассчитывает аспекты
-            interpretation,
-          },
-        });
-        return;
+      // Use new caching system - get or create natal chart
+      const natalChart = await ensureUserNatalChart(userId);
+      const savedChart = natalChart.data as NatalChartResult;
+      
+      // Generate AI interpretation
+      const interpretation = await getAstrologyInterpretation("natal", savedChart, locale, user.gender);
+      
+      // Transform planets from object to array for frontend
+      const planetsArray = Object.entries(savedChart.planets).map(([name, data]) => ({
+        name,
+        sign: data.sign,
+        position: data.longitude,
+        longitude: data.longitude,
+        latitude: data.latitude,
+        degree_in_sign: data.degree_in_sign,
+      }));
+      
+      res.json({
+        ok: true,
+        data: {
+          planets: planetsArray,
+          houses: savedChart.houses,
+          angles: savedChart.angles,
+          aspects: [],
+          interpretation,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // DEPRECATED - old natal endpoint, keeping for backward compatibility
+  app.post("/api/astrology/natal/old", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const locale = req.body.locale || 'en';
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Если карты нет - рассчитываем через Python (Swiss Ephemeris)
       if (!user.birthTime) {
         return res.status(400).json({ 
           ok: false, 
@@ -333,9 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const birthDate = new Date(user.birthdayDate);
       const [hours, minutes] = user.birthTime.split(':').map(Number);
       
-      // Парсим координаты из birthPlace (если есть) или используем дефолтные
-      // TODO: В будущем нужно сохранять latitude/longitude отдельно
-      const latitude = 55.7558; // Москва по умолчанию
+      const latitude = 55.7558;
       const longitude = 37.6173;
 
       const pythonChart = await calculateNatalChartPython({
