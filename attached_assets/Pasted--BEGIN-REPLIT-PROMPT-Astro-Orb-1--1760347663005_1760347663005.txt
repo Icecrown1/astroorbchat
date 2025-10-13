@@ -1,0 +1,280 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: обновить Astro Orb так, чтобы:
+1) При первом входе пользователь может нажать ТОЛЬКО на «Натальная карта». UI явно указывает, куда нажать.
+2) Собственная натальная карта создаётся БЕСПЛАТНО один раз и сохраняется в профиле «навсегда». Все прочие механики (соляр/гороскоп/совместимость/вопросы) используют сохранённую карту.
+3) Внутри экрана натальной карты можно создать натальную карту ДРУГОГО человека (гостевую) за 1 сферу. Эти карты сохраняются в профиле пользователя (списком), их можно выбирать для совместимости и т.п.
+
+Никаких заглушек и TODO. Дать полный код изменённых/новых файлов.
+
+## Контекст проекта
+- Frontend: apps/web (React + Vite + TS), Telegram WebApp SDK; экраны Dashboard, NatalChart.
+- Backend: apps/api (Express + TS), Prisma + Postgres; астрология в `src/astrology/*`, OpenAI в `src/astrology/openai.ts`.
+- Energy: `UsageLog` + фича-коды.
+- Сейчас натал вычисляется на лету по данным пользователя; нужно кешировать/фиксировать «собственную» карту, и для других людей — отдельные сущности.
+
+## ИЗМЕНЕНИЯ
+
+### 1) БД (Prisma) — добавить хранение карт
+Файл: `prisma/schema.prisma`
+- Добавить модели:
+
+```prisma
+model NatalChart {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  data      Json     // структурированные расчёты натальной карты пользователя
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExternalNatal {
+  id          String   @id @default(cuid())
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     String
+  name        String
+  gender      String   // "male" | "female" | "other"
+  birthdayDate DateTime
+  birthTime    String?  // "HH:mm" | null
+  birthPlace   String?
+  timezone     String   @default("Europe/Moscow")
+  data         Json     // расчёты натальной карты гостя
+  createdAt    DateTime @default(now())
+
+  @@index([ownerId])
+}
+Важно: User без изменений, но следует гарантировать флаги через наличие/отсутствие NatalChart.
+
+Создать миграцию в prisma/migrations/* и обновить prisma/seed.ts:
+
+У тестового пользователя @demo_user создать NatalChart с примерными данными.
+
+Создать один ExternalNatal (например, «Анна»).
+
+2) Energy — новая фича и тариф
+В бэкенде в логике списания добавить фичу "natal_external" с ценой 1.
+
+Первая собственная натальная карта пользователя — бесплатно, энергию не списывать. Повторная генерация собственной карты не допускается автоматически (см. ниже перегенерацию при изменении данных).
+
+Файлы:
+
+apps/api/src/routes/energy.ts: добавить в маппинг фич natal_external: 1. Остальные без изменений.
+
+Тесты обновить (см. раздел Tests).
+
+3) Backend — роуты и сервисы
+Новый сервис кеширования и извлечения натала:
+
+Файл: apps/api/src/astrology/natalService.ts (новый)
+
+computeNatalFromUser(user: User): NatalData — существующий расчёт (используй astrology/natal.ts), возвращает структурированные данные.
+
+ensureUserNatalChart(userId: string): NatalChart — если у пользователя нет NatalChart, вычисляет computeNatalFromUser, создаёт запись (БЕСПЛАТНО), возвращает NatalChart. Если есть — возвращает существующую.
+
+recomputeIfProfileChanged(userId: string) — опциональная функция: если дата/время/место рождения изменены после NatalChart.createdAt, пересчитать и перезаписать карту. Вызов при /user/update.
+
+Маршруты:
+
+apps/api/src/routes/astrology.ts
+
+POST /astrology/natal/init
+
+Требует JWT. Проверяет наличие NatalChart:
+
+Если нет — создаёт (через ensureUserNatalChart), возвращает { ok: true, data: natalChart }. Энергию не списывает.
+
+Если уже есть — возвращает { ok: true, data: natalChart }.
+
+GET /astrology/natal/me
+
+Возвращает сохранённую собственную карту { ok: true, data }. Если нет — 409 { ok: false, error: "NATAL_NOT_INITIALIZED" } (для фронтенда-гейта).
+
+POST /astrology/natal/external
+
+Тело (Zod):
+
+ts
+Копировать код
+{
+  name: string.min(1),
+  gender: enum("male","female","other"),
+  birthdayDate: string (ISO),
+  birthTime?: string.nullish(), // "HH:mm"
+  birthPlace?: string.nullish(),
+  timezone?: string.default("Europe/Moscow")
+}
+Логика:
+
+Списать энергию feature="natal_external" (1).
+
+Посчитать натал по присланным данным (без записи в User), создать ExternalNatal (ownerId = текущий пользователь).
+
+Вернуть { ok: true, data: externalNatal }.
+
+GET /astrology/natal/external
+
+Список гостевых карт текущего пользователя.
+
+Все существующие маршруты /astrology/solar, /astrology/horoscope, /astrology/compatibility, /astrology/ask:
+
+В начале обработчика: попытаться получить NatalChart пользователя. Если нет — вернуть 409 NATAL_NOT_INITIALIZED.
+
+Для compatibility добавить опциональный вход withExternalId?: string:
+
+Если указан — использовать данные ExternalNatal с данным id как второго участника, иначе — как раньше (ввод партнёра вручную).
+
+Внутри расчётов использовать данные из NatalChart.data вместо пересчёта на лету (для пользователя). Для внешних — из ExternalNatal.data.
+
+User update (необязательное, но желательно):
+
+apps/api/src/routes/user.ts: при POST /user/update после сохранения полей рождения вызвать recomputeIfProfileChanged(userId).
+
+4) Frontend — онбординг и ограничения
+Файлы и изменения:
+
+apps/web/src/store/useAuth.ts
+
+Расширить me-профиль флагом natalInitialized: boolean (сервер выставляет как наличие NatalChart).
+
+После логина/refresh — сохранять флаг.
+
+apps/web/src/routes/Dashboard.tsx
+
+До загрузки профиля показывать лоадер.
+
+Если !natalInitialized:
+
+Все карточки, кроме «Натальная карта» — в состоянии disabled (pointer-events: none; opacity 0.4).
+
+Над ними — полупрозрачный оверлей.
+
+На карточке «Натальная карта» — активная «подсказка-стрелка» (coachmark/spotlight) с текстом:
+«Начни здесь: создай свою натальную карту бесплатно. Она сохранится навсегда».
+
+Клик по карточке вызывает POST /astrology/natal/init, по успеху — обновляет natalInitialized = true и редиректит на NatalChart.
+
+apps/web/src/routes/NatalChart.tsx
+
+Если !natalInitialized, сразу дернуть POST /astrology/natal/init и затем GET /astrology/natal/me.
+
+Отображать сохранённую карту.
+
+Кнопка «Добавить натальную карту другого человека (−1 сфера)»:
+
+Открывает форму (имя, дата, время (опц.), место (опц.), пол, часовой пояс).
+
+После сабмита — запрос POST /astrology/natal/external; при успехе — показать подтверждение и добавить карточку в список «Гостевые карты».
+
+Панель «Гостевые карты»: список ExternalNatal с кнопкой «Использовать в совместимости» → навигация в Compatibility и передача withExternalId.
+
+apps/web/src/routes/Compatibility.tsx
+
+Новая секция выбора партнёра:
+
+Радио: «Ввести данные» | «Выбрать из гостевых карт»
+
+Если второй вариант — выпадающий список ExternalNatal (название), при выборе запрос выполняется с withExternalId.
+
+apps/web/src/lib/api.ts
+
+Методы:
+
+ts
+Копировать код
+export async function initUserNatal() { return http.post('/astrology/natal/init', {}); }
+export async function getMyNatal() { return http.get('/astrology/natal/me'); }
+export async function listExternalNatal() { return http.get('/astrology/natal/external'); }
+export async function createExternalNatal(payload) { return http.post('/astrology/natal/external', payload); }
+Все остальные вызовы астрологии должны корректно обрабатывать 409 NATAL_NOT_INITIALIZED (показывать модалку с CTA «Создать натальную карту» → route на NatalChart).
+
+UI/UX подсказка на Dashboard:
+
+В apps/web/src/components/Coachmark.tsx (новый компонент): стрелка/спотлайт + текст CTA; закрывается по клику или после успешной инициализации.
+
+Использовать те же THEME_COLORS, что и в ChartCanvas.tsx (контраст золотистый акцент).
+
+5) Безопасность и ограничения
+Защита маршрутов: все новые эндпойнты требуют JWT.
+
+Rate limit общий уже есть; использовать.
+
+ExternalNatal жёстко привязана к ownerId; доступ к чужим картам — 403.
+
+6) Tests
+Backend (Jest + Supertest) — apps/api/src/tests/api.spec.ts:
+
+POST /astrology/natal/init без существующей карты → 200, создаёт запись в NatalChart, энергия не списывается.
+
+Повторный POST /astrology/natal/init → 200, возвращает ту же карту (id не меняется).
+
+GET /astrology/natal/me до инициализации → 409 NATAL_NOT_INITIALIZED.
+
+POST /astrology/natal/external корректные данные → 200, создаёт ExternalNatal, списывает 1 энергию, создаёт UsageLog.
+
+GET /astrology/natal/external → список содержит ранее созданную запись.
+
+Любой из /astrology/solar|horoscope|ask|compatibility без NatalChart → 409.
+
+compatibility с withExternalId → 200, использует данные ExternalNatal.
+
+Frontend (Vitest):
+
+Dashboard рендерится с natalInitialized=false → все карточки кроме «Натальная» disabled; виден Coachmark.
+
+Клик по «Натальная» вызывает initUserNatal и снимает disabled.
+
+NatalChart форма «гостевая карта» — при сабмите вызывает createExternalNatal и обновляет список.
+
+Compatibility — переключение режимов и передача withExternalId.
+
+7) README
+Раздел «Онбординг»:
+«При первом входе доступна только натальная карта. Создайте её бесплатно — она сохранится навсегда. Остальные разделы будут учитывать вашу сохранённую карту.»
+
+Раздел «Гостевые карты»:
+«Можно сохранять натальные карты других людей за 1 сферу. Их удобно использовать в совместимости.»
+
+8) Acceptance Criteria
+Новый пользователь видит на Dashboard подсказку и может нажать только «Натальная карта». Остальные карточки недоступны до создания карты.
+
+POST /astrology/natal/init создаёт и сохраняет собственную карту бесплатно и единожды; повторные вызовы безопасны (идемпотентны).
+
+Все механики астрологии используют сохранённую NatalChart пользователя; при отсутствии — 409 с понятной ошибкой.
+
+Создание гостевой карты за 1 сферу работает, запись сохраняется и используется в совместимости.
+
+Обновлены миграции, seed, фронтенд, тесты; сборка и тесты проходят: pnpm -r build && pnpm -r test.
+
+9) Вывести ПОЛНЫЙ список изменённых/новых файлов
+prisma/schema.prisma
+
+prisma/migrations/**/*
+
+prisma/seed.ts
+
+apps/api/src/routes/energy.ts
+
+apps/api/src/astrology/natalService.ts
+
+apps/api/src/routes/astrology.ts
+
+apps/api/src/routes/user.ts
+
+apps/api/src/tests/api.spec.ts
+
+apps/web/src/store/useAuth.ts
+
+apps/web/src/routes/Dashboard.tsx
+
+apps/web/src/routes/NatalChart.tsx
+
+apps/web/src/routes/Compatibility.tsx
+
+apps/web/src/lib/api.ts
+
+apps/web/src/components/Coachmark.tsx
+
+README.md
+
+[END REPLIT PROMPT]

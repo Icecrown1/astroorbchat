@@ -43,6 +43,50 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   payments: many(payments),
   usageLogs: many(usageLogs),
+  natalChart: one(natalCharts, {
+    fields: [users.id],
+    references: [natalCharts.userId],
+  }),
+  externalNatals: many(externalNatals),
+}));
+
+export const natalCharts = pgTable("natal_charts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull().unique(),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("natal_charts_user_id_idx").on(table.userId),
+}));
+
+export const natalChartsRelations = relations(natalCharts, ({ one }) => ({
+  user: one(users, {
+    fields: [natalCharts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const externalNatals = pgTable("external_natals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id", { length: 255 }).notNull(),
+  name: text("name").notNull(),
+  gender: varchar("gender", { length: 20 }).notNull(),
+  birthdayDate: timestamp("birthday_date").notNull(),
+  birthTime: varchar("birth_time", { length: 5 }),
+  birthPlace: text("birth_place"),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Moscow"),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  ownerIdIdx: index("external_natals_owner_id_idx").on(table.ownerId),
+}));
+
+export const externalNatalsRelations = relations(externalNatals, ({ one }) => ({
+  owner: one(users, {
+    fields: [externalNatals.ownerId],
+    references: [users.id],
+  }),
 }));
 
 export const subscriptions = pgTable("subscriptions", {
@@ -223,7 +267,7 @@ export const insertPaymentSchema = createInsertSchema(payments, {
 
 export const insertUsageLogSchema = createInsertSchema(usageLogs, {
   userId: z.string(),
-  feature: z.enum(["natal", "solar", "horoscope", "compatibility", "ask"]),
+  feature: z.enum(["natal", "solar", "horoscope", "compatibility", "ask", "natal_external"]),
   cost: z.number().int().positive(),
 }).omit({
   id: true,
@@ -268,6 +312,29 @@ export const insertAiQuestionSchema = createInsertSchema(aiQuestions, {
   createdAt: true,
 });
 
+export const insertNatalChartSchema = createInsertSchema(natalCharts, {
+  userId: z.string(),
+  data: z.any(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertExternalNatalSchema = createInsertSchema(externalNatals, {
+  ownerId: z.string(),
+  name: z.string().min(1),
+  gender: z.enum(["male", "female", "other"]),
+  birthdayDate: z.date().or(z.string()),
+  birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  birthPlace: z.string().optional().nullable(),
+  timezone: z.string(),
+  data: z.any(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -292,3 +359,9 @@ export type InsertCompatibilityReading = z.infer<typeof insertCompatibilityReadi
 
 export type AiQuestion = typeof aiQuestions.$inferSelect;
 export type InsertAiQuestion = z.infer<typeof insertAiQuestionSchema>;
+
+export type NatalChart = typeof natalCharts.$inferSelect;
+export type InsertNatalChart = z.infer<typeof insertNatalChartSchema>;
+
+export type ExternalNatal = typeof externalNatals.$inferSelect;
+export type InsertExternalNatal = z.infer<typeof insertExternalNatalSchema>;
