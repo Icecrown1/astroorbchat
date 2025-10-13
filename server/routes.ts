@@ -328,6 +328,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete external natal chart
+  app.delete("/api/natal/external/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const chartId = req.params.id;
+      
+      const chart = await storage.getExternalNatal(chartId);
+      
+      if (!chart) {
+        return res.status(404).json({ ok: false, error: "Chart not found" });
+      }
+      
+      // Verify ownership
+      if (chart.ownerId !== userId) {
+        return res.status(403).json({ ok: false, error: "Access denied" });
+      }
+      
+      await storage.deleteExternalNatal(chartId);
+      
+      res.json({ ok: true, message: "Chart deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/energy", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

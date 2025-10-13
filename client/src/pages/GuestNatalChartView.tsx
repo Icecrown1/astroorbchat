@@ -1,20 +1,31 @@
 import { useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft, Users, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function GuestNatalChartView() {
   const [, navigate] = useLocation();
@@ -22,8 +33,34 @@ export default function GuestNatalChartView() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const chartId = params?.id;
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!chartId) throw new Error('No chart ID');
+      return await apiRequest('DELETE', `/api/natal/external/${chartId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
+      toast({
+        title: locale === 'ru' ? 'Карта удалена' : 'Chart deleted',
+        description: locale === 'ru' 
+          ? 'Гостевая карта успешно удалена' 
+          : 'Guest chart has been deleted successfully',
+      });
+      navigate('/natal-chart');
+    },
+    onError: (error: any) => {
+      toast({
+        title: locale === 'ru' ? 'Ошибка' : 'Error',
+        description: error.message || (locale === 'ru' ? 'Не удалось удалить карту' : 'Failed to delete chart'),
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Load guest natal chart
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
@@ -101,15 +138,25 @@ export default function GuestNatalChartView() {
               </p>
             </div>
           </div>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => navigate(`/compatibility?guestId=${chartId}`)}
-            data-testid="button-use-compatibility"
-          >
-            <Users className="w-4 h-4 mr-2" />
-            {locale === 'ru' ? 'Совместимость' : 'Compatibility'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate(`/compatibility?guestId=${chartId}`)}
+              data-testid="button-use-compatibility"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              {locale === 'ru' ? 'Совместимость' : 'Compatibility'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteDialogOpen(true)}
+              data-testid="button-delete-chart"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -244,6 +291,35 @@ export default function GuestNatalChartView() {
           chartId={chartId}
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {locale === 'ru' ? 'Удалить гостевую карту?' : 'Delete guest chart?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {locale === 'ru' 
+                ? 'Это действие нельзя отменить. Карта будет удалена навсегда.' 
+                : 'This action cannot be undone. The chart will be permanently deleted.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              {locale === 'ru' ? 'Отмена' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending 
+                ? (locale === 'ru' ? 'Удаление...' : 'Deleting...') 
+                : (locale === 'ru' ? 'Удалить' : 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

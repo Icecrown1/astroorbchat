@@ -1,16 +1,31 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { GuestChartForm } from '@/components/GuestChartForm';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft, Users, Trash2 } from 'lucide-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function GuestNatalCharts() {
   const [, navigate] = useLocation();
   const { locale } = useTranslation();
+  const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [chartToDelete, setChartToDelete] = useState<string | null>(null);
 
   // Load saved guest charts
   const { data: guestChartsResponse } = useQuery<any>({
@@ -18,6 +33,42 @@ export default function GuestNatalCharts() {
   });
 
   const guestCharts = guestChartsResponse?.data || [];
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (chartId: string) => {
+      return await apiRequest('DELETE', `/api/natal/external/${chartId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
+      toast({
+        title: locale === 'ru' ? 'Карта удалена' : 'Chart deleted',
+        description: locale === 'ru' 
+          ? 'Гостевая карта успешно удалена' 
+          : 'Guest chart has been deleted successfully',
+      });
+      setDeleteDialogOpen(false);
+      setChartToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: locale === 'ru' ? 'Ошибка' : 'Error',
+        description: error.message || (locale === 'ru' ? 'Не удалось удалить карту' : 'Failed to delete chart'),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteClick = (chartId: string) => {
+    setChartToDelete(chartId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (chartToDelete) {
+      deleteMutation.mutate(chartToDelete);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -113,6 +164,14 @@ export default function GuestNatalCharts() {
                         >
                           {locale === 'ru' ? 'Совместимость' : 'Compatibility'}
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(chart.id)}
+                          data-testid={`button-delete-chart-${chart.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   </Card>
@@ -122,6 +181,35 @@ export default function GuestNatalCharts() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {locale === 'ru' ? 'Удалить гостевую карту?' : 'Delete guest chart?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {locale === 'ru' 
+                ? 'Это действие нельзя отменить. Карта будет удалена навсегда.' 
+                : 'This action cannot be undone. The chart will be permanently deleted.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              {locale === 'ru' ? 'Отмена' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending 
+                ? (locale === 'ru' ? 'Удаление...' : 'Deleting...') 
+                : (locale === 'ru' ? 'Удалить' : 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
