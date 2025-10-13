@@ -63,6 +63,8 @@ export function PlanetModal({ planet, onClose }: PlanetModalProps) {
     'Saturn': '♄',
     'Uranus': '♅',
     'Neptune': '♆',
+    'North Node': '☊',
+    'South Node': '☋',
     'Pluto': '♇'
   };
 
