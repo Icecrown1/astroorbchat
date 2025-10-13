@@ -25,18 +25,36 @@ export default function MyNatalChart() {
 
   // Load user's OWN natal chart from cache
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
-    queryKey: ['/api/natal/me'],
+    queryKey: [`/api/natal/me?locale=${locale}`],
     queryFn: async () => {
+      // Get auth token from localStorage
+      const authData = localStorage.getItem('astro-orb-auth');
+      const headers: Record<string, string> = {};
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          if (parsed.state?.token) {
+            headers.Authorization = `Bearer ${parsed.state.token}`;
+          }
+        } catch (e) {
+          console.error('Failed to parse auth data:', e);
+        }
+      }
+
       const response = await fetch(`/api/natal/me?locale=${locale}`, {
+        headers,
         credentials: 'include',
       });
+      
+      if (response.status === 409) {
+        // Natal chart not initialized yet
+        return null;
+      }
+      
       if (!response.ok) {
-        const error = await response.json();
-        if (error.error === 'NATAL_NOT_INITIALIZED') {
-          return null;
-        }
         throw new Error('Failed to fetch chart');
       }
+      
       return response.json();
     },
   });
@@ -48,7 +66,7 @@ export default function MyNatalChart() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
       toast({
         title: locale === 'ru' ? 'Карта создана!' : 'Chart created!',
         description: locale === 'ru' ? 'Ваша натальная карта успешно создана' : 'Your natal chart has been created successfully',
@@ -70,7 +88,7 @@ export default function MyNatalChart() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
       toast({
         title: locale === 'ru' ? 'Карта пересчитана' : 'Chart recalculated',
         description: locale === 'ru' ? 'Ваша натальная карта обновлена с учётом последних данных профиля' : 'Your natal chart has been updated with latest profile data',
