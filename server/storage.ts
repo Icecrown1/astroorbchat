@@ -8,6 +8,8 @@ import {
   horoscopeReadings,
   compatibilityReadings,
   aiQuestions,
+  natalCharts,
+  externalNatals,
   type User, 
   type InsertUser,
   type Subscription,
@@ -23,7 +25,11 @@ import {
   type CompatibilityReading,
   type InsertCompatibilityReading,
   type AiQuestion,
-  type InsertAiQuestion
+  type InsertAiQuestion,
+  type NatalChart,
+  type InsertNatalChart,
+  type ExternalNatal,
+  type InsertExternalNatal
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -67,6 +73,17 @@ export interface IStorage {
   // AI question operations
   createAiQuestion(question: InsertAiQuestion): Promise<AiQuestion>;
   getAiQuestionsByUserId(userId: string, limit?: number): Promise<AiQuestion[]>;
+  
+  // Natal chart operations
+  getNatalChart(userId: string): Promise<NatalChart | undefined>;
+  createNatalChart(chart: InsertNatalChart): Promise<NatalChart>;
+  updateNatalChart(userId: string, data: Partial<NatalChart>): Promise<NatalChart | undefined>;
+  
+  // External natal operations
+  getExternalNatal(id: string): Promise<ExternalNatal | undefined>;
+  getExternalNatalsByOwnerId(ownerId: string): Promise<ExternalNatal[]>;
+  createExternalNatal(natal: InsertExternalNatal): Promise<ExternalNatal>;
+  deleteExternalNatal(id: string): Promise<void>;
   
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -265,6 +282,63 @@ export class DatabaseStorage implements IStorage {
       .where(eq(aiQuestions.userId, userId))
       .orderBy(desc(aiQuestions.createdAt))
       .limit(limit);
+  }
+
+  // Natal chart operations
+  async getNatalChart(userId: string): Promise<NatalChart | undefined> {
+    const [chart] = await db
+      .select()
+      .from(natalCharts)
+      .where(eq(natalCharts.userId, userId));
+    return chart || undefined;
+  }
+
+  async createNatalChart(insertChart: InsertNatalChart): Promise<NatalChart> {
+    const [chart] = await db
+      .insert(natalCharts)
+      .values(insertChart)
+      .returning();
+    return chart;
+  }
+
+  async updateNatalChart(userId: string, data: Partial<NatalChart>): Promise<NatalChart | undefined> {
+    const [chart] = await db
+      .update(natalCharts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(natalCharts.userId, userId))
+      .returning();
+    return chart || undefined;
+  }
+
+  // External natal operations
+  async getExternalNatal(id: string): Promise<ExternalNatal | undefined> {
+    const [natal] = await db
+      .select()
+      .from(externalNatals)
+      .where(eq(externalNatals.id, id));
+    return natal || undefined;
+  }
+
+  async getExternalNatalsByOwnerId(ownerId: string): Promise<ExternalNatal[]> {
+    return await db
+      .select()
+      .from(externalNatals)
+      .where(eq(externalNatals.ownerId, ownerId))
+      .orderBy(desc(externalNatals.createdAt));
+  }
+
+  async createExternalNatal(insertNatal: InsertExternalNatal): Promise<ExternalNatal> {
+    const [natal] = await db
+      .insert(externalNatals)
+      .values(insertNatal)
+      .returning();
+    return natal;
+  }
+
+  async deleteExternalNatal(id: string): Promise<void> {
+    await db
+      .delete(externalNatals)
+      .where(eq(externalNatals.id, id));
   }
 
   // Admin operations
