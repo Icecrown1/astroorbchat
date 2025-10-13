@@ -128,7 +128,8 @@ Preferred communication style: Simple, everyday language.
 - **Caching Service**: Implemented `natalService.ts` with `ensureUserNatalChart()`, `computeNatalFromUser()`, and `recomputeIfProfileChanged()` functions
 - **API Endpoints**:
   - `POST /api/natal/init` - Create user's natal chart (FREE, cached forever)
-  - `GET /api/natal/me` - Retrieve cached chart
+  - `GET /api/natal/me` - Retrieve cached chart with auto-recalculation on profile change
+  - `POST /api/natal/recalculate` - Force recalculation of user's chart (FREE)
   - `POST /api/natal/external` - Create guest chart (1 orb each)
   - `GET /api/natal/external` - List all guest charts
 - **Energy Model Update**: Own natal chart FREE (created once), guest charts cost 1 orb each, compatibility analysis uses guest charts
@@ -139,3 +140,12 @@ Preferred communication style: Simple, everyday language.
   - Compatibility page allows selecting from saved guest charts
 - **Backend Integration**: Updated `/api/astrology/natal` to use new caching system, `/api/user/me` returns `natalInitialized` flag
 - **Frontend Components**: `Coachmark.tsx` for onboarding prompts, `GuestChartForm.tsx` for guest chart creation
+
+**UI Separation & Auto-Recalculation (Complete):**
+- **Separate Pages**: Created `MyNatalChart.tsx` for user's own chart (FREE, cached) and updated `NatalChart.tsx` exclusively for guest charts (1 orb each)
+- **Dashboard Updates**: Split natal chart functionality into two buttons:
+  - "My Natal Chart" → `/my-natal-chart` route (FREE access to cached chart)
+  - "Guest Charts" → `/natal-chart` route (1 orb per guest chart)
+- **Auto-Recalculation**: GET `/api/natal/me` automatically invokes `recomputeIfProfileChanged()` before returning, ensuring profile edits (birth date/time/location) trigger FREE recalculation without energy cost
+- **Data Normalization**: `MyNatalChart.tsx` includes `Array.isArray()` guard to transform cached planet objects `{Sun: {...}, Moon: {...}}` into arrays `[{name: "Sun", ...}, ...]` for ChartCanvas compatibility
+- **Manual Recalculation**: Added "Recalculate Chart" button in `MyNatalChart.tsx` using POST `/api/natal/recalculate` endpoint for manual refresh without energy deduction
