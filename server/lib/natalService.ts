@@ -1,8 +1,9 @@
 import { storage } from "../storage";
 import { calculateNatalChartPython, type NatalChartResult } from "./pythonNatal";
+import { getAstrologyInterpretation } from "./openai";
 import type { User, NatalChart } from "@shared/schema";
 
-export async function computeNatalFromUser(user: User): Promise<NatalChartResult> {
+export async function computeNatalFromUser(user: User, locale: string = 'ru'): Promise<NatalChartResult & { interpretation: string }> {
   const birthDate = new Date(user.birthdayDate);
   const birthTimeStr = user.birthTime || "12:00";
   const [hours, minutes] = birthTimeStr.split(":").map(Number);
@@ -20,10 +21,21 @@ export async function computeNatalFromUser(user: User): Promise<NatalChartResult
     longitude,
   });
   
-  return pythonChart;
+  // Generate AI interpretation
+  const interpretation = await getAstrologyInterpretation(
+    "natal",
+    pythonChart,
+    locale,
+    user.gender || 'other'
+  );
+  
+  return {
+    ...pythonChart,
+    interpretation,
+  };
 }
 
-export async function ensureUserNatalChart(userId: string): Promise<NatalChart> {
+export async function ensureUserNatalChart(userId: string, locale: string = 'ru'): Promise<NatalChart> {
   const existingChart = await storage.getNatalChart(userId);
   
   if (existingChart) {
@@ -35,7 +47,7 @@ export async function ensureUserNatalChart(userId: string): Promise<NatalChart> 
     throw new Error("User not found");
   }
   
-  const natalData = await computeNatalFromUser(user);
+  const natalData = await computeNatalFromUser(user, locale);
   
   const chart = await storage.createNatalChart({
     userId,
@@ -45,7 +57,7 @@ export async function ensureUserNatalChart(userId: string): Promise<NatalChart> 
   return chart;
 }
 
-export async function recomputeIfProfileChanged(userId: string): Promise<void> {
+export async function recomputeIfProfileChanged(userId: string, locale: string = 'ru'): Promise<void> {
   const user = await storage.getUser(userId);
   const chart = await storage.getNatalChart(userId);
   
@@ -57,7 +69,7 @@ export async function recomputeIfProfileChanged(userId: string): Promise<void> {
   const userUpdatedAt = new Date(user.updatedAt);
   
   if (userUpdatedAt > chartCreatedAt) {
-    const newData = await computeNatalFromUser(user);
+    const newData = await computeNatalFromUser(user, locale);
     await storage.updateNatalChart(userId, { data: newData });
   }
 }

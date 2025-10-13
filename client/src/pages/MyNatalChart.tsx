@@ -26,12 +26,47 @@ export default function MyNatalChart() {
   // Load user's OWN natal chart from cache
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
     queryKey: ['/api/natal/me'],
+    queryFn: async () => {
+      const response = await fetch(`/api/natal/me?locale=${locale}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        if (error.error === 'NATAL_NOT_INITIALIZED') {
+          return null;
+        }
+        throw new Error('Failed to fetch chart');
+      }
+      return response.json();
+    },
+  });
+
+  // Create natal chart (first time)
+  const createChartMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/natal/init', { locale });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] });
+      toast({
+        title: locale === 'ru' ? 'Карта создана!' : 'Chart created!',
+        description: locale === 'ru' ? 'Ваша натальная карта успешно создана' : 'Your natal chart has been created successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.natalChart.generationFailed,
+        description: error.message || t.compatibility.tryAgain,
+        variant: 'destructive',
+      });
+    },
   });
 
   // Recalculate chart (force recomputation)
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/natal/recalculate', {});
+      const response = await apiRequest('POST', '/api/natal/recalculate', { locale });
       return response.data;
     },
     onSuccess: () => {
@@ -97,11 +132,28 @@ export default function MyNatalChart() {
             </div>
           </div>
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground">
+            <Sparkles className="w-16 h-16 mx-auto mb-4 text-primary" />
+            <h3 className="text-xl font-semibold mb-2">
+              {locale === 'ru' ? 'Создайте свою натальную карту' : 'Create Your Natal Chart'}
+            </h3>
+            <p className="text-muted-foreground mb-6">
               {locale === 'ru' 
-                ? 'Натальная карта не найдена. Вернитесь на главную для создания.' 
-                : 'Natal chart not found. Return to dashboard to create.'}
+                ? 'Получите бесплатную персонализированную астрологическую интерпретацию на основе точных данных вашего рождения.' 
+                : 'Get a free personalized astrological interpretation based on your precise birth data.'}
             </p>
+            <Button
+              onClick={() => createChartMutation.mutate()}
+              disabled={createChartMutation.isPending}
+              size="lg"
+              data-testid="button-create-chart"
+            >
+              {createChartMutation.isPending ? (
+                <Loader className="mr-2" size="sm" />
+              ) : (
+                <Sparkles className="w-5 h-5 mr-2" />
+              )}
+              {locale === 'ru' ? 'Создать карту бесплатно' : 'Create Chart for Free'}
+            </Button>
           </Card>
         </div>
       </div>
@@ -164,15 +216,21 @@ export default function MyNatalChart() {
           </Card>
 
           {chartData.interpretation && (
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">{t.natalChart.interpretation}</h2>
-              <div 
-                className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ 
-                  __html: chartData.interpretation.replace(/\n/g, '<br />') 
-                }}
-              />
-            </Card>
+            <Accordion type="single" collapsible defaultValue="interpretation">
+              <AccordionItem value="interpretation">
+                <AccordionTrigger className="text-lg font-semibold">
+                  {t.natalChart.interpretation}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div 
+                    className="prose prose-sm dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: chartData.interpretation.replace(/\n/g, '<br />') 
+                    }}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
 
           <Card className="p-6">

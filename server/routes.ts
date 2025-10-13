@@ -164,7 +164,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/natal/init", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const chart = await ensureUserNatalChart(userId);
+      const locale = req.body.locale || 'ru';
+      const chart = await ensureUserNatalChart(userId, locale);
       res.json({ ok: true, data: chart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
@@ -175,9 +176,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/natal/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const locale = (req.query.locale as string) || 'ru';
       
       // Auto-recalculate if profile changed
-      await recomputeIfProfileChanged(userId);
+      await recomputeIfProfileChanged(userId, locale);
       
       const chart = await storage.getNatalChart(userId);
       
@@ -195,14 +197,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/natal/recalculate", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const locale = req.body.locale || 'ru';
       const user = await storage.getUser(userId);
       
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
       
-      // Force recalculation
-      const newData = await computeNatalFromUser(user);
+      // Force recalculation with interpretation
+      const newData = await computeNatalFromUser(user, locale);
       await storage.updateNatalChart(userId, { data: newData });
       
       const chart = await storage.getNatalChart(userId);
