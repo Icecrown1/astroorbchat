@@ -475,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/planet-interpretation", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { planet, locale = 'ru' } = req.body;
+      const { planet, locale = 'ru', chartType = 'own', chartId } = req.body;
       
       // Валидация планеты
       const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'North Node', 'South Node'];
@@ -491,15 +491,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Получаем сохраненную натальную карту пользователя
-      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
-        return res.status(400).json({ 
-          ok: false, 
-          error: 'Natal chart not found. Please generate your natal chart first.' 
-        });
+      let savedChart: NatalChartResult;
+      let chartOwner = user;
+
+      // Получаем данные карты в зависимости от типа
+      if (chartType === 'guest' && chartId) {
+        // Загружаем гостевую карту
+        const guestChart = await storage.getExternalNatal(chartId);
+        
+        if (!guestChart) {
+          return res.status(404).json({ ok: false, error: "Guest chart not found" });
+        }
+        
+        // Проверяем владельца
+        if (guestChart.ownerId !== userId) {
+          return res.status(403).json({ ok: false, error: "Access denied" });
+        }
+        
+        if (!guestChart.data || typeof guestChart.data !== 'object' || !('planets' in guestChart.data)) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: 'Guest chart data is invalid' 
+          });
+        }
+        
+        savedChart = guestChart.data as NatalChartResult;
+        // Для гостевой карты создаем минимальный профиль
+        chartOwner = {
+          ...user,
+          name: guestChart.name,
+          gender: guestChart.gender,
+          birthdayDate: guestChart.birthdayDate
+        } as any;
+      } else {
+        // Получаем сохраненную натальную карту пользователя
+        const ownChart = await storage.getNatalChart(userId);
+        
+        if (!ownChart || !ownChart.data || typeof ownChart.data !== 'object' || !('planets' in ownChart.data)) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: 'Natal chart not found. Please generate your natal chart first.' 
+          });
+        }
+        
+        savedChart = ownChart.data as NatalChartResult;
       }
 
-      const savedChart = user.natalChart as NatalChartResult;
       const planetData = savedChart.planets[planet];
       
       if (!planetData) {
@@ -557,9 +594,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           aspects: planetAspects
         },
         profile: {
-          name: user.name,
-          age: user.birthdayDate ? new Date().getFullYear() - new Date(user.birthdayDate).getFullYear() : undefined,
-          gender: user.gender || undefined
+          name: chartOwner.name,
+          age: chartOwner.birthdayDate ? new Date().getFullYear() - new Date(chartOwner.birthdayDate).getFullYear() : undefined,
+          gender: chartOwner.gender || undefined
         }
       };
 

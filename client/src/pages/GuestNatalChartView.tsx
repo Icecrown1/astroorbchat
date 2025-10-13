@@ -240,6 +240,8 @@ export default function GuestNatalChartView() {
         <PlanetModal
           planet={selectedPlanet}
           onClose={() => setSelectedPlanet(null)}
+          chartType="guest"
+          chartId={chartId}
         />
       )}
     </div>

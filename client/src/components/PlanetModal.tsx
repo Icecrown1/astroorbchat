@@ -24,9 +24,11 @@ interface PlanetInterpretation {
 interface PlanetModalProps {
   planet: string | null;
   onClose: () => void;
+  chartType?: 'own' | 'guest';
+  chartId?: string;
 }
 
-export function PlanetModal({ planet, onClose }: PlanetModalProps) {
+export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: PlanetModalProps) {
   const { locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -35,12 +37,14 @@ export function PlanetModal({ planet, onClose }: PlanetModalProps) {
   }, [planet]);
 
   const { data, isLoading, error } = useQuery<PlanetInterpretation>({
-    queryKey: ['/api/astrology/planet-interpretation', planet, locale],
+    queryKey: ['/api/astrology/planet-interpretation', planet, locale, chartType, chartId],
     queryFn: async () => {
       if (!planet) throw new Error('No planet selected');
       const response = await apiRequest('POST', '/api/astrology/planet-interpretation', {
         planet,
-        locale
+        locale,
+        chartType,
+        chartId
       });
       return response.data;
     },
