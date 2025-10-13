@@ -149,3 +149,11 @@ Preferred communication style: Simple, everyday language.
 - **Auto-Recalculation**: GET `/api/natal/me` automatically invokes `recomputeIfProfileChanged()` before returning, ensuring profile edits (birth date/time/location) trigger FREE recalculation without energy cost
 - **Data Normalization**: `MyNatalChart.tsx` includes `Array.isArray()` guard to transform cached planet objects `{Sun: {...}, Moon: {...}}` into arrays `[{name: "Sun", ...}, ...]` for ChartCanvas compatibility
 - **Manual Recalculation**: Added "Recalculate Chart" button in `MyNatalChart.tsx` using POST `/api/natal/recalculate` endpoint for manual refresh without energy deduction
+
+**AI Interpretation Caching (Complete):**
+- **Interpretation Generation**: `computeNatalFromUser()` now calls `getAstrologyInterpretation()` to generate personalized AI interpretation based on user's gender and locale
+- **Caching in Database**: AI interpretation stored in `natalCharts.data.interpretation` field alongside chart structure (planets, houses, aspects)
+- **Locale Support**: All natal endpoints (POST /api/natal/init, GET /api/natal/me, POST /api/natal/recalculate) accept `locale` parameter for language-specific interpretations
+- **Auto-Regeneration**: Profile changes trigger automatic interpretation regeneration with `recomputeIfProfileChanged()` using updated locale
+- **UI Display**: Interpretation shown in collapsible Accordion component (defaultValue="interpretation") with dangerouslySetInnerHTML for HTML formatting
+- **First-Time UX**: MyNatalChart page shows "Create Chart" button if natal chart doesn't exist, triggering POST /api/natal/init with locale and interpretation generation
