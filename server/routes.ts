@@ -11,7 +11,7 @@ import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, type PlanetInterpretationData } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
-import { ensureUserNatalChart, computeNatalFromUser } from "./lib/natalService";
+import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -175,12 +175,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/natal/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      
+      // Auto-recalculate if profile changed
+      await recomputeIfProfileChanged(userId);
+      
       const chart = await storage.getNatalChart(userId);
       
       if (!chart) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
       
+      res.json({ ok: true, data: chart });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Force recalculate natal chart (FREE for own chart)
+  app.post("/api/natal/recalculate", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+      
+      // Force recalculation
+      const newData = await computeNatalFromUser(user);
+      await storage.updateNatalChart(userId, { data: newData });
+      
+      const chart = await storage.getNatalChart(userId);
       res.json({ ok: true, data: chart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });

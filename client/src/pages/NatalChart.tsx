@@ -1,66 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChartCanvas } from '@/components/ChartCanvas';
-import { PlanetModal } from '@/components/PlanetModal';
 import { GuestChartForm } from '@/components/GuestChartForm';
-import { Loader } from '@/components/Loader';
-import { ArrowLeft, Sparkles } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Users } from 'lucide-react';
 import { useTranslation } from '@/contexts/LocaleContext';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-export default function NatalChart() {
+export default function GuestNatalCharts() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
-  const { t, locale } = useTranslation();
-  const [chartData, setChartData] = useState<any>(null);
-  const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const { locale } = useTranslation();
 
-  // Check if user has natal chart initialized
-  const { data: userData, isLoading: userLoading } = useQuery<any>({
-    queryKey: ['/api/user/me'],
+  // Load saved guest charts
+  const { data: guestChartsResponse } = useQuery<any>({
+    queryKey: ['/api/natal/external'],
   });
 
-  // Create (POST) or regenerate natal chart
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/astrology/natal', { locale });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setChartData(data);
-      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      toast({
-        title: t.natalChart.generated,
-        description: t.natalChart.blueprintReady,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t.natalChart.generationFailed,
-        description: error.message || t.compatibility.tryAgain,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Auto-load cached chart if it exists (GET, not POST!)
-  useEffect(() => {
-    if (!userLoading && userData?.data?.natalInitialized && !chartData) {
-      // Load from cache using POST (backend will use cached data)
-      mutation.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLoading, userData]);
+  const guestCharts = guestChartsResponse?.data || [];
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -75,138 +32,86 @@ export default function NatalChart() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-display font-bold">{t.natalChart.title}</h1>
-            <p className="text-muted-foreground">{t.natalChart.subtitle}</p>
+            <h1 className="text-2xl font-display font-bold">
+              {locale === 'ru' ? 'Гостевые натальные карты' : 'Guest Natal Charts'}
+            </h1>
+            <p className="text-muted-foreground">
+              {locale === 'ru' 
+                ? 'Создавайте карты для друзей и партнёров' 
+                : 'Create charts for friends and partners'}
+            </p>
           </div>
         </div>
 
-        {!chartData && (
-          <Card className="p-8 text-center">
-            <div className="mb-6">
-              <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                <Sparkles className="w-12 h-12 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2">{t.natalChart.generateTitle}</h2>
-              <p className="text-muted-foreground mb-4">
-                {t.natalChart.generateDescription}
-              </p>
-              <p className="text-sm text-primary font-medium">
-                {locale === 'ru' ? '✨ Бесплатно навсегда' : '✨ Free forever'}
-              </p>
-            </div>
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-              size="lg"
-              data-testid="button-generate-natal"
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader className="mr-2" size="sm" />
-                  {t.natalChart.calculating}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  {t.natalChart.generate}
-                </>
-              )}
-            </Button>
-          </Card>
-        )}
+        <Tabs defaultValue="create" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="create" data-testid="tab-create">
+              {locale === 'ru' ? 'Создать карту' : 'Create Chart'}
+            </TabsTrigger>
+            <TabsTrigger value="saved" data-testid="tab-saved">
+              {locale === 'ru' ? 'Сохранённые' : 'Saved'} ({guestCharts.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {chartData && (
-          <div className="space-y-6">
+          <TabsContent value="create" className="mt-6">
             <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">{t.natalChart.chartVisualization}</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                {locale === 'ru' 
-                  ? 'Нажмите на планету для подробной интерпретации' 
-                  : 'Click on a planet for detailed interpretation'}
-              </p>
-              <ChartCanvas
-                planets={chartData.planets || []}
-                aspects={chartData.aspects || []}
-                onPlanetClick={setSelectedPlanet}
-              />
-            </Card>
-
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">{t.natalChart.interpretation}</h2>
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <p className="text-foreground leading-relaxed whitespace-pre-line">
-                  {chartData.interpretation}
+              <div className="mb-6">
+                <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
+                  <Users className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold mb-2">
+                  {locale === 'ru' ? 'Создать гостевую карту' : 'Create Guest Chart'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'ru' 
+                    ? 'Введите данные рождения для создания натальной карты. Стоимость: 1 орб' 
+                    : 'Enter birth data to create a natal chart. Cost: 1 orb'}
                 </p>
               </div>
-            </Card>
-
-            {chartData.planets && chartData.planets.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">{t.natalChart.planetaryPositions}</h2>
-                <Accordion type="single" collapsible>
-                  {chartData.planets.map((planet: any, index: number) => (
-                    <AccordionItem key={index} value={`planet-${index}`}>
-                      <AccordionTrigger>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{planet.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {planet.sign} {planet.position.toFixed(2)}°
-                          </span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <p className="text-sm text-muted-foreground">
-                          {planet.meaning || t.natalChart.planetaryInfluence}
-                        </p>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </Card>
-            )}
-
-            {chartData.aspects && chartData.aspects.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">{t.natalChart.majorAspects}</h2>
-                <div className="space-y-2">
-                  {chartData.aspects.map((aspect: any, index: number) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted"
-                    >
-                      <span className="text-sm">
-                        {aspect.planet1} {aspect.type} {aspect.planet2}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {aspect.angle.toFixed(1)}°
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setChartData(null)}
-              data-testid="button-regenerate"
-            >
-              {t.natalChart.generateNew}
-            </Button>
-
-            {/* Guest Charts Section */}
-            <div className="mt-8">
               <GuestChartForm />
-            </div>
-          </div>
-        )}
-      </div>
+            </Card>
+          </TabsContent>
 
-      <PlanetModal 
-        planet={selectedPlanet} 
-        onClose={() => setSelectedPlanet(null)} 
-      />
+          <TabsContent value="saved" className="mt-6">
+            {guestCharts.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {locale === 'ru' 
+                    ? 'У вас пока нет сохранённых гостевых карт' 
+                    : 'You have no saved guest charts yet'}
+                </p>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {guestCharts.map((chart: any) => (
+                  <Card key={chart.id} className="p-4 hover-elevate" data-testid={`guest-chart-${chart.id}`}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold">{chart.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(chart.birthDate).toLocaleDateString(locale)}
+                        </p>
+                        {chart.birthPlace && (
+                          <p className="text-sm text-muted-foreground">{chart.birthPlace}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/compatibility?guestId=${chart.id}`)}
+                        data-testid={`button-use-chart-${chart.id}`}
+                      >
+                        {locale === 'ru' ? 'Использовать' : 'Use'}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

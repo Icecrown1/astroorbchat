@@ -41,9 +41,16 @@ export default function Dashboard() {
   const FEATURES = [
     {
       icon: Moon,
-      title: t.dashboard.natalChart,
-      description: t.dashboard.natalChartDesc,
-      energyCost: 2,
+      title: locale === 'ru' ? 'Моя натальная карта' : 'My Natal Chart',
+      description: locale === 'ru' ? 'Ваш космический отпечаток' : 'Your cosmic blueprint',
+      energyCost: 0,
+      path: '/my-natal-chart',
+    },
+    {
+      icon: Users,
+      title: locale === 'ru' ? 'Гостевые карты' : 'Guest Charts',
+      description: locale === 'ru' ? 'Карты для друзей и партнёров' : 'Charts for friends and partners',
+      energyCost: 1,
       path: '/natal-chart',
     },
     {
@@ -136,7 +143,7 @@ export default function Dashboard() {
             ? "Создайте свою натальную карту бесплатно! Это займёт всего минуту и откроет доступ ко всем возможностям Astro Orb."
             : "Create your natal chart for free! It takes just a minute and unlocks all Astro Orb features."}
           buttonText={locale === 'ru' ? "Создать карту" : "Create Chart"}
-          onAction={() => navigate('/natal-chart')}
+          onAction={() => navigate('/my-natal-chart')}
           icon={<Moon className="w-6 h-6" />}
         />
 

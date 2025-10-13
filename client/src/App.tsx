@@ -11,6 +11,7 @@ import { useAuth } from '@/store/useAuth';
 import NotFound from '@/pages/not-found';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
+import MyNatalChart from '@/pages/MyNatalChart';
 import NatalChart from '@/pages/NatalChart';
 import SolarToday from '@/pages/SolarToday';
 import Horoscope from '@/pages/Horoscope';
@@ -43,6 +44,7 @@ function Router() {
     <Switch>
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/my-natal-chart" component={MyNatalChart} />
       <Route path="/natal-chart" component={NatalChart} />
       <Route path="/solar-today" component={SolarToday} />
       <Route path="/horoscope" component={Horoscope} />
