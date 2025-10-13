@@ -90,7 +90,7 @@ export default function GuestNatalCharts() {
                       <div>
                         <h3 className="font-semibold">{chart.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(chart.birthDate).toLocaleDateString(locale)}
+                          {new Date(chart.birthdayDate).toLocaleDateString(locale)}
                         </p>
                         {chart.birthPlace && (
                           <p className="text-sm text-muted-foreground">{chart.birthPlace}</p>
