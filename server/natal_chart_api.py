@@ -28,6 +28,7 @@ PLANETS = {
     'Neptune': swe.NEPTUNE,
     'Pluto': swe.PLUTO,
     'North Node': swe.TRUE_NODE,
+    'South Node': swe.TRUE_NODE  # South Node рассчитывается как North Node + 180°
 }
 
 HOUSE_SYSTEMS = {
@@ -76,16 +77,39 @@ def calculate_natal_chart(birth_data):
     
     # Рассчитываем позиции планет
     planets_data = {}
+    north_node_lon = None
+    
     for planet_name, planet_id in PLANETS.items():
         try:
-            position, _ = swe.calc(jd_tt, planet_id, swe.FLG_SWIEPH)
-            lon = position[0]
-            planets_data[planet_name] = {
-                'longitude': round(lon, 4),
-                'latitude': round(position[1], 4),
-                'sign': get_zodiac_sign(lon),
-                'degree_in_sign': round(lon % 30, 4)
-            }
+            # Специальная обработка для South Node
+            if planet_name == 'South Node':
+                if north_node_lon is None:
+                    # Если North Node еще не рассчитан, рассчитываем его
+                    nn_position, _ = swe.calc(jd_tt, swe.TRUE_NODE, swe.FLG_SWIEPH)
+                    north_node_lon = nn_position[0]
+                
+                # South Node = North Node + 180°
+                lon = (north_node_lon + 180) % 360
+                planets_data[planet_name] = {
+                    'longitude': round(lon, 4),
+                    'latitude': 0,  # South Node всегда на эклиптике
+                    'sign': get_zodiac_sign(lon),
+                    'degree_in_sign': round(lon % 30, 4)
+                }
+            else:
+                position, _ = swe.calc(jd_tt, planet_id, swe.FLG_SWIEPH)
+                lon = position[0]
+                
+                # Сохраняем долготу North Node для расчета South Node
+                if planet_name == 'North Node':
+                    north_node_lon = lon
+                
+                planets_data[planet_name] = {
+                    'longitude': round(lon, 4),
+                    'latitude': round(position[1], 4),
+                    'sign': get_zodiac_sign(lon),
+                    'degree_in_sign': round(lon % 30, 4)
+                }
         except Exception as e:
             planets_data[planet_name] = {'error': str(e)}
     

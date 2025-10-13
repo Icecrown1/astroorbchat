@@ -46,7 +46,9 @@ const PLANET_SYMBOLS: Record<string, string> = {
   'Saturn': '♄',
   'Uranus': '♅',
   'Neptune': '♆',
-  'Pluto': '♇'
+  'Pluto': '♇',
+  'North Node': '☊',
+  'South Node': '☋'
 };
 
 // Цветовая тема карты

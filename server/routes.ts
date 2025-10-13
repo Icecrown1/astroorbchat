@@ -298,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { planet, locale = 'ru' } = req.body;
       
       // Валидация планеты
-      const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
+      const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'North Node', 'South Node'];
       if (!planet || !validPlanets.includes(planet)) {
         return res.status(400).json({ 
           ok: false, 
@@ -325,7 +325,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!planetData) {
         return res.status(404).json({ 
           ok: false, 
-          error: `Planet ${planet} not found in your natal chart` 
+          error: locale === 'ru' 
+            ? `${planet} не найден в вашей натальной карте. Попробуйте перегенерировать карту.`
+            : `${planet} not found in your natal chart. Try regenerating your chart.`
         });
       }
 
