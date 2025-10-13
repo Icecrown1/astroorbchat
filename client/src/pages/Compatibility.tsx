@@ -3,22 +3,36 @@ import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Heart } from 'lucide-react';
+import { ArrowLeft, Heart, UserPlus, Users } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+
+interface GuestChart {
+  id: string;
+  name: string;
+  gender: string;
+  birthdayDate: string;
+  birthTime?: string | null;
+}
 
 export default function Compatibility() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
+  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+
+  const { data: guestCharts } = useQuery<{ ok: boolean; data: GuestChart[] }>({
+    queryKey: ['/api/natal/external'],
+  });
 
   const compatibilitySchema = useMemo(() => z.object({
     partnerName: z.string().min(1, locale === 'ru' ? 'Имя партнера обязательно' : 'Partner name is required'),
@@ -99,6 +113,47 @@ export default function Compatibility() {
                 {t.compatibility.cost}
               </p>
             </div>
+
+            {guestCharts?.data && guestCharts.data.length > 0 && (
+              <div className="mb-6">
+                <Label className="mb-2 block">
+                  {locale === 'ru' ? 'Выбрать из сохранённых' : 'Select from saved'}
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {guestCharts.data.map((chart) => (
+                    <Button
+                      key={chart.id}
+                      type="button"
+                      variant={selectedGuestId === chart.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedGuestId(chart.id);
+                        form.setValue('partnerName', chart.name);
+                        form.setValue('partnerDate', chart.birthdayDate);
+                        form.setValue('partnerTime', chart.birthTime || '');
+                      }}
+                      data-testid={`button-select-guest-${chart.id}`}
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      {chart.name}
+                    </Button>
+                  ))}
+                  {selectedGuestId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedGuestId(null);
+                        form.reset();
+                      }}
+                    >
+                      {locale === 'ru' ? 'Очистить' : 'Clear'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
               <div>
