@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { EnergyBadge } from '@/components/EnergyBadge';
 import { FeatureCard } from '@/components/FeatureCard';
 import { Loader } from '@/components/Loader';
+import { Coachmark } from '@/components/Coachmark';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -27,6 +28,7 @@ interface UserMeResponse {
   ok: boolean;
   data: User & {
     subscription?: Subscription | null;
+    natalInitialized?: boolean;
   };
 }
 
@@ -34,7 +36,7 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { energy, setEnergy, setResetAt } = useEnergy();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const FEATURES = [
     {
@@ -126,6 +128,18 @@ export default function Dashboard() {
           <EnergyBadge />
         </div>
 
+        {/* Onboarding Coachmark */}
+        <Coachmark
+          visible={!data?.data?.natalInitialized}
+          title={locale === 'ru' ? "Начните своё путешествие" : "Start Your Journey"}
+          description={locale === 'ru' 
+            ? "Создайте свою натальную карту бесплатно! Это займёт всего минуту и откроет доступ ко всем возможностям Astro Orb."
+            : "Create your natal chart for free! It takes just a minute and unlocks all Astro Orb features."}
+          buttonText={locale === 'ru' ? "Создать карту" : "Create Chart"}
+          onAction={() => navigate('/natal-chart')}
+          icon={<Moon className="w-6 h-6" />}
+        />
+
         {/* Feature Cards */}
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {FEATURES.map((feature) => (
@@ -136,7 +150,7 @@ export default function Dashboard() {
               description={feature.description}
               energyCost={feature.energyCost}
               onClick={() => navigate(feature.path)}
-              disabled={energy < feature.energyCost}
+              disabled={!data?.data?.natalInitialized || energy < feature.energyCost}
             />
           ))}
         </div>
