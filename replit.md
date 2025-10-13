@@ -109,3 +109,16 @@ Preferred communication style: Simple, everyday language.
 **Localization Fixes (Complete):**
 - Fixed Russian welcome message with proper placeholder replacement
 - All error messages and toasts properly localized
+
+## Recent Changes (October 13, 2025)
+
+**AI Tone Personalization System (Complete):**
+- Implemented gender-based AI response personalization for all astrology features
+- Created `personalizeTone()` function with gender-aware tone instructions (male/female/other)
+- Migrated all AI prompts to markdown files in `server/lib/prompts/` for better maintainability
+- Prompt system with placeholder replacement (`{{DATA}}`, `{{TONE_INSTRUCTION}}`)
+- Full integration across natal charts, solar returns, horoscopes, compatibility, AI Q&A, and planet interpretations
+- All API routes now pass user.gender to AI functions
+- README.md created with detailed documentation of personalization feature
+- Women receive warmer, more empathetic tone; men receive concrete, confident tone; others get balanced neutral tone
+- All responses remain human-friendly and avoid robotic AI language
