@@ -227,6 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
         birthPlace: z.string().optional().nullable(),
         timezone: z.string().default("Europe/Moscow"),
+        locale: z.string().default("ru"),
       });
       
       const data = externalNatalSchema.parse(req.body);
@@ -250,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const latitude = 55.7558; // Moscow fallback
       const longitude = 37.6173;
       
-      const natalData = await calculateNatalChartPython({
+      const pythonChart = await calculateNatalChartPython({
         year: birthDate.getFullYear(),
         month: birthDate.getMonth() + 1,
         day: birthDate.getDate(),
@@ -259,6 +260,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude,
         longitude,
       });
+      
+      // Generate AI interpretation
+      const interpretation = await getAstrologyInterpretation(
+        "natal",
+        pythonChart,
+        data.locale,
+        data.gender
+      );
+      
+      const natalData = {
+        ...pythonChart,
+        interpretation,
+      };
       
       const externalNatal = await storage.createExternalNatal({
         ownerId: userId,
@@ -286,6 +300,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const charts = await storage.getExternalNatalsByOwnerId(userId);
       res.json({ ok: true, data: charts });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get specific external natal chart
+  app.get("/api/natal/external/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const chartId = req.params.id;
+      
+      const chart = await storage.getExternalNatal(chartId);
+      
+      if (!chart) {
+        return res.status(404).json({ ok: false, error: "Chart not found" });
+      }
+      
+      // Verify ownership
+      if (chart.ownerId !== userId) {
+        return res.status(403).json({ ok: false, error: "Access denied" });
+      }
+      
+      res.json({ ok: true, data: chart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }

@@ -13,6 +13,7 @@ import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import MyNatalChart from '@/pages/MyNatalChart';
 import NatalChart from '@/pages/NatalChart';
+import GuestNatalChartView from '@/pages/GuestNatalChartView';
 import SolarToday from '@/pages/SolarToday';
 import Horoscope from '@/pages/Horoscope';
 import Compatibility from '@/pages/Compatibility';
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/my-natal-chart" component={MyNatalChart} />
       <Route path="/natal-chart" component={NatalChart} />
+      <Route path="/guest-chart/:id" component={GuestNatalChartView} />
       <Route path="/solar-today" component={SolarToday} />
       <Route path="/horoscope" component={Horoscope} />
       <Route path="/compatibility" component={Compatibility} />

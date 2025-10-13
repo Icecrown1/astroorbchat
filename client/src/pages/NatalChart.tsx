@@ -87,7 +87,7 @@ export default function GuestNatalCharts() {
                 {guestCharts.map((chart: any) => (
                   <Card key={chart.id} className="p-4 hover-elevate" data-testid={`guest-chart-${chart.id}`}>
                     <div className="flex items-start justify-between">
-                      <div>
+                      <div className="flex-1">
                         <h3 className="font-semibold">{chart.name}</h3>
                         <p className="text-sm text-muted-foreground">
                           {new Date(chart.birthdayDate).toLocaleDateString(locale)}
@@ -96,14 +96,24 @@ export default function GuestNatalCharts() {
                           <p className="text-sm text-muted-foreground">{chart.birthPlace}</p>
                         )}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/compatibility?guestId=${chart.id}`)}
-                        data-testid={`button-use-chart-${chart.id}`}
-                      >
-                        {locale === 'ru' ? 'Использовать' : 'Use'}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => navigate(`/guest-chart/${chart.id}`)}
+                          data-testid={`button-view-chart-${chart.id}`}
+                        >
+                          {locale === 'ru' ? 'Посмотреть' : 'View'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/compatibility?guestId=${chart.id}`)}
+                          data-testid={`button-use-chart-${chart.id}`}
+                        >
+                          {locale === 'ru' ? 'Совместимость' : 'Compatibility'}
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}

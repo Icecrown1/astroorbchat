@@ -35,7 +35,7 @@ export function GuestChartForm() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/natal/external', formData);
+      const response = await apiRequest('POST', '/api/natal/external', { ...formData, locale });
       return response.data;
     },
     onSuccess: () => {
