@@ -122,3 +122,20 @@ Preferred communication style: Simple, everyday language.
 - README.md created with detailed documentation of personalization feature
 - Women receive warmer, more empathetic tone; men receive concrete, confident tone; others get balanced neutral tone
 - All responses remain human-friendly and avoid robotic AI language
+
+**Natal Chart Caching & Onboarding System (Complete):**
+- **Database Architecture**: Created dedicated `natalCharts` (user's own chart, one per user) and `externalNatals` (guest charts for compatibility, many per user) tables
+- **Caching Service**: Implemented `natalService.ts` with `ensureUserNatalChart()`, `computeNatalFromUser()`, and `recomputeIfProfileChanged()` functions
+- **API Endpoints**:
+  - `POST /api/natal/init` - Create user's natal chart (FREE, cached forever)
+  - `GET /api/natal/me` - Retrieve cached chart
+  - `POST /api/natal/external` - Create guest chart (1 orb each)
+  - `GET /api/natal/external` - List all guest charts
+- **Energy Model Update**: Own natal chart FREE (created once), guest charts cost 1 orb each, compatibility analysis uses guest charts
+- **Onboarding UX**:
+  - Dashboard shows Coachmark component when `natalInitialized: false`
+  - All features blocked until user creates natal chart
+  - NatalChart page includes GuestChartForm for creating guest charts
+  - Compatibility page allows selecting from saved guest charts
+- **Backend Integration**: Updated `/api/astrology/natal` to use new caching system, `/api/user/me` returns `natalInitialized` flag
+- **Frontend Components**: `Coachmark.tsx` for onboarding prompts, `GuestChartForm.tsx` for guest chart creation

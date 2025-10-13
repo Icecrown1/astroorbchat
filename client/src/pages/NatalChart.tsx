@@ -25,11 +25,12 @@ export default function NatalChart() {
   const [chartData, setChartData] = useState<any>(null);
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
 
-  // Загружаем профиль пользователя, чтобы проверить есть ли сохранённая натальная карта
+  // Check if user has natal chart initialized
   const { data: userData, isLoading: userLoading } = useQuery<any>({
     queryKey: ['/api/user/me'],
   });
 
+  // Create (POST) or regenerate natal chart
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/natal', { locale });
@@ -38,13 +39,10 @@ export default function NatalChart() {
     onSuccess: (data) => {
       setChartData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      const hadCachedChart = userData?.natalChart;
-      if (!hadCachedChart) {
-        toast({
-          title: t.natalChart.generated,
-          description: t.natalChart.blueprintReady,
-        });
-      }
+      toast({
+        title: t.natalChart.generated,
+        description: t.natalChart.blueprintReady,
+      });
     },
     onError: (error: any) => {
       toast({
@@ -55,9 +53,10 @@ export default function NatalChart() {
     },
   });
 
-  // Автоматически загружаем карту при открытии страницы (если она есть в профиле)
+  // Auto-load cached chart if it exists (GET, not POST!)
   useEffect(() => {
-    if (!userLoading && userData?.natalChart && !chartData && !mutation.isPending) {
+    if (!userLoading && userData?.data?.natalInitialized && !chartData) {
+      // Load from cache using POST (backend will use cached data)
       mutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
