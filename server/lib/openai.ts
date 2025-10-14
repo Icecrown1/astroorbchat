@@ -415,3 +415,95 @@ export async function getProfessionalInterpretation(
     throw new Error('Failed to parse professional interpretation response');
   }
 }
+
+export async function getProfessionalCompatibilityInterpretation(
+  compatibilityData: {
+    person1: { planets: any; houses: any; angles: any };
+    person2: { planets: any; houses: any; angles: any };
+    houseOverlays: any;
+  },
+  locale: string = 'ru'
+): Promise<any> {
+  const systemMessage = locale === 'ru'
+    ? "Ты профессиональный астролог уровня ISAR/NCGR. Анализируешь синастрию с учетом оверлеев домов, межпланетных аспектов и весов факторов. Возвращаешь только валидный JSON."
+    : "You are a professional ISAR/NCGR level astrologer. You analyze synastry considering house overlays, interplanetary aspects, and factor weights. Return only valid JSON.";
+
+  const promptText = locale === 'ru' ? `
+ПРОФЕССИОНАЛЬНЫЙ АНАЛИЗ СИНАСТРИИ
+
+Данные Персоны 1:
+${JSON.stringify(compatibilityData.person1, null, 2)}
+
+Данные Персоны 2:
+${JSON.stringify(compatibilityData.person2, null, 2)}
+
+Оверлеи домов (планеты Персоны 2 в домах Персоны 1):
+${JSON.stringify(compatibilityData.houseOverlays, null, 2)}
+
+Проанализируй синастрию с учетом:
+1. Оверлеи домов - какие планеты партнера попадают в какие дома человека
+2. Межпланетные аспекты между картами (соединения, трины, квадраты, оппозиции)
+3. Веса факторов (угловые дома важнее, Солнце/Луна/ASC/MC имеют больший вес)
+4. Управители знаков и их взаимодействие
+
+Верни структурированный JSON:
+{
+  "summary": "Краткое резюме совместимости (2-3 предложения)",
+  "key_connections": ["Ключевое взаимодействие 1", "Ключевое взаимодействие 2", ...],
+  "house_overlays_analysis": "Анализ оверлеев домов",
+  "strengths": ["Сила 1", "Сила 2", ...],
+  "challenges": ["Вызов 1", "Вызов 2", ...],
+  "recommendations": ["Рекомендация 1", "Рекомендация 2", ...]
+}
+` : `
+PROFESSIONAL SYNASTRY ANALYSIS
+
+Person 1 Data:
+${JSON.stringify(compatibilityData.person1, null, 2)}
+
+Person 2 Data:
+${JSON.stringify(compatibilityData.person2, null, 2)}
+
+House Overlays (Person 2 planets in Person 1 houses):
+${JSON.stringify(compatibilityData.houseOverlays, null, 2)}
+
+Analyze the synastry considering:
+1. House overlays - which partner planets fall in which native houses
+2. Interplanetary aspects between charts (conjunctions, trines, squares, oppositions)
+3. Factor weights (angular houses more important, Sun/Moon/ASC/MC have greater weight)
+4. Sign rulers and their interactions
+
+Return structured JSON:
+{
+  "summary": "Brief compatibility summary (2-3 sentences)",
+  "key_connections": ["Key connection 1", "Key connection 2", ...],
+  "house_overlays_analysis": "Analysis of house overlays",
+  "strengths": ["Strength 1", "Strength 2", ...],
+  "challenges": ["Challenge 1", "Challenge 2", ...],
+  "recommendations": ["Recommendation 1", "Recommendation 2", ...]
+}
+`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: promptText
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 2500
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate professional compatibility interpretation');
+  }
+
+  return JSON.parse(content);
+}

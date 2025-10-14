@@ -79,9 +79,51 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
 }
 
 /**
+ * Рассчитывает оверлеи домов - какие планеты партнера попадают в какие дома пользователя
+ */
+export function calculateHouseOverlays(
+  partnerPlanets: Record<string, any>,
+  userHouses: Record<string, any>
+): Record<string, string[]> {
+  const overlays: Record<string, string[]> = {};
+  
+  // Инициализируем массивы для каждого дома
+  for (let i = 1; i <= 12; i++) {
+    overlays[`house${i}`] = [];
+  }
+  
+  // Extract house cusps array from houses object
+  let houseCusps: number[] | Record<string, number>;
+  if (Array.isArray(userHouses)) {
+    houseCusps = userHouses;
+  } else if (userHouses.cusps && Array.isArray(userHouses.cusps)) {
+    houseCusps = userHouses.cusps;
+  } else {
+    houseCusps = userHouses;
+  }
+  
+  // Validate houseCusps is array before using
+  if (!Array.isArray(houseCusps)) {
+    console.warn('House cusps is not an array, using fallback');
+    return overlays; // Return empty overlays
+  }
+  
+  // Для каждой планеты партнера определяем в какой дом пользователя она попадает
+  Object.entries(partnerPlanets).forEach(([planetName, planetData]) => {
+    const planetLongitude = planetData.longitude || planetData.lon_deg;
+    if (planetLongitude !== undefined) {
+      const houseNumber = determineHouse(planetLongitude, houseCusps as number[]);
+      overlays[`house${houseNumber}`].push(planetName);
+    }
+  });
+  
+  return overlays;
+}
+
+/**
  * Генерирует профессиональную интерпретацию натальной карты с учетом домов, управителей и весов
  */
-async function generateProfessionalInterpretation(
+export async function generateProfessionalInterpretation(
   pythonChart: NatalChartResult,
   user: User,
   locale: string = 'ru'

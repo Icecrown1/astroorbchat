@@ -194,24 +194,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Generate missing locale interpretation (FREE for own chart)
         const user = await storage.getUser(userId);
         if (user && chart.data) {
-          const { generateProfessionalInterpretation } = await import("./lib/natalService");
-          const chartData = chart.data as NatalChartResult;
-          const pythonChart = await calculateNatalChartPython({
-            year: new Date(user.birthdayDate).getFullYear(),
-            month: new Date(user.birthdayDate).getMonth() + 1,
-            day: new Date(user.birthdayDate).getDate(),
-            hour: Number((user.birthTime || "12:00").split(":")[0]),
-            minute: Number((user.birthTime || "12:00").split(":")[1]),
-            latitude: 55.7558,
-            longitude: 37.6173,
-          });
-          
-          const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-          interpretations[locale] = professionalInterpretation;
-          
-          await storage.updateNatalChart(userId, {
-            professionalInterpretation: interpretations as any
-          });
+          try {
+            const { generateProfessionalInterpretation } = await import("./lib/natalService");
+            const chartData = chart.data as NatalChartResult;
+            const pythonChart = await calculateNatalChartPython({
+              year: new Date(user.birthdayDate).getFullYear(),
+              month: new Date(user.birthdayDate).getMonth() + 1,
+              day: new Date(user.birthdayDate).getDate(),
+              hour: Number((user.birthTime || "12:00").split(":")[0]),
+              minute: Number((user.birthTime || "12:00").split(":")[1]),
+              latitude: 55.7558,
+              longitude: 37.6173,
+            });
+            
+            const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
+            interpretations[locale] = professionalInterpretation;
+            
+            await storage.updateNatalChart(userId, {
+              professionalInterpretation: interpretations as any
+            });
+          } catch (error) {
+            console.error('Failed to generate professional interpretation:', error);
+            // Continue without professional interpretation
+          }
         }
       }
       
@@ -907,7 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/compatibility", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { partner } = req.body;
+      const { partner, professional = false } = req.body;
       const locale = req.body.locale || 'en';
 
       // Check energy first (without deducting)
@@ -917,7 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      const cost = ENERGY_COSTS.compatibility;
+      const cost = professional ? ENERGY_COSTS.compatibility_professional : ENERGY_COSTS.compatibility;
       if (user.energy < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
@@ -987,27 +992,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Person 1 chart planets:', person1Chart.planets.length);
       console.log('Person 2 chart planets:', person2Chart.planets.length);
 
-      const analysis = await getAstrologyInterpretation("compatibility", {
-        person1: person1Chart,
-        person2: person2Chart,
-      }, locale, user.gender);
+      let analysis: string;
+      let professionalInterpretation = null;
+      let houseOverlays = null;
+
+      if (professional) {
+        try {
+          // Professional synastry with house overlays
+          const { calculateHouseOverlays } = await import("./lib/natalService");
+          houseOverlays = calculateHouseOverlays(person2ChartData.planets, person1ChartData.houses);
+
+          const { getProfessionalCompatibilityInterpretation } = await import("./lib/openai");
+          const compatibilityData = {
+            person1: {
+              planets: person1ChartData.planets,
+              houses: person1ChartData.houses,
+              angles: person1ChartData.angles,
+            },
+            person2: {
+              planets: person2ChartData.planets,
+              houses: person2ChartData.houses,
+              angles: person2ChartData.angles,
+            },
+            houseOverlays,
+          };
+
+          professionalInterpretation = await getProfessionalCompatibilityInterpretation(compatibilityData, locale);
+          analysis = professionalInterpretation.summary || "Professional compatibility analysis";
+        } catch (error: any) {
+          console.error('Failed to generate professional compatibility:', error);
+          // Fall back to basic compatibility on error (no energy deducted yet)
+          analysis = await getAstrologyInterpretation("compatibility", {
+            person1: person1Chart,
+            person2: person2Chart,
+          }, locale, user.gender);
+        }
+      } else {
+        // Basic compatibility interpretation
+        analysis = await getAstrologyInterpretation("compatibility", {
+          person1: person1Chart,
+          person2: person2Chart,
+        }, locale, user.gender);
+      }
 
       await storage.createCompatibilityReading({
         userId,
         partnerName: partner.name,
         partnerDate: new Date(partner.date),
         analysis,
+        isProfessional: professional,
+        professionalInterpretation: professionalInterpretation as any,
+        houseOverlays: houseOverlays as any,
       });
 
       // Only deduct energy after successful execution
+      const featureName = professional ? "compatibility_professional" : "compatibility";
       await storage.updateUser(userId, { energy: user.energy - cost });
-      await storage.createUsageLog({ userId, feature: "compatibility", cost });
+      await storage.createUsageLog({ userId, feature: featureName, cost });
 
       res.json({
         ok: true,
         data: {
           partners: `${user.name} & ${partner.name}`,
           analysis,
+          professionalInterpretation,
+          houseOverlays,
           strengths: [
             "Strong emotional connection and understanding",
             "Shared values and life goals",

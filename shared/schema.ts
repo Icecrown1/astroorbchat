@@ -193,6 +193,9 @@ export const compatibilityReadings = pgTable("compatibility_readings", {
   partnerName: text("partner_name").notNull(),
   partnerDate: timestamp("partner_date").notNull(),
   analysis: text("analysis").notNull(),
+  isProfessional: boolean("is_professional").notNull().default(false),
+  professionalInterpretation: jsonb("professional_interpretation"),
+  houseOverlays: jsonb("house_overlays"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("compatibility_readings_user_id_idx").on(table.userId),
@@ -320,6 +323,9 @@ export const insertCompatibilityReadingSchema = createInsertSchema(compatibility
   partnerName: z.string(),
   partnerDate: z.date().or(z.string()),
   analysis: z.string(),
+  isProfessional: z.boolean().optional(),
+  professionalInterpretation: z.any().optional(),
+  houseOverlays: z.any().optional(),
 }).omit({
   id: true,
   createdAt: true,
