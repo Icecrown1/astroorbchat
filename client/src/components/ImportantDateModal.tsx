@@ -53,6 +53,35 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
     return labels[kind]?.[locale] || kind;
   };
 
+  const getLocalizedBrief = (event: ImportantEvent) => {
+    const planet = translatePlanet(event.planet, locale);
+    const sign = event.sign ? translateSign(event.sign, locale) : '';
+
+    if (event.kind === 'retrograde-start') {
+      return locale === 'ru' 
+        ? `${planet} в ${sign} начинает ретроградное движение — пересмотрите планы в соответствующей сфере`
+        : `${planet} in ${sign} begins retrograde motion — review plans in this area`;
+    }
+    if (event.kind === 'retrograde-end') {
+      return locale === 'ru'
+        ? `${planet} в ${sign} возвращается к директному движению — путь вперёд открыт`
+        : `${planet} in ${sign} returns to direct motion — the way forward is clear`;
+    }
+    if (event.kind === 'ingress') {
+      return locale === 'ru'
+        ? `${planet} входит в ${sign} — новая энергия в этой области жизни`
+        : `${planet} enters ${sign} — new energy in this life area`;
+    }
+    if (event.kind === 'major-transit' && event.natalTarget) {
+      const natalPlanet = translatePlanet(event.natalTarget.planet, locale);
+      const aspect = event.natalTarget.aspect ? getEventTypeLabel(event.natalTarget.aspect) : '';
+      return locale === 'ru'
+        ? `Транзитный ${planet} формирует ${aspect} к натальному ${natalPlanet} — важное влияние`
+        : `Transiting ${planet} forms ${aspect} to natal ${natalPlanet} — significant influence`;
+    }
+    return event.brief;
+  };
+
   // Unlock and get details mutation
   const unlockMutation = useMutation({
     mutationFn: async () => {
@@ -120,7 +149,7 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-muted-foreground">{event.brief}</p>
+          <p className="text-muted-foreground">{getLocalizedBrief(event)}</p>
 
           {event.natalTarget && (
             <div className="p-3 rounded-lg bg-muted/50">
