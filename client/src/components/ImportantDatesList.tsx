@@ -91,71 +91,81 @@ export function ImportantDatesList() {
   return (
     <>
       <div className="space-y-3">
-        {events.map((event) => (
-          <Card
-            key={event.key}
-            className={cn(
-              'relative p-4 cursor-pointer transition-all',
-              'hover-elevate active-elevate-2',
-              !event.unlocked && 'opacity-80'
-            )}
-            onClick={() => setSelectedEvent(event)}
-            data-testid={`card-important-date-${event.key}`}
-          >
-            {!event.unlocked && (
-              <div className="absolute top-3 right-3">
-                <Lock className="w-4 h-4 text-muted-foreground" />
-              </div>
-            )}
+        {events.map((event) => {
+          const eventDate = new Date(event.date);
+          const day = eventDate.getDate();
+          const month = eventDate.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'short' });
+          
+          return (
+            <Card
+              key={event.key}
+              className={cn(
+                'relative p-4 cursor-pointer transition-all',
+                'hover-elevate active-elevate-2',
+                !event.unlocked && 'opacity-80'
+              )}
+              onClick={() => setSelectedEvent(event)}
+              data-testid={`card-important-date-${event.key}`}
+            >
+              {!event.unlocked && (
+                <div className="absolute top-3 right-3">
+                  <Lock className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
 
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                'p-2 rounded-lg shrink-0',
-                event.kind === 'retrograde-start' ? 'bg-destructive/10' : 'bg-primary/10'
-              )}>
-                {event.kind === 'retrograde-start' || event.kind === 'retrograde-end' ? (
-                  <TrendingUp className={cn(
-                    'w-5 h-5',
-                    event.kind === 'retrograde-start' ? 'text-destructive rotate-180' : 'text-primary'
-                  )} />
-                ) : (
-                  <Calendar className="w-5 h-5 text-primary" />
-                )}
-              </div>
+              <div className="flex items-start gap-4">
+                {/* Date Block - Main Focus */}
+                <div className="flex flex-col items-center shrink-0 w-16">
+                  <div className={cn(
+                    'text-3xl font-bold leading-none',
+                    event.kind === 'retrograde-start' ? 'text-destructive' : 'text-primary'
+                  )}>
+                    {day}
+                  </div>
+                  <div className="text-xs text-muted-foreground uppercase mt-1">
+                    {month}
+                  </div>
+                  <div className="mt-2">
+                    {event.kind === 'retrograde-start' || event.kind === 'retrograde-end' ? (
+                      <TrendingUp className={cn(
+                        'w-4 h-4',
+                        event.kind === 'retrograde-start' ? 'text-destructive rotate-180' : 'text-primary'
+                      )} />
+                    ) : (
+                      <Calendar className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-card-foreground mb-1">
+                {/* Event Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="font-semibold text-card-foreground">
                       {translatePlanet(event.planet, locale)} {getEventTypeLabel(event.kind)}
                       {event.sign && ` ${locale === 'ru' ? 'в' : 'in'} ${translateSign(event.sign, locale)}`}
                     </h4>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(event.date)}
-                    </p>
+                    {!event.unlocked && (
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        1 {locale === 'ru' ? 'орб' : 'orb'}
+                      </Badge>
+                    )}
                   </div>
-                  {!event.unlocked && (
-                    <Badge variant="secondary" className="shrink-0 text-xs">
-                      1 {locale === 'ru' ? 'орб' : 'orb'}
-                    </Badge>
+
+                  <p className="text-sm text-muted-foreground">
+                    {getLocalizedBrief(event)}
+                  </p>
+
+                  {event.natalTarget && (
+                    <p className="text-xs text-primary mt-2">
+                      {locale === 'ru' ? 'Влияет на' : 'Affects'}: {translatePlanet(event.natalTarget.planet, locale)}
+                      {event.natalTarget.aspect && ` (${getEventTypeLabel(event.natalTarget.aspect)})`}
+                    </p>
                   )}
                 </div>
-
-                <p className="text-sm text-muted-foreground mt-2">
-                  {getLocalizedBrief(event)}
-                </p>
-
-                {event.natalTarget && (
-                  <p className="text-xs text-primary mt-2">
-                    {locale === 'ru' ? 'Влияет на' : 'Affects'}: {translatePlanet(event.natalTarget.planet, locale)}
-                    {event.natalTarget.aspect && ` (${getEventTypeLabel(event.natalTarget.aspect)})`}
-                  </p>
-                )}
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {selectedEvent && (
