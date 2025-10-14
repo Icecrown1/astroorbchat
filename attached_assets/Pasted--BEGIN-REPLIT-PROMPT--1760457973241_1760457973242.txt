@@ -1,0 +1,279 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: добавить в экран «Натальная карта» новый блок «Важные даты» под разделом «Положения планет». Блок показывает персональные ближайшие астрособытия (на основе натала пользователя и текущих транзитов) — например: «Ретроградный Меркурий», «Плутон меняет знак», «Станция директ/ретро», «Точный мажорный транзитный аспект к натальной планете». Внизу — краткое описание ближайшей важной даты (всегда бесплатно). Полная расшифровка события — в платном доступе: у подписчиков — бесплатно; без подписки — –1 сфера за разблокировку конкретного события. Никаких заглушек и TODO. Отдать ПОЛНЫЕ файлы.
+
+Контекст
+
+Фронтенд: apps/web (React + Vite + TS). Экран: src/routes/NatalChart.tsx. API клиент: src/lib/api.ts. Общие компоненты.
+
+Бэкенд: apps/api (Express + TS). Расчёты: src/astrology/* (используются astronomia / astronomy-engine). OpenAI: src/astrology/openai.ts.
+
+БД: Postgres + Prisma.
+
+Энергия: уже есть маппинг фич и UsageLog. Подписки: "standard"|"pro" (активные получают контент без списания энергии).
+
+Изменения
+1) Prisma — новая таблица разблокировок (и маппинг фич энергии)
+
+Файл: prisma/schema.prisma — ДОБАВИТЬ модель:
+
+model ImportantDateUnlock {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  eventKey   String   // детерминированный ключ события (например, "2025-03-04|Mercury|retrograde-start")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, eventKey])
+  @@index([userId])
+}
+
+
+Создать миграцию prisma/migrations/*. В prisma/seed.ts добавить 1–2 мок-разблокировки для @demo_user (согласовать с форматом eventKey ниже).
+
+2) Backend — вычисление «важных дат» и API
+2.1 Новый модуль транзитов
+
+Файл: apps/api/src/astrology/transits.ts (ПОЛНЫЙ):
+
+Экспортировать:
+
+type ImportantEvent = { key: string; date: string; kind: "retrograde-start"|"retrograde-end"|"ingress"|"station-direct"|"station-retrograde"|"major-transit"; planet: "Sun"|"Moon"|"Mercury"|"Venus"|"Mars"|"Jupiter"|"Saturn"|"Uranus"|"Neptune"|"Pluto"; sign?: string; natalTarget?: { planet: string; aspect?: "conjunction"|"sextile"|"square"|"trine"|"opposition" }; brief: string }
+
+findImportantEvents(userNatalData, opts): ImportantEvent[]
+
+Вход: сохранённый натал (из NatalChart.data) и опции { from: Date; to: Date; limit?: number }.
+
+Реализовать:
+
+Ретроград/станции для Mercury/Venus/Mars/Jupiter/Saturn/Uranus/Neptune/Pluto (через изменение знака скорости — поиск ближайших дат внутри окна).
+
+Вход в знак (ingress) для тех же планет — фиксировать дату смены знака.
+
+Мажорные транзиты к натальной карте: когда транзитная планета образует точный аспект (±0.5°) к натальной планете пользователя; рассчитать ближайшие точные даты.
+
+Вернуть отсортированный по date массив и сгенерировать детерминированный eventKey: ${YYYY-MM-DD}|${planet}|${kind} (+ |${natalTarget.planet}|${aspect} при major-transit).
+
+brief — краткая фраза для бесплатного превью (до 140 символов), на русском, без воды (например «Меркурий разворачивается в ретроградное движение — пересмотри договорённости»).
+
+2.2 Новый OpenAI-промпт
+
+Файл: apps/api/src/astrology/prompts/important_dates.md (ПОЛНЫЙ):
+
+Ты — астролог-практик. На входе структура события и данные пользователя (возраст, пол) и выдержки из его натальной карты.
+Задача: дать ПОЛНУЮ РАСШИФРОВКУ важной даты конкретно для этого человека.
+
+Формат ответа JSON:
+{
+  "title": "Короткий заголовок (напр. Ретроградный Меркурий в Овне)",
+  "window": "Окно влияния: даты/фаза (3–7 дней вокруг)",
+  "whatItMeans": ["по пунктам, практично"],
+  "risks": ["по пунктам"],
+  "do": ["конкретные действия"],
+  "dont": ["чего избегать"],
+  "timingTips": ["когда лучше планировать/переносить"]
+}
+
+Пиши по-человечески и с учётом пола:
+- Женщинам — мягче и теплее, с поддержкой.
+- Мужчинам — конкретно, но по-людски, без жёсткости.
+Никакой эзотерической воды. Максимум пользы.
+
+2.3 Обёртка OpenAI
+
+Файл: apps/api/src/astrology/openai.ts — ДОБАВИТЬ функцию:
+
+export async function interpretImportantDate(input: {
+  profile: { name: string; age: number; gender: string; timezone: string };
+  event: ImportantEvent;
+  natalSummary: any; // выдержка из натала: ключевые планеты/аспекты
+}): Promise<{ title:string; window:string; whatItMeans:string[]; risks:string[]; do:string[]; dont:string[]; timingTips:string[] }>;
+
+
+Читает prompts/important_dates.md, добавляет персональную тональность (используется уже добавленная personalizeTone()) и запрашивает модель gpt-4o-mini с response_format: "json_object". Парсит и валидирует Zod-схемой.
+
+2.4 Энергия
+
+Файл: apps/api/src/routes/energy.ts — ДОБАВИТЬ фичу:
+
+important_date_detail: 1
+
+2.5 Новые роуты
+
+Файл: apps/api/src/routes/astrology.ts — ДОБАВИТЬ:
+
+GET /astrology/important-dates
+
+Требует JWT. Проверяет NatalChart (иначе 409 NATAL_NOT_INITIALIZED).
+
+Аргументы query: days=90 (по умолчанию), limit=10.
+
+Вызывает findImportantEvents(natal.data, {from: now, to: now+days, limit}).
+
+Отмечает, какие события разблокированы пользователем (запрос к ImportantDateUnlock).
+
+Возвращает { ok:true, data: { events, nearestBrief: events[0]?.brief ?? null } }.
+
+POST /astrology/important-dates/unlock
+
+Тело: { eventKey: string } (Zod).
+
+Если у пользователя есть активная подписка — ничего не списывать, сразу создать запись в ImportantDateUnlock.
+
+Иначе — списать энергию feature="important_date_detail" (1), затем создать ImportantDateUnlock.
+
+Вернуть { ok:true }. Повторные вызовы на тот же eventKey — идемпотентны (вернуть 200).
+
+POST /astrology/important-dates/detail
+
+Тело: { eventKey: string }.
+
+Проверить наличие разблокировки или активную подписку. Если нет — 402 { ok:false, error:"PAYWALL" }.
+
+Найти событие по ключу (если оно уже не в окне, пересчитать локально).
+
+Сформировать entrada для interpretImportantDate(...) (пол, возраст, timezone, краткий срез натала).
+
+Вернуть { ok:true, data: { title, window, whatItMeans, risks, do, dont, timingTips } }.
+
+2.6 Тесты API
+
+Файл: apps/api/src/tests/api.spec.ts — ДОБАВИТЬ кейсы:
+
+GET /astrology/important-dates → 200, массив событий, nearestBrief не пуст.
+
+POST /astrology/important-dates/unlock без подписки → списывает 1 энергию, создаёт запись; повторный вызов → 200 без списания.
+
+POST /astrology/important-dates/detail без разблокировки → 402 PAYWALL; после unlock → 200 и валидный JSON.
+
+При активной подписке — detail без списания/разблокировки → 200.
+
+3) Frontend — UI «Важные даты» на экране Натальной карты
+3.1 Новый модуль API
+
+Файл: apps/web/src/lib/api.ts — ДОБАВИТЬ:
+
+export const getImportantDates = (params?: { days?: number; limit?: number }) =>
+  http.get('/astrology/important-dates', { params });
+
+export const unlockImportantDate = (eventKey: string) =>
+  http.post('/astrology/important-dates/unlock', { eventKey });
+
+export const getImportantDateDetail = (eventKey: string) =>
+  http.post('/astrology/important-dates/detail', { eventKey });
+
+3.2 Компоненты UI
+
+apps/web/src/components/ImportantDatesList.tsx (ПОЛНЫЙ):
+
+Принимает events, nearestBrief, onUnlock(eventKey), onOpen(eventKey), isSubscriber.
+
+Рисует список карточек событий: слева маленькая иконка планеты (<PlanetIcon size={20} />), заголовок (локализованный kind), дата (date), бейджи (retrograde, ingress, station, aspect).
+
+Если событие не разблокировано и нет подписки — кнопка «Подробнее (–1 сфера)», иначе «Подробнее».
+
+Внизу блока всегда показывать nearestBrief (коротко, 1–2 предложения).
+
+apps/web/src/components/ImportantDateModal.tsx (ПОЛНЫЙ):
+
+Пропсы: { eventKey: string | null, onClose: () => void, locked: boolean, isSubscriber: boolean }.
+
+Если locked && !isSubscriber — показать paywall (кнопка «Разблокировать за 1 сферу» → unlockImportantDate → перезагрузить контент).
+
+При доступе — запрашивает getImportantDateDetail(eventKey) и рендерит тайтл, окно влияния, списки «Что это значит», «Риски», «Что делать/не делать», «Тайминг».
+
+3.3 Встраивание в «Натальная карта»
+
+Файл: apps/web/src/routes/NatalChart.tsx — ОБНОВИТЬ:
+
+Под разделом «Положения планет» вставить секцию:
+
+Заголовок: «Важные даты»
+
+Хук: useQuery → getImportantDates({ days: 90, limit: 10 }).
+
+Локальный activeEventKey, isSubscriber (из /user/me: наличие активной подписки).
+
+Рендер <ImportantDatesList .../> и <ImportantDateModal .../>.
+
+Визуально использовать текущую золотисто-бронзовую палитру (иконки/бейджи), аккуратные разделители.
+
+4) Тексты
+
+Bоттом-подпись блока: «Краткое описание ближайшей важной даты — бесплатно. Полная расшифровка доступна по подписке или за 1 сферу».
+
+Бейджи: «Ретроград», «Смена знака», «Станция», «Точный аспект».
+
+5) Доступ/Безопасность/UX
+
+Все запросы — с JWT.
+
+Если сервер вернул 409 NATAL_NOT_INITIALIZED, показать CTA «Создайте натальную карту» (переход на /NatalChart с инициализацией — уже реализовано ранее).
+
+Обрабатывать 402 PAYWALL через модалку с кнопкой «Разблокировать за 1 сферу» и вторым вариантом «Оформить подписку».
+
+6) Тесты фронтенда (Vitest)
+
+Снапшоты ImportantDatesList (с заблокированным и разблокированным элементом).
+
+Интеграционный тест модалки: при locked=false — сразу грузит detail; при locked=true — показывает paywall и после «Разблокировать» вызывает unlockImportantDate и подгружает detail.
+
+7) README
+
+Добавить раздел «Важные даты»:
+
+Описание логики, список типов событий, окно прогноза по умолчанию 90 дней.
+
+Модель оплаты: подписка — бесплатно; разовая расшифровка — 1 сфера.
+
+Примеры: «Ретроградный Меркурий», «Плутон — смена знака и 14-летний цикл», «Станция директ/ретро», «Точный транзит к натальному Марсу».
+
+Acceptance Criteria
+
+На экране «Натальная карта» под «Положением планет» появился блок «Важные даты».
+
+GET /astrology/important-dates отдаёт персональный список ближайших событий + nearestBrief.
+
+Клик «Подробнее»:
+
+Подписчик видит полную расшифровку без списаний.
+
+Без подписки — paywall; после «Разблокировать за 1 сферу» создаётся запись и открывается расшифровка.
+
+События детерминированы ключом eventKey и кэшируются разблокировками в БД.
+
+Добавлен OpenAI-промпт и обёртка для генерации полной интерпретации.
+
+Тесты API/фронта проходят. Никаких TODO/заглушек.
+
+Вывести ПОЛНЫЙ список новых/изменённых файлов
+
+prisma/schema.prisma
+
+prisma/migrations/**/*
+
+prisma/seed.ts
+
+apps/api/src/astrology/transits.ts
+
+apps/api/src/astrology/prompts/important_dates.md
+
+apps/api/src/astrology/openai.ts
+
+apps/api/src/routes/energy.ts
+
+apps/api/src/routes/astrology.ts
+
+apps/api/src/tests/api.spec.ts
+
+apps/web/src/lib/api.ts
+
+apps/web/src/components/ImportantDatesList.tsx
+
+apps/web/src/components/ImportantDateModal.tsx
+
+apps/web/src/routes/NatalChart.tsx
+
+README.md
+
+[END REPLIT PROMPT]

@@ -48,6 +48,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [natalCharts.userId],
   }),
   externalNatals: many(externalNatals),
+  importantDateUnlocks: many(importantDateUnlocks),
 }));
 
 export const natalCharts = pgTable("natal_charts", {
@@ -219,6 +220,23 @@ export const aiQuestionsRelations = relations(aiQuestions, ({ one }) => ({
   }),
 }));
 
+export const importantDateUnlocks = pgTable("important_date_unlocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  eventKey: text("event_key").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("important_date_unlocks_user_id_idx").on(table.userId),
+  userEventIdx: index("important_date_unlocks_user_event_idx").on(table.userId, table.eventKey),
+}));
+
+export const importantDateUnlocksRelations = relations(importantDateUnlocks, ({ one }) => ({
+  user: one(users, {
+    fields: [importantDateUnlocks.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users, {
   tgId: z.string().min(1),
@@ -335,6 +353,14 @@ export const insertExternalNatalSchema = createInsertSchema(externalNatals, {
   createdAt: true,
 });
 
+export const insertImportantDateUnlockSchema = createInsertSchema(importantDateUnlocks, {
+  userId: z.string(),
+  eventKey: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -365,3 +391,6 @@ export type InsertNatalChart = z.infer<typeof insertNatalChartSchema>;
 
 export type ExternalNatal = typeof externalNatals.$inferSelect;
 export type InsertExternalNatal = z.infer<typeof insertExternalNatalSchema>;
+
+export type ImportantDateUnlock = typeof importantDateUnlocks.$inferSelect;
+export type InsertImportantDateUnlock = z.infer<typeof insertImportantDateUnlockSchema>;
