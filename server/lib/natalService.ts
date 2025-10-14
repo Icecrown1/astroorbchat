@@ -213,22 +213,25 @@ export async function recomputeIfProfileChanged(userId: string, locale: string =
   if (userUpdatedAt > chartCreatedAt) {
     const newData = await computeNatalFromUser(user, locale);
     
-    // Generate professional interpretation for user's own chart (FREE)
-    const pythonChart = await calculateNatalChartPython({
-      year: new Date(user.birthdayDate).getFullYear(),
-      month: new Date(user.birthdayDate).getMonth() + 1,
-      day: new Date(user.birthdayDate).getDate(),
-      hour: Number((user.birthTime || "12:00").split(":")[0]),
-      minute: Number((user.birthTime || "12:00").split(":")[1]),
-      latitude: 55.7558,
-      longitude: 37.6173,
-    });
-    
-    const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-    
-    // Store interpretations by locale
+    // Try to generate professional interpretation for user's own chart (FREE)
     const currentInterpretations = (chart.professionalInterpretation as any) || {};
-    currentInterpretations[locale] = professionalInterpretation;
+    try {
+      const pythonChart = await calculateNatalChartPython({
+        year: new Date(user.birthdayDate).getFullYear(),
+        month: new Date(user.birthdayDate).getMonth() + 1,
+        day: new Date(user.birthdayDate).getDate(),
+        hour: Number((user.birthTime || "12:00").split(":")[0]),
+        minute: Number((user.birthTime || "12:00").split(":")[1]),
+        latitude: 55.7558,
+        longitude: 37.6173,
+      });
+      
+      const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
+      currentInterpretations[locale] = professionalInterpretation;
+    } catch (error) {
+      console.error('Failed to generate professional interpretation during recompute:', error);
+      // Continue without professional interpretation
+    }
     
     await storage.updateNatalChart(userId, { 
       data: newData,
