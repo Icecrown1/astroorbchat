@@ -271,11 +271,23 @@ export default function MyNatalChart() {
                     <h3 className="text-sm font-semibold mb-2">
                       {locale === 'ru' ? 'Анализ домов:' : 'House Framework:'}
                     </h3>
-                    <ul className="space-y-1">
-                      {rawChartData.professionalInterpretation[locale].house_framework.map((item: string, i: number) => (
-                        <li key={i} className="text-sm text-muted-foreground ml-4">• {item}</li>
+                    <div className="space-y-2">
+                      {rawChartData.professionalInterpretation[locale].house_framework.map((item: any, i: number) => (
+                        <div key={i} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
+                          <div className="font-medium text-foreground">
+                            {locale === 'ru' ? `Дом ${item.house}` : `House ${item.house}`}: {item.sign_on_cusp}
+                          </div>
+                          <div className="text-muted-foreground mt-1">
+                            {locale === 'ru' ? 'Управитель' : 'Ruler'}: {item.ruler} ({item.ruler_position})
+                          </div>
+                          {item.key_aspects_to_ruler && (
+                            <div className="text-muted-foreground text-xs mt-0.5">
+                              {item.key_aspects_to_ruler}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
                 {rawChartData.professionalInterpretation[locale].planet_synthesis?.length > 0 && (
@@ -288,6 +300,16 @@ export default function MyNatalChart() {
                         <li key={i} className="text-sm text-muted-foreground ml-4">• {item}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+                {rawChartData.professionalInterpretation[locale].angles_focus && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">
+                      {locale === 'ru' ? 'Аспекты к углам (ASC/MC/DSC/IC):' : 'Angles Focus (ASC/MC/DSC/IC):'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {rawChartData.professionalInterpretation[locale].angles_focus}
+                    </p>
                   </div>
                 )}
               </div>
