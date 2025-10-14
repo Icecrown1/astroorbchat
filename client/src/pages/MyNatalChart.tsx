@@ -7,7 +7,8 @@ import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
-import { ArrowLeft, Sparkles, RefreshCw } from 'lucide-react';
+import { ImportantDatesList } from '@/components/ImportantDatesList';
+import { ArrowLeft, Sparkles, RefreshCw, Calendar } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -285,6 +286,21 @@ export default function MyNatalChart() {
                 </AccordionItem>
               ))}
             </Accordion>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">
+                {locale === 'ru' ? 'Важные даты' : 'Important Dates'}
+              </h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              {locale === 'ru' 
+                ? 'Персональные астрологические события на ближайшие 3 месяца на основе транзитов к вашей натальной карте' 
+                : 'Personalized astrological events for the next 3 months based on transits to your natal chart'}
+            </p>
+            <ImportantDatesList />
           </Card>
         </div>
       </div>
