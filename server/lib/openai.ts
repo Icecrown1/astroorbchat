@@ -379,6 +379,9 @@ export async function getProfessionalInterpretation(
     ? "Ты профессиональный астролог уровня ISAR/NCGR. Анализируешь натальные карты с учетом домов, управителей, весов факторов. Возвращаешь только валидный JSON."
     : "You are a professional ISAR/NCGR level astrologer. You analyze natal charts considering houses, rulers, and factor weights. Return only valid JSON.";
 
+  // Логируем размер промпта для отладки
+  console.log(`[Professional Interpretation] Prompt size: ${promptText.length} chars, System message: ${systemMessage.length} chars`);
+
   const completion = await openai.chat.completions.create({
     model: "gpt-5",
     messages: [
@@ -392,11 +395,22 @@ export async function getProfessionalInterpretation(
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 2000
+    max_completion_tokens: 4000
+  });
+
+  // Детальное логирование ответа
+  console.log(`[Professional Interpretation] Response:`, {
+    finish_reason: completion.choices[0]?.finish_reason,
+    content_length: completion.choices[0]?.message?.content?.length || 0,
+    usage: completion.usage,
+    has_content: !!completion.choices[0]?.message?.content
   });
 
   const content = completion.choices[0]?.message?.content;
   if (!content) {
+    console.error('[Professional Interpretation] OpenAI returned empty content!', {
+      full_response: JSON.stringify(completion, null, 2)
+    });
     throw new Error('Failed to generate professional interpretation');
   }
 
