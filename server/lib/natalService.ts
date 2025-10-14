@@ -66,10 +66,13 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
   
   const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
   
+  // Store interpretation by locale
+  const interpretations = { [locale]: professionalInterpretation };
+  
   const chart = await storage.createNatalChart({
     userId,
     data: natalData,
-    professionalInterpretation: professionalInterpretation as any,
+    professionalInterpretation: interpretations as any,
   });
   
   return chart;
@@ -181,9 +184,13 @@ export async function recomputeIfProfileChanged(userId: string, locale: string =
     
     const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
     
+    // Store interpretations by locale
+    const currentInterpretations = (chart.professionalInterpretation as any) || {};
+    currentInterpretations[locale] = professionalInterpretation;
+    
     await storage.updateNatalChart(userId, { 
       data: newData,
-      professionalInterpretation: professionalInterpretation as any
+      professionalInterpretation: currentInterpretations as any
     });
   }
 }

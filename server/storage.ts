@@ -350,6 +350,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(externalNatals.id, id));
   }
 
+  async updateExternalNatal(id: string, data: Partial<ExternalNatal>): Promise<ExternalNatal | undefined> {
+    const [natal] = await db
+      .update(externalNatals)
+      .set(data)
+      .where(eq(externalNatals.id, id))
+      .returning();
+    return natal || undefined;
+  }
+
   // Important Date Unlock operations
   async getImportantDateUnlockByUserAndKey(userId: string, eventKey: string): Promise<ImportantDateUnlock | undefined> {
     const [unlock] = await db

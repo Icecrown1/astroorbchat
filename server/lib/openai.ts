@@ -392,7 +392,6 @@ export async function getProfessionalInterpretation(
       }
     ],
     response_format: { type: "json_object" },
-    temperature: 0.6,
     max_completion_tokens: 2000
   });
 
