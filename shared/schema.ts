@@ -55,6 +55,7 @@ export const natalCharts = pgTable("natal_charts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull().unique(),
   data: jsonb("data").notNull(),
+  professionalInterpretation: jsonb("professional_interpretation"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -78,6 +79,7 @@ export const externalNatals = pgTable("external_natals", {
   birthPlace: text("birth_place"),
   timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Moscow"),
   data: jsonb("data").notNull(),
+  professionalInterpretation: jsonb("professional_interpretation"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   ownerIdIdx: index("external_natals_owner_id_idx").on(table.ownerId),
