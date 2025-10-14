@@ -206,6 +206,7 @@ export default function GuestNatalChartView() {
                         name={planet.name as any} 
                         size={36} 
                         variant="gold"
+                        animated
                         className="shrink-0"
                       />
                       <div className="text-left flex-1">

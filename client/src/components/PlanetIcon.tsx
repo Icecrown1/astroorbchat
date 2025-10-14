@@ -9,6 +9,7 @@ export type PlanetIconProps = {
   variant?: "gold" | "bronze" | "ink";
   title?: string;
   className?: string;
+  animated?: boolean;
 };
 
 const PALETTE = {
@@ -27,6 +28,7 @@ export default function PlanetIcon({
   variant = "gold",
   title,
   className,
+  animated = true,
 }: PlanetIconProps) {
   const { fill, stroke } = useColors(variant);
   const common = {
@@ -37,10 +39,12 @@ export default function PlanetIcon({
     "aria-label": title ?? name,
   } as const;
 
+  const animClass = animated ? "po-anim" : "";
+
   switch (name) {
     case "Sun":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-sun`}>
           <title>{title ?? "Sun"}</title>
           <defs>
             <radialGradient id="gSun" cx="50%" cy="50%" r="50%">
@@ -49,19 +53,19 @@ export default function PlanetIcon({
               <stop offset="100%" stopColor={stroke} />
             </radialGradient>
           </defs>
-          <circle cx="32" cy="32" r="16" fill="url(#gSun)" stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="32" r="16" className="po-sun-core" fill="url(#gSun)" stroke={stroke} strokeWidth="1.5"/>
           {Array.from({length:12}).map((_,i)=> {
             const a = (i * Math.PI*2)/12;
             const x1 = 32 + Math.cos(a)*22, y1 = 32 + Math.sin(a)*22;
             const x2 = 32 + Math.cos(a)*30, y2 = 32 + Math.sin(a)*30;
-            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={fill} strokeWidth="2" strokeLinecap="round"/>;
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} className="po-sun-ray" stroke={fill} strokeWidth="2" strokeLinecap="round"/>;
           })}
         </svg>
       );
 
     case "Moon":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-moon`}>
           <title>{title ?? "Moon"}</title>
           <defs>
             <linearGradient id="gMoon" x1="0" y1="0" x2="1" y2="1">
@@ -70,14 +74,14 @@ export default function PlanetIcon({
             </linearGradient>
           </defs>
           <circle cx="32" cy="32" r="16" fill="#faf8f1" stroke={stroke} strokeWidth="1"/>
-          <path d="M40,16 A16,16 0 1,0 40,48 A12,16 0 1,1 40,16 Z"
+          <path className="po-moon-crescent" d="M40,16 A16,16 0 1,0 40,48 A12,16 0 1,1 40,16 Z"
                 fill="url(#gMoon)" stroke={stroke} strokeWidth="1"/>
         </svg>
       );
 
     case "Saturn":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-saturn`}>
           <title>{title ?? "Saturn"}</title>
           <defs>
             <linearGradient id="gSat" x1="0" y1="0" x2="1" y2="1">
@@ -86,17 +90,19 @@ export default function PlanetIcon({
             </linearGradient>
           </defs>
           <circle cx="32" cy="32" r="14" fill="url(#gSat)" stroke={stroke} strokeWidth="1.5"/>
-          <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={fill} strokeWidth="3"/>
-          <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={stroke} strokeWidth="1"/>
-          <ellipse cx="32" cy="34" rx="18" ry="7" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
+          <g className="po-saturn-rings">
+            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={fill} strokeWidth="3"/>
+            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={stroke} strokeWidth="1"/>
+            <ellipse cx="32" cy="34" rx="18" ry="7" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
+          </g>
         </svg>
       );
 
     case "Mercury":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-mercury`}>
           <title>{title ?? "Mercury"}</title>
-          <circle cx="32" cy="28" r="10" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="28" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <path d="M22 16 C26 12, 38 12, 42 16" fill="none" stroke={stroke} strokeWidth="2"/>
           <line x1="32" y1="38" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
           <line x1="28" y1="44" x2="36" y2="44" stroke={stroke} strokeWidth="2"/>
@@ -105,9 +111,9 @@ export default function PlanetIcon({
 
     case "Venus":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-venus`}>
           <title>{title ?? "Venus"}</title>
-          <circle cx="32" cy="24" r="10" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="24" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <line x1="32" y1="34" x2="32" y2="50" stroke={stroke} strokeWidth="2"/>
           <line x1="24" y1="42" x2="40" y2="42" stroke={stroke} strokeWidth="2"/>
         </svg>
@@ -115,9 +121,9 @@ export default function PlanetIcon({
 
     case "Mars":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-mars`}>
           <title>{title ?? "Mars"}</title>
-          <circle cx="28" cy="36" r="10" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="28" cy="36" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <line x1="36" y1="28" x2="46" y2="18" stroke={stroke} strokeWidth="2"/>
           <polygon points="46,18 42,18 46,22" fill={stroke}/>
         </svg>
@@ -125,9 +131,9 @@ export default function PlanetIcon({
 
     case "Jupiter":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-jupiter`}>
           <title>{title ?? "Jupiter"}</title>
-          <circle cx="32" cy="28" r="12" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="28" r="12" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <path d="M22 36 H42" stroke={stroke} strokeWidth="2"/>
           <path d="M26 40 H40" stroke={stroke} strokeWidth="2"/>
         </svg>
@@ -135,9 +141,9 @@ export default function PlanetIcon({
 
     case "Uranus":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-uranus`}>
           <title>{title ?? "Uranus"}</title>
-          <circle cx="32" cy="34" r="10" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="34" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <line x1="32" y1="12" x2="32" y2="24" stroke={stroke} strokeWidth="2"/>
           <line x1="22" y1="20" x2="42" y2="20" stroke={stroke} strokeWidth="2"/>
         </svg>
@@ -145,20 +151,22 @@ export default function PlanetIcon({
 
     case "Neptune":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-neptune`}>
           <title>{title ?? "Neptune"}</title>
-          <line x1="20" y1="20" x2="44" y2="20" stroke={stroke} strokeWidth="2"/>
-          <path d="M24 20 C24 34, 40 34, 40 20" fill="none" stroke={stroke} strokeWidth="2"/>
-          <line x1="32" y1="20" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
-          <line x1="26" y1="42" x2="38" y2="42" stroke={stroke} strokeWidth="2"/>
+          <g className="po-pulse">
+            <line x1="20" y1="20" x2="44" y2="20" stroke={stroke} strokeWidth="2"/>
+            <path d="M24 20 C24 34, 40 34, 40 20" fill="none" stroke={stroke} strokeWidth="2"/>
+            <line x1="32" y1="20" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
+            <line x1="26" y1="42" x2="38" y2="42" stroke={stroke} strokeWidth="2"/>
+          </g>
         </svg>
       );
 
     case "Pluto":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass} po-pluto`}>
           <title>{title ?? "Pluto"}</title>
-          <circle cx="32" cy="24" r="8" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="24" r="8" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
           <line x1="32" y1="32" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
           <line x1="24" y1="40" x2="40" y2="40" stroke={stroke} strokeWidth="2"/>
         </svg>
@@ -166,37 +174,41 @@ export default function PlanetIcon({
 
     case "North Node":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "North Node"}</title>
           <path d="M20 40 Q32 20, 44 40" fill="none" stroke={stroke} strokeWidth="2"/>
-          <circle cx="32" cy="26" r="6" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="26" r="6" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
         </svg>
       );
 
     case "South Node":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "South Node"}</title>
           <path d="M20 24 Q32 44, 44 24" fill="none" stroke={stroke} strokeWidth="2"/>
-          <circle cx="32" cy="38" r="6" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="38" r="6" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
         </svg>
       );
 
     case "Ascendant":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Ascendant"}</title>
-          <line x1="12" y1="32" x2="52" y2="32" stroke={stroke} strokeWidth="2"/>
-          <polygon points="52,32 46,28 46,36" fill={stroke}/>
+          <g className="po-pulse">
+            <line x1="12" y1="32" x2="52" y2="32" stroke={stroke} strokeWidth="2"/>
+            <polygon points="52,32 46,28 46,36" fill={stroke}/>
+          </g>
         </svg>
       );
 
     case "Midheaven":
       return (
-        <svg {...common} className={className}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Midheaven"}</title>
-          <line x1="32" y1="12" x2="32" y2="52" stroke={stroke} strokeWidth="2"/>
-          <polygon points="32,12 28,18 36,18" fill={stroke}/>
+          <g className="po-pulse">
+            <line x1="32" y1="12" x2="32" y2="52" stroke={stroke} strokeWidth="2"/>
+            <polygon points="32,12 28,18 36,18" fill={stroke}/>
+          </g>
         </svg>
       );
 

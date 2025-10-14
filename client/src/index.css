@@ -366,13 +366,62 @@
     inset: -1px;
   }
 
-  /* Planet icons - crisp rendering and focus states */
+  /* Planet icons - crisp rendering */
   svg {
     shape-rendering: geometricPrecision;
   }
 
-  button:focus-visible {
-    outline: 2px solid rgba(207, 162, 75, 0.6);
-    outline-offset: 2px;
+  /* Planet icon animations */
+  @keyframes poPulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.04); opacity: .95; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes poSunRay {
+    0% { opacity: .85; }
+    50% { opacity: .45; }
+    100% { opacity: .85; }
+  }
+
+  @keyframes poMoonShimmer {
+    0% { filter: brightness(100%); }
+    50% { filter: brightness(112%); }
+    100% { filter: brightness(100%); }
+  }
+
+  @keyframes poSaturnRings {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(6deg); }
+  }
+
+  /* Apply animations to specific planet elements */
+  .po-anim .po-pulse {
+    transform-origin: center;
+    animation: poPulse 3.6s ease-in-out infinite;
+  }
+
+  .po-anim.po-sun .po-sun-ray {
+    animation: poSunRay 2.8s ease-in-out infinite;
+  }
+
+  .po-anim.po-moon .po-moon-crescent {
+    transform-origin: 32px 32px;
+    animation: poMoonShimmer 4.2s ease-in-out infinite;
+  }
+
+  .po-anim.po-saturn .po-saturn-rings {
+    transform-origin: 32px 34px;
+    animation: poSaturnRings 14s linear infinite alternate;
+  }
+
+  /* Respect user's motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .po-anim .po-pulse,
+    .po-anim.po-sun .po-sun-ray,
+    .po-anim.po-moon .po-moon-crescent,
+    .po-anim.po-saturn .po-saturn-rings {
+      animation: none !important;
+    }
   }
 }

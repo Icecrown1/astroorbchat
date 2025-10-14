@@ -1,0 +1,349 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: добавить лёгкую, ненавязчивую анимацию к векторным иконкам планет в списке «Положения планет». Использовать **CSS-анимации** (без внешних библиотек), учитывать `prefers-reduced-motion`, работать в Telegram WebApp. Никаких заглушек и TODO. Отдать **полные файлы**.
+
+## Что менять
+
+### 1) `apps/web/src/components/PlanetIcon.tsx` — обновить (ПОЛНЫЙ ФАЙЛ)
+
+```tsx
+import React from "react";
+
+type PlanetName =
+  | "Sun" | "Moon" | "Mercury" | "Venus" | "Mars"
+  | "Jupiter" | "Saturn" | "Uranus" | "Neptune" | "Pluto";
+
+export type PlanetIconProps = {
+  name: PlanetName;
+  size?: number;            // px, по умолчанию 32
+  variant?: "gold" | "bronze" | "ink"; // цветовая тема
+  title?: string;           // для a11y
+  className?: string;
+  animated?: boolean;       // включает лёгкую анимацию
+};
+
+const PALETTE = {
+  gold:   { fill: "#cfa24b", stroke: "#8d6a25" },
+  bronze: { fill: "#b87436", stroke: "#7a4d22" },
+  ink:    { fill: "#444",    stroke: "#222"    },
+};
+
+function useColors(variant: PlanetIconProps["variant"]) {
+  return PALETTE[variant ?? "gold"];
+}
+
+export default function PlanetIcon({
+  name,
+  size = 32,
+  variant = "gold",
+  title,
+  className,
+  animated = true,
+}: PlanetIconProps) {
+  const { fill, stroke } = useColors(variant);
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 64 64",
+    role: "img",
+    "aria-label": title ?? name,
+  } as const;
+
+  const animClass = animated ? "po-anim" : "";
+
+  switch (name) {
+    case "Sun":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-sun`}>
+          <title>{title ?? "Sun"}</title>
+          <defs>
+            <radialGradient id="gSun" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ffe08a" />
+              <stop offset="60%" stopColor={fill} />
+              <stop offset="100%" stopColor={stroke} />
+            </radialGradient>
+          </defs>
+          <circle cx="32" cy="32" r="16" className="po-sun-core" fill="url(#gSun)" stroke={stroke} strokeWidth="1.5"/>
+          {Array.from({length:12}).map((_,i)=> {
+            const a = (i * Math.PI*2)/12;
+            const x1 = 32 + Math.cos(a)*22, y1 = 32 + Math.sin(a)*22;
+            const x2 = 32 + Math.cos(a)*30, y2 = 32 + Math.sin(a)*30;
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} className="po-sun-ray" stroke={fill} strokeWidth="2" strokeLinecap="round"/>;
+          })}
+        </svg>
+      );
+
+    case "Moon":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-moon`}>
+          <title>{title ?? "Moon"}</title>
+          <defs>
+            <linearGradient id="gMoon" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#f5f2e8"/>
+              <stop offset="100%" stopColor={fill}/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="32" r="16" fill="#faf8f1" stroke={stroke} strokeWidth="1"/>
+          <path className="po-moon-crescent" d="M40,16 A16,16 0 1,0 40,48 A12,16 0 1,1 40,16 Z"
+                fill="url(#gMoon)" stroke={stroke} strokeWidth="1"/>
+        </svg>
+      );
+
+    case "Saturn":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-saturn`}>
+          <title>{title ?? "Saturn"}</title>
+          <defs>
+            <linearGradient id="gSat" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={fill}/>
+              <stop offset="100%" stopColor={stroke}/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="32" r="14" fill="url(#gSat)" stroke={stroke} strokeWidth="1.5"/>
+          <g className="po-saturn-rings">
+            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={fill} strokeWidth="3"/>
+            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={stroke} strokeWidth="1"/>
+            <ellipse cx="32" cy="34" rx="18" ry="7"  fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
+          </g>
+        </svg>
+      );
+
+    case "Mercury":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-mercury`}>
+          <title>{title ?? "Mercury"}</title>
+          <circle cx="32" cy="28" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <path d="M22 16 C26 12, 38 12, 42 16" fill="none" stroke={stroke} strokeWidth="2"/>
+          <line x1="32" y1="38" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
+          <line x1="28" y1="44" x2="36" y2="44" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    case "Venus":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-venus`}>
+          <title>{title ?? "Venus"}</title>
+          <circle cx="32" cy="24" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <line x1="32" y1="34" x2="32" y2="50" stroke={stroke} strokeWidth="2"/>
+          <line x1="24" y1="42" x2="40" y2="42" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    case "Mars":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-mars`}>
+          <title>{title ?? "Mars"}</title>
+          <circle cx="28" cy="36" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <line x1="36" y1="28" x2="46" y2="18" stroke={stroke} strokeWidth="2"/>
+          <polygon points="46,18 42,18 46,22" fill={stroke}/>
+        </svg>
+      );
+
+    case "Jupiter":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-jupiter`}>
+          <title>{title ?? "Jupiter"}</title>
+          <circle cx="32" cy="28" r="12" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <path d="M22 36 H42" stroke={stroke} strokeWidth="2"/>
+          <path d="M26 40 H40" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    case "Uranus":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-uranus`}>
+          <title>{title ?? "Uranus"}</title>
+          <circle cx="32" cy="34" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <line x1="32" y1="12" x2="32" y2="24" stroke={stroke} strokeWidth="2"/>
+          <line x1="22" y1="20" x2="42" y2="20" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    case "Neptune":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-neptune`}>
+          <title>{title ?? "Neptune"}</title>
+          <line x1="20" y1="20" x2="44" y2="20" stroke={stroke} strokeWidth="2"/>
+          <path d="M24 20 C24 34, 40 34, 40 20" fill="none" stroke={stroke} strokeWidth="2"/>
+          <line x1="32" y1="20" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
+          <line x1="26" y1="42" x2="38" y2="42" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    case "Pluto":
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass} po-pluto`}>
+          <title>{title ?? "Pluto"}</title>
+          <circle cx="32" cy="24" r="8" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <line x1="32" y1="32" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
+          <line x1="24" y1="40" x2="40" y2="40" stroke={stroke} strokeWidth="2"/>
+        </svg>
+      );
+
+    default:
+      return (
+        <svg {...common} className={className}>
+          <circle cx="32" cy="32" r="14" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+        </svg>
+      );
+  }
+}
+```
+
+### 2) `apps/web/src/components/PlanetRow.tsx` — обновить (ПОЛНЫЙ ФАЙЛ)
+
+```tsx
+import React from "react";
+import PlanetIcon from "./PlanetIcon";
+
+type PlanetRowProps = {
+  name: "Sun"|"Moon"|"Mercury"|"Venus"|"Mars"|"Jupiter"|"Saturn"|"Uranus"|"Neptune"|"Pluto";
+  signLabel: string;
+  degreesLabel: string;
+  onClick?: () => void;
+};
+
+export default function PlanetRow({ name, signLabel, degreesLabel, onClick }: PlanetRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-12 px-12 py-10 rounded-xl hover:bg-black/5 active:bg-black/10 transition-colors text-left"
+      aria-label={`${name} ${signLabel} ${degreesLabel}`}
+    >
+      <PlanetIcon name={name} size={36} variant="gold" animated className="shrink-0" />
+      <div className="flex-1">
+        <div className="text-[15px] font-semibold">{name}</div>
+        <div className="text-[13px] opacity-70">{signLabel} {degreesLabel}</div>
+      </div>
+      <div aria-hidden className="opacity-50">▾</div>
+    </button>
+  );
+}
+```
+
+### 3) `apps/web/src/styles.css` — ДОБАВИТЬ НИЖЕ (или включить в конец файла)
+
+```css
+/* Чёткий рендер svg */
+svg { shape-rendering: geometricPrecision; }
+
+/* Анимации. Почти незаметные, но оживляют UI */
+@keyframes poPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: .95; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes poSunRay {
+  0% { opacity: .85; }
+  50% { opacity: .45; }
+  100% { opacity: .85; }
+}
+
+@keyframes poMoonShimmer {
+  0% { filter: brightness(100%); }
+  50% { filter: brightness(112%); }
+  100% { filter: brightness(100%); }
+}
+
+@keyframes poSaturnRings {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(6deg); } /* очень медленное покачивание */
+}
+
+/* Глобальный переключатель анимаций */
+.po-anim .po-pulse {
+  transform-origin: center;
+  animation: poPulse 3.6s ease-in-out infinite;
+}
+.po-anim.po-sun .po-sun-ray {
+  animation: poSunRay 2.8s ease-in-out infinite;
+}
+.po-anim.po-moon .po-moon-crescent {
+  transform-origin: 32px 32px;
+  animation: poMoonShimmer 4.2s ease-in-out infinite;
+}
+.po-anim.po-saturn .po-saturn-rings {
+  transform-origin: 32px 34px;
+  animation: poSaturnRings 14s linear infinite alternate;
+}
+
+/* Уважение к пользователям, отключившим анимации */
+@media (prefers-reduced-motion: reduce) {
+  .po-anim .po-pulse,
+  .po-anim.po-sun .po-sun-ray,
+  .po-anim.po-moon .po-moon-crescent,
+  .po-anim.po-saturn .po-saturn-rings {
+    animation: none !important;
+  }
+}
+
+/* Фокус и доступность */
+button:focus-visible { outline: 2px solid rgba(207,162,75,.6); outline-offset: 2px; }
+```
+
+### 4) (Опционально) `apps/web/src/routes/NatalChart.tsx`
+
+Если у вас уже подключён `PlanetRow`, ничего менять не нужно. Если список строится вручную — замените бейдж на `<PlanetIcon animated />`. Отдайте ПОЛНЫЙ файл, если в нём были изменения.
+
+### 5) Тесты (Vitest) — обновить/добавить
+
+`apps/web/src/tests/PlanetIcon.spec.tsx` (ПОЛНЫЙ ФАЙЛ):
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import React from "react";
+import PlanetIcon from "../components/PlanetIcon";
+
+describe("PlanetIcon", () => {
+  it("renders with aria-label and animation classes", () => {
+    render(<PlanetIcon name="Sun" size={36} animated title="Sun" />);
+    const img = screen.getByRole("img", { name: /sun/i });
+    expect(img).toBeInTheDocument();
+    expect(img.classList.contains("po-anim")).toBe(true);
+  });
+
+  it("can render without animation", () => {
+    render(<PlanetIcon name="Saturn" size={36} animated={false} />);
+    const img = screen.getByRole("img", { name: /saturn/i });
+    expect(img.classList.contains("po-anim")).toBe(false);
+  });
+});
+```
+
+`apps/web/src/tests/PlanetRow.spec.tsx` (ПОЛНЫЙ ФАЙЛ):
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import React from "react";
+import PlanetRow from "../components/PlanetRow";
+
+describe("PlanetRow", () => {
+  it("renders name and labels", () => {
+    render(<PlanetRow name="Mars" signLabel="Scorpio" degreesLabel="6.05°" />);
+    expect(screen.getByRole("button", { name: /Mars Scorpio 6\.05°/i })).toBeInTheDocument();
+    expect(document.querySelector("svg")).toBeTruthy();
+  });
+});
+```
+
+## Acceptance Criteria
+
+* Иконки Солнца, Луны и Сатурна имеют лёгкую анимацию (пульс лучей/сияние/покачивание колец), остальные — мягкий «pulse».
+* Анимации не мешают чтению, работают плавно в Telegram WebApp.
+* При `prefers-reduced-motion: reduce` анимации полностью отключаются.
+* Никаких внешних ассетов и заглушек. Всё — встроенные SVG и CSS.
+* Существующий функционал клика/раскрытия не изменён.
+* Тесты проходят.
+
+## Вывести ПОЛНЫЙ список изменённых/новых файлов
+
+* apps/web/src/components/PlanetIcon.tsx
+* apps/web/src/components/PlanetRow.tsx
+* apps/web/src/styles.css
+* apps/web/src/tests/PlanetIcon.spec.tsx
+* apps/web/src/tests/PlanetRow.spec.tsx
+* apps/web/src/routes/NatalChart.tsx (если редактировался)
+
+[END REPLIT PROMPT]
