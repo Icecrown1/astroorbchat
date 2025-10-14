@@ -12,6 +12,8 @@ export const ENERGY_COSTS = {
   ask: 1,
   natal_external: 1,
   important_date_detail: 1,
+  natal_professional: 2,  // Глубокий анализ чужой карты
+  compatibility_professional: 4,  // Профессиональная синастрия
 } as const;
 
 export const SUBSCRIPTION_DAILY_ENERGY = {
