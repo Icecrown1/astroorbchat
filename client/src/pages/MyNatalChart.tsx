@@ -254,6 +254,46 @@ export default function MyNatalChart() {
             </Accordion>
           )}
 
+          {rawChartData?.professionalInterpretation?.[locale] && (
+            <Card className="p-6 border-primary/20 bg-gradient-to-br from-primary/5 to-chart-1/5">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">
+                  {locale === 'ru' ? 'Профессиональная интерпретация' : 'Professional Interpretation'}
+                </h2>
+              </div>
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed">
+                  {rawChartData.professionalInterpretation[locale].summary}
+                </p>
+                {rawChartData.professionalInterpretation[locale].house_framework?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">
+                      {locale === 'ru' ? 'Анализ домов:' : 'House Framework:'}
+                    </h3>
+                    <ul className="space-y-1">
+                      {rawChartData.professionalInterpretation[locale].house_framework.map((item: string, i: number) => (
+                        <li key={i} className="text-sm text-muted-foreground ml-4">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {rawChartData.professionalInterpretation[locale].planet_synthesis?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">
+                      {locale === 'ru' ? 'Синтез планет:' : 'Planet Synthesis:'}
+                    </h3>
+                    <ul className="space-y-1">
+                      {rawChartData.professionalInterpretation[locale].planet_synthesis.map((item: string, i: number) => (
+                        <li key={i} className="text-sm text-muted-foreground ml-4">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">{t.natalChart.planetaryPositions}</h2>
             <Accordion type="single" collapsible className="w-full">
