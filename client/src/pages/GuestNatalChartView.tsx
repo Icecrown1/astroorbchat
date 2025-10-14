@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
+import PlanetIcon from '@/components/PlanetIcon';
 import { ArrowLeft, Users, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -201,10 +202,18 @@ export default function GuestNatalChartView() {
                 <AccordionItem key={planet.name} value={planet.name}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3 w-full">
-                      <span className="font-medium">{planet.name}</span>
-                      <span className="text-muted-foreground text-sm">
-                        {planet.sign} {planet.degree_in_sign?.toFixed(2)}°
-                      </span>
+                      <PlanetIcon 
+                        name={planet.name as any} 
+                        size={36} 
+                        variant="gold"
+                        className="shrink-0"
+                      />
+                      <div className="text-left flex-1">
+                        <div className="font-medium">{planet.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {planet.sign} {planet.degree_in_sign?.toFixed(2)}°
+                        </div>
+                      </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>

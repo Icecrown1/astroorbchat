@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
+import PlanetIcon from '@/components/PlanetIcon';
 import { ArrowLeft, Sparkles, RefreshCw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -258,11 +259,12 @@ export default function MyNatalChart() {
                 <AccordionItem key={index} value={`planet-${index}`}>
                   <AccordionTrigger data-testid={`accordion-planet-${planet.name}`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 flex items-center justify-center">
-                        <span className="text-xs font-semibold">
-                          {planet.name.substring(0, 2).toUpperCase()}
-                        </span>
-                      </div>
+                      <PlanetIcon 
+                        name={planet.name as any} 
+                        size={36} 
+                        variant="gold"
+                        className="shrink-0"
+                      />
                       <div className="text-left">
                         <div className="font-medium">{planet.name}</div>
                         <div className="text-sm text-muted-foreground">
