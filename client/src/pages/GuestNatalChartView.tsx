@@ -10,6 +10,7 @@ import PlanetIcon from '@/components/PlanetIcon';
 import { ArrowLeft, Users, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { translatePlanet, translateSign } from '@/lib/astroTranslations';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   Accordion,
@@ -210,9 +211,9 @@ export default function GuestNatalChartView() {
                         className="shrink-0"
                       />
                       <div className="text-left flex-1">
-                        <div className="font-medium">{planet.name}</div>
+                        <div className="font-medium">{translatePlanet(planet.name, locale)}</div>
                         <div className="text-sm text-muted-foreground">
-                          {planet.sign} {planet.degree_in_sign?.toFixed(2)}°
+                          {translateSign(planet.sign, locale)} {planet.degree_in_sign?.toFixed(2)}°
                         </div>
                       </div>
                     </div>
@@ -220,7 +221,7 @@ export default function GuestNatalChartView() {
                   <AccordionContent>
                     <div className="space-y-2 text-sm">
                       <p className="text-muted-foreground">
-                        {locale === 'ru' ? 'Знак:' : 'Sign:'} {planet.sign}
+                        {locale === 'ru' ? 'Знак:' : 'Sign:'} {translateSign(planet.sign, locale)}
                       </p>
                       <p className="text-muted-foreground">
                         {locale === 'ru' ? 'Градус в знаке:' : 'Degree in sign:'} {planet.degree_in_sign?.toFixed(2)}°
@@ -247,14 +248,14 @@ export default function GuestNatalChartView() {
                           {locale === 'ru' ? `Дом ${index + 1}` : `House ${index + 1}`}
                         </span>
                         <span className="text-muted-foreground text-sm">
-                          {house.sign} {house.degree?.toFixed(2)}°
+                          {translateSign(house.sign, locale)} {house.degree?.toFixed(2)}°
                         </span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-2 text-sm">
                         <p className="text-muted-foreground">
-                          {locale === 'ru' ? 'Знак:' : 'Sign:'} {house.sign}
+                          {locale === 'ru' ? 'Знак:' : 'Sign:'} {translateSign(house.sign, locale)}
                         </p>
                         <p className="text-muted-foreground">
                           {locale === 'ru' ? 'Куспид:' : 'Cusp:'} {house.degree?.toFixed(2)}°
@@ -278,9 +279,9 @@ export default function GuestNatalChartView() {
                     data-testid={`aspect-${index}`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="font-medium">{aspect.planet1}</span>
+                      <span className="font-medium">{translatePlanet(aspect.planet1, locale)}</span>
                       <span className="text-muted-foreground">{aspect.aspect}</span>
-                      <span className="font-medium">{aspect.planet2}</span>
+                      <span className="font-medium">{translatePlanet(aspect.planet2, locale)}</span>
                     </div>
                     <span className="text-sm text-muted-foreground">
                       {aspect.orb?.toFixed(2)}°

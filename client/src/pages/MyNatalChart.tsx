@@ -11,6 +11,7 @@ import { ArrowLeft, Sparkles, RefreshCw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { translatePlanet, translateSign } from '@/lib/astroTranslations';
 import {
   Accordion,
   AccordionContent,
@@ -267,9 +268,9 @@ export default function MyNatalChart() {
                         className="shrink-0"
                       />
                       <div className="text-left">
-                        <div className="font-medium">{planet.name}</div>
+                        <div className="font-medium">{translatePlanet(planet.name, locale)}</div>
                         <div className="text-sm text-muted-foreground">
-                          {planet.sign} {planet.degree_in_sign?.toFixed(2)}°
+                          {translateSign(planet.sign, locale)} {planet.degree_in_sign?.toFixed(2)}°
                         </div>
                       </div>
                     </div>

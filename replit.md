@@ -166,3 +166,19 @@ Preferred communication style: Simple, everyday language.
 - **UI Enhancement**: NatalChart.tsx guest card now has "Посмотреть/View" button (navigates to detail page) and "Совместимость/Compatibility" button
 - **Locale Integration**: GuestChartForm passes locale parameter when creating chart for language-specific interpretation
 - **Field Name Fix**: Corrected guest chart date display from `birthDate` to `birthdayDate` matching database schema
+
+## Recent Changes (October 14, 2025)
+
+**Astrological Symbols & Full Localization (Complete):**
+- **Traditional Glyphs**: Replaced custom planet icons with authentic astrological symbols (☉☽☿♀♂♃♄♅♆♇) using SVG paths for professional appearance
+- **Translation System**: Created comprehensive translation infrastructure for planets and zodiac signs
+  - Added `planets` section to `translations.ts` with English and Russian translations
+  - Created `astroTranslations.ts` helper module with `translatePlanet()` and `translateSign()` functions
+  - Supports all celestial bodies: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto, North Node, South Node, Ascendant, Midheaven
+  - All 12 zodiac signs fully translated (Aries→Овен, Taurus→Телец, etc.)
+- **Component Integration**: Fully integrated translations across all natal chart components
+  - `MyNatalChart.tsx`: Planet and sign names display in user's selected language
+  - `GuestNatalChartView.tsx`: Complete localization for guest charts including planets, signs, houses, and aspects
+  - Planet modal and all chart visualizations respect user locale
+- **Bug Fix**: Fixed SVG gradient ID conflicts using React `useId()` hook - each planet icon instance now has unique gradient identifiers preventing visual duplication
+- **Architecture**: Translation functions use English planet/sign names as keys, returning localized versions based on user's locale (en/ru); seamless integration with existing LocaleContext system

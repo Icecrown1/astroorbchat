@@ -43,186 +43,171 @@ export default function PlanetIcon({
     "aria-label": title ?? name,
   } as const;
 
-  const animClass = animated ? "po-anim" : "";
+  const animClass = animated ? "po-anim po-pulse" : "";
 
   switch (name) {
     case "Sun":
-      const sunGradId = `gSun-${uniqueId}`;
+      // ☉ - Circle with dot in center
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-sun`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Sun"}</title>
-          <defs>
-            <radialGradient id={sunGradId} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffe08a" />
-              <stop offset="60%" stopColor={fill} />
-              <stop offset="100%" stopColor={stroke} />
-            </radialGradient>
-          </defs>
-          <circle cx="32" cy="32" r="16" className="po-sun-core" fill={`url(#${sunGradId})`} stroke={stroke} strokeWidth="1.5"/>
-          {Array.from({length:12}).map((_,i)=> {
-            const a = (i * Math.PI*2)/12;
-            const x1 = 32 + Math.cos(a)*22, y1 = 32 + Math.sin(a)*22;
-            const x2 = 32 + Math.cos(a)*30, y2 = 32 + Math.sin(a)*30;
-            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} className="po-sun-ray" stroke={fill} strokeWidth="2" strokeLinecap="round"/>;
-          })}
+          <circle cx="32" cy="32" r="16" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="32" cy="32" r="4" fill={fill}/>
         </svg>
       );
 
     case "Moon":
-      const moonGradId = `gMoon-${uniqueId}`;
+      // ☽ - Crescent
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-moon`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Moon"}</title>
-          <defs>
-            <linearGradient id={moonGradId} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f5f2e8"/>
-              <stop offset="100%" stopColor={fill}/>
-            </linearGradient>
-          </defs>
-          <circle cx="32" cy="32" r="16" fill="#faf8f1" stroke={stroke} strokeWidth="1"/>
-          <path className="po-moon-crescent" d="M40,16 A16,16 0 1,0 40,48 A12,16 0 1,1 40,16 Z"
-                fill={`url(#${moonGradId})`} stroke={stroke} strokeWidth="1"/>
-        </svg>
-      );
-
-    case "Saturn":
-      const satGradId = `gSat-${uniqueId}`;
-      return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-saturn`}>
-          <title>{title ?? "Saturn"}</title>
-          <defs>
-            <linearGradient id={satGradId} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={fill}/>
-              <stop offset="100%" stopColor={stroke}/>
-            </linearGradient>
-          </defs>
-          <circle cx="32" cy="32" r="14" fill={`url(#${satGradId})`} stroke={stroke} strokeWidth="1.5"/>
-          <g className="po-saturn-rings">
-            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={fill} strokeWidth="3"/>
-            <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={stroke} strokeWidth="1"/>
-            <ellipse cx="32" cy="34" rx="18" ry="7" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
-          </g>
+          <path d="M32 16 A16 16 0 1 0 32 48 A12 12 0 1 1 32 16 Z" 
+                fill="none" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Mercury":
+      // ☿ - Circle with cross below and horns on top
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-mercury`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Mercury"}</title>
-          <circle cx="32" cy="28" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <path d="M22 16 C26 12, 38 12, 42 16" fill="none" stroke={stroke} strokeWidth="2"/>
-          <line x1="32" y1="38" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
-          <line x1="28" y1="44" x2="36" y2="44" stroke={stroke} strokeWidth="2"/>
+          <circle cx="32" cy="30" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <path d="M24 20 Q32 14 40 20" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="38" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
+          <line x1="28" y1="44" x2="36" y2="44" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Venus":
+      // ♀ - Circle with cross below
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-venus`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Venus"}</title>
-          <circle cx="32" cy="24" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <line x1="32" y1="34" x2="32" y2="50" stroke={stroke} strokeWidth="2"/>
-          <line x1="24" y1="42" x2="40" y2="42" stroke={stroke} strokeWidth="2"/>
+          <circle cx="32" cy="24" r="10" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="34" x2="32" y2="50" stroke={fill} strokeWidth="2.5"/>
+          <line x1="24" y1="42" x2="40" y2="42" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Mars":
+      // ♂ - Circle with arrow pointing upper-right
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-mars`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Mars"}</title>
-          <circle cx="28" cy="36" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <line x1="36" y1="28" x2="46" y2="18" stroke={stroke} strokeWidth="2"/>
-          <polygon points="46,18 42,18 46,22" fill={stroke}/>
+          <circle cx="28" cy="36" r="10" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="36" y1="28" x2="48" y2="16" stroke={fill} strokeWidth="2.5"/>
+          <line x1="48" y1="16" x2="48" y2="22" stroke={fill} strokeWidth="2.5"/>
+          <line x1="48" y1="16" x2="42" y2="16" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Jupiter":
+      // ♃ - Stylized number 4 or 2|
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-jupiter`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Jupiter"}</title>
-          <circle cx="32" cy="28" r="12" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <path d="M22 36 H42" stroke={stroke} strokeWidth="2"/>
-          <path d="M26 40 H40" stroke={stroke} strokeWidth="2"/>
+          <line x1="20" y1="16" x2="20" y2="48" stroke={fill} strokeWidth="2.5"/>
+          <path d="M20 28 Q32 20 44 28" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="28" y1="36" x2="36" y2="36" stroke={fill} strokeWidth="2.5"/>
+        </svg>
+      );
+
+    case "Saturn":
+      // ♄ - Cross with tail (like letter h)
+      return (
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
+          <title>{title ?? "Saturn"}</title>
+          <line x1="32" y1="16" x2="32" y2="40" stroke={fill} strokeWidth="2.5"/>
+          <line x1="20" y1="28" x2="44" y2="28" stroke={fill} strokeWidth="2.5"/>
+          <path d="M16 48 Q24 38 32 40" fill="none" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Uranus":
+      // ♅ - H with circle in center and dot on top
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-uranus`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Uranus"}</title>
-          <circle cx="32" cy="34" r="10" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <line x1="32" y1="12" x2="32" y2="24" stroke={stroke} strokeWidth="2"/>
-          <line x1="22" y1="20" x2="42" y2="20" stroke={stroke} strokeWidth="2"/>
+          <circle cx="32" cy="36" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="24" y1="16" x2="24" y2="36" stroke={fill} strokeWidth="2.5"/>
+          <line x1="40" y1="16" x2="40" y2="36" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="32" cy="16" r="3" fill={fill}/>
         </svg>
       );
 
     case "Neptune":
+      // ♆ - Trident
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-neptune`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Neptune"}</title>
-          <g className="po-pulse">
-            <line x1="20" y1="20" x2="44" y2="20" stroke={stroke} strokeWidth="2"/>
-            <path d="M24 20 C24 34, 40 34, 40 20" fill="none" stroke={stroke} strokeWidth="2"/>
-            <line x1="32" y1="20" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
-            <line x1="26" y1="42" x2="38" y2="42" stroke={stroke} strokeWidth="2"/>
-          </g>
+          <line x1="32" y1="18" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
+          <line x1="20" y1="18" x2="44" y2="18" stroke={fill} strokeWidth="2.5"/>
+          <path d="M24 18 Q24 32 20 40" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <path d="M40 18 Q40 32 44 40" fill="none" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Pluto":
+      // ♇ - PL monogram or circle with P-like symbol
       return (
-        <svg {...common} className={`${className ?? ""} ${animClass} po-pluto`}>
+        <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Pluto"}</title>
-          <circle cx="32" cy="24" r="8" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-          <line x1="32" y1="32" x2="32" y2="48" stroke={stroke} strokeWidth="2"/>
-          <line x1="24" y1="40" x2="40" y2="40" stroke={stroke} strokeWidth="2"/>
+          <circle cx="32" cy="22" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="24" y1="22" x2="24" y2="48" stroke={fill} strokeWidth="2.5"/>
+          <line x1="18" y1="38" x2="38" y2="38" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "North Node":
+      // Ω - Horseshoe shape (upward)
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "North Node"}</title>
-          <path d="M20 40 Q32 20, 44 40" fill="none" stroke={stroke} strokeWidth="2"/>
-          <circle cx="32" cy="26" r="6" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <path d="M20 40 Q20 20 32 20 Q44 20 44 40" 
+                fill="none" stroke={fill} strokeWidth="2.5" strokeLinecap="round"/>
+          <circle cx="20" cy="40" r="3" fill={fill}/>
+          <circle cx="44" cy="40" r="3" fill={fill}/>
         </svg>
       );
 
     case "South Node":
+      // Ω inverted - Horseshoe shape (downward)
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "South Node"}</title>
-          <path d="M20 24 Q32 44, 44 24" fill="none" stroke={stroke} strokeWidth="2"/>
-          <circle cx="32" cy="38" r="6" className="po-pulse" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <path d="M20 24 Q20 44 32 44 Q44 44 44 24" 
+                fill="none" stroke={fill} strokeWidth="2.5" strokeLinecap="round"/>
+          <circle cx="20" cy="24" r="3" fill={fill}/>
+          <circle cx="44" cy="24" r="3" fill={fill}/>
         </svg>
       );
 
     case "Ascendant":
+      // AS or AC - Arrow pointing right
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Ascendant"}</title>
-          <g className="po-pulse">
-            <line x1="12" y1="32" x2="52" y2="32" stroke={stroke} strokeWidth="2"/>
-            <polygon points="52,32 46,28 46,36" fill={stroke}/>
-          </g>
+          <line x1="16" y1="32" x2="48" y2="32" stroke={fill} strokeWidth="2.5"/>
+          <line x1="48" y1="32" x2="42" y2="26" stroke={fill} strokeWidth="2.5"/>
+          <line x1="48" y1="32" x2="42" y2="38" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     case "Midheaven":
+      // MC - Arrow pointing up
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Midheaven"}</title>
-          <g className="po-pulse">
-            <line x1="32" y1="12" x2="32" y2="52" stroke={stroke} strokeWidth="2"/>
-            <polygon points="32,12 28,18 36,18" fill={stroke}/>
-          </g>
+          <line x1="32" y1="16" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="16" x2="26" y2="22" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="16" x2="38" y2="22" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
 
     default:
       return (
         <svg {...common} className={className}>
-          <circle cx="32" cy="32" r="14" fill={fill} stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="32" r="14" fill="none" stroke={fill} strokeWidth="2.5"/>
         </svg>
       );
   }
