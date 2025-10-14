@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 type PlanetName =
   | "Sun" | "Moon" | "Mercury" | "Venus" | "Mars"
   | "Jupiter" | "Saturn" | "Uranus" | "Neptune" | "Pluto"
@@ -31,6 +33,8 @@ export default function PlanetIcon({
   animated = true,
 }: PlanetIconProps) {
   const { fill, stroke } = useColors(variant);
+  const uniqueId = useId();
+  
   const common = {
     width: size,
     height: size,
@@ -43,17 +47,18 @@ export default function PlanetIcon({
 
   switch (name) {
     case "Sun":
+      const sunGradId = `gSun-${uniqueId}`;
       return (
         <svg {...common} className={`${className ?? ""} ${animClass} po-sun`}>
           <title>{title ?? "Sun"}</title>
           <defs>
-            <radialGradient id="gSun" cx="50%" cy="50%" r="50%">
+            <radialGradient id={sunGradId} cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#ffe08a" />
               <stop offset="60%" stopColor={fill} />
               <stop offset="100%" stopColor={stroke} />
             </radialGradient>
           </defs>
-          <circle cx="32" cy="32" r="16" className="po-sun-core" fill="url(#gSun)" stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="32" r="16" className="po-sun-core" fill={`url(#${sunGradId})`} stroke={stroke} strokeWidth="1.5"/>
           {Array.from({length:12}).map((_,i)=> {
             const a = (i * Math.PI*2)/12;
             const x1 = 32 + Math.cos(a)*22, y1 = 32 + Math.sin(a)*22;
@@ -64,32 +69,34 @@ export default function PlanetIcon({
       );
 
     case "Moon":
+      const moonGradId = `gMoon-${uniqueId}`;
       return (
         <svg {...common} className={`${className ?? ""} ${animClass} po-moon`}>
           <title>{title ?? "Moon"}</title>
           <defs>
-            <linearGradient id="gMoon" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id={moonGradId} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#f5f2e8"/>
               <stop offset="100%" stopColor={fill}/>
             </linearGradient>
           </defs>
           <circle cx="32" cy="32" r="16" fill="#faf8f1" stroke={stroke} strokeWidth="1"/>
           <path className="po-moon-crescent" d="M40,16 A16,16 0 1,0 40,48 A12,16 0 1,1 40,16 Z"
-                fill="url(#gMoon)" stroke={stroke} strokeWidth="1"/>
+                fill={`url(#${moonGradId})`} stroke={stroke} strokeWidth="1"/>
         </svg>
       );
 
     case "Saturn":
+      const satGradId = `gSat-${uniqueId}`;
       return (
         <svg {...common} className={`${className ?? ""} ${animClass} po-saturn`}>
           <title>{title ?? "Saturn"}</title>
           <defs>
-            <linearGradient id="gSat" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id={satGradId} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor={fill}/>
               <stop offset="100%" stopColor={stroke}/>
             </linearGradient>
           </defs>
-          <circle cx="32" cy="32" r="14" fill="url(#gSat)" stroke={stroke} strokeWidth="1.5"/>
+          <circle cx="32" cy="32" r="14" fill={`url(#${satGradId})`} stroke={stroke} strokeWidth="1.5"/>
           <g className="po-saturn-rings">
             <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={fill} strokeWidth="3"/>
             <ellipse cx="32" cy="34" rx="26" ry="10" fill="none" stroke={stroke} strokeWidth="1"/>
