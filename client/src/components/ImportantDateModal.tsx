@@ -40,9 +40,10 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
 
   const getEventTypeLabel = (kind: string) => {
     const labels: Record<string, { en: string; ru: string }> = {
-      retrograde: { en: 'Retrograde', ru: 'Ретроград' },
-      direct: { en: 'Direct', ru: 'Директное движение' },
+      'retrograde-start': { en: 'Retrograde Start', ru: 'Начало ретрограда' },
+      'retrograde-end': { en: 'Direct Motion', ru: 'Директное движение' },
       ingress: { en: 'Sign Change', ru: 'Смена знака' },
+      'major-transit': { en: 'Major Transit', ru: 'Важный транзит' },
       conjunction: { en: 'Conjunction', ru: 'Соединение' },
       opposition: { en: 'Opposition', ru: 'Оппозиция' },
       trine: { en: 'Trine', ru: 'Трин' },
