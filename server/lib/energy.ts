@@ -11,6 +11,7 @@ export const ENERGY_COSTS = {
   compatibility: 2,
   ask: 1,
   natal_external: 1,
+  important_date_detail: 1,
 } as const;
 
 export const SUBSCRIPTION_DAILY_ENERGY = {

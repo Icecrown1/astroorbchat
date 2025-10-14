@@ -195,3 +195,98 @@ export async function getPlanetInterpretation(
     throw new Error('Failed to parse planet interpretation response');
   }
 }
+
+export interface ImportantDateInterpretationInput {
+  profile: {
+    name: string;
+    age: number;
+    gender: string;
+    timezone: string;
+  };
+  event: {
+    kind: string;
+    planet: string;
+    date: string;
+    sign?: string;
+    natalTarget?: {
+      planet: string;
+      aspect?: string;
+    };
+    brief: string;
+  };
+  natalSummary: any;
+}
+
+export interface ImportantDateInterpretationResult {
+  title: string;
+  window: string;
+  whatItMeans: string[];
+  risks: string[];
+  do: string[];
+  dont: string[];
+  timingTips: string[];
+}
+
+export async function interpretImportantDate(
+  input: ImportantDateInterpretationInput,
+  locale: string = 'ru'
+): Promise<ImportantDateInterpretationResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const toneInstruction = personalizeTone(input.profile.gender);
+
+  const promptText = loadPrompt('important_dates', {
+    EVENT_DATA: JSON.stringify(input.event, null, 2),
+    NAME: input.profile.name,
+    AGE: String(input.profile.age),
+    GENDER: input.profile.gender,
+    TIMEZONE: input.profile.timezone,
+    NATAL_SUMMARY: JSON.stringify(input.natalSummary, null, 2),
+    TONE_INSTRUCTION: toneInstruction,
+    LOCALE: locale
+  });
+
+  const finalPrompt = `${languageInstruction}\n\n${promptText}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик. Даёшь конкретные, полезные советы по важным датам. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer. You provide concrete, useful advice for important dates. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: finalPrompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 3000
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate important date interpretation');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    return {
+      title: result.title || `Важное событие: ${input.event.brief}`,
+      window: result.window || 'Период влияния: 3-7 дней вокруг даты',
+      whatItMeans: Array.isArray(result.whatItMeans) ? result.whatItMeans : [],
+      risks: Array.isArray(result.risks) ? result.risks : [],
+      do: Array.isArray(result.do) ? result.do : [],
+      dont: Array.isArray(result.dont) ? result.dont : [],
+      timingTips: Array.isArray(result.timingTips) ? result.timingTips : []
+    };
+  } catch (e) {
+    throw new Error('Failed to parse important date interpretation response');
+  }
+}
