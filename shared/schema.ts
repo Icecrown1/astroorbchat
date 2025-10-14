@@ -224,7 +224,9 @@ export const importantDateUnlocks = pgTable("important_date_unlocks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   eventKey: text("event_key").notNull(),
+  interpretation: jsonb("interpretation"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("important_date_unlocks_user_id_idx").on(table.userId),
   userEventIdx: index("important_date_unlocks_user_event_idx").on(table.userId, table.eventKey),

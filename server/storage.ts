@@ -10,6 +10,7 @@ import {
   aiQuestions,
   natalCharts,
   externalNatals,
+  importantDateUnlocks,
   type User, 
   type InsertUser,
   type Subscription,
@@ -29,7 +30,9 @@ import {
   type NatalChart,
   type InsertNatalChart,
   type ExternalNatal,
-  type InsertExternalNatal
+  type InsertExternalNatal,
+  type ImportantDateUnlock,
+  type InsertImportantDateUnlock
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -84,6 +87,12 @@ export interface IStorage {
   getExternalNatalsByOwnerId(ownerId: string): Promise<ExternalNatal[]>;
   createExternalNatal(natal: InsertExternalNatal): Promise<ExternalNatal>;
   deleteExternalNatal(id: string): Promise<void>;
+  
+  // Important Date Unlock operations
+  getImportantDateUnlockByUserAndKey(userId: string, eventKey: string): Promise<ImportantDateUnlock | undefined>;
+  getImportantDateUnlocksByUserId(userId: string): Promise<ImportantDateUnlock[]>;
+  createImportantDateUnlock(unlock: InsertImportantDateUnlock): Promise<ImportantDateUnlock>;
+  updateImportantDateUnlock(id: string, data: Partial<ImportantDateUnlock>): Promise<ImportantDateUnlock | undefined>;
   
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -339,6 +348,40 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(externalNatals)
       .where(eq(externalNatals.id, id));
+  }
+
+  // Important Date Unlock operations
+  async getImportantDateUnlockByUserAndKey(userId: string, eventKey: string): Promise<ImportantDateUnlock | undefined> {
+    const [unlock] = await db
+      .select()
+      .from(importantDateUnlocks)
+      .where(and(eq(importantDateUnlocks.userId, userId), eq(importantDateUnlocks.eventKey, eventKey)));
+    return unlock || undefined;
+  }
+
+  async getImportantDateUnlocksByUserId(userId: string): Promise<ImportantDateUnlock[]> {
+    return await db
+      .select()
+      .from(importantDateUnlocks)
+      .where(eq(importantDateUnlocks.userId, userId))
+      .orderBy(desc(importantDateUnlocks.createdAt));
+  }
+
+  async createImportantDateUnlock(insertUnlock: InsertImportantDateUnlock): Promise<ImportantDateUnlock> {
+    const [unlock] = await db
+      .insert(importantDateUnlocks)
+      .values(insertUnlock)
+      .returning();
+    return unlock;
+  }
+
+  async updateImportantDateUnlock(id: string, data: Partial<ImportantDateUnlock>): Promise<ImportantDateUnlock | undefined> {
+    const [unlock] = await db
+      .update(importantDateUnlocks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(importantDateUnlocks.id, id))
+      .returning();
+    return unlock || undefined;
   }
 
   // Admin operations

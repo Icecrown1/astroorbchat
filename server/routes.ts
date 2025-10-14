@@ -9,9 +9,10 @@ import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBon
 import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
-import { getAstrologyInterpretation, getPlanetInterpretation, type PlanetInterpretationData } from "./lib/openai";
+import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
+import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -987,6 +988,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const questions = await storage.getAiQuestionsByUserId(userId, limit);
       res.json({ ok: true, data: questions });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Important Dates endpoints
+  app.get("/api/astrology/important-dates", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      // Get user's natal chart
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart) {
+        return res.status(400).json({ ok: false, error: "Natal chart required. Please create your natal chart first." });
+      }
+      
+      const chartData = natalChart.data as NatalChartResult;
+      
+      // Extract natal planets for transit calculation
+      const natalPlanets = extractNatalPlanets(chartData);
+      
+      // Find important events (next 90 days)
+      const now = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(now.getDate() + 90);
+      
+      const events = await findImportantEvents(natalPlanets, {
+        from: now,
+        to: futureDate,
+        limit: 20
+      });
+      
+      // Get user's unlocked events
+      const unlocked = await storage.getImportantDateUnlocksByUserId(userId);
+      const unlockedKeys = new Set(unlocked.map((u: any) => u.eventKey));
+      
+      // Mark which events are unlocked
+      const eventsWithStatus = events.map(event => ({
+        ...event,
+        unlocked: unlockedKeys.has(event.key)
+      }));
+      
+      res.json({ ok: true, data: eventsWithStatus });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/important-dates/unlock", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { eventKey } = req.body;
+      
+      if (!eventKey) {
+        return res.status(400).json({ ok: false, error: "Event key is required" });
+      }
+      
+      // Check if already unlocked
+      const existing = await storage.getImportantDateUnlockByUserAndKey(userId, eventKey);
+      if (existing) {
+        return res.json({ ok: true, data: existing });
+      }
+      
+      // Create unlock record (no energy cost for unlock itself)
+      const unlock = await storage.createImportantDateUnlock({
+        userId,
+        eventKey,
+      });
+      
+      res.json({ ok: true, data: unlock });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/important-dates/detail", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { eventKey, locale = 'ru' } = req.body;
+      
+      if (!eventKey) {
+        return res.status(400).json({ ok: false, error: "Event key is required" });
+      }
+      
+      // Check energy first
+      await checkAndResetEnergy(storage, userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+      
+      const cost = ENERGY_COSTS.important_date_detail;
+      if (user.energy < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+      
+      // Get natal chart
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart) {
+        return res.status(400).json({ ok: false, error: "Natal chart required" });
+      }
+      
+      const chartData = natalChart.data as NatalChartResult;
+      
+      // Extract natal planets for transit calculation
+      const natalPlanets = extractNatalPlanets(chartData);
+      
+      // Find all events and locate the requested one
+      const now = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(now.getDate() + 90);
+      
+      const events = await findImportantEvents(natalPlanets, {
+        from: now,
+        to: futureDate,
+        limit: 20
+      });
+      
+      const event = events.find(e => e.key === eventKey);
+      
+      if (!event) {
+        return res.status(404).json({ ok: false, error: "Event not found" });
+      }
+      
+      // Prepare natal summary for interpretation
+      const natalSummary = {
+        planets: Object.entries(chartData.planets).map(([name, data]) => ({
+          name,
+          sign: data.sign,
+          house: 1 // Houses not calculated in current version
+        })),
+        ascendant: chartData.angles?.ascendant
+      };
+      
+      // Build interpretation input
+      const interpretationInput: ImportantDateInterpretationInput = {
+        profile: {
+          name: user.name,
+          age: new Date().getFullYear() - new Date(user.birthdayDate).getFullYear(),
+          gender: user.gender,
+          timezone: user.timezone
+        },
+        event: {
+          kind: event.kind,
+          planet: event.planet,
+          date: event.date,
+          sign: event.sign,
+          natalTarget: event.natalTarget,
+          brief: event.brief
+        },
+        natalSummary
+      };
+      
+      // Generate interpretation
+      const interpretation = await interpretImportantDate(interpretationInput, locale);
+      
+      // Deduct energy and log usage
+      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.createUsageLog({ userId, feature: "important_date_detail", cost });
+      
+      // Update unlock record with interpretation
+      const unlock = await storage.getImportantDateUnlockByUserAndKey(userId, eventKey);
+      if (unlock) {
+        await storage.updateImportantDateUnlock(unlock.id, {
+          interpretation: interpretation as any
+        });
+      }
+      
+      res.json({ ok: true, data: interpretation });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
