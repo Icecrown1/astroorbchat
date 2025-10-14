@@ -241,8 +241,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newData = await computeNatalFromUser(user, locale);
       await storage.updateNatalChart(userId, { data: newData });
       
+      // Also regenerate professional interpretation for current locale
       const chart = await storage.getNatalChart(userId);
-      res.json({ ok: true, data: chart });
+      const currentInterpretations = (chart?.professionalInterpretation as any) || {};
+      
+      try {
+        const { generateProfessionalInterpretation } = await import("./lib/natalService");
+        const pythonChart = await calculateNatalChartPython({
+          year: new Date(user.birthdayDate).getFullYear(),
+          month: new Date(user.birthdayDate).getMonth() + 1,
+          day: new Date(user.birthdayDate).getDate(),
+          hour: Number((user.birthTime || "12:00").split(":")[0]),
+          minute: Number((user.birthTime || "12:00").split(":")[1]),
+          latitude: 55.7558,
+          longitude: 37.6173,
+        });
+        
+        const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
+        currentInterpretations[locale] = professionalInterpretation;
+        
+        await storage.updateNatalChart(userId, {
+          professionalInterpretation: currentInterpretations as any
+        });
+      } catch (error) {
+        console.error('Failed to generate professional interpretation during recalculate:', error);
+        // Continue without professional interpretation
+      }
+      
+      const updatedChart = await storage.getNatalChart(userId);
+      res.json({ ok: true, data: updatedChart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
