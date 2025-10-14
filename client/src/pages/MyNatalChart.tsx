@@ -106,16 +106,16 @@ export default function MyNatalChart() {
     },
   });
 
-  // Chart is stored as { id, userId, data: {...}, createdAt }
-  // The actual chart data is in chartResponse.data.data
-  const rawChartData = chartResponse?.data?.data;
+  // Chart is stored as { id, userId, data: {...}, professionalInterpretation: {...}, createdAt }
+  // Full chart object including professionalInterpretation
+  const rawChartData = chartResponse?.data;
   
   // Transform planets from object to array for display (if not already an array)
-  const chartData = rawChartData ? {
-    ...rawChartData,
-    planets: Array.isArray(rawChartData.planets) 
-      ? rawChartData.planets 
-      : Object.entries(rawChartData.planets || {}).map(([name, data]: [string, any]) => ({
+  const chartData = rawChartData?.data ? {
+    ...rawChartData.data,
+    planets: Array.isArray(rawChartData.data.planets) 
+      ? rawChartData.data.planets 
+      : Object.entries(rawChartData.data.planets || {}).map(([name, data]: [string, any]) => ({
           name,
           sign: data.sign,
           position: data.longitude,
