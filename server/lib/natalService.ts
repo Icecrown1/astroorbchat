@@ -49,9 +49,27 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
   
   const natalData = await computeNatalFromUser(user, locale);
   
+  // Generate professional interpretation for user's own chart (FREE)
+  const birthDate = new Date(user.birthdayDate);
+  const birthTimeStr = user.birthTime || "12:00";
+  const [hours, minutes] = birthTimeStr.split(":").map(Number);
+  
+  const pythonChart = await calculateNatalChartPython({
+    year: birthDate.getFullYear(),
+    month: birthDate.getMonth() + 1,
+    day: birthDate.getDate(),
+    hour: hours,
+    minute: minutes,
+    latitude: 55.7558,
+    longitude: 37.6173,
+  });
+  
+  const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
+  
   const chart = await storage.createNatalChart({
     userId,
     data: natalData,
+    professionalInterpretation: professionalInterpretation as any,
   });
   
   return chart;
