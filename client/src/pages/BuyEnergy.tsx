@@ -25,6 +25,15 @@ export default function BuyEnergy() {
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
 
+  // Check Telegram version for Stars support
+  const isTelegramVersionSupported = () => {
+    const version = WebApp.version;
+    const [major, minor] = version.split('.').map(Number);
+    return major > 6 || (major === 6 && minor >= 1);
+  };
+
+  const supportsStars = isTelegramVersionSupported();
+
   useEffect(() => {
     const checkWallet = () => {
       setWalletConnected(isWalletConnected());
@@ -202,9 +211,19 @@ export default function BuyEnergy() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedPack(pack.amount);
+                      if (!supportsStars) {
+                        toast({
+                          title: locale === 'ru' ? 'Обновите Telegram' : 'Update Telegram',
+                          description: locale === 'ru' 
+                            ? 'Для оплаты Stars требуется Telegram версии 6.1 или выше. Пожалуйста, обновите приложение.'
+                            : 'Stars payment requires Telegram version 6.1 or higher. Please update your app.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
                       starsMutation.mutate(pack);
                     }}
-                    disabled={starsMutation.isPending && selectedPack === pack.amount}
+                    disabled={(starsMutation.isPending && selectedPack === pack.amount) || !supportsStars}
                     data-testid={`button-buy-stars-${pack.amount}`}
                   >
                     {starsMutation.isPending && selectedPack === pack.amount ? (
@@ -228,13 +247,18 @@ export default function BuyEnergy() {
                       setSelectedPack(pack.amount);
                       if (!walletConnected) {
                         try {
+                          console.log('Attempting to connect TON wallet...');
                           await connectWallet();
                           setWalletConnected(true);
+                          console.log('TON wallet connected successfully');
                           tonMutation.mutate(pack);
                         } catch (error: any) {
+                          console.error('Failed to connect wallet:', error);
                           toast({
-                            title: t.common.error,
-                            description: error.message || 'Failed to connect wallet',
+                            title: locale === 'ru' ? 'Ошибка подключения' : 'Connection Error',
+                            description: locale === 'ru'
+                              ? 'Не удалось подключить TON кошелек. Попробуйте снова или используйте Stars.'
+                              : 'Failed to connect TON wallet. Try again or use Stars payment.',
                             variant: 'destructive',
                           });
                         }
@@ -266,6 +290,17 @@ export default function BuyEnergy() {
               </Card>
             ))}
           </div>
+        )}
+
+        {!supportsStars && (
+          <Card className="mt-6 p-4 bg-destructive/10 border-destructive/20">
+            <p className="text-sm text-destructive text-center">
+              {locale === 'ru' ? 
+                '⚠️ Ваша версия Telegram не поддерживает Stars. Обновите приложение или используйте TON.' :
+                '⚠️ Your Telegram version doesn\'t support Stars. Update your app or use TON payment.'
+              }
+            </p>
+          </Card>
         )}
 
         <Card className="mt-6 p-4 bg-muted/50">
