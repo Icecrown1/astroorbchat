@@ -465,12 +465,28 @@ export interface HoroscopeInterpretationInput {
 }
 
 export interface HoroscopeInterpretationResult {
-  period: "day" | "week" | "month";
-  date_range: string;
-  summary: string;
-  day_parts: { title: "Утро" | "День" | "Вечер"; advice: string[] }[];
-  themes: Record<"Деньги" | "Работа" | "Учёба" | "Любовь" | "Здоровье", string[]>;
-  notes: string[];
+  morning?: {
+    money: string;
+    work: string;
+    study: string;
+    love: string;
+    health: string;
+  };
+  day?: {
+    money: string;
+    work: string;
+    study: string;
+    love: string;
+    health: string;
+  };
+  evening?: {
+    money: string;
+    work: string;
+    study: string;
+    love: string;
+    health: string;
+    self_care?: string;
+  };
 }
 
 export async function interpretHoroscope(
@@ -538,14 +554,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты: ${JSON.string
 
   try {
     const result = JSON.parse(content);
-    return {
-      period: result.period || input.period,
-      date_range: result.date_range || dateRange,
-      summary: result.summary || '',
-      day_parts: Array.isArray(result.day_parts) ? result.day_parts : [],
-      themes: result.themes || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
-      notes: Array.isArray(result.notes) ? result.notes : []
-    };
+    return result;
   } catch (e) {
     throw new Error('Failed to parse horoscope interpretation response');
   }
@@ -559,10 +568,14 @@ export interface WeeklyPlanInput {
 }
 
 export interface WeeklyPlanResult {
-  week_range: string;
-  focus_map: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string>;
-  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
-  daily_tips: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string[]>;
+  week_start: string;
+  week_end: string;
+  days: Array<{
+    date: string;
+    day_of_week: string;
+    summary: string;
+    advice: string;
+  }>;
 }
 
 export async function generateWeeklyPlan(
@@ -621,12 +634,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
 
   try {
     const result = JSON.parse(content);
-    return {
-      week_range: result.week_range || weekRange,
-      focus_map: result.focus_map || {},
-      spheres: result.spheres || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
-      daily_tips: result.daily_tips || {}
-    };
+    return result;
   } catch (e) {
     throw new Error('Failed to parse weekly plan response');
   }
@@ -641,9 +649,13 @@ export interface MonthlyPlanInput {
 
 export interface MonthlyPlanResult {
   month: string;
-  weeks: { range: string; focus: string; tips: string[] }[];
-  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
-  milestones: string[];
+  overview: string;
+  weeks: Array<{
+    week_number: number;
+    dates: string;
+    summary: string;
+    key_themes: string[];
+  }>;
 }
 
 export async function generateMonthlyPlan(
@@ -705,12 +717,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты месяца: 
 
   try {
     const result = JSON.parse(content);
-    return {
-      month: result.month || month,
-      weeks: Array.isArray(result.weeks) ? result.weeks : [],
-      spheres: result.spheres || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
-      milestones: Array.isArray(result.milestones) ? result.milestones : []
-    };
+    return result;
   } catch (e) {
     throw new Error('Failed to parse monthly plan response');
   }

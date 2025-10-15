@@ -23,6 +23,7 @@ Preferred communication style: Simple, everyday language.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, with custom prompts for various reading types and gender-based tone personalization.
 - **Personalized Compatibility**: All compatibility interpretations use real user names (e.g., "Марина и Алексей" / "Marina and Alex") throughout the analysis. The AI prompts enforce name usage (minimum 1 name per section), and backend validates that names appear in the response. This personalization increases engagement and makes readings feel individually crafted.
 - **Data Caching**: Multi-locale caching for natal charts (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
+- **Horoscope System**: Restructured with three time periods (Morning/Day/Evening) and five life themes (Money/Work/Study/Love/Health). Evening section includes self-care recommendations. Weekly and monthly planning features available (1 orb each, free for subscribers).
 
 ### Data Storage
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
