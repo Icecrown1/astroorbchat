@@ -1,0 +1,287 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: обновить раздел «Гороскоп» в Astro Orb, чтобы тексты стали более сконструированными и полезными, а также добавить платные подподы «Составить план на неделю/месяц». Никаких заглушек и TODO. Выдай ПОЛНЫЕ файлы там, где указано.
+
+## Что нужно сделать
+
+### A) Новый формат гороскопов (день/неделя/месяц)
+
+1. **Строгая структура для ДНЯ**: разделы «Утро», «День», «Вечер» + 5 обязательных тем, упоминаемых по делу: «Деньги», «Работа», «Учёба», «Любовь», «Здоровье». В «Вечер» — короткая конкретика self-care (напр. «примите тёплую ванну», «время без телефона»). Допустимы мягкие предупреждения уровня «возможна усталость/головная боль при стрессе» без мед. диагнозов.
+2. **Еженедельный гороскоп** получает кнопку «Оставить план на неделю» (платно, см. ниже).
+3. **Ежемесячный гороскоп** — аналогично «План на месяц» (платно).
+
+### B) Энергия/доступ
+
+* Сохранить текущую стоимость `horoscope` (1 сфера).
+* Добавить 2 новых фичи энергии:
+
+  * `weekly_plan`: 1 сфера (подписчики — бесплатно).
+  * `monthly_plan`: 1 сфера (подписчики — бесплатно).
+
+### C) Backend
+
+#### 1. Промпты OpenAI (ПОЛНЫЕ ФАЙЛЫ)
+
+Создать/обновить файлы:
+
+**`apps/api/src/astrology/prompts/horoscope.md`** — ПЕРЕЗАПИСАТЬ:
+
+```
+Ты — астролог-практик. Дай структурированный гороскоп на выбранный период (день/неделя/месяц) с короткими практичными советами.
+
+ФОРМАТ ВЫХОДА (JSON):
+{
+  "period": "day|week|month",
+  "date_range": "ISO-дата или интервал",
+  "summary": "2–4 предложения — общий тон периода",
+  "day_parts": [
+    { "title": "Утро", "advice": ["...", "..."] },
+    { "title": "День",  "advice": ["...", "..."] },
+    { "title": "Вечер","advice": ["...", "..."] }
+  ],
+  "themes": {
+    "Деньги":   ["2–3 прикладных тезиса"],
+    "Работа":   ["..."],
+    "Учёба":    ["..."],
+    "Любовь":   ["..."],
+    "Здоровье": ["..."]
+  },
+  "notes": ["краткие уточнения по транзитам, если даны"]
+}
+
+Правила:
+- Пиши кратко, по делу, на русском, человеческим тоном.
+- «Вечер» всегда содержит self-care (ванна/тишина/детокс-экранов/дыхание).
+- Не используй медицинских диагнозов и фатальных формулировок.
+- Если данных недостаточно (нет транзитов/натала) — явно отметь это в "notes".
+```
+
+**`apps/api/src/astrology/prompts/weekly_plan.md`** — НОВЫЙ:
+
+```
+Составь ПЛАН НА НЕДЕЛЮ по сферам для конкретного человека, учитывая его натальную карту и транзиты недели.
+
+ВЫХОД (JSON):
+{
+  "week_range": "YYYY-MM-DD..YYYY-MM-DD",
+  "focus_map": { "Пн": "фокус/ответственность", "Вт": "самообслуживание", "Ср": "...", "Чт": "...", "Пт": "...", "Сб": "...", "Вс": "..." },
+  "spheres": {
+    "Деньги":   ["что усилить/чего избежать на этой неделе"],
+    "Работа":   ["..."],
+    "Учёба":    ["..."],
+    "Любовь":   ["..."],
+    "Здоровье": ["..."]
+  },
+  "daily_tips": {
+    "Пн": ["короткие советы"], "Вт": ["..."], "Ср": ["..."], "Чт": ["..."], "Пт": ["..."], "Сб": ["..."], "Вс": ["..."]
+  }
+}
+
+Тон: практичный и доброжелательный, без воды. Если транзитов мало — опирайся на общую картину недели.
+```
+
+**`apps/api/src/astrology/prompts/monthly_plan.md`** — НОВЫЙ:
+
+```
+Составь ПЛАН НА МЕСЯЦ по сферам и неделям, опираясь на натал и транзиты месяца.
+
+ВЫХОД (JSON):
+{
+  "month": "YYYY-MM",
+  "weeks": [
+    { "range": "YYYY-MM-DD..YYYY-MM-DD", "focus": "главная тема недели", "tips": ["2–3 совета"] }
+  ],
+  "spheres": {
+    "Деньги":   ["приоритеты месяца"],
+    "Работа":   ["..."],
+    "Учёба":    ["..."],
+    "Любовь":   ["..."],
+    "Здоровье": ["..."]
+  },
+  "milestones": ["важные даты/окна для дел и отдыха (если доступны)"]
+}
+
+Пиши по делу. Если данных мало — явно укажи.
+```
+
+> Встроенная персонализация тона по полу уже есть в `openai.ts` (через `personalizeTone()`); применять и здесь.
+
+#### 2. Обёртка OpenAI (ИЗМЕНИТЬ ФАЙЛ ПОЛНОСТЬЮ С ДОБАВЛЕННЫМИ ФУНКЦИЯМИ)
+
+Файл: `apps/api/src/astrology/openai.ts` — ДОБАВИТЬ экспортируемые функции:
+
+```ts
+export async function interpretHoroscope(input: {
+  period: "day" | "week" | "month";
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;         // сохранённый натал пользователя
+  transits?: any[];   // опционально
+}): Promise<{
+  period: "day" | "week" | "month";
+  date_range: string;
+  summary: string;
+  day_parts: { title: "Утро" | "День" | "Вечер"; advice: string[] }[];
+  themes: Record<"Деньги" | "Работа" | "Учёба" | "Любовь" | "Здоровье", string[]>;
+  notes: string[];
+}>;
+
+export async function generateWeeklyPlan(input: {
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;
+  week_start_iso: string; // понедельник
+  transits?: any[];
+}): Promise<{
+  week_range: string;
+  focus_map: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string>;
+  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
+  daily_tips: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string[]>;
+}>;
+
+export async function generateMonthlyPlan(input: {
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;
+  month_iso: string; // YYYY-MM-01
+  transits?: any[];
+}): Promise<{
+  month: string;
+  weeks: { range: string; focus: string; tips: string[] }[];
+  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
+  milestones: string[];
+}>;
+```
+
+* Все функции читают соответствующие `.md` промпты, добавляют `toneInstruction` и используют `response_format: "json_object"` + Zod-валидацию.
+* При парсинге гарантировать наличие всех обязательных полей; при ошибке — HTTP 400.
+
+#### 3. Роуты API (ПОЛНЫЙ ФАЙЛ С ДОБАВЛЕНИЯМИ)
+
+Файл: `apps/api/src/routes/astrology.ts` — ДОБАВИТЬ:
+
+* `POST /astrology/horoscope`
+  Тело: `{ period: "day"|"week"|"month" }`
+  Требует наличие `NatalChart`; списывает энергию **как раньше** для `period="day"`; для `week|month` — также 1 сфера (используется общая фича `horoscope`). Возвращает JSON структуры `interpretHoroscope`.
+
+* `POST /astrology/horoscope/weekly-plan`
+  Тело: `{ week_start_iso?: string }` (если не передан — берём понедельник текущей недели по таймзоне пользователя).
+  Подписчики — бесплатно; иначе списать `feature="weekly_plan"` (1). Возвращает `generateWeeklyPlan`.
+
+* `POST /astrology/horoscope/monthly-plan`
+  Тело: `{ month_iso?: string }` (если не передан — первый день текущего месяца по таймзоне пользователя).
+  Подписчики — бесплатно; иначе списать `feature="monthly_plan"` (1). Возвращает `generateMonthlyPlan`.
+
+* Для всех трёх роутов: если нет `NatalChart` → `409 NATAL_NOT_INITIALIZED`.
+
+#### 4. Энергия (ПОЛНЫЙ ФАЙЛ)
+
+Файл: `apps/api/src/routes/energy.ts` — ДОБАВИТЬ в карту фич:
+
+```ts
+weekly_plan: 1,
+monthly_plan: 1,
+```
+
+#### 5. Тесты backend
+
+Файл: `apps/api/src/tests/api.spec.ts` — ДОБАВИТЬ кейсы:
+
+* `POST /astrology/horoscope {period:"day"}` → 200, есть поля `day_parts` (Утро/День/Вечер) и `themes`.
+* `POST /astrology/horoscope {period:"week"}` → 200, корректная структура.
+* `POST /astrology/horoscope/weekly-plan` без подписки → списывает 1 сферу; с подпиской — не списывает.
+* `POST /astrology/horoscope/monthly-plan` аналогично.
+* Без `NatalChart` → 409 для всех трёх роутов.
+
+### D) Frontend
+
+#### 1. API-клиент (ПОЛНЫЙ ФАЙЛ С ДОБАВЛЕННЫМИ ФУНКЦИЯМИ)
+
+Файл: `apps/web/src/lib/api.ts` — ДОБАВИТЬ:
+
+```ts
+export const postHoroscope = (period: "day"|"week"|"month") =>
+  http.post('/astrology/horoscope', { period });
+
+export const postWeeklyPlan = (week_start_iso?: string) =>
+  http.post('/astrology/horoscope/weekly-plan', week_start_iso ? { week_start_iso } : {});
+
+export const postMonthlyPlan = (month_iso?: string) =>
+  http.post('/astrology/horoscope/monthly-plan', month_iso ? { month_iso } : {});
+```
+
+#### 2. UI «Гороскоп» (ПОЛНЫЕ ФАЙЛЫ)
+
+Обновить/создать:
+
+**`apps/web/src/routes/Horoscope.tsx`** — ПЕРЕПИСАТЬ экран на вкладки:
+
+* Tabs: «День», «Неделя», «Месяц».
+* На «День»: при загрузке делает `postHoroscope("day")`, рендерит `summary`, `day_parts` (Утро/День/Вечер) и `themes` (5 сфер).
+* На «Неделя»: `postHoroscope("week")` + кнопка «Составить план на неделю (–1 сфера)» → модалка `WeeklyPlanModal`.
+* На «Месяц»: `postHoroscope("month")` + кнопка «Составить план на месяц (–1 сфера)» → `MonthlyPlanModal`.
+
+**`apps/web/src/components/WeeklyPlanModal.tsx`** — НОВЫЙ:
+
+* Собирает `week_start_iso` (по умолчанию ближайший понедельник), вызывает `postWeeklyPlan`, рендерит сетку: `focus_map` по дням, `daily_tips`, и раздел `spheres`. Если сервер вернул 402/энергии не хватает — показать CTA «Купить сферы» (переход в BuyEnergy).
+
+**`apps/web/src/components/MonthlyPlanModal.tsx`** — НОВЫЙ:
+
+* Вызывает `postMonthlyPlan`, рендерит по неделям `weeks` (range/focus/tips), раздел `spheres`, и `milestones`.
+
+**`apps/web/src/components/HoroscopeThemes.tsx`** — НОВЫЙ:
+
+* Отображает 5 сфер «Деньги/Работа/Учёба/Любовь/Здоровье» с 2–3 пунктами, единый стиль (золотисто-бронзовые бейджи как в натальной).
+
+**Детали UI/UX**:
+
+* У «Вечер» — небольшой бейдж «Self-care».
+* Кнопки планов показывают «Бесплатно по подписке» если у пользователя активная подписка.
+* Обработка 409 `NATAL_NOT_INITIALIZED`: показать модалку «Сначала создайте натальную карту» с CTA на экран Натала.
+
+#### 3. Стили
+
+Файл: `apps/web/src/styles.css` — ДОБАВИТЬ:
+
+```css
+.horoscope-section { border-radius: 14px; padding: 12px 14px; background: rgba(0,0,0,0.04); }
+.horo-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(207,162,75,.6); }
+```
+
+#### 4. Тесты фронтенда
+
+* Рендер вкладок «День/Неделя/Месяц».
+* Проверка наличия блоков «Утро/День/Вечер» и всех 5 сфер.
+* Кнопки «Составить план на неделю/месяц» открывают модалки и вызывают соответствующие API-функции.
+
+### E) README
+
+Файл: `README.md` — ДОБАВИТЬ раздел «Гороскоп — структура и планы»:
+
+* Описание структуры «Утро/День/Вечер» и 5 сфер.
+* Про планы: неделя/месяц, платно по 1 сфере, бесплатно по подписке.
+* Скриншоты-схемы UI (ссылки на `docs/` если предусмотрено).
+
+## Acceptance Criteria
+
+* `POST /astrology/horoscope` возвращает строго структурированный JSON (с «Утро/День/Вечер» и всеми 5 темами).
+* «Неделя» и «Месяц» имеют кнопки «Составить план …», которые обращаются к отдельным API и показывают результат; подписчики получают бесплатно, остальным списывается 1 сфера.
+* Frontend рендерит все блоки, обработаны ошибки 409/402.
+* Тесты backend и frontend добавлены/обновлены и проходят.
+* Никаких TODO и заглушек; `.env.sample` не меняется.
+
+## Вывести ПОЛНЫЙ список новых/изменённых файлов
+
+* apps/api/src/astrology/prompts/horoscope.md
+* apps/api/src/astrology/prompts/weekly_plan.md
+* apps/api/src/astrology/prompts/monthly_plan.md
+* apps/api/src/astrology/openai.ts
+* apps/api/src/routes/astrology.ts
+* apps/api/src/routes/energy.ts
+* apps/api/src/tests/api.spec.ts
+* apps/web/src/lib/api.ts
+* apps/web/src/routes/Horoscope.tsx
+* apps/web/src/components/WeeklyPlanModal.tsx
+* apps/web/src/components/MonthlyPlanModal.tsx
+* apps/web/src/components/HoroscopeThemes.tsx
+* apps/web/src/styles.css
+* README.md
+
+[END REPLIT PROMPT]
