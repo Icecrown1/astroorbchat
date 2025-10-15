@@ -188,38 +188,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
       
-      // Check if professional interpretation exists for this locale
-      const interpretations = (chart.professionalInterpretation as any) || {};
-      if (!interpretations[locale]) {
-        // Generate missing locale interpretation (FREE for own chart)
-        const user = await storage.getUser(userId);
-        if (user && chart.data) {
-          try {
-            const { generateProfessionalInterpretation } = await import("./lib/natalService");
-            const chartData = chart.data as NatalChartResult;
-            const pythonChart = await calculateNatalChartPython({
-              year: new Date(user.birthdayDate).getFullYear(),
-              month: new Date(user.birthdayDate).getMonth() + 1,
-              day: new Date(user.birthdayDate).getDate(),
-              hour: Number((user.birthTime || "12:00").split(":")[0]),
-              minute: Number((user.birthTime || "12:00").split(":")[1]),
-              latitude: 55.7558,
-              longitude: 37.6173,
-            });
-            
-            const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-            interpretations[locale] = professionalInterpretation;
-            
-            await storage.updateNatalChart(userId, {
-              professionalInterpretation: interpretations as any
-            });
-          } catch (error) {
-            console.error('Failed to generate professional interpretation:', error);
-            // Continue without professional interpretation
-          }
-        }
-      }
-      
       res.json({ ok: true, data: chart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
@@ -240,33 +208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Force recalculation with interpretation
       const newData = await computeNatalFromUser(user, locale);
       await storage.updateNatalChart(userId, { data: newData });
-      
-      // Also regenerate professional interpretation for current locale
-      const chart = await storage.getNatalChart(userId);
-      const currentInterpretations = (chart?.professionalInterpretation as any) || {};
-      
-      try {
-        const { generateProfessionalInterpretation } = await import("./lib/natalService");
-        const pythonChart = await calculateNatalChartPython({
-          year: new Date(user.birthdayDate).getFullYear(),
-          month: new Date(user.birthdayDate).getMonth() + 1,
-          day: new Date(user.birthdayDate).getDate(),
-          hour: Number((user.birthTime || "12:00").split(":")[0]),
-          minute: Number((user.birthTime || "12:00").split(":")[1]),
-          latitude: 55.7558,
-          longitude: 37.6173,
-        });
-        
-        const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-        currentInterpretations[locale] = professionalInterpretation;
-        
-        await storage.updateNatalChart(userId, {
-          professionalInterpretation: currentInterpretations as any
-        });
-      } catch (error) {
-        console.error('Failed to generate professional interpretation during recalculate:', error);
-        // Continue without professional interpretation
-      }
       
       const updatedChart = await storage.getNatalChart(userId);
       res.json({ ok: true, data: updatedChart });
@@ -383,96 +324,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json({ ok: true, data: chart });
-    } catch (error: any) {
-      res.status(500).json({ ok: false, error: error.message });
-    }
-  });
-
-  // Get professional interpretation for external natal chart (costs 2 orbs)
-  app.post("/api/natal/professional/:externalId", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const externalId = req.params.externalId;
-      const locale = req.body.locale || 'ru';
-      
-      const chart = await storage.getExternalNatal(externalId);
-      
-      if (!chart) {
-        return res.status(404).json({ ok: false, error: "Chart not found" });
-      }
-      
-      // Verify ownership
-      if (chart.ownerId !== userId) {
-        return res.status(403).json({ ok: false, error: "Access denied" });
-      }
-      
-      // Check if professional interpretation exists for this locale (cached)
-      const cachedInterpretations = (chart.professionalInterpretation as any) || {};
-      if (cachedInterpretations[locale]) {
-        return res.json({ ok: true, data: cachedInterpretations[locale] });
-      }
-      
-      // Check energy before generating new interpretation
-      await checkAndResetEnergy(storage, userId);
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ ok: false, error: "User not found" });
-      }
-      
-      const cost = ENERGY_COSTS.natal_professional;
-      if (user.energy < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
-      }
-      
-      // Generate professional interpretation
-      const chartData = chart.data as NatalChartResult;
-      const professionalData: import("./lib/openai").ProfessionalChartData = {
-        profile: {
-          name: chart.name,
-          gender: chart.gender,
-          birth_accuracy: chart.birthTime ? "точное" : "неточное"
-        },
-        birth: {
-          date_iso: new Date(chart.birthdayDate).toISOString().split('T')[0],
-          time_iso: `${chart.birthTime || '12:00'}:00`,
-          tz_offset_minutes: 180,
-          lat: 55.7558,
-          lon: 37.6173
-        },
-        zodiac_type: "tropical",
-        ayanamsha: "none",
-        house_system: chartData.houses.system || "Placidus",
-        angles: {
-          ASC_deg: chartData.angles.Ascendant?.longitude || 0,
-          MC_deg: chartData.angles.Midheaven?.longitude || 0,
-          DSC_deg: (chartData.angles.Ascendant?.longitude || 0) + 180,
-          IC_deg: (chartData.angles.Midheaven?.longitude || 0) + 180
-        },
-        house_cusps: chartData.houses.cusps,
-        planets: Object.entries(chartData.planets).map(([name, data]) => ({
-          name,
-          lon_deg: data.longitude,
-          house_index: 1, // Simplified for now
-          speed_deg_per_day: 0
-        })),
-        aspects: []
-      };
-      
-      const { getProfessionalInterpretation } = await import("./lib/openai");
-      const professionalInterpretation = await getProfessionalInterpretation(professionalData, locale);
-      
-      // Cache the interpretation in the database by locale
-      cachedInterpretations[locale] = professionalInterpretation;
-      await storage.updateExternalNatal(externalId, {
-        professionalInterpretation: cachedInterpretations as any
-      });
-      
-      // Deduct energy
-      await storage.updateUser(userId, { energy: user.energy - cost });
-      await storage.createUsageLog({ userId, feature: "natal_professional", cost });
-      
-      res.json({ ok: true, data: professionalInterpretation });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }

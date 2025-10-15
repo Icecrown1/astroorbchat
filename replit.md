@@ -21,15 +21,13 @@ Preferred communication style: Simple, everyday language.
 - **Astrology Engine**: Utilizes Swiss Ephemeris via a Python bridge for accurate astronomical calculations (natal charts, solar returns, horoscopes, compatibility).
 - **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, with custom prompts for various reading types and gender-based tone personalization.
-- **Professional Interpretation System**: Advanced natal chart analysis with house rulers (classical astrology), aspect weights (angular/succedent/cadent +2/+1/+0.5), stellium detection (×1.3 coefficient), and professional synastry with house overlays.
 - **Personalized Compatibility**: All compatibility interpretations use real user names (e.g., "Марина и Алексей" / "Marina and Alex") throughout the analysis. The AI prompts enforce name usage (minimum 1 name per section), and backend validates that names appear in the response. This personalization increases engagement and makes readings feel individually crafted.
-- **Data Caching**: Multi-locale caching for natal charts and professional interpretations (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
+- **Data Caching**: Multi-locale caching for natal charts (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
 
 ### Data Storage
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
 - **Schema**: Tables for `users`, `subscriptions`, `payments`, `usageLogs`, `natal_readings`, `horoscope_readings`, `compatibility_readings`, `ai_questions`, `importantDateUnlocks`, `externalNatals`.
-- **Professional Features**: `natal_charts.professionalInterpretation` (JSONB, locale-keyed), `external_natals.professionalInterpretation` (JSONB), `compatibility_readings.isProfessional`, `compatibility_readings.professionalInterpretation`, `compatibility_readings.houseOverlays`.
-- **Energy Costs**: natal_professional=2 orbs, compatibility_professional=4 orbs (user's own natal professional interpretation is FREE).
+- **Energy Costs**: Basic natal chart and horoscope readings cost 1 orb each, compatibility analysis costs 2 orbs. Energy resets daily to 10 orbs.
 
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.

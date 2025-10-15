@@ -49,34 +49,9 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
   
   const natalData = await computeNatalFromUser(user, locale);
   
-  // Try to generate professional interpretation for user's own chart (FREE)
-  let interpretations: any = {};
-  try {
-    const birthDate = new Date(user.birthdayDate);
-    const birthTimeStr = user.birthTime || "12:00";
-    const [hours, minutes] = birthTimeStr.split(":").map(Number);
-    
-    const pythonChart = await calculateNatalChartPython({
-      year: birthDate.getFullYear(),
-      month: birthDate.getMonth() + 1,
-      day: birthDate.getDate(),
-      hour: hours,
-      minute: minutes,
-      latitude: 55.7558,
-      longitude: 37.6173,
-    });
-    
-    const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-    interpretations[locale] = professionalInterpretation;
-  } catch (error) {
-    console.error('Failed to generate professional interpretation during chart creation:', error);
-    // Continue without professional interpretation - chart creation should still succeed
-  }
-  
   const chart = await storage.createNatalChart({
     userId,
     data: natalData,
-    professionalInterpretation: interpretations as any,
   });
   
   return chart;
@@ -217,29 +192,8 @@ export async function recomputeIfProfileChanged(userId: string, locale: string =
   if (userUpdatedAt > chartCreatedAt) {
     const newData = await computeNatalFromUser(user, locale);
     
-    // Try to generate professional interpretation for user's own chart (FREE)
-    const currentInterpretations = (chart.professionalInterpretation as any) || {};
-    try {
-      const pythonChart = await calculateNatalChartPython({
-        year: new Date(user.birthdayDate).getFullYear(),
-        month: new Date(user.birthdayDate).getMonth() + 1,
-        day: new Date(user.birthdayDate).getDate(),
-        hour: Number((user.birthTime || "12:00").split(":")[0]),
-        minute: Number((user.birthTime || "12:00").split(":")[1]),
-        latitude: 55.7558,
-        longitude: 37.6173,
-      });
-      
-      const professionalInterpretation = await generateProfessionalInterpretation(pythonChart, user, locale);
-      currentInterpretations[locale] = professionalInterpretation;
-    } catch (error) {
-      console.error('Failed to generate professional interpretation during recompute:', error);
-      // Continue without professional interpretation
-    }
-    
     await storage.updateNatalChart(userId, { 
       data: newData,
-      professionalInterpretation: currentInterpretations as any
     });
   }
 }
