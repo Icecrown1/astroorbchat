@@ -1754,7 +1754,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentId: payment.id,
           walletAddress: process.env.TON_WALLET_ADDRESS,
           amountTON,
-          payload: payment.id,
         },
       });
     } catch (error: any) {

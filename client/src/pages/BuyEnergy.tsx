@@ -68,7 +68,6 @@ export default function BuyEnergy() {
             {
               address: data.walletAddress,
               amount: data.amountTON,
-              payload: data.payload || '',
             },
           ],
         };
