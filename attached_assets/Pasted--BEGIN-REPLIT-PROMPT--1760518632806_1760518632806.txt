@@ -1,0 +1,134 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: персонализировать трактовку совместимости — в текстах ИИ должны явно использоваться имена обоих людей (носителя профиля и партнёра). Имена должны встречаться в заголовках и по ходу текста, что повышает читаемость и чувство индивидуального подхода. Никаких заглушек и TODO. Отдать ПОЛНЫЕ файлы, где есть изменения.
+
+Контекст
+
+Бэкенд: apps/api (Express + TS), OpenAI-обёртка в src/astrology/openai.ts, промпт для совместимости: src/astrology/prompts/compatibility.md.
+
+Фронтенд: apps/web, экран: src/routes/Compatibility.tsx, API-клиент: src/lib/api.ts.
+
+В профиле пользователя и данных партнёра уже есть profile.name и partner_profile.name.
+
+Изменить
+1) Обновить промпт совместимости (ПОЛНЫЙ ФАЙЛ)
+
+Файл: apps/api/src/astrology/prompts/compatibility.md
+
+Содержимое ЗАМЕНИТЬ полностью:
+
+Ты — астрологический интерпретатор уровня ISAR/NCGR. Строга структура: сначала оверлеи по домам, затем аспекты к углам и управителям 5/7, затем личные-личные (Солнце/Луна/Венера/Марс), итог — сильные зоны и риски.
+
+ПЕРСОНАЛИЗАЦИЯ ПО ИМЕНАМ:
+- Тебе передают имена двух людей: host_name и partner_name.
+- Используй имена в заголовках разделов и по тексту (не реже 1 имени на абзац).
+- Стилистика: уважительно и по-человечески; обращайся в 3-м лице («Марина ощущает…» / «Алексей склонен…»), без фамильярности.
+- Русская морфология: склоняй имена по падежам, если это естественно («для Марины», «у Алексея»). Если имя не склоняется — оставь в начальной форме.
+
+ВХОД (сокращённо): host_profile { name, gender }, partner_profile { name, gender }, overlays, aspects_to_angles, rulers, houses и т.д.
+
+ВЫХОД (JSON):
+{
+  "title": "Марина и Алексей — синтез совместимости",
+  "summary": "3–5 предложений о ключевых точках опоры пары (углы, 5/7/8 дома).",
+  "overlays": ["Планеты Алексея в 7-м доме Марины …", "..."],
+  "angles_and_rulers": ["Аспект Венеры Марины к ASC Алексея …", "..."],
+  "personal_planets": ["Солнце Марины — Луна Алексея …", "..."],
+  "strengths": ["...", "..."],
+  "risks": ["...", "..."],
+  "advice": ["конкретные шаги для Марины и Алексея", "..."]
+}
+
+Правила орбов и приоритизации — как в базовом движке (углы > управители > стеллиумы). Если данных не хватает — явно укажи, чего нет, и не додумывай.
+Пиши кратко и структурно, без воды.
+
+2) OpenAI-обёртка — гарантировать передачу имён и проверку
+
+Файл: apps/api/src/astrology/openai.ts
+
+В функции interpretCompatibility(input):
+
+Добавить валидацию Zod входа: require host_profile.name: string и partner_profile.name: string.
+
+При формировании finalPrompt для совместимости:
+
+const hostName = input.host_profile.name;
+const partnerName = input.partner_profile.name;
+// Вставка контекста имён в начало промпта перед текстом файла:
+const namesHeader = `host_name: ${hostName}\npartner_name: ${partnerName}`;
+const promptText = readFile('prompts/compatibility.md');
+const finalPrompt = `${promptText}\n\n${namesHeader}\n\nДанные JSON:\n${JSON.stringify(payload)}`;
+
+
+В response_format: "json_object" парсить результат и дополнительно проверить, что в полях title и summary встречается хотя бы одно из имён (case-insensitive). Если нет — вернуть HTTP 502 с сообщением "PERSONALIZATION_MISSING" (редко, но защищает от деградации модели).
+
+Экспортировать тип результата:
+
+export type CompatibilityResult = {
+  title: string;
+  summary: string;
+  overlays: string[];
+  angles_and_rulers: string[];
+  personal_planets: string[];
+  strengths: string[];
+  risks: string[];
+  advice: string[];
+};
+
+3) Тесты API — убедиться, что имена используются
+
+Файл: apps/api/src/tests/api.spec.ts
+
+Добавить кейс:
+
+Вызов POST /astrology/compatibility с host_profile.name = "Марина", partner_profile.name = "Алексей".
+
+Проверить, что res.body.data.title содержит "Марина" или "Алексей", а summary содержит хотя бы одно из имён.
+
+Добавить негативный тест (мок ответа модели без имён): убедиться, что сервер возвращает 502 PERSONALIZATION_MISSING.
+
+4) Фронтенд — заголовки с именами
+
+Файл: apps/web/src/routes/Compatibility.tsx
+
+В заголовке страницы и карточке результата выводить имя-к-имени:
+
+Если пользователь — me.name, партнёр вводится в форме или выбран из гостевых карт — показать «{me.name} и {partner.name}».
+
+Если API вернул title — использовать его как H1 (он уже персонализирован). В подзаголовке оставить me.name и partner.name на случай fallback.
+
+Никаких заглушек. Отдать полный обновлённый файл, если в нём есть правки вывода заголовка.
+
+5) README — кратко о персонализации
+
+Файл: README.md
+
+В разделе «Совместимость» добавь подпункт:
+
+Персонализация: интерпретации обращаются к паре по именам (например, «Марина и Алексей»). Это повышает читаемость и вовлечённость. Проверяется на бэкенде (title/summary обязаны содержать имена).
+
+Acceptance Criteria
+
+Промпт compatibility.md требует и использует имена host_name и partner_name; имена появляются в каждом разделе.
+
+Бэкенд гарантированно передаёт имена в запрос к модели и валидирует наличие имён в ответе (title/summary).
+
+Тесты покрывают оба сценария (успех с именами, отказ при отсутствии персонализации).
+
+На фронте заголовок результата содержит имена.
+
+Никаких TODO/заглушек; все изменённые файлы предоставлены полностью.
+
+Вывести ПОЛНЫЙ список новых/изменённых файлов
+
+apps/api/src/astrology/prompts/compatibility.md
+
+apps/api/src/astrology/openai.ts
+
+apps/api/src/tests/api.spec.ts
+
+apps/web/src/routes/Compatibility.tsx
+
+README.md
+
+[END REPLIT PROMPT]
