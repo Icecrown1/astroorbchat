@@ -1487,6 +1487,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ ok: false, error: "Telegram bot not configured" });
       }
 
+      // Server-side price validation - CRITICAL SECURITY
+      const VALID_PACKS = [
+        { amount: 20, stars: 190 },
+        { amount: 50, stars: 375 },
+        { amount: 120, stars: 750 },
+      ];
+
+      if (kind === 'energy_pack') {
+        const validPack = VALID_PACKS.find(p => p.amount === energyAmount && p.stars === amountStars);
+        if (!validPack) {
+          console.error('[STARS] Invalid pack configuration:', { energyAmount, amountStars });
+          return res.status(400).json({ ok: false, error: "Invalid pack configuration" });
+        }
+      }
+
       // Generate unique invoice payload
       const invoicePayload = `stars_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -1542,6 +1557,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Telegram webhook for Stars payments
   app.post("/api/webhook/telegram", async (req, res) => {
     try {
+      // Webhook secret validation (optional but recommended)
+      // Telegram webhooks can be set with a secret_token parameter
+      const secretToken = req.headers['x-telegram-bot-api-secret-token'];
+      if (process.env.TELEGRAM_WEBHOOK_SECRET && secretToken !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+        console.error('[TELEGRAM_WEBHOOK] Invalid secret token');
+        return res.status(403).json({ ok: false, error: "Unauthorized" });
+      }
+
       const update = req.body;
       console.log('[TELEGRAM_WEBHOOK] Received update:', JSON.stringify(update));
 
@@ -1584,25 +1607,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log('[TELEGRAM_WEBHOOK] Successful payment:', { invoicePayload, telegramChargeId, totalAmount });
 
-        // Get payment record
-        const payment = await storage.getStarPaymentByPayload(invoicePayload);
+        // ATOMIC OPERATION: Try to claim this payment for processing
+        // This prevents race conditions - only ONE webhook can successfully set status to 'processing'
+        const payment = await storage.atomicStartProcessing(invoicePayload, telegramChargeId);
+        
         if (!payment) {
-          console.error('[TELEGRAM_WEBHOOK] Payment record not found:', invoicePayload);
+          // Payment was already claimed by another webhook, or doesn't exist, or not in pending state
+          const existingPayment = await storage.getStarPaymentByPayload(invoicePayload);
+          if (!existingPayment) {
+            console.error('[TELEGRAM_WEBHOOK] Payment record not found:', invoicePayload);
+          } else if (existingPayment.status === 'completed') {
+            console.log('[TELEGRAM_WEBHOOK] Payment already completed - idempotency check passed');
+          } else if (existingPayment.telegramChargeId && existingPayment.telegramChargeId !== telegramChargeId) {
+            console.log('[TELEGRAM_WEBHOOK] Payment already claimed by different charge ID');
+          } else {
+            console.log('[TELEGRAM_WEBHOOK] Payment already being processed');
+          }
           return res.json({ ok: true });
         }
 
-        // Check if already processed
-        if (payment.status === 'completed') {
-          console.log('[TELEGRAM_WEBHOOK] Payment already completed');
-          return res.json({ ok: true });
-        }
-
-        // Verify amount matches
+        // We successfully claimed this payment - now verify and process it
+        // Verify amount matches (SECURITY: Prevent amount tampering)
         if (payment.amountStars !== totalAmount) {
           console.error('[TELEGRAM_WEBHOOK] Amount mismatch:', { expected: payment.amountStars, received: totalAmount });
           await storage.updateStarPaymentStatus(invoicePayload, {
-            status: 'failed',
-            telegramChargeId
+            status: 'failed'
           });
           return res.json({ ok: true });
         }

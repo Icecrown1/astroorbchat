@@ -36,11 +36,24 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
-- **Schema**: Tables for `users`, `subscriptions`, `payments`, `usageLogs`, `natal_readings`, `horoscope_readings`, `compatibility_readings`, `ai_questions`, `importantDateUnlocks`, `externalNatals`.
+- **Schema**: Tables for `users`, `subscriptions`, `payments`, `usageLogs`, `natal_readings`, `horoscope_readings`, `compatibility_readings`, `ai_questions`, `importantDateUnlocks`, `externalNatals`, `starPayments`.
 - **Energy Costs**: Basic natal chart and horoscope readings cost 1 orb each, compatibility analysis costs 2 orbs. Energy resets daily to 10 orbs.
+
+### Payment Systems
+- **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration
+- **Telegram Stars**: In-app purchases using Telegram's native Stars currency (⭐)
+  - **Pricing**: 20 orbs = 190 Stars, 50 orbs = 375 Stars, 120 orbs = 750 Stars (~62.5 Stars per USD)
+  - **Security Features**:
+    - Server-side price validation (prevents client-side tampering)
+    - Webhook secret token authentication (optional, via TELEGRAM_WEBHOOK_SECRET)
+    - Idempotency checks (prevents duplicate energy crediting)
+    - Race condition protection (atomic status updates with 'processing' state)
+    - Amount verification (ensures paid amount matches expected)
+  - **Payment Flow**: Invoice creation → WebApp.openInvoice() → pre_checkout_query (validation) → successful_payment (fulfillment) → energy crediting
+  - **Refund Support**: telegram_payment_charge_id stored for refund capability
 
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.
 - **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`) for wallet connection, TON API for transactions and price fetching.
 - **AI Services**: OpenAI API (GPT-5) for astrological interpretations.
-- **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `VITE_BOT_USERNAME`, `TON_WALLET_ADDRESS`, `SESSION_SECRET`.
+- **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `VITE_BOT_USERNAME`, `TON_WALLET_ADDRESS`, `SESSION_SECRET`, `TELEGRAM_WEBHOOK_SECRET` (optional, for Stars webhook security).
