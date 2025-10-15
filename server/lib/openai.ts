@@ -456,3 +456,262 @@ Return structured JSON with ${hostName} and ${partnerName} names in texts:
 
   return result;
 }
+
+export interface HoroscopeInterpretationInput {
+  period: "day" | "week" | "month";
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;
+  transits?: any[];
+}
+
+export interface HoroscopeInterpretationResult {
+  period: "day" | "week" | "month";
+  date_range: string;
+  summary: string;
+  day_parts: { title: "Утро" | "День" | "Вечер"; advice: string[] }[];
+  themes: Record<"Деньги" | "Работа" | "Учёба" | "Любовь" | "Здоровье", string[]>;
+  notes: string[];
+}
+
+export async function interpretHoroscope(
+  input: HoroscopeInterpretationInput,
+  locale: string = 'ru'
+): Promise<HoroscopeInterpretationResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const toneInstruction = personalizeTone(input.profile.gender);
+
+  const today = new Date().toISOString().split('T')[0];
+  let dateRange = today;
+  if (input.period === 'week') {
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    dateRange = `${today}..${weekEnd.toISOString().split('T')[0]}`;
+  } else if (input.period === 'month') {
+    const monthEnd = new Date();
+    monthEnd.setMonth(monthEnd.getMonth() + 1);
+    dateRange = `${today}..${monthEnd.toISOString().split('T')[0]}`;
+  }
+
+  const promptData = `
+Период: ${input.period}
+Дата: ${dateRange}
+Имя: ${input.profile.name}
+Пол: ${input.profile.gender}
+Часовой пояс: ${input.profile.timezone}
+
+Натальная карта:
+${JSON.stringify(input.natal, null, 2)}
+
+${input.transits && input.transits.length > 0 ? `Транзиты: ${JSON.stringify(input.transits, null, 2)}` : ''}
+  `.trim();
+
+  const promptText = loadPrompt('horoscope', {});
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}\n\n${promptData}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик. Даёшь структурированные гороскопы с практичными советами. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer. You provide structured horoscopes with practical advice. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: finalPrompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 3000
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate horoscope interpretation');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    return {
+      period: result.period || input.period,
+      date_range: result.date_range || dateRange,
+      summary: result.summary || '',
+      day_parts: Array.isArray(result.day_parts) ? result.day_parts : [],
+      themes: result.themes || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
+      notes: Array.isArray(result.notes) ? result.notes : []
+    };
+  } catch (e) {
+    throw new Error('Failed to parse horoscope interpretation response');
+  }
+}
+
+export interface WeeklyPlanInput {
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;
+  week_start_iso: string;
+  transits?: any[];
+}
+
+export interface WeeklyPlanResult {
+  week_range: string;
+  focus_map: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string>;
+  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
+  daily_tips: Record<"Пн"|"Вт"|"Ср"|"Чт"|"Пт"|"Сб"|"Вс", string[]>;
+}
+
+export async function generateWeeklyPlan(
+  input: WeeklyPlanInput,
+  locale: string = 'ru'
+): Promise<WeeklyPlanResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const toneInstruction = personalizeTone(input.profile.gender);
+
+  const weekEnd = new Date(input.week_start_iso);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekRange = `${input.week_start_iso}..${weekEnd.toISOString().split('T')[0]}`;
+
+  const promptData = `
+Неделя: ${weekRange}
+Имя: ${input.profile.name}
+Пол: ${input.profile.gender}
+Часовой пояс: ${input.profile.timezone}
+
+Натальная карта:
+${JSON.stringify(input.natal, null, 2)}
+
+${input.transits && input.transits.length > 0 ? `Транзиты недели: ${JSON.stringify(input.transits, null, 2)}` : ''}
+  `.trim();
+
+  const promptText = loadPrompt('weekly_plan', {});
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}\n\n${promptData}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик. Составляешь недельные планы с конкретными рекомендациями. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer. You create weekly plans with concrete recommendations. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: finalPrompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 3000
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate weekly plan');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    return {
+      week_range: result.week_range || weekRange,
+      focus_map: result.focus_map || {},
+      spheres: result.spheres || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
+      daily_tips: result.daily_tips || {}
+    };
+  } catch (e) {
+    throw new Error('Failed to parse weekly plan response');
+  }
+}
+
+export interface MonthlyPlanInput {
+  profile: { name: string; gender: string; timezone: string };
+  natal: any;
+  month_iso: string;
+  transits?: any[];
+}
+
+export interface MonthlyPlanResult {
+  month: string;
+  weeks: { range: string; focus: string; tips: string[] }[];
+  spheres: Record<"Деньги"|"Работа"|"Учёба"|"Любовь"|"Здоровье", string[]>;
+  milestones: string[];
+}
+
+export async function generateMonthlyPlan(
+  input: MonthlyPlanInput,
+  locale: string = 'ru'
+): Promise<MonthlyPlanResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const toneInstruction = personalizeTone(input.profile.gender);
+
+  const monthStart = new Date(input.month_iso);
+  const monthEnd = new Date(monthStart);
+  monthEnd.setMonth(monthEnd.getMonth() + 1);
+  monthEnd.setDate(0);
+  const month = input.month_iso.substring(0, 7);
+
+  const promptData = `
+Месяц: ${month}
+Период: ${input.month_iso}..${monthEnd.toISOString().split('T')[0]}
+Имя: ${input.profile.name}
+Пол: ${input.profile.gender}
+Часовой пояс: ${input.profile.timezone}
+
+Натальная карта:
+${JSON.stringify(input.natal, null, 2)}
+
+${input.transits && input.transits.length > 0 ? `Транзиты месяца: ${JSON.stringify(input.transits, null, 2)}` : ''}
+  `.trim();
+
+  const promptText = loadPrompt('monthly_plan', {});
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}\n\n${promptData}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик. Составляешь месячные планы с учётом недель и ключевых дат. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer. You create monthly plans considering weeks and key dates. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: finalPrompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 4000
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate monthly plan');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    return {
+      month: result.month || month,
+      weeks: Array.isArray(result.weeks) ? result.weeks : [],
+      spheres: result.spheres || { "Деньги": [], "Работа": [], "Учёба": [], "Любовь": [], "Здоровье": [] },
+      milestones: Array.isArray(result.milestones) ? result.milestones : []
+    };
+  } catch (e) {
+    throw new Error('Failed to parse monthly plan response');
+  }
+}
