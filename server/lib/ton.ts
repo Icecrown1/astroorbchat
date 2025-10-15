@@ -69,6 +69,13 @@ export async function findRecentTransaction(
   excludeTxHashes: Set<string> = new Set()
 ): Promise<{ hash: string; amount: string; timestamp: number } | null> {
   try {
+    console.log('[TON] Searching for transaction:', {
+      wallet: walletAddress,
+      expectedAmount,
+      maxAgeMinutes,
+      excludedCount: excludeTxHashes.size
+    });
+
     const response = await fetch(
       `https://tonapi.io/v2/blockchain/accounts/${walletAddress}/transactions?limit=50`
     );
@@ -81,7 +88,22 @@ export async function findRecentTransaction(
     const data = await response.json();
     const transactions = data.transactions || [];
     
+    console.log(`[TON] Fetched ${transactions.length} transactions from blockchain`);
+    
     const cutoffTime = Math.floor(Date.now() / 1000) - (maxAgeMinutes * 60);
+    console.log('[TON] Cutoff time:', new Date(cutoffTime * 1000).toISOString());
+    
+    // Log all recent incoming transactions for debugging
+    const recentIncoming = transactions
+      .filter((tx: any) => tx.in_msg && tx.utime >= cutoffTime)
+      .map((tx: any) => ({
+        hash: tx.hash,
+        amount: tx.in_msg.value,
+        time: new Date(tx.utime * 1000).toISOString(),
+        used: excludeTxHashes.has(tx.hash)
+      }));
+    
+    console.log('[TON] Recent incoming transactions:', JSON.stringify(recentIncoming, null, 2));
     
     // Find matching transaction by amount and time, excluding already used ones
     for (const tx of transactions) {
@@ -97,8 +119,19 @@ export async function findRecentTransaction(
         continue;
       }
       
+      // Log comparison details
+      console.log('[TON] Comparing transaction:', {
+        txHash: txHash.substring(0, 10) + '...',
+        txAmount,
+        expectedAmount,
+        amountMatch: txAmount === expectedAmount,
+        txTime: new Date(txTime * 1000).toISOString(),
+        cutoffTime: new Date(cutoffTime * 1000).toISOString(),
+        timeMatch: txTime >= cutoffTime
+      });
+      
       if (txAmount === expectedAmount && txTime >= cutoffTime) {
-        console.log('[TON] Found matching transaction:', {
+        console.log('[TON] ✅ Found matching transaction:', {
           hash: txHash,
           amount: txAmount,
           timestamp: txTime
@@ -112,7 +145,7 @@ export async function findRecentTransaction(
       }
     }
     
-    console.log('[TON] No matching unused transaction found');
+    console.error('[TON] ❌ No matching unused transaction found. Expected:', expectedAmount);
     return null;
   } catch (error) {
     console.error('[TON] Error finding transaction:', error);
