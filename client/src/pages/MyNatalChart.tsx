@@ -20,6 +20,81 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
+// Уникальные описания для каждой планеты
+function getPlanetDescription(planetName: string, sign: string, locale: 'ru' | 'en'): string {
+  const planetNameLower = planetName.toLowerCase();
+  
+  const descriptions: Record<string, { ru: string; en: string }> = {
+    sun: {
+      ru: 'Солнце определяет вашу суть и жизненную силу. Это ваше истинное "Я" и путь самовыражения. Узнайте больше о том, как раскрыть свой внутренний потенциал.',
+      en: 'The Sun defines your essence and life force. This is your true self and path of self-expression. Discover how to unlock your inner potential.'
+    },
+    moon: {
+      ru: 'Луна показывает ваш эмоциональный мир и внутренние потребности. Она раскрывает, что приносит вам комфорт и безопасность. Погрузитесь в глубины своих чувств.',
+      en: 'The Moon reveals your emotional world and inner needs. It shows what brings you comfort and security. Dive deep into your feelings.'
+    },
+    mercury: {
+      ru: 'Меркурий управляет вашим мышлением и общением. Это ваш способ понимать мир и выражать идеи. Откройте секреты своего интеллекта.',
+      en: 'Mercury governs your thinking and communication. This is how you understand the world and express ideas. Unlock the secrets of your intellect.'
+    },
+    venus: {
+      ru: 'Венера отвечает за любовь, красоту и ценности. Она показывает, что вы цените в отношениях и как выражаете привязанность. Раскройте свои романтические особенности.',
+      en: 'Venus rules love, beauty, and values. It shows what you cherish in relationships and how you express affection. Reveal your romantic nature.'
+    },
+    mars: {
+      ru: 'Марс символизирует вашу энергию, страсть и способ действовать. Это ваш внутренний воин и источник мотивации. Узнайте, как направить свою силу.',
+      en: 'Mars symbolizes your energy, passion, and way of taking action. This is your inner warrior and source of motivation. Learn how to channel your power.'
+    },
+    jupiter: {
+      ru: 'Юпитер приносит удачу, рост и расширение горизонтов. Это планета возможностей и оптимизма. Откройте пути к процветанию и мудрости.',
+      en: 'Jupiter brings luck, growth, and expanding horizons. This is the planet of opportunities and optimism. Open paths to prosperity and wisdom.'
+    },
+    saturn: {
+      ru: 'Сатурн учит дисциплине, ответственности и достижению целей. Это строгий учитель, но щедрый на награды. Познайте уроки жизненной мудрости.',
+      en: 'Saturn teaches discipline, responsibility, and achieving goals. A strict teacher but generous with rewards. Learn the lessons of life wisdom.'
+    },
+    uranus: {
+      ru: 'Уран несёт революцию, инновации и свободу. Это ваша уникальность и жажда перемен. Исследуйте свой нестандартный путь.',
+      en: 'Uranus brings revolution, innovation, and freedom. This is your uniqueness and thirst for change. Explore your unconventional path.'
+    },
+    neptune: {
+      ru: 'Нептун открывает мир мечты, интуиции и духовности. Это планета воображения и тонких энергий. Погрузитесь в мистические глубины.',
+      en: 'Neptune opens the world of dreams, intuition, and spirituality. The planet of imagination and subtle energies. Dive into mystical depths.'
+    },
+    pluto: {
+      ru: 'Плутон трансформирует и обновляет через глубокие изменения. Это сила возрождения и личной власти. Откройте свою скрытую мощь.',
+      en: 'Pluto transforms and renews through deep changes. The power of rebirth and personal power. Discover your hidden strength.'
+    },
+    north_node: {
+      ru: 'Северный Узел указывает направление вашего роста и эволюции души. Это ваше предназначение и путь развития. Узнайте куда вам стоит двигаться.',
+      en: 'North Node points to your growth direction and soul evolution. Your destiny and path of development. Discover where you should be heading.'
+    },
+    south_node: {
+      ru: 'Южный Узел показывает ваш прошлый опыт и врождённые таланты. Это то, что вы уже освоили. Поймите свои природные способности.',
+      en: 'South Node reveals your past experience and innate talents. What you have already mastered. Understand your natural abilities.'
+    },
+    chiron: {
+      ru: 'Хирон указывает на ваши глубокие раны и дар исцеления. Через боль приходит мудрость помогать другим. Откройте путь к целительству.',
+      en: 'Chiron points to your deep wounds and gift of healing. Through pain comes wisdom to help others. Open the path to healing.'
+    },
+    ascendant: {
+      ru: 'Асцендент показывает вашу маску и первое впечатление на людей. Это то, как мир видит вас при знакомстве. Раскройте свой внешний образ.',
+      en: 'Ascendant shows your mask and first impression on people. How the world sees you at first meeting. Reveal your outer image.'
+    },
+    mc: {
+      ru: 'MC (Середина Неба) указывает на карьеру и публичный образ. Это ваши амбиции и жизненные достижения. Постройте путь к успеху.',
+      en: 'MC (Midheaven) points to career and public image. Your ambitions and life achievements. Build your path to success.'
+    }
+  };
+
+  const planetDesc = descriptions[planetNameLower] || {
+    ru: 'Это положение показывает важную часть вашей личности и характера. Оно влияет на то, как вы проявляете себя в мире и взаимодействуете с окружающими. Нажмите кнопку ниже, чтобы узнать подробную персональную трактовку с учётом всех аспектов.',
+    en: 'This placement reveals an important part of your personality and character. It influences how you express yourself in the world and interact with others. Click the button below to discover a detailed personal interpretation with all aspects considered.'
+  };
+
+  return planetDesc[locale];
+}
+
 export default function MyNatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -129,7 +204,7 @@ export default function MyNatalChart() {
   if (chartLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader size="lg" />
+        <Loader size="lg" withPhrases />
       </div>
     );
   }
@@ -348,9 +423,7 @@ export default function MyNatalChart() {
                   {expandedPlanet === planet.name && (
                     <div className="px-4 pb-4 pt-2 border-t bg-muted/30">
                       <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                        {locale === 'ru' 
-                          ? `${translatePlanet(planet.name, locale)} в ${translateSign(planet.sign, locale)} показывает важную часть вашей личности и характера. Это положение влияет на то, как вы проявляете себя в мире и взаимодействуете с окружающими. Нажмите кнопку ниже, чтобы узнать подробную персональную трактовку с учётом всех аспектов.`
-                          : `${translatePlanet(planet.name, locale)} in ${translateSign(planet.sign, locale)} reveals an important part of your personality and character. This placement influences how you express yourself in the world and interact with others. Click the button below to discover a detailed personal interpretation with all aspects considered.`}
+                        {getPlanetDescription(planet.name, planet.sign, locale)}
                       </p>
                       <Button
                         onClick={() => setSelectedPlanet(planet.name)}

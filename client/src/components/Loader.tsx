@@ -5,30 +5,7 @@ import { useTranslation } from '@/contexts/LocaleContext';
 interface LoaderProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
-}
-
-export function Loader({ className, size = 'md' }: LoaderProps) {
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-16 h-16',
-    lg: 'w-24 h-24',
-  };
-
-  return (
-    <div className={cn('flex items-center justify-center', className)}>
-      <div
-        className={cn(
-          'relative',
-          sizeClasses[size]
-        )}
-        data-testid="loader-spinner"
-      >
-        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
-        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 animate-pulse"></div>
-      </div>
-    </div>
-  );
+  withPhrases?: boolean;
 }
 
 const LOADING_PHRASES_RU = [
@@ -137,6 +114,71 @@ const LOADING_PHRASES_EN = [
   "Calling guardian angels for help..."
 ];
 
+export function Loader({ className, size = 'md', withPhrases = false }: LoaderProps) {
+  const { locale } = useTranslation();
+  const [currentPhrase, setCurrentPhrase] = useState('');
+  const [fadeIn, setFadeIn] = useState(true);
+
+  const sizeClasses = {
+    sm: 'w-8 h-8',
+    md: 'w-16 h-16',
+    lg: 'w-24 h-24',
+  };
+
+  useEffect(() => {
+    if (!withPhrases) return;
+
+    const phrases = locale === 'ru' ? LOADING_PHRASES_RU : LOADING_PHRASES_EN;
+    
+    // Set initial random phrase
+    setCurrentPhrase(phrases[Math.floor(Math.random() * phrases.length)]);
+
+    let timeoutId: NodeJS.Timeout | null = null;
+    const interval = setInterval(() => {
+      // Fade out
+      setFadeIn(false);
+      
+      // Change phrase after fade out
+      timeoutId = setTimeout(() => {
+        setCurrentPhrase(phrases[Math.floor(Math.random() * phrases.length)]);
+        setFadeIn(true);
+      }, 300);
+    }, 2500); // Change phrase every 2.5 seconds
+
+    return () => {
+      clearInterval(interval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [locale, withPhrases]);
+
+  return (
+    <div className={cn('flex flex-col items-center justify-center gap-4', className)}>
+      <div
+        className={cn(
+          'relative',
+          sizeClasses[size]
+        )}
+        data-testid="loader-spinner"
+      >
+        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
+        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 animate-pulse"></div>
+      </div>
+      {withPhrases && (
+        <p 
+          className={cn(
+            "text-sm text-muted-foreground transition-opacity duration-300 min-h-[20px] text-center",
+            fadeIn ? "opacity-100" : "opacity-0"
+          )}
+          data-testid="loader-phrase"
+        >
+          {currentPhrase}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function FullPageLoader() {
   const { locale } = useTranslation();
   const [currentPhrase, setCurrentPhrase] = useState('');
@@ -148,18 +190,22 @@ export function FullPageLoader() {
     // Set initial random phrase
     setCurrentPhrase(phrases[Math.floor(Math.random() * phrases.length)]);
 
+    let timeoutId: NodeJS.Timeout | null = null;
     const interval = setInterval(() => {
       // Fade out
       setFadeIn(false);
       
       // Change phrase after fade out
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         setCurrentPhrase(phrases[Math.floor(Math.random() * phrases.length)]);
         setFadeIn(true);
       }, 300);
     }, 2500); // Change phrase every 2.5 seconds
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [locale]);
 
   return (
