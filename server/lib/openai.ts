@@ -502,17 +502,33 @@ export async function interpretHoroscope(
 
   const today = new Date().toISOString().split('T')[0];
 
+  // Use compact planet positions instead of full natal chart
+  const planetPositions = extractKeyPlanetPositions(input.natal, locale);
+  
+  // Localized labels
+  const labels = {
+    period: locale === 'ru' ? 'Период' : 'Period',
+    date: locale === 'ru' ? 'Дата' : 'Date',
+    name: locale === 'ru' ? 'Имя' : 'Name',
+    gender: locale === 'ru' ? 'Пол' : 'Gender',
+    timezone: locale === 'ru' ? 'Часовой пояс' : 'Timezone',
+    planets: locale === 'ru' ? 'Основные позиции планет' : 'Key planet positions',
+    transits: locale === 'ru' ? 'Транзиты дня' : 'Day transits'
+  };
+  
+  // Include transits if available (compact summary without data loss)
+  const transitsInfo = input.transits && input.transits.length > 0 
+    ? `\n${labels.transits}: ${summarizeTransits(input.transits, locale)}` 
+    : '';
+
   const promptData = `
-Период: day
-Дата: ${today}
-Имя: ${input.profile.name}
-Пол: ${input.profile.gender}
-Часовой пояс: ${input.profile.timezone}
+${labels.period}: day
+${labels.date}: ${today}
+${labels.name}: ${input.profile.name}
+${labels.gender}: ${input.profile.gender}
+${labels.timezone}: ${input.profile.timezone}
 
-Натальная карта:
-${JSON.stringify(input.natal, null, 2)}
-
-${input.transits && input.transits.length > 0 ? `Транзиты: ${JSON.stringify(input.transits, null, 2)}` : ''}
+${labels.planets}: ${planetPositions}${transitsInfo}
   `.trim();
 
   const promptText = loadPrompt('horoscope', {});
@@ -540,7 +556,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты: ${JSON.string
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 3000
+      max_completion_tokens: 15000
     });
 
     console.log('[INTERPRET_HOROSCOPE] OpenAI response received');
