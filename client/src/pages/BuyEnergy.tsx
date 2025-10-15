@@ -69,7 +69,7 @@ export default function BuyEnergy() {
         });
 
         const transaction = {
-          validUntil: Math.floor(Date.now() / 1000) + 600,
+          validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes max per TON Connect spec
           messages: [
             {
               address: data.walletAddress,
@@ -79,8 +79,24 @@ export default function BuyEnergy() {
         };
 
         console.log('[TON] Sending transaction via TON Connect...', transaction);
-        const result = await tonConnectUI.sendTransaction(transaction);
-        console.log('[TON] Transaction sent successfully, confirming payment...', result);
+        
+        let result;
+        try {
+          result = await tonConnectUI.sendTransaction(transaction);
+          console.log('[TON] Transaction sent successfully, confirming payment...', result);
+        } catch (sendError: any) {
+          console.error('[TON] sendTransaction error:', sendError);
+          // Transaction might be sent but SDK lost context due to HMR/reconnection
+          // Show user to wait and check their balance
+          toast({
+            title: locale === 'ru' ? 'Транзакция отправлена' : 'Transaction sent',
+            description: locale === 'ru' 
+              ? 'Проверяем подтверждение на блокчейне... Обновите страницу через несколько секунд если энергия не начислится'
+              : 'Checking blockchain confirmation... Refresh the page in a few seconds if energy is not credited',
+          });
+          // Try to confirm anyway using paymentId (backend will search blockchain)
+          result = null; // No BOC available, backend will search by amount/time
+        }
 
         // Retry confirmation with exponential backoff (blockchain needs time)
         const maxRetries = 10;
@@ -90,10 +106,12 @@ export default function BuyEnergy() {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           console.log(`[TON] Confirmation attempt ${attempt}/${maxRetries}`);
           
-          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
-            paymentId: data.paymentId,
-            boc: result.boc,
-          });
+          const confirmPayload: any = { paymentId: data.paymentId };
+          if (result?.boc) {
+            confirmPayload.boc = result.boc;
+          }
+          
+          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', confirmPayload);
 
           if (confirmResponse.ok) {
             console.log('[TON] Payment confirmed, energy credited');

@@ -1766,7 +1766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const confirmTonPaymentSchema = z.object({
     paymentId: z.string(),
-    boc: z.string(),
+    boc: z.string().optional(), // BOC not used, backend searches by amount/time
   });
 
   app.post("/api/payments/ton/confirm", requireAuth, async (req, res) => {
