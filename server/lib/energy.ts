@@ -13,6 +13,8 @@ export const ENERGY_COSTS = {
   natal_external: 1,
   important_date_detail: 1,
   compatibility_professional: 4,  // Профессиональная синастрия
+  weekly_plan: 1,  // План на неделю
+  monthly_plan: 1,  // План на месяц
 } as const;
 
 export const SUBSCRIPTION_DAILY_ENERGY = {

@@ -9,7 +9,7 @@ import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBon
 import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
-import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
+import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
@@ -711,8 +711,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/horoscope", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { period } = req.body;
-      const locale = req.body.locale || 'en';
+      const { period = 'day' } = req.body;
+      const locale = req.body.locale || 'ru';
+
+      // Validate period
+      if (!['day', 'week', 'month'].includes(period)) {
+        return res.status(400).json({ ok: false, error: "Invalid period. Must be 'day', 'week', or 'month'" });
+      }
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -721,49 +726,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      // Check if natal chart exists
+      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+
       const cost = ENERGY_COSTS.horoscope;
       if (user.energy < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+        return res.status(402).json({ ok: false, error: "Insufficient energy" });
       }
 
-      // Execute the reading using Swiss Ephemeris (use cached natal chart or calculate)
-      let chartData: NatalChartResult;
-      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
-        chartData = user.natalChart as NatalChartResult;
-      } else {
-        const birthDate = new Date(user.birthdayDate);
-        const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
-        const latitude = 55.7558; // Moscow fallback
-        const longitude = 37.6173; // Moscow fallback
-        
-        chartData = await calculateNatalChartPython({
-          year: birthDate.getFullYear(),
-          month: birthDate.getMonth() + 1,
-          day: birthDate.getDate(),
-          hour: hours,
-          minute: minutes,
-          latitude,
-          longitude,
-          house_system: 'Placidus',
-        });
-      }
-      
-      // Transform for AI interpretation
-      const chart = {
-        planets: Object.entries(chartData.planets).map(([name, data]) => ({
-          name,
-          sign: data.sign,
-          position: data.longitude,
-        })),
-        aspects: [],
-      };
-      
-      const forecast = await getAstrologyInterpretation("horoscope", { chart, period }, locale, user.gender);
+      // Use the new interpretHoroscope function
+      const result = await interpretHoroscope({
+        period: period as "day" | "week" | "month",
+        profile: {
+          name: user.name,
+          gender: user.gender,
+          timezone: user.timezone
+        },
+        natal: user.natalChart,
+        transits: []
+      }, locale);
 
+      // Save to database
       await storage.createHoroscopeReading({
         userId,
-        period: period || "daily",
-        forecast,
+        period,
+        forecast: JSON.stringify(result),
       });
 
       // Only deduct energy after successful execution
@@ -772,15 +761,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         ok: true,
-        data: {
-          period,
-          forecast,
-          highlights: [
-            "Opportunities for growth and expansion",
-            "Focus on relationships and communication",
-            "Trust your inner wisdom",
-          ],
+        data: result
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/horoscope/weekly-plan", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { week_start_iso } = req.body;
+      const locale = req.body.locale || 'ru';
+
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // Check if natal chart exists
+      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+
+      // Check subscription status
+      const subscription = await storage.getSubscription(userId);
+      const hasActiveSubscription = subscription?.status === 'active';
+
+      // Subscribers get it free, others pay 1 orb
+      if (!hasActiveSubscription) {
+        const cost = ENERGY_COSTS.weekly_plan;
+        if (user.energy < cost) {
+          return res.status(402).json({ ok: false, error: "Insufficient energy" });
+        }
+      }
+
+      // Calculate week_start_iso if not provided (next Monday)
+      let weekStart = week_start_iso;
+      if (!weekStart) {
+        const now = dayjs().tz(user.timezone);
+        const daysUntilMonday = (8 - now.day()) % 7;
+        const nextMonday = daysUntilMonday === 0 ? now : now.add(daysUntilMonday, 'day');
+        weekStart = nextMonday.format('YYYY-MM-DD');
+      }
+
+      // Generate weekly plan
+      const result = await generateWeeklyPlan({
+        profile: {
+          name: user.name,
+          gender: user.gender,
+          timezone: user.timezone
         },
+        natal: user.natalChart,
+        week_start_iso: weekStart,
+        transits: []
+      }, locale);
+
+      // Deduct energy only if not subscriber
+      if (!hasActiveSubscription) {
+        const cost = ENERGY_COSTS.weekly_plan;
+        await storage.updateUser(userId, { energy: user.energy - cost });
+        await storage.createUsageLog({ userId, feature: "weekly_plan", cost });
+      }
+
+      res.json({
+        ok: true,
+        data: result
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/astrology/horoscope/monthly-plan", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { month_iso } = req.body;
+      const locale = req.body.locale || 'ru';
+
+      // Check energy first (without deducting)
+      await checkAndResetEnergy(storage, userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // Check if natal chart exists
+      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+
+      // Check subscription status
+      const subscription = await storage.getSubscription(userId);
+      const hasActiveSubscription = subscription?.status === 'active';
+
+      // Subscribers get it free, others pay 1 orb
+      if (!hasActiveSubscription) {
+        const cost = ENERGY_COSTS.monthly_plan;
+        if (user.energy < cost) {
+          return res.status(402).json({ ok: false, error: "Insufficient energy" });
+        }
+      }
+
+      // Calculate month_iso if not provided (first day of current month)
+      let monthStart = month_iso;
+      if (!monthStart) {
+        const now = dayjs().tz(user.timezone);
+        monthStart = now.startOf('month').format('YYYY-MM-DD');
+      }
+
+      // Generate monthly plan
+      const result = await generateMonthlyPlan({
+        profile: {
+          name: user.name,
+          gender: user.gender,
+          timezone: user.timezone
+        },
+        natal: user.natalChart,
+        month_iso: monthStart,
+        transits: []
+      }, locale);
+
+      // Deduct energy only if not subscriber
+      if (!hasActiveSubscription) {
+        const cost = ENERGY_COSTS.monthly_plan;
+        await storage.updateUser(userId, { energy: user.energy - cost });
+        await storage.createUsageLog({ userId, feature: "monthly_plan", cost });
+      }
+
+      res.json({
+        ok: true,
+        data: result
       });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });

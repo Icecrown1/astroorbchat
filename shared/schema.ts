@@ -292,7 +292,7 @@ export const insertPaymentSchema = createInsertSchema(payments, {
 
 export const insertUsageLogSchema = createInsertSchema(usageLogs, {
   userId: z.string(),
-  feature: z.enum(["natal", "solar", "horoscope", "compatibility", "ask", "natal_external", "important_date_detail", "natal_professional", "compatibility_professional"]),
+  feature: z.enum(["natal", "solar", "horoscope", "compatibility", "ask", "natal_external", "important_date_detail", "natal_professional", "compatibility_professional", "weekly_plan", "monthly_plan"]),
   cost: z.number().int().positive(),
 }).omit({
   id: true,
