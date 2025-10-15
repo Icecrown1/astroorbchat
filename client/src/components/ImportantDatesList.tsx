@@ -108,7 +108,7 @@ export function ImportantDatesList() {
               data-testid={`card-important-date-${event.key}`}
             >
               {!event.unlocked && (
-                <div className="absolute top-3 right-3">
+                <div className="absolute top-3 left-3">
                   <Lock className="w-4 h-4 text-muted-foreground" />
                 </div>
               )}
