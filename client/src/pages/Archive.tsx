@@ -29,9 +29,7 @@ export default function Archive() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/astrology/horoscope/${id}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/astrology/horoscope/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/horoscope/archive'] });
