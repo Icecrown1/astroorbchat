@@ -458,7 +458,6 @@ Return structured JSON with ${hostName} and ${partnerName} names in texts:
 }
 
 export interface HoroscopeInterpretationInput {
-  period: "day" | "week" | "month";
   profile: { name: string; gender: string; timezone: string };
   natal: any;
   transits?: any[];
@@ -493,7 +492,7 @@ export async function interpretHoroscope(
   input: HoroscopeInterpretationInput,
   locale: string = 'ru'
 ): Promise<HoroscopeInterpretationResult> {
-  console.log('[INTERPRET_HOROSCOPE] Starting with period:', input.period, 'locale:', locale);
+  console.log('[INTERPRET_HOROSCOPE] Starting daily horoscope generation, locale:', locale);
   
   const languageInstruction = locale === 'ru'
     ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
@@ -502,20 +501,10 @@ export async function interpretHoroscope(
   const toneInstruction = personalizeTone(input.profile.gender);
 
   const today = new Date().toISOString().split('T')[0];
-  let dateRange = today;
-  if (input.period === 'week') {
-    const weekEnd = new Date();
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    dateRange = `${today}..${weekEnd.toISOString().split('T')[0]}`;
-  } else if (input.period === 'month') {
-    const monthEnd = new Date();
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
-    dateRange = `${today}..${monthEnd.toISOString().split('T')[0]}`;
-  }
 
   const promptData = `
-Период: ${input.period}
-Дата: ${dateRange}
+Период: day
+Дата: ${today}
 Имя: ${input.profile.name}
 Пол: ${input.profile.gender}
 Часовой пояс: ${input.profile.timezone}

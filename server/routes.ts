@@ -711,15 +711,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/horoscope", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { period = 'day' } = req.body;
       const locale = req.body.locale || 'ru';
 
-      console.log('[HOROSCOPE] Request started - userId:', userId, 'period:', period, 'locale:', locale);
-
-      // Validate period
-      if (!['day', 'week', 'month'].includes(period)) {
-        return res.status(400).json({ ok: false, error: "Invalid period. Must be 'day', 'week', or 'month'" });
-      }
+      console.log('[HOROSCOPE] Request started - userId:', userId, 'locale:', locale);
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -731,11 +725,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
       console.log('[HOROSCOPE] Natal chart exists:', !!natalChart);
-      console.log('[HOROSCOPE] Natal chart has data:', !!(natalChart && natalChart.data));
-      if (natalChart && natalChart.data) {
-        console.log('[HOROSCOPE] Natal chart data type:', typeof natalChart.data);
-        console.log('[HOROSCOPE] Natal chart data keys:', Object.keys(natalChart.data));
-      }
       if (!natalChart || !natalChart.data) {
         console.log('[HOROSCOPE] ERROR: NATAL_NOT_INITIALIZED');
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
@@ -748,9 +737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[HOROSCOPE] Calling interpretHoroscope...');
 
-      // Use the new interpretHoroscope function
+      // Generate daily horoscope only
       const result = await interpretHoroscope({
-        period: period as "day" | "week" | "month",
         profile: {
           name: user.name,
           gender: user.gender,
@@ -762,17 +750,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[HOROSCOPE] interpretHoroscope returned successfully');
 
-      // Determine date range for saving
+      // Save to database with today's date
       const now = dayjs().tz(user.timezone);
-      let startDate = now.format('YYYY-MM-DD');
-      let endDate = now.format('YYYY-MM-DD');
+      const today = now.format('YYYY-MM-DD');
 
-      // Save to database with date range
       await storage.createHoroscopeReading({
         userId,
-        period,
-        startDate,
-        endDate,
+        period: 'day',
+        startDate: today,
+        endDate: today,
         forecast: JSON.stringify(result),
       });
 

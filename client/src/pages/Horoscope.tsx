@@ -49,8 +49,9 @@ export default function Horoscope() {
 
   const mutation = useMutation({
     mutationFn: async () => {
+      // Only for daily horoscope
       const response = await apiRequest('POST', '/api/astrology/horoscope', { 
-        period: activeTab, 
+        period: 'day', 
         locale 
       });
       return response.data;
@@ -122,7 +123,8 @@ export default function Horoscope() {
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-6">
-            {!horoscopeData && (
+            {/* For daily horoscope - show generate button */}
+            {activeTab === 'day' && !horoscopeData && (
               <Card className="p-8">
                 <div className="mb-6">
                   <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
@@ -160,20 +162,64 @@ export default function Horoscope() {
               </Card>
             )}
 
-            {horoscopeData && (
+            {/* For weekly/monthly - show plan buttons directly */}
+            {activeTab === 'week' && (
+              <Card className="p-8">
+                <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
+                  <Calendar className="w-12 h-12 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">{t.horoscope.weeklyTitle}</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {t.horoscope.weeklyDescription || 'Получите подробный план на всю неделю с рекомендациями по каждому дню'}
+                </p>
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setWeeklyPlanOpen(true)}
+                  data-testid="button-weekly-plan"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  {t.horoscope.getWeeklyPlan}
+                </Button>
+              </Card>
+            )}
+
+            {activeTab === 'month' && (
+              <Card className="p-8">
+                <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
+                  <CalendarRange className="w-12 h-12 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">{t.horoscope.monthlyTitle}</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {t.horoscope.monthlyDescription || 'Получите детальный прогноз на весь месяц с разбивкой по неделям'}
+                </p>
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setMonthlyPlanOpen(true)}
+                  data-testid="button-monthly-plan"
+                >
+                  <CalendarRange className="w-4 h-4 mr-2" />
+                  {t.horoscope.getMonthlyPlan}
+                </Button>
+              </Card>
+            )}
+
+            {/* Daily horoscope result */}
+            {activeTab === 'day' && horoscopeData && (
               <div className="space-y-6">
                 <Card className="p-6">
                   <div className="mb-6">
                     <h2 className="text-lg font-semibold mb-1">{getPeriodTitle()}</h2>
                     <p className="text-sm text-muted-foreground">
-                      {activeTab === 'day' && new Date().toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { 
+                      {new Date().toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { 
                         weekday: 'long', 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric' 
                       })}
-                      {activeTab === 'week' && `${t.horoscope.planningFor} ${new Date().toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'long' })}`}
-                      {activeTab === 'month' && `${t.horoscope.planningFor} ${new Date().toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'long', year: 'numeric' })}`}
                     </p>
                   </div>
 
@@ -184,40 +230,14 @@ export default function Horoscope() {
                   />
                 </Card>
 
-                <div className="grid gap-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setHoroscopeData(null)}
-                    data-testid="button-regenerate"
-                  >
-                    {t.horoscope.generateNew}
-                  </Button>
-
-                  {activeTab === 'week' && (
-                    <Button
-                      variant="default"
-                      className="w-full"
-                      onClick={() => setWeeklyPlanOpen(true)}
-                      data-testid="button-weekly-plan"
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      {t.horoscope.getWeeklyPlan}
-                    </Button>
-                  )}
-
-                  {activeTab === 'month' && (
-                    <Button
-                      variant="default"
-                      className="w-full"
-                      onClick={() => setMonthlyPlanOpen(true)}
-                      data-testid="button-monthly-plan"
-                    >
-                      <CalendarRange className="w-4 h-4 mr-2" />
-                      {t.horoscope.getMonthlyPlan}
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setHoroscopeData(null)}
+                  data-testid="button-regenerate"
+                >
+                  {t.horoscope.generateNew}
+                </Button>
               </div>
             )}
           </TabsContent>
