@@ -1477,6 +1477,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Telegram Stars payment endpoints
+  app.post("/api/payments/stars/create-invoice", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { kind, energyAmount, amountStars } = req.body;
+
+      if (!process.env.TELEGRAM_BOT_TOKEN) {
+        return res.status(500).json({ ok: false, error: "Telegram bot not configured" });
+      }
+
+      // Generate unique invoice payload
+      const invoicePayload = `stars_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Store payment record
+      await storage.createStarPayment({
+        userId,
+        kind,
+        energyAmount,
+        amountStars,
+        invoicePayload,
+      });
+
+      // Create invoice link via Telegram Bot API
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      const invoiceData = {
+        title: kind === "energy_pack" ? `${energyAmount} Orbs` : "Subscription",
+        description: kind === "energy_pack" ? `Buy ${energyAmount} energy orbs` : "Monthly subscription",
+        payload: invoicePayload,
+        provider_token: "", // Empty for Stars
+        currency: "XTR",
+        prices: [{
+          label: kind === "energy_pack" ? `${energyAmount} Orbs` : "1 Month",
+          amount: amountStars
+        }]
+      };
+
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/createInvoiceLink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoiceData)
+      });
+
+      const data = await response.json();
+      
+      if (!data.ok) {
+        console.error('[STARS] Telegram API error:', data);
+        return res.status(500).json({ ok: false, error: data.description || "Failed to create invoice" });
+      }
+
+      res.json({ 
+        ok: true, 
+        data: { 
+          invoiceLink: data.result,
+          invoicePayload 
+        } 
+      });
+    } catch (error: any) {
+      console.error('[STARS] Error creating invoice:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Telegram webhook for Stars payments
+  app.post("/api/webhook/telegram", async (req, res) => {
+    try {
+      const update = req.body;
+      console.log('[TELEGRAM_WEBHOOK] Received update:', JSON.stringify(update));
+
+      // Handle pre_checkout_query
+      if (update.pre_checkout_query) {
+        const queryId = update.pre_checkout_query.id;
+        const invoicePayload = update.pre_checkout_query.invoice_payload;
+        
+        console.log('[TELEGRAM_WEBHOOK] Pre-checkout query for:', invoicePayload);
+
+        // Verify payment exists
+        const payment = await storage.getStarPaymentByPayload(invoicePayload);
+        if (!payment) {
+          console.error('[TELEGRAM_WEBHOOK] Payment not found:', invoicePayload);
+          // Answer anyway to not block user
+          await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pre_checkout_query_id: queryId, ok: false, error_message: "Payment not found" })
+          });
+          return res.json({ ok: true });
+        }
+
+        // Answer pre-checkout query (approve)
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pre_checkout_query_id: queryId, ok: true })
+        });
+
+        console.log('[TELEGRAM_WEBHOOK] Pre-checkout approved');
+      }
+
+      // Handle successful_payment
+      if (update.message?.successful_payment) {
+        const payment_info = update.message.successful_payment;
+        const invoicePayload = payment_info.invoice_payload;
+        const telegramChargeId = payment_info.telegram_payment_charge_id;
+        const totalAmount = payment_info.total_amount;
+
+        console.log('[TELEGRAM_WEBHOOK] Successful payment:', { invoicePayload, telegramChargeId, totalAmount });
+
+        // Get payment record
+        const payment = await storage.getStarPaymentByPayload(invoicePayload);
+        if (!payment) {
+          console.error('[TELEGRAM_WEBHOOK] Payment record not found:', invoicePayload);
+          return res.json({ ok: true });
+        }
+
+        // Check if already processed
+        if (payment.status === 'completed') {
+          console.log('[TELEGRAM_WEBHOOK] Payment already completed');
+          return res.json({ ok: true });
+        }
+
+        // Verify amount matches
+        if (payment.amountStars !== totalAmount) {
+          console.error('[TELEGRAM_WEBHOOK] Amount mismatch:', { expected: payment.amountStars, received: totalAmount });
+          await storage.updateStarPaymentStatus(invoicePayload, {
+            status: 'failed',
+            telegramChargeId
+          });
+          return res.json({ ok: true });
+        }
+
+        // Process payment
+        if (payment.kind === "energy_pack" && payment.energyAmount) {
+          const user = await storage.getUser(payment.userId);
+          if (user) {
+            await storage.updateUser(payment.userId, {
+              energy: user.energy + payment.energyAmount,
+            });
+            console.log('[TELEGRAM_WEBHOOK] Energy credited:', payment.energyAmount, 'to user:', payment.userId);
+          }
+        }
+
+        // Mark payment as completed
+        await storage.updateStarPaymentStatus(invoicePayload, {
+          status: 'completed',
+          telegramChargeId,
+          completedAt: new Date()
+        });
+
+        console.log('[TELEGRAM_WEBHOOK] Payment processed successfully');
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[TELEGRAM_WEBHOOK] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/payments/history", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
