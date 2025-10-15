@@ -233,9 +233,11 @@ export default function Compatibility() {
           <div className="space-y-6">
             <Card className="p-6">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">{t.compatibility.result}</h2>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-2xl font-display font-bold mb-2">
                   {compatibilityData.partners || t.compatibility.youAndPartner}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {t.compatibility.result}
                 </p>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none">

@@ -66,6 +66,8 @@ export async function getAstrologyInterpretation(
       period_text: data.period === 'day' ? 'day' : data.period === 'week' ? 'week' : 'month'
     },
     compatibility: {
+      host_name: data.host_name || 'Person 1',
+      partner_name: data.partner_name || 'Person 2',
       person1: JSON.stringify(data.person1, null, 2),
       person2: JSON.stringify(data.person2, null, 2)
     },
@@ -97,7 +99,37 @@ export async function getAstrologyInterpretation(
     max_completion_tokens: 8192
   });
 
-  return completion.choices[0]?.message?.content || "Unable to generate interpretation at this time.";
+  const content = completion.choices[0]?.message?.content || "";
+  
+  // Для совместимости проверяем наличие имён в ответе
+  if (type === 'compatibility' && content) {
+    const hostName = data.host_name || '';
+    const partnerName = data.partner_name || '';
+    
+    if (hostName && partnerName) {
+      const hasHostName = content.toLowerCase().includes(hostName.toLowerCase());
+      const hasPartnerName = content.toLowerCase().includes(partnerName.toLowerCase());
+      
+      if (!hasHostName || !hasPartnerName) {
+        const missing = [];
+        if (!hasHostName) missing.push(hostName);
+        if (!hasPartnerName) missing.push(partnerName);
+        console.error(`[Compatibility Personalization Failure] Missing names: ${missing.join(', ')}`, {
+          host_name: hostName,
+          partner_name: partnerName,
+          has_host: hasHostName,
+          has_partner: hasPartnerName,
+          response_preview: content.substring(0, 200),
+          locale,
+          gender
+        });
+      } else {
+        console.log(`[Compatibility Personalization Success] Both names present: ${hostName}, ${partnerName}`);
+      }
+    }
+  }
+
+  return content || "Unable to generate interpretation at this time.";
 }
 
 export interface PlanetInterpretationData {
@@ -435,9 +467,14 @@ export async function getProfessionalCompatibilityInterpretation(
     person1: { planets: any; houses: any; angles: any };
     person2: { planets: any; houses: any; angles: any };
     houseOverlays: any;
+    host_name?: string;
+    partner_name?: string;
   },
   locale: string = 'ru'
 ): Promise<any> {
+  const hostName = compatibilityData.host_name || (locale === 'ru' ? 'Персона 1' : 'Person 1');
+  const partnerName = compatibilityData.partner_name || (locale === 'ru' ? 'Персона 2' : 'Person 2');
+
   const systemMessage = locale === 'ru'
     ? "Ты профессиональный астролог уровня ISAR/NCGR. Анализируешь синастрию с учетом оверлеев домов, межпланетных аспектов и весов факторов. Возвращаешь только валидный JSON."
     : "You are a professional ISAR/NCGR level astrologer. You analyze synastry considering house overlays, interplanetary aspects, and factor weights. Return only valid JSON.";
@@ -445,56 +482,68 @@ export async function getProfessionalCompatibilityInterpretation(
   const promptText = locale === 'ru' ? `
 ПРОФЕССИОНАЛЬНЫЙ АНАЛИЗ СИНАСТРИИ
 
-Данные Персоны 1:
+ПЕРСОНАЛИЗАЦИЯ:
+- Имя первого человека: ${hostName}
+- Имя партнёра: ${partnerName}
+- ОБЯЗАТЕЛЬНО используй эти имена в анализе (минимум 1 имя на раздел)
+- Пиши уважительно, в 3-м лице («${hostName} ощущает...» / «${partnerName} склонен...»)
+
+Данные ${hostName}:
 ${JSON.stringify(compatibilityData.person1, null, 2)}
 
-Данные Персоны 2:
+Данные ${partnerName}:
 ${JSON.stringify(compatibilityData.person2, null, 2)}
 
-Оверлеи домов (планеты Персоны 2 в домах Персоны 1):
+Оверлеи домов (планеты ${partnerName} в домах ${hostName}):
 ${JSON.stringify(compatibilityData.houseOverlays, null, 2)}
 
 Проанализируй синастрию с учетом:
-1. Оверлеи домов - какие планеты партнера попадают в какие дома человека
+1. Оверлеи домов - какие планеты ${partnerName} попадают в какие дома ${hostName}
 2. Межпланетные аспекты между картами (соединения, трины, квадраты, оппозиции)
 3. Веса факторов (угловые дома важнее, Солнце/Луна/ASC/MC имеют больший вес)
 4. Управители знаков и их взаимодействие
 
-Верни структурированный JSON:
+Верни структурированный JSON с именами ${hostName} и ${partnerName} в текстах:
 {
-  "summary": "Краткое резюме совместимости (2-3 предложения)",
-  "key_connections": ["Ключевое взаимодействие 1", "Ключевое взаимодействие 2", ...],
-  "house_overlays_analysis": "Анализ оверлеев домов",
-  "strengths": ["Сила 1", "Сила 2", ...],
-  "challenges": ["Вызов 1", "Вызов 2", ...],
-  "recommendations": ["Рекомендация 1", "Рекомендация 2", ...]
+  "summary": "Краткое резюме (используй имена ${hostName} и ${partnerName})",
+  "key_connections": ["Ключевое взаимодействие с именами", "..."],
+  "house_overlays_analysis": "Анализ оверлеев (упоминай ${hostName} и ${partnerName})",
+  "strengths": ["Сила пары (с именами)", "..."],
+  "challenges": ["Вызов (с именами)", "..."],
+  "recommendations": ["Рекомендация для ${hostName} и ${partnerName}", "..."]
 }
 ` : `
 PROFESSIONAL SYNASTRY ANALYSIS
 
-Person 1 Data:
+PERSONALIZATION:
+- First person's name: ${hostName}
+- Partner's name: ${partnerName}
+- MANDATORY: Use these names throughout the analysis (minimum 1 name per section)
+- Write respectfully in 3rd person ("${hostName} feels..." / "${partnerName} tends to...")
+
+${hostName}'s Data:
 ${JSON.stringify(compatibilityData.person1, null, 2)}
 
-Person 2 Data:
+${partnerName}'s Data:
 ${JSON.stringify(compatibilityData.person2, null, 2)}
 
-House Overlays (Person 2 planets in Person 1 houses):
+House Overlays (${partnerName}'s planets in ${hostName}'s houses):
 ${JSON.stringify(compatibilityData.houseOverlays, null, 2)}
 
 Analyze the synastry considering:
-1. House overlays - which partner planets fall in which native houses
+1. House overlays - which of ${partnerName}'s planets fall in ${hostName}'s houses
 2. Interplanetary aspects between charts (conjunctions, trines, squares, oppositions)
 3. Factor weights (angular houses more important, Sun/Moon/ASC/MC have greater weight)
 4. Sign rulers and their interactions
 
-Return structured JSON:
+Return structured JSON with ${hostName} and ${partnerName} names in texts:
 {
-  "summary": "Brief compatibility summary (2-3 sentences)",
-  "key_connections": ["Key connection 1", "Key connection 2", ...],
-  "house_overlays_analysis": "Analysis of house overlays",
-  "strengths": ["Strength 1", "Strength 2", ...],
-  "challenges": ["Challenge 1", "Challenge 2", ...],
-  "recommendations": ["Recommendation 1", "Recommendation 2", ...]
+  "summary": "Brief summary (use ${hostName} and ${partnerName} names)",
+  "key_connections": ["Key connection with names", "..."],
+  "house_overlays_analysis": "Overlays analysis (mention ${hostName} and ${partnerName})",
+  "strengths": ["Strength (with names)", "..."],
+  "challenges": ["Challenge (with names)", "..."],
+  "recommendations": ["Recommendation for ${hostName} and ${partnerName}", "..."]
 }
 `;
 
@@ -519,5 +568,30 @@ Return structured JSON:
     throw new Error('Failed to generate professional compatibility interpretation');
   }
 
-  return JSON.parse(content);
+  const result = JSON.parse(content);
+  
+  // Валидация наличия имён в ответе
+  if (hostName && partnerName) {
+    const summaryText = result.summary || '';
+    const hasHostName = summaryText.toLowerCase().includes(hostName.toLowerCase());
+    const hasPartnerName = summaryText.toLowerCase().includes(partnerName.toLowerCase());
+    
+    if (!hasHostName || !hasPartnerName) {
+      const missing = [];
+      if (!hasHostName) missing.push(hostName);
+      if (!hasPartnerName) missing.push(partnerName);
+      console.error(`[Professional Compatibility Personalization Failure] Missing names in summary: ${missing.join(', ')}`, {
+        host_name: hostName,
+        partner_name: partnerName,
+        has_host: hasHostName,
+        has_partner: hasPartnerName,
+        summary_preview: summaryText.substring(0, 200),
+        locale
+      });
+    } else {
+      console.log(`[Professional Compatibility Personalization Success] Both names present in summary: ${hostName}, ${partnerName}`);
+    }
+  }
+
+  return result;
 }

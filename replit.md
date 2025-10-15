@@ -22,6 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, with custom prompts for various reading types and gender-based tone personalization.
 - **Professional Interpretation System**: Advanced natal chart analysis with house rulers (classical astrology), aspect weights (angular/succedent/cadent +2/+1/+0.5), stellium detection (×1.3 coefficient), and professional synastry with house overlays.
+- **Personalized Compatibility**: All compatibility interpretations use real user names (e.g., "Марина и Алексей" / "Marina and Alex") throughout the analysis. The AI prompts enforce name usage (minimum 1 name per section), and backend validates that names appear in the response. This personalization increases engagement and makes readings feel individually crafted.
 - **Data Caching**: Multi-locale caching for natal charts and professional interpretations (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
 
 ### Data Storage

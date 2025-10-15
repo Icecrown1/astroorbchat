@@ -1042,6 +1042,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               angles: person2ChartData.angles,
             },
             houseOverlays,
+            host_name: user.name,
+            partner_name: partner.name,
           };
 
           professionalInterpretation = await getProfessionalCompatibilityInterpretation(compatibilityData, locale);
@@ -1050,6 +1052,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Failed to generate professional compatibility:', error);
           // Fall back to basic compatibility on error (no energy deducted yet)
           analysis = await getAstrologyInterpretation("compatibility", {
+            host_name: user.name,
+            partner_name: partner.name,
             person1: person1Chart,
             person2: person2Chart,
           }, locale, user.gender);
@@ -1057,6 +1061,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Basic compatibility interpretation
         analysis = await getAstrologyInterpretation("compatibility", {
+          host_name: user.name,
+          partner_name: partner.name,
           person1: person1Chart,
           person2: person2Chart,
         }, locale, user.gender);
