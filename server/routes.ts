@@ -1083,6 +1083,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUser(userId, { energy: user.energy - cost });
       await storage.createUsageLog({ userId, feature: featureName, cost });
 
+      const strengths = locale === 'ru' ? [
+        "Сильная эмоциональная связь и понимание",
+        "Общие ценности и жизненные цели",
+        "Отличная коммуникация и доверие",
+      ] : [
+        "Strong emotional connection and understanding",
+        "Shared values and life goals",
+        "Excellent communication and trust",
+      ];
+
+      const challenges = locale === 'ru' ? [
+        "Разные подходы к разрешению конфликтов",
+        "Баланс между независимостью и близостью",
+      ] : [
+        "Different approaches to conflict resolution",
+        "Balance independence with togetherness",
+      ];
+
       res.json({
         ok: true,
         data: {
@@ -1090,15 +1108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           analysis,
           professionalInterpretation,
           houseOverlays,
-          strengths: [
-            "Strong emotional connection and understanding",
-            "Shared values and life goals",
-            "Excellent communication and trust",
-          ],
-          challenges: [
-            "Different approaches to conflict resolution",
-            "Balance independence with togetherness",
-          ],
+          strengths,
+          challenges,
         },
       });
     } catch (error: any) {

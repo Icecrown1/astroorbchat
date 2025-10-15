@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Heart, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, Heart, HeartCrack, UserPlus, Users } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -273,6 +273,7 @@ export default function Compatibility() {
                       key={index}
                       className="flex items-start gap-3 p-3 rounded-lg bg-chart-4/10 border border-chart-4/20"
                     >
+                      <HeartCrack className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                       <p className="text-sm">{challenge}</p>
                     </div>
                   ))}
