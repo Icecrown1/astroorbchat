@@ -726,8 +726,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Check if natal chart exists
-      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+      // Check if natal chart exists in database
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart || !natalChart.data) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
 
@@ -744,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gender: user.gender,
           timezone: user.timezone
         },
-        natal: user.natalChart,
+        natal: natalChart.data,
         transits: []
       }, locale);
 
@@ -781,8 +782,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Check if natal chart exists
-      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+      // Check if natal chart exists in database
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart || !natalChart.data) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
 
@@ -814,7 +816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gender: user.gender,
           timezone: user.timezone
         },
-        natal: user.natalChart,
+        natal: natalChart.data,
         week_start_iso: weekStart,
         transits: []
       }, locale);
@@ -848,8 +850,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      // Check if natal chart exists
-      if (!user.natalChart || typeof user.natalChart !== 'object' || !('planets' in user.natalChart)) {
+      // Check if natal chart exists in database
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart || !natalChart.data) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
 
@@ -879,7 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gender: user.gender,
           timezone: user.timezone
         },
-        natal: user.natalChart,
+        natal: natalChart.data,
         month_iso: monthStart,
         transits: []
       }, locale);
@@ -921,8 +924,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Execute the reading using Swiss Ephemeris for both charts
       // User's chart (use cached if available, or calculate from profile data)
       let person1ChartData: NatalChartResult;
-      if (user.natalChart && typeof user.natalChart === 'object' && 'planets' in user.natalChart) {
-        person1ChartData = user.natalChart as NatalChartResult;
+      const natalChart = await storage.getNatalChart(userId);
+      if (natalChart && natalChart.data) {
+        person1ChartData = natalChart.data as NatalChartResult;
       } else {
         // Parse birth time
         const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
