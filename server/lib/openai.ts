@@ -590,6 +590,77 @@ export interface WeeklyPlanResult {
   }>;
 }
 
+// Determine which house a planet is in based on longitude
+function findHouseForPlanet(longitude: number, cusps: number[]): number {
+  if (!cusps || cusps.length < 12) return 1;
+  
+  for (let i = 0; i < 12; i++) {
+    const houseStart = cusps[i];
+    const nextHouseStart = cusps[(i + 1) % 12];
+    
+    if (houseStart > nextHouseStart) {
+      if (longitude >= houseStart || longitude < nextHouseStart) {
+        return i + 1;
+      }
+    } else {
+      if (longitude >= houseStart && longitude < nextHouseStart) {
+        return i + 1;
+      }
+    }
+  }
+  return 1;
+}
+
+// Summarize transits compactly without losing data
+function summarizeTransits(transits: any[], locale: string = 'ru'): string {
+  if (!transits || transits.length === 0) return '';
+  
+  // Planet and aspect translations for Russian
+  const planetTranslations: Record<string, string> = {
+    'Sun': 'Солнце', 'Moon': 'Луна', 'Mercury': 'Меркурий', 'Venus': 'Венера',
+    'Mars': 'Марс', 'Jupiter': 'Юпитер', 'Saturn': 'Сатурн', 'Uranus': 'Уран',
+    'Neptune': 'Нептун', 'Pluto': 'Плутон'
+  };
+  
+  const aspectTranslations: Record<string, string> = {
+    'conjunction': 'соединение', 'opposition': 'оппозиция', 'square': 'квадрат',
+    'trine': 'трин', 'sextile': 'секстиль'
+  };
+  
+  const translateTerm = (term: string): string => {
+    if (locale !== 'ru') return term;
+    return planetTranslations[term] || aspectTranslations[term] || term;
+  };
+  
+  const transitSummaries = transits.map((t: any) => {
+    const date = t.date || t.start_date || '?';
+    const planet = translateTerm(t.planet || t.transiting_planet || '?');
+    const aspect = translateTerm(t.aspect || '?');
+    const target = translateTerm(t.natal_planet || t.target || '?');
+    return `${date}: ${planet} ${aspect} ${target}`;
+  }).join('; ');
+  
+  return transitSummaries;
+}
+
+// Extract key planet positions from natal chart for compact prompt
+function extractKeyPlanetPositions(natal: any, locale: string = 'ru'): string {
+  if (!natal || !natal.planets) return '';
+  
+  const cusps = natal.houses?.cusps || [];
+  const planetEntries = Object.entries(natal.planets as Record<string, any>);
+  
+  const inHouse = locale === 'ru' ? 'в доме' : 'in house';
+  const inSign = locale === 'ru' ? 'в' : 'in';
+  
+  const planetInfo = planetEntries.map(([name, data]: [string, any]) => {
+    const house = cusps.length > 0 ? findHouseForPlanet(data.longitude, cusps) : '?';
+    return `${name} ${inSign} ${data.sign || '?'} ${inHouse} ${house}`;
+  }).join(', ');
+  
+  return planetInfo;
+}
+
 export async function generateWeeklyPlan(
   input: WeeklyPlanInput,
   locale: string = 'ru'
@@ -604,16 +675,31 @@ export async function generateWeeklyPlan(
   weekEnd.setDate(weekEnd.getDate() + 6);
   const weekRange = `${input.week_start_iso}..${weekEnd.toISOString().split('T')[0]}`;
 
+  // Use compact planet positions instead of full natal chart
+  const planetPositions = extractKeyPlanetPositions(input.natal, locale);
+  
+  // Localized labels
+  const labels = {
+    week: locale === 'ru' ? 'Неделя' : 'Week',
+    name: locale === 'ru' ? 'Имя' : 'Name',
+    gender: locale === 'ru' ? 'Пол' : 'Gender',
+    timezone: locale === 'ru' ? 'Часовой пояс' : 'Timezone',
+    planets: locale === 'ru' ? 'Основные позиции планет' : 'Key planet positions',
+    transits: locale === 'ru' ? 'Транзиты недели' : 'Week transits'
+  };
+  
+  // Include transits if available (compact summary without data loss)
+  const transitsInfo = input.transits && input.transits.length > 0 
+    ? `\n${labels.transits}: ${summarizeTransits(input.transits, locale)}` 
+    : '';
+
   const promptData = `
-Неделя: ${weekRange}
-Имя: ${input.profile.name}
-Пол: ${input.profile.gender}
-Часовой пояс: ${input.profile.timezone}
+${labels.week}: ${weekRange}
+${labels.name}: ${input.profile.name}
+${labels.gender}: ${input.profile.gender}
+${labels.timezone}: ${input.profile.timezone}
 
-Натальная карта:
-${JSON.stringify(input.natal, null, 2)}
-
-${input.transits && input.transits.length > 0 ? `Транзиты недели: ${JSON.stringify(input.transits, null, 2)}` : ''}
+${labels.planets}: ${planetPositions}${transitsInfo}
   `.trim();
 
   const promptText = loadPrompt('weekly_plan', {});
@@ -623,11 +709,11 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
     ? "Ты опытный астролог-практик. Составляешь недельные планы с конкретными рекомендациями. Возвращаешь только валидный JSON."
     : "You are a practical astrologer. You create weekly plans with concrete recommendations. Return only valid JSON.";
 
-  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-4-turbo');
+  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-5');
   console.log('[generateWeeklyPlan] Prompt length:', finalPrompt.length);
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
+    model: "gpt-5",
     messages: [
       {
         role: "system",
@@ -639,7 +725,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 4000
+    max_completion_tokens: 5000
   });
 
   console.log('[generateWeeklyPlan] OpenAI response received');
@@ -696,17 +782,33 @@ export async function generateMonthlyPlan(
   monthEnd.setDate(0);
   const month = input.month_iso.substring(0, 7);
 
+  // Use compact planet positions instead of full natal chart
+  const planetPositions = extractKeyPlanetPositions(input.natal, locale);
+  
+  // Localized labels
+  const labels = {
+    month: locale === 'ru' ? 'Месяц' : 'Month',
+    period: locale === 'ru' ? 'Период' : 'Period',
+    name: locale === 'ru' ? 'Имя' : 'Name',
+    gender: locale === 'ru' ? 'Пол' : 'Gender',
+    timezone: locale === 'ru' ? 'Часовой пояс' : 'Timezone',
+    planets: locale === 'ru' ? 'Основные позиции планет' : 'Key planet positions',
+    transits: locale === 'ru' ? 'Транзиты месяца' : 'Month transits'
+  };
+  
+  // Include transits if available (compact summary without data loss)
+  const transitsInfo = input.transits && input.transits.length > 0 
+    ? `\n${labels.transits}: ${summarizeTransits(input.transits, locale)}` 
+    : '';
+
   const promptData = `
-Месяц: ${month}
-Период: ${input.month_iso}..${monthEnd.toISOString().split('T')[0]}
-Имя: ${input.profile.name}
-Пол: ${input.profile.gender}
-Часовой пояс: ${input.profile.timezone}
+${labels.month}: ${month}
+${labels.period}: ${input.month_iso}..${monthEnd.toISOString().split('T')[0]}
+${labels.name}: ${input.profile.name}
+${labels.gender}: ${input.profile.gender}
+${labels.timezone}: ${input.profile.timezone}
 
-Натальная карта:
-${JSON.stringify(input.natal, null, 2)}
-
-${input.transits && input.transits.length > 0 ? `Транзиты месяца: ${JSON.stringify(input.transits, null, 2)}` : ''}
+${labels.planets}: ${planetPositions}${transitsInfo}
   `.trim();
 
   const promptText = loadPrompt('monthly_plan', {});
@@ -717,7 +819,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты месяца: 
     : "You are a practical astrologer. You create monthly plans considering weeks and key dates. Return only valid JSON.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
+    model: "gpt-5",
     messages: [
       {
         role: "system",
