@@ -7,7 +7,7 @@ import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram"
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
 import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
-import { getTonPrice, convertUSDToTON, verifyTonTransaction } from "./lib/ton";
+import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
@@ -1774,11 +1774,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const validated = confirmTonPaymentSchema.parse(req.body);
 
-      // Basic BOC validation (must be non-empty base64-ish string)
-      if (!validated.boc || validated.boc.length < 10) {
-        return res.status(400).json({ ok: false, error: "Invalid transaction proof" });
-      }
-
       // Find payment
       const payments = await storage.getAllPayments();
       const payment = payments.find(p => p.id === validated.paymentId && p.userId === userId);
@@ -1793,23 +1788,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ok: true, message: "Already processed" });
       }
 
-      // Security: Check payment age (must be recent, within 10 minutes)
-      const paymentCreatedAt = new Date(payment.txHash.replace('pending_', ''));
-      const ageMinutes = (Date.now() - paymentCreatedAt.getTime()) / (1000 * 60);
-      if (ageMinutes > 10) {
-        console.error('[TON_CONFIRM] Payment too old:', ageMinutes, 'minutes');
-        return res.status(400).json({ ok: false, error: "Payment expired" });
+      // Get wallet address from env
+      const walletAddress = process.env.TON_WALLET_ADDRESS;
+      if (!walletAddress) {
+        console.error('[TON_CONFIRM] TON_WALLET_ADDRESS not configured');
+        return res.status(500).json({ ok: false, error: "Payment system not configured" });
       }
 
-      // Log transaction details for manual verification
-      console.log('[TON_CONFIRM] Processing TON payment:', {
+      // Get all used txHashes to exclude them from search
+      const usedTxHashes = new Set(
+        payments
+          .filter(p => p.status === "completed" && p.txHash && !p.txHash.startsWith('pending_'))
+          .map(p => p.txHash)
+      );
+
+      // Find matching transaction on blockchain (excluding already used ones)
+      console.log('[TON_CONFIRM] Searching for transaction:', {
         paymentId: validated.paymentId,
-        userId,
-        amount: payment.amountUSD,
-        amountTON: payment.amountTON,
-        bocLength: validated.boc.length,
-        bocPreview: validated.boc.substring(0, 20) + '...'
+        walletAddress,
+        expectedAmount: payment.amountTON,
+        usedTxHashesCount: usedTxHashes.size,
       });
+
+      const matchedTx = await findRecentTransaction(
+        walletAddress,
+        payment.amountTON || '0',
+        10, // 10 minutes max age
+        usedTxHashes // Exclude already used transactions
+      );
+
+      if (!matchedTx) {
+        console.error('[TON_CONFIRM] No matching unused transaction found on blockchain');
+        return res.status(400).json({ 
+          ok: false, 
+          error: "Transaction not found on blockchain. Please wait a few seconds and try again." 
+        });
+      }
 
       // Process payment - credit energy
       if (payment.kind === "energy_pack" && payment.energyAmount) {
@@ -1822,13 +1836,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Update payment status with boc as proof
+      // Update payment status with verified txHash
       await storage.updatePayment(validated.paymentId, {
         status: "completed",
-        txHash: `boc_${Date.now()}`, // Store timestamp, boc logged above
+        txHash: matchedTx.hash,
       });
 
-      res.json({ ok: true, message: "Payment confirmed" });
+      console.log('[TON_CONFIRM] Payment verified and completed:', {
+        paymentId: validated.paymentId,
+        txHash: matchedTx.hash,
+        amount: matchedTx.amount,
+      });
+
+      res.json({ 
+        ok: true, 
+        message: "Payment confirmed",
+        txHash: matchedTx.hash 
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ ok: false, error: error.errors[0].message });

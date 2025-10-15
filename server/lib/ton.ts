@@ -61,3 +61,61 @@ export async function verifyTonTransaction(
     return false;
   }
 }
+
+export async function findRecentTransaction(
+  walletAddress: string,
+  expectedAmount: string,
+  maxAgeMinutes: number = 10,
+  excludeTxHashes: Set<string> = new Set()
+): Promise<{ hash: string; amount: string; timestamp: number } | null> {
+  try {
+    const response = await fetch(
+      `https://tonapi.io/v2/blockchain/accounts/${walletAddress}/transactions?limit=50`
+    );
+    
+    if (!response.ok) {
+      console.error('[TON] Failed to fetch transactions:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    const transactions = data.transactions || [];
+    
+    const cutoffTime = Math.floor(Date.now() / 1000) - (maxAgeMinutes * 60);
+    
+    // Find matching transaction by amount and time, excluding already used ones
+    for (const tx of transactions) {
+      if (!tx.in_msg) continue;
+      
+      const txAmount = tx.in_msg.value || '0';
+      const txTime = tx.utime || 0;
+      const txHash = tx.hash;
+      
+      // Skip if already used
+      if (excludeTxHashes.has(txHash)) {
+        console.log('[TON] Skipping already used transaction:', txHash);
+        continue;
+      }
+      
+      if (txAmount === expectedAmount && txTime >= cutoffTime) {
+        console.log('[TON] Found matching transaction:', {
+          hash: txHash,
+          amount: txAmount,
+          timestamp: txTime
+        });
+        
+        return {
+          hash: txHash,
+          amount: txAmount,
+          timestamp: txTime
+        };
+      }
+    }
+    
+    console.log('[TON] No matching unused transaction found');
+    return null;
+  } catch (error) {
+    console.error('[TON] Error finding transaction:', error);
+    return null;
+  }
+}

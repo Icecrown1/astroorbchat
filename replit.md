@@ -40,10 +40,17 @@ Preferred communication style: Simple, everyday language.
 - **Energy Costs**: Basic natal chart and horoscope readings cost 1 orb each, compatibility analysis costs 2 orbs. Energy resets daily to 10 orbs.
 
 ### Payment Systems
-- **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration
+- **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration with blockchain verification
   - **TON Connect Setup**: Uses `@tonconnect/ui-react` Provider with manifest at `/.well-known/tonconnect-manifest.json`
   - **Wallet Integration**: `useTonConnectUI()` hook provides wallet connection state and transaction methods
-  - **Modal Flow**: Opens TON Connect modal → User selects wallet → Connects → Sends transaction
+  - **Payment Flow**: Create pending payment → Send TON transaction → Backend polls TON API → Finds transaction by amount+time → Verifies & credits energy
+  - **Verification Method**: Uses `findRecentTransaction()` to poll TON API (tonapi.io) for incoming transactions matching exact amount within 10-minute window
+  - **Security Features**:
+    - Blockchain verification via TON API (amount + timestamp matching)
+    - txHash uniqueness check (prevents replay attacks)
+    - User ownership validation (payment.userId === userId)
+    - 10-minute expiry window for transaction matching
+    - Idempotency support (safe to retry confirmation)
 - **Telegram Stars**: In-app purchases using Telegram's native Stars currency (⭐)
   - **Version Requirement**: Requires Telegram WebApp version 6.1+ (method `openInvoice` not available in 6.0)
   - **Version Check**: Frontend validates Telegram version before allowing Stars payments, shows warning for outdated versions

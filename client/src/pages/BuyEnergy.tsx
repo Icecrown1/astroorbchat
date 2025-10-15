@@ -74,23 +74,44 @@ export default function BuyEnergy() {
         const result = await tonConnectUI.sendTransaction(transaction);
         console.log('[TON] Transaction sent, confirming payment...', result);
 
-        // Confirm payment on backend
-        const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
-          paymentId: data.paymentId,
-          boc: result.boc,
-        });
+        // Retry confirmation with exponential backoff (blockchain needs time)
+        const maxRetries = 10;
+        const retryDelay = 3000; // 3 seconds
+        let lastError = '';
 
-        if (!confirmResponse.ok) {
-          throw new Error(confirmResponse.error || 'Failed to confirm payment');
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          console.log(`[TON] Confirmation attempt ${attempt}/${maxRetries}`);
+          
+          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
+            paymentId: data.paymentId,
+            boc: result.boc,
+          });
+
+          if (confirmResponse.ok) {
+            console.log('[TON] Payment confirmed, energy credited');
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            toast({
+              title: t.common.success,
+              description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
+            });
+            navigate('/dashboard');
+            return;
+          }
+
+          lastError = confirmResponse.error || 'Failed to confirm payment';
+          
+          // If not found on blockchain, wait and retry
+          if (lastError.includes('not found on blockchain') && attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          
+          // Other errors - don't retry
+          break;
         }
 
-        console.log('[TON] Payment confirmed, energy credited');
-        queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-        toast({
-          title: t.common.success,
-          description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
-        });
-        navigate('/dashboard');
+        // All retries failed
+        throw new Error(lastError || 'Failed to confirm payment after multiple attempts');
       } catch (error: any) {
         console.error('[TON] Error:', error);
         toast({
