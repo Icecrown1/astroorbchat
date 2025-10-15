@@ -10,11 +10,12 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
 import { useTranslation } from '@/contexts/LocaleContext';
+import WebApp from '@twa-dev/sdk';
 
 const ENERGY_PACKS = [
-  { amount: 20, usdPrice: 2.99, popular: false },
-  { amount: 50, usdPrice: 5.99, popular: true },
-  { amount: 120, usdPrice: 11.99, popular: false },
+  { amount: 20, usdPrice: 2.99, starsPrice: 190, popular: false },
+  { amount: 50, usdPrice: 5.99, starsPrice: 375, popular: true },
+  { amount: 120, usdPrice: 11.99, starsPrice: 750, popular: false },
 ];
 
 export default function BuyEnergy() {
@@ -37,7 +38,7 @@ export default function BuyEnergy() {
     queryKey: ['/api/payments/price'],
   });
 
-  const mutation = useMutation({
+  const tonMutation = useMutation({
     mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
       const response = await apiRequest('POST', '/api/payments/ton/create', {
         kind: 'energy_pack',
@@ -77,9 +78,60 @@ export default function BuyEnergy() {
     },
   });
 
+  const starsMutation = useMutation({
+    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+      const response = await apiRequest('POST', '/api/payments/stars/create-invoice', {
+        kind: 'energy_pack',
+        energyAmount: pack.amount,
+        amountStars: pack.starsPrice,
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data, pack) => {
+      try {
+        WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          if (status === 'paid') {
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            toast({
+              title: t.common.success,
+              description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
+            });
+            navigate('/dashboard');
+          } else if (status === 'cancelled') {
+            toast({
+              title: locale === 'ru' ? 'Платеж отменен' : 'Payment cancelled',
+              description: locale === 'ru' ? 'Вы отменили платеж' : 'You cancelled the payment',
+            });
+          } else if (status === 'failed') {
+            toast({
+              title: t.common.error,
+              description: locale === 'ru' ? 'Платеж не прошел' : 'Payment failed',
+              variant: 'destructive',
+            });
+          }
+        });
+      } catch (error: any) {
+        toast({
+          title: t.common.error,
+          description: error.message || t.errors.calculationFailed,
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
-    if (pricesData?.ok && pricesData.data?.tonRate) {
-      return (usdPrice / pricesData.data.tonRate).toFixed(2);
+    const data = pricesData as any;
+    if (data?.ok && data.data?.tonRate) {
+      return (usdPrice / data.data.tonRate).toFixed(2);
     }
     return (usdPrice / 7.5).toFixed(2);
   };
@@ -137,52 +189,80 @@ export default function BuyEnergy() {
                     <p className="text-sm text-muted-foreground">
                       ≈ {getTonPrice(pack.usdPrice)} TON
                     </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {locale === 'ru' ? 'или' : 'or'} {pack.starsPrice} ⭐ Stars
+                    </p>
                   </div>
                 </div>
 
-                <Button
-                  className="w-full"
-                  variant={selectedPack === pack.amount ? 'default' : 'outline'}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!walletConnected) {
-                      try {
-                        await connectWallet();
-                        setWalletConnected(true);
-                        // Immediately proceed with purchase after successful connection
-                        mutation.mutate(pack);
-                      } catch (error: any) {
-                        toast({
-                          title: t.common.error,
-                          description: error.message || 'Failed to connect wallet',
-                          variant: 'destructive',
-                        });
+                <div className="space-y-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPack(pack.amount);
+                      starsMutation.mutate(pack);
+                    }}
+                    disabled={starsMutation.isPending && selectedPack === pack.amount}
+                    data-testid={`button-buy-stars-${pack.amount}`}
+                  >
+                    {starsMutation.isPending && selectedPack === pack.amount ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.buyEnergy.purchasing}
+                      </>
+                    ) : (
+                      <>
+                        <span className="mr-2">⭐</span>
+                        {locale === 'ru' ? 'Оплатить Stars' : 'Pay with Stars'}
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setSelectedPack(pack.amount);
+                      if (!walletConnected) {
+                        try {
+                          await connectWallet();
+                          setWalletConnected(true);
+                          tonMutation.mutate(pack);
+                        } catch (error: any) {
+                          toast({
+                            title: t.common.error,
+                            description: error.message || 'Failed to connect wallet',
+                            variant: 'destructive',
+                          });
+                        }
+                      } else {
+                        tonMutation.mutate(pack);
                       }
-                    } else {
-                      mutation.mutate(pack);
-                    }
-                  }}
-                  disabled={mutation.isPending}
-                  data-testid={`button-buy-pack-${pack.amount}`}
-                >
-                  {mutation.isPending && selectedPack === pack.amount ? (
-                    <>
-                      <Loader className="mr-2" size="sm" />
-                      {t.buyEnergy.purchasing}
-                    </>
-                  ) : !walletConnected ? (
-                    <>
-                      <Wallet className="w-4 h-4 mr-2" />
-                      {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
-                    </>
-                  ) : (
-                    <>
-                      {selectedPack === pack.amount && <Check className="w-4 h-4 mr-2" />}
-                      <ShoppingBag className="w-4 h-4 mr-2" />
-                      {t.buyEnergy.purchaseWith}
-                    </>
-                  )}
-                </Button>
+                    }}
+                    disabled={tonMutation.isPending && selectedPack === pack.amount}
+                    data-testid={`button-buy-ton-${pack.amount}`}
+                  >
+                    {tonMutation.isPending && selectedPack === pack.amount ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.buyEnergy.purchasing}
+                      </>
+                    ) : !walletConnected ? (
+                      <>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? 'Подключить TON' : 'Connect TON'}
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? 'Оплатить TON' : 'Pay with TON'}
+                      </>
+                    )}
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
@@ -190,11 +270,9 @@ export default function BuyEnergy() {
 
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
-            {t.subscribe.mostPopular === t.subscribe.mostPopular ? 
-              (t.common.energy === 'Energy' ? 
-                'Payments are processed securely via TON blockchain. Your energy will be added instantly after confirmation.' :
-                'Платежи обрабатываются безопасно через блокчейн TON. Ваша энергия будет добавлена мгновенно после подтверждения.'
-              ) : ''
+            {locale === 'ru' ? 
+              'Оплата через Telegram Stars ⭐ или TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
+              'Pay with Telegram Stars ⭐ or TON blockchain. Energy is added instantly after confirmation.'
             }
           </p>
         </Card>
