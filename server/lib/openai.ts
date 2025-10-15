@@ -639,7 +639,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 3000
+    max_completion_tokens: 6000
   });
 
   console.log('[generateWeeklyPlan] OpenAI response received');
@@ -729,7 +729,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты месяца: 
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 4000
+    max_completion_tokens: 8000
   });
 
   const content = completion.choices[0]?.message?.content;
