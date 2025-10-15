@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartCanvas } from '@/components/ChartCanvas';
 import { PlanetModal } from '@/components/PlanetModal';
-import { Loader } from '@/components/Loader';
+import { Loader, FullPageLoader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
 import { ImportantDatesList } from '@/components/ImportantDatesList';
 import { ArrowLeft, Sparkles, RefreshCw, Calendar } from 'lucide-react';
@@ -210,6 +210,11 @@ export default function MyNatalChart() {
   }
 
   if (!chartData) {
+    // Show full-page loader when creating chart
+    if (createChartMutation.isPending) {
+      return <FullPageLoader />;
+    }
+
     return (
       <div className="min-h-screen bg-background p-4 pb-20">
         <div className="container max-w-4xl mx-auto">
@@ -244,11 +249,7 @@ export default function MyNatalChart() {
               size="lg"
               data-testid="button-create-chart"
             >
-              {createChartMutation.isPending ? (
-                <Loader className="mr-2" size="sm" />
-              ) : (
-                <Sparkles className="w-5 h-5 mr-2" />
-              )}
+              <Sparkles className="w-5 h-5 mr-2" />
               {locale === 'ru' ? 'Создать карту бесплатно' : 'Create Chart for Free'}
             </Button>
           </Card>
