@@ -783,27 +783,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { week_start_iso } = req.body;
       const locale = req.body.locale || 'ru';
 
+      console.log('[WEEKLY_PLAN] User ID:', userId);
+      console.log('[WEEKLY_PLAN] Request body:', { week_start_iso, locale });
+
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log('[WEEKLY_PLAN] User not found');
         return res.status(404).json({ ok: false, error: "User not found" });
       }
+
+      console.log('[WEEKLY_PLAN] User energy:', user.energy);
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
       if (!natalChart || !natalChart.data) {
+        console.log('[WEEKLY_PLAN] Natal chart not initialized');
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
+
+      console.log('[WEEKLY_PLAN] Natal chart exists');
 
       // Check subscription status
       const subscription = await storage.getSubscription(userId);
       const hasActiveSubscription = subscription?.status === 'active';
 
+      console.log('[WEEKLY_PLAN] Has active subscription:', hasActiveSubscription);
+
       // Subscribers get it free, others pay 1 orb
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.weekly_plan;
         if (user.energy < cost) {
+          console.log('[WEEKLY_PLAN] Insufficient energy:', user.energy, '< cost:', cost);
           return res.status(402).json({ ok: false, error: "Insufficient energy" });
         }
       }
@@ -817,7 +829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weekStart = nextMonday.format('YYYY-MM-DD');
       }
 
+      console.log('[WEEKLY_PLAN] Week start calculated:', weekStart);
+
       // Generate weekly plan
+      console.log('[WEEKLY_PLAN] Calling generateWeeklyPlan...');
       const result = await generateWeeklyPlan({
         profile: {
           name: user.name,
@@ -829,11 +844,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transits: []
       }, locale);
 
+      console.log('[WEEKLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
+
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.weekly_plan;
         await storage.updateUser(userId, { energy: user.energy - cost });
         await storage.createUsageLog({ userId, feature: "weekly_plan", cost });
+        console.log('[WEEKLY_PLAN] Energy deducted:', cost);
       }
 
       res.json({
@@ -841,6 +859,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: result
       });
     } catch (error: any) {
+      console.error('[WEEKLY_PLAN] Error:', error);
+      console.error('[WEEKLY_PLAN] Error stack:', error.stack);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
@@ -851,27 +871,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { month_iso } = req.body;
       const locale = req.body.locale || 'ru';
 
+      console.log('[MONTHLY_PLAN] User ID:', userId);
+      console.log('[MONTHLY_PLAN] Request body:', { month_iso, locale });
+
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log('[MONTHLY_PLAN] User not found');
         return res.status(404).json({ ok: false, error: "User not found" });
       }
+
+      console.log('[MONTHLY_PLAN] User energy:', user.energy);
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
       if (!natalChart || !natalChart.data) {
+        console.log('[MONTHLY_PLAN] Natal chart not initialized');
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
+
+      console.log('[MONTHLY_PLAN] Natal chart exists');
 
       // Check subscription status
       const subscription = await storage.getSubscription(userId);
       const hasActiveSubscription = subscription?.status === 'active';
 
+      console.log('[MONTHLY_PLAN] Has active subscription:', hasActiveSubscription);
+
       // Subscribers get it free, others pay 1 orb
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.monthly_plan;
         if (user.energy < cost) {
+          console.log('[MONTHLY_PLAN] Insufficient energy:', user.energy, '< cost:', cost);
           return res.status(402).json({ ok: false, error: "Insufficient energy" });
         }
       }
@@ -883,7 +915,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthStart = now.startOf('month').format('YYYY-MM-DD');
       }
 
+      console.log('[MONTHLY_PLAN] Month start calculated:', monthStart);
+
       // Generate monthly plan
+      console.log('[MONTHLY_PLAN] Calling generateMonthlyPlan...');
       const result = await generateMonthlyPlan({
         profile: {
           name: user.name,
@@ -895,11 +930,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transits: []
       }, locale);
 
+      console.log('[MONTHLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
+
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.monthly_plan;
         await storage.updateUser(userId, { energy: user.energy - cost });
         await storage.createUsageLog({ userId, feature: "monthly_plan", cost });
+        console.log('[MONTHLY_PLAN] Energy deducted:', cost);
       }
 
       res.json({
@@ -907,6 +945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: result
       });
     } catch (error: any) {
+      console.error('[MONTHLY_PLAN] Error:', error);
+      console.error('[MONTHLY_PLAN] Error stack:', error.stack);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
