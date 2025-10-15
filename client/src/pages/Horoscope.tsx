@@ -8,7 +8,7 @@ import { Loader } from '@/components/Loader';
 import { HoroscopeThemes } from '@/components/HoroscopeThemes';
 import { WeeklyPlanModal } from '@/components/WeeklyPlanModal';
 import { MonthlyPlanModal } from '@/components/MonthlyPlanModal';
-import { ArrowLeft, Sparkles, Calendar, CalendarRange } from 'lucide-react';
+import { ArrowLeft, Sparkles, Calendar, CalendarRange, Archive as ArchiveIcon } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -94,19 +94,29 @@ export default function Horoscope() {
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
       <div className="container max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/dashboard')}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-display font-bold">{t.horoscope.title}</h1>
-            <p className="text-muted-foreground">{t.horoscope.subtitle}</p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/dashboard')}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-display font-bold">{t.horoscope.title}</h1>
+              <p className="text-muted-foreground">{t.horoscope.subtitle}</p>
+            </div>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/archive')}
+            data-testid="button-archive"
+          >
+            <ArchiveIcon className="w-4 h-4 mr-2" />
+            {t.horoscope.archive || 'Архив'}
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">

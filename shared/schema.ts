@@ -177,6 +177,7 @@ export const horoscopeReadings = pgTable("horoscope_readings", {
   startDate: varchar("start_date", { length: 10 }),
   endDate: varchar("end_date", { length: 10 }),
   forecast: text("forecast").notNull(),
+  data: jsonb("data"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("horoscope_readings_user_id_idx").on(table.userId),

@@ -862,6 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: weekStart,
         endDate: weekEnd,
         forecast: JSON.stringify(result),
+        data: result,
       });
 
       // Deduct energy only if not subscriber
@@ -960,6 +961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: monthStart,
         endDate: monthEnd,
         forecast: JSON.stringify(result),
+        data: result,
       });
 
       // Deduct energy only if not subscriber
@@ -977,6 +979,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[MONTHLY_PLAN] Error:', error);
       console.error('[MONTHLY_PLAN] Error stack:', error.stack);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get archive of saved horoscope plans
+  app.get("/api/astrology/horoscope/archive", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      // Get all saved horoscope readings (weekly and monthly plans)
+      const readings = await storage.getHoroscopeReadingsByUserId(userId, 100);
+      
+      // Filter only weekly and monthly plans
+      const archive = readings
+        .filter(r => r.period === 'week' || r.period === 'month')
+        .map(r => ({
+          id: r.id,
+          period: r.period,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          data: r.data,
+          createdAt: r.createdAt,
+        }));
+      
+      res.json({
+        ok: true,
+        data: archive
+      });
+    } catch (error: any) {
+      console.error('[ARCHIVE] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Delete a saved horoscope plan
+  app.delete("/api/astrology/horoscope/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { id } = req.params;
+      
+      // First check if the reading belongs to the user
+      const reading = await storage.getHoroscopeReadingsByUserId(userId, 100);
+      const userReading = reading.find(r => r.id === id);
+      
+      if (!userReading) {
+        return res.status(404).json({ ok: false, error: "Reading not found" });
+      }
+      
+      // Delete the reading
+      await storage.deleteHoroscopeReading(id);
+      
+      res.json({
+        ok: true,
+        message: "Reading deleted successfully"
+      });
+    } catch (error: any) {
+      console.error('[DELETE_READING] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

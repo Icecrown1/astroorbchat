@@ -68,6 +68,7 @@ export interface IStorage {
   // Horoscope reading operations
   createHoroscopeReading(reading: InsertHoroscopeReading): Promise<HoroscopeReading>;
   getHoroscopeReadingsByUserId(userId: string, limit?: number): Promise<HoroscopeReading[]>;
+  deleteHoroscopeReading(id: string): Promise<void>;
   
   // Compatibility reading operations
   createCompatibilityReading(reading: InsertCompatibilityReading): Promise<CompatibilityReading>;
@@ -255,6 +256,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(horoscopeReadings.userId, userId))
       .orderBy(desc(horoscopeReadings.createdAt))
       .limit(limit);
+  }
+
+  async deleteHoroscopeReading(id: string): Promise<void> {
+    await db
+      .delete(horoscopeReadings)
+      .where(eq(horoscopeReadings.id, id));
   }
 
   // Compatibility reading operations
