@@ -725,7 +725,7 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 5000
+    max_completion_tokens: 15000
   });
 
   console.log('[generateWeeklyPlan] OpenAI response received');
@@ -831,7 +831,7 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 5000
+    max_completion_tokens: 15000
   });
 
   const content = completion.choices[0]?.message?.content;
