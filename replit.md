@@ -21,6 +21,10 @@ Preferred communication style: Simple, everyday language.
 - **Astrology Engine**: Utilizes Swiss Ephemeris via a Python bridge for accurate astronomical calculations (natal charts, solar returns, horoscopes, compatibility).
 - **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, with custom prompts for various reading types and gender-based tone personalization.
+  - **GPT-5 Optimization**: Compact prompt system reduces size by 90% to prevent reasoning token exhaustion. Uses helper functions (`extractKeyPlanetPositions`, `summarizeTransits`) instead of full JSON.
+  - **Prompt Helpers**: `findHouseForPlanet` calculates house positions, `extractKeyPlanetPositions` creates compact planet summaries, `summarizeTransits` preserves all transit data in concise format.
+  - **Full Localization**: All prompts (labels, planets, aspects) fully localized for ru/en. Planet translations (Sun→Солнце), aspect translations (square→квадрат).
+  - **Token Limits**: `max_completion_tokens=5000` for weekly/monthly plans balances quality and cost.
 - **Personalized Compatibility**: All compatibility interpretations use real user names (e.g., "Марина и Алексей" / "Marina and Alex") throughout the analysis. The AI prompts enforce name usage (minimum 1 name per section), and backend validates that names appear in the response. This personalization increases engagement and makes readings feel individually crafted.
 - **Data Caching**: Multi-locale caching for natal charts (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
 - **Horoscope System**: 
