@@ -728,7 +728,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
+      console.log('[HOROSCOPE] User ID:', userId);
+      console.log('[HOROSCOPE] Natal chart exists:', !!natalChart);
+      console.log('[HOROSCOPE] Natal chart has data:', !!(natalChart && natalChart.data));
+      if (natalChart && natalChart.data) {
+        console.log('[HOROSCOPE] Natal chart data type:', typeof natalChart.data);
+        console.log('[HOROSCOPE] Natal chart data keys:', Object.keys(natalChart.data));
+      }
       if (!natalChart || !natalChart.data) {
+        console.log('[HOROSCOPE] ERROR: NATAL_NOT_INITIALIZED');
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
 
