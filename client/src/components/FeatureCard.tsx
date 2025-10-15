@@ -35,7 +35,7 @@ export function FeatureCard({
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
       {disabled && (
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 left-4">
           <Lock className="w-5 h-5 text-muted-foreground" />
         </div>
       )}

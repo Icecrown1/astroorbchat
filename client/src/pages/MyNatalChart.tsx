@@ -146,6 +146,7 @@ export default function MyNatalChart() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Карта создана!' : 'Chart created!',
         description: locale === 'ru' ? 'Ваша натальная карта успешно создана' : 'Your natal chart has been created successfully',
@@ -168,6 +169,7 @@ export default function MyNatalChart() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Карта пересчитана' : 'Chart recalculated',
         description: locale === 'ru' ? 'Ваша натальная карта обновлена с учётом последних данных профиля' : 'Your natal chart has been updated with latest profile data',
