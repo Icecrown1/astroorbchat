@@ -62,6 +62,12 @@ export default function BuyEnergy() {
     },
     onSuccess: async (data, pack) => {
       try {
+        console.log('[TON] Payment created, preparing transaction...', {
+          paymentId: data.paymentId,
+          wallet: data.walletAddress,
+          amount: data.amountTON
+        });
+
         const transaction = {
           validUntil: Math.floor(Date.now() / 1000) + 600,
           messages: [
@@ -71,8 +77,10 @@ export default function BuyEnergy() {
             },
           ],
         };
+
+        console.log('[TON] Sending transaction via TON Connect...', transaction);
         const result = await tonConnectUI.sendTransaction(transaction);
-        console.log('[TON] Transaction sent, confirming payment...', result);
+        console.log('[TON] Transaction sent successfully, confirming payment...', result);
 
         // Retry confirmation with exponential backoff (blockchain needs time)
         const maxRetries = 10;
