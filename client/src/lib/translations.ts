@@ -67,6 +67,7 @@ export const translations = {
       baZiDesc: 'Chinese astrology insights',
       energyPacks: 'Energy Packs',
       subscriptionPlans: 'Subscription Plans',
+      needMoreEnergy: 'You need more energy orbs',
     },
     natalChart: {
       title: 'Natal Chart',
@@ -302,6 +303,7 @@ export const translations = {
       standardFeatures: 'Unlimited daily horoscopes, 50 orbs/month, Basic support',
       proFeatures: 'Everything in Standard, Unlimited orbs, Priority support, Advanced insights',
       mostPopular: 'Most Popular',
+      freeForSubscribers: 'Free for subscribers',
     },
     referral: {
       title: 'Referral Program',
@@ -461,6 +463,7 @@ export const translations = {
       baZiDesc: 'Прозрения китайской астрологии',
       energyPacks: 'Пакеты энергии',
       subscriptionPlans: 'Тарифы подписки',
+      needMoreEnergy: 'Вам нужно больше сфер энергии',
     },
     natalChart: {
       title: 'Натальная карта',
@@ -696,6 +699,7 @@ export const translations = {
       standardFeatures: 'Безлимитные гороскопы, 50 сфер/месяц, Базовая поддержка',
       proFeatures: 'Всё из Стандарта, Безлимитные сферы, Приоритетная поддержка, Продвинутые прозрения',
       mostPopular: 'Самый популярный',
+      freeForSubscribers: 'Бесплатно для подписчиков',
     },
     referral: {
       title: 'Реферальная программа',
