@@ -714,6 +714,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { period = 'day' } = req.body;
       const locale = req.body.locale || 'ru';
 
+      console.log('[HOROSCOPE] Request started - userId:', userId, 'period:', period, 'locale:', locale);
+
       // Validate period
       if (!['day', 'week', 'month'].includes(period)) {
         return res.status(400).json({ ok: false, error: "Invalid period. Must be 'day', 'week', or 'month'" });
@@ -728,7 +730,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
-      console.log('[HOROSCOPE] User ID:', userId);
       console.log('[HOROSCOPE] Natal chart exists:', !!natalChart);
       console.log('[HOROSCOPE] Natal chart has data:', !!(natalChart && natalChart.data));
       if (natalChart && natalChart.data) {
@@ -745,6 +746,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(402).json({ ok: false, error: "Insufficient energy" });
       }
 
+      console.log('[HOROSCOPE] Calling interpretHoroscope...');
+
       // Use the new interpretHoroscope function
       const result = await interpretHoroscope({
         period: period as "day" | "week" | "month",
@@ -756,6 +759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         natal: natalChart.data,
         transits: []
       }, locale);
+
+      console.log('[HOROSCOPE] interpretHoroscope returned successfully');
 
       // Determine date range for saving
       const now = dayjs().tz(user.timezone);
@@ -771,15 +776,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         forecast: JSON.stringify(result),
       });
 
+      console.log('[HOROSCOPE] Saved to database');
+
       // Only deduct energy after successful execution
       await storage.updateUser(userId, { energy: user.energy - cost });
       await storage.createUsageLog({ userId, feature: "horoscope", cost });
+
+      console.log('[HOROSCOPE] Request completed successfully');
 
       res.json({
         ok: true,
         data: result
       });
     } catch (error: any) {
+      console.error('[HOROSCOPE] Error occurred:', error.message);
+      console.error('[HOROSCOPE] Error stack:', error.stack);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

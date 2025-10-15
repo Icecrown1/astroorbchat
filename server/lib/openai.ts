@@ -493,6 +493,8 @@ export async function interpretHoroscope(
   input: HoroscopeInterpretationInput,
   locale: string = 'ru'
 ): Promise<HoroscopeInterpretationResult> {
+  console.log('[INTERPRET_HOROSCOPE] Starting with period:', input.period, 'locale:', locale);
+  
   const languageInstruction = locale === 'ru'
     ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
     : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
@@ -527,36 +529,54 @@ ${input.transits && input.transits.length > 0 ? `Транзиты: ${JSON.string
   const promptText = loadPrompt('horoscope', {});
   const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}\n\n${promptData}`;
 
+  console.log('[INTERPRET_HOROSCOPE] Prompt length:', finalPrompt.length);
+
   const systemMessage = locale === 'ru'
     ? "Ты опытный астролог-практик. Даёшь структурированные гороскопы с практичными советами. Возвращаешь только валидный JSON."
     : "You are a practical astrologer. You provide structured horoscopes with practical advice. Return only valid JSON.";
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: systemMessage
-      },
-      {
-        role: "user",
-        content: finalPrompt
-      }
-    ],
-    response_format: { type: "json_object" },
-    max_completion_tokens: 3000
-  });
-
-  const content = completion.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('Failed to generate horoscope interpretation');
-  }
-
+  console.log('[INTERPRET_HOROSCOPE] Calling OpenAI...');
+  
   try {
-    const result = JSON.parse(content);
-    return result;
-  } catch (e) {
-    throw new Error('Failed to parse horoscope interpretation response');
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: systemMessage
+        },
+        {
+          role: "user",
+          content: finalPrompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 3000
+    });
+
+    console.log('[INTERPRET_HOROSCOPE] OpenAI response received');
+    
+    const content = completion.choices[0]?.message?.content;
+    console.log('[INTERPRET_HOROSCOPE] Content length:', content?.length || 0);
+    
+    if (!content) {
+      console.error('[INTERPRET_HOROSCOPE] No content in response');
+      throw new Error('Failed to generate horoscope interpretation');
+    }
+
+    try {
+      const result = JSON.parse(content);
+      console.log('[INTERPRET_HOROSCOPE] Successfully parsed JSON');
+      return result;
+    } catch (e) {
+      console.error('[INTERPRET_HOROSCOPE] Failed to parse JSON:', e);
+      console.error('[INTERPRET_HOROSCOPE] Content was:', content.substring(0, 500));
+      throw new Error('Failed to parse horoscope interpretation response');
+    }
+  } catch (error: any) {
+    console.error('[INTERPRET_HOROSCOPE] OpenAI error:', error.message);
+    console.error('[INTERPRET_HOROSCOPE] Error details:', error);
+    throw error;
   }
 }
 
