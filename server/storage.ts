@@ -11,6 +11,7 @@ import {
   natalCharts,
   externalNatals,
   importantDateUnlocks,
+  starPayments,
   type User, 
   type InsertUser,
   type Subscription,
@@ -32,7 +33,9 @@ import {
   type ExternalNatal,
   type InsertExternalNatal,
   type ImportantDateUnlock,
-  type InsertImportantDateUnlock
+  type InsertImportantDateUnlock,
+  type StarPayment,
+  type InsertStarPayment
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -94,6 +97,11 @@ export interface IStorage {
   getImportantDateUnlocksByUserId(userId: string): Promise<ImportantDateUnlock[]>;
   createImportantDateUnlock(unlock: InsertImportantDateUnlock): Promise<ImportantDateUnlock>;
   updateImportantDateUnlock(id: string, data: Partial<ImportantDateUnlock>): Promise<ImportantDateUnlock | undefined>;
+  
+  // Star payment operations
+  createStarPayment(payment: InsertStarPayment): Promise<StarPayment>;
+  getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined>;
+  updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined>;
   
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -398,6 +406,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(importantDateUnlocks.id, id))
       .returning();
     return unlock || undefined;
+  }
+
+  // Star payment operations
+  async createStarPayment(insertPayment: InsertStarPayment): Promise<StarPayment> {
+    const [payment] = await db
+      .insert(starPayments)
+      .values(insertPayment)
+      .returning();
+    return payment;
+  }
+
+  async getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(starPayments)
+      .where(eq(starPayments.invoicePayload, invoicePayload));
+    return payment || undefined;
+  }
+
+  async updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined> {
+    const [payment] = await db
+      .update(starPayments)
+      .set(data)
+      .where(eq(starPayments.invoicePayload, invoicePayload))
+      .returning();
+    return payment || undefined;
   }
 
   // Admin operations
