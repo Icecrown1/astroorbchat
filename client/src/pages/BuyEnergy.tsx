@@ -71,7 +71,20 @@ export default function BuyEnergy() {
             },
           ],
         };
-        await tonConnectUI.sendTransaction(transaction);
+        const result = await tonConnectUI.sendTransaction(transaction);
+        console.log('[TON] Transaction sent, confirming payment...', result);
+
+        // Confirm payment on backend
+        const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
+          paymentId: data.paymentId,
+          boc: result.boc,
+        });
+
+        if (!confirmResponse.ok) {
+          throw new Error(confirmResponse.error || 'Failed to confirm payment');
+        }
+
+        console.log('[TON] Payment confirmed, energy credited');
         queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
         toast({
           title: t.common.success,
@@ -79,6 +92,7 @@ export default function BuyEnergy() {
         });
         navigate('/dashboard');
       } catch (error: any) {
+        console.error('[TON] Error:', error);
         toast({
           title: t.common.error,
           description: error.message || t.errors.calculationFailed,

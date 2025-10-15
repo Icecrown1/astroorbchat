@@ -1764,6 +1764,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const confirmTonPaymentSchema = z.object({
+    paymentId: z.string(),
+    boc: z.string(),
+  });
+
+  app.post("/api/payments/ton/confirm", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const validated = confirmTonPaymentSchema.parse(req.body);
+
+      // Basic BOC validation (must be non-empty base64-ish string)
+      if (!validated.boc || validated.boc.length < 10) {
+        return res.status(400).json({ ok: false, error: "Invalid transaction proof" });
+      }
+
+      // Find payment
+      const payments = await storage.getAllPayments();
+      const payment = payments.find(p => p.id === validated.paymentId && p.userId === userId);
+
+      if (!payment) {
+        return res.status(404).json({ ok: false, error: "Payment not found" });
+      }
+
+      if (payment.status === "completed") {
+        // Already processed (idempotency)
+        console.log('[TON_CONFIRM] Payment already completed:', validated.paymentId);
+        return res.json({ ok: true, message: "Already processed" });
+      }
+
+      // Security: Check payment age (must be recent, within 10 minutes)
+      const paymentCreatedAt = new Date(payment.txHash.replace('pending_', ''));
+      const ageMinutes = (Date.now() - paymentCreatedAt.getTime()) / (1000 * 60);
+      if (ageMinutes > 10) {
+        console.error('[TON_CONFIRM] Payment too old:', ageMinutes, 'minutes');
+        return res.status(400).json({ ok: false, error: "Payment expired" });
+      }
+
+      // Log transaction details for manual verification
+      console.log('[TON_CONFIRM] Processing TON payment:', {
+        paymentId: validated.paymentId,
+        userId,
+        amount: payment.amountUSD,
+        amountTON: payment.amountTON,
+        bocLength: validated.boc.length,
+        bocPreview: validated.boc.substring(0, 20) + '...'
+      });
+
+      // Process payment - credit energy
+      if (payment.kind === "energy_pack" && payment.energyAmount) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          await storage.updateUser(userId, {
+            energy: user.energy + payment.energyAmount,
+          });
+          console.log('[TON_CONFIRM] Energy credited:', payment.energyAmount, 'to user:', userId);
+        }
+      }
+
+      // Update payment status with boc as proof
+      await storage.updatePayment(validated.paymentId, {
+        status: "completed",
+        txHash: `boc_${Date.now()}`, // Store timestamp, boc logged above
+      });
+
+      res.json({ ok: true, message: "Payment confirmed" });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
+      console.error('[TON_CONFIRM] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
