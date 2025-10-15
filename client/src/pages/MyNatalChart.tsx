@@ -25,6 +25,7 @@ export default function MyNatalChart() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const [expandedPlanet, setExpandedPlanet] = useState<string | null>(null);
 
   // Load user's OWN natal chart from cache
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
@@ -254,7 +255,7 @@ export default function MyNatalChart() {
             </Accordion>
           )}
 
-          {rawChartData?.professionalInterpretation?.[locale] && (
+          {false && rawChartData?.professionalInterpretation?.[locale] && (
             <Card className="p-6 border-primary/20 bg-gradient-to-br from-primary/5 to-chart-1/5">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-5 h-5 text-primary" />
@@ -318,36 +319,54 @@ export default function MyNatalChart() {
 
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">{t.natalChart.planetaryPositions}</h2>
-            <Accordion type="single" collapsible className="w-full">
+            <div className="space-y-3">
               {chartData.planets?.map((planet: any, index: number) => (
-                <AccordionItem key={index} value={`planet-${index}`}>
-                  <AccordionTrigger data-testid={`accordion-planet-${planet.name}`}>
-                    <div className="flex items-center gap-3">
-                      <PlanetIcon 
-                        name={planet.name as any} 
-                        size={36} 
-                        variant="gold"
-                        animated
-                        className="shrink-0"
-                      />
-                      <div className="text-left">
-                        <div className="font-medium">{translatePlanet(planet.name, locale)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {translateSign(planet.sign, locale)} {planet.degree_in_sign?.toFixed(2)}°
-                        </div>
+                <div 
+                  key={index} 
+                  className="border rounded-lg overflow-hidden hover-elevate transition-all"
+                >
+                  <button
+                    onClick={() => setExpandedPlanet(expandedPlanet === planet.name ? null : planet.name)}
+                    className="w-full p-4 flex items-center gap-3 text-left"
+                    data-testid={`button-planet-${planet.name}`}
+                  >
+                    <PlanetIcon 
+                      name={planet.name as any} 
+                      size={36} 
+                      variant="gold"
+                      animated
+                      className="shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{translatePlanet(planet.name, locale)}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {translateSign(planet.sign, locale)} {planet.degree_in_sign?.toFixed(2)}°
                       </div>
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pt-2 text-sm text-muted-foreground">
-                      {locale === 'ru' 
-                        ? `Нажмите на планету в карте для детальной AI-интерпретации` 
-                        : `Click on the planet in the chart for detailed AI interpretation`}
+                  </button>
+                  
+                  {expandedPlanet === planet.name && (
+                    <div className="px-4 pb-4 pt-2 border-t bg-muted/30">
+                      <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                        {locale === 'ru' 
+                          ? `${translatePlanet(planet.name, locale)} в ${translateSign(planet.sign, locale)} показывает важную часть вашей личности и характера. Это положение влияет на то, как вы проявляете себя в мире и взаимодействуете с окружающими. Нажмите кнопку ниже, чтобы узнать подробную персональную трактовку с учётом всех аспектов.`
+                          : `${translatePlanet(planet.name, locale)} in ${translateSign(planet.sign, locale)} reveals an important part of your personality and character. This placement influences how you express yourself in the world and interact with others. Click the button below to discover a detailed personal interpretation with all aspects considered.`}
+                      </p>
+                      <Button
+                        onClick={() => setSelectedPlanet(planet.name)}
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        data-testid={`button-detailed-${planet.name}`}
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
+                      </Button>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+                  )}
+                </div>
               ))}
-            </Accordion>
+            </div>
           </Card>
 
           <Card className="p-6">
