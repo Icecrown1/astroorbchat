@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
 import { HoroscopeThemes } from '@/components/HoroscopeThemes';
+import { WeeklyPlanModal } from '@/components/WeeklyPlanModal';
+import { MonthlyPlanModal } from '@/components/MonthlyPlanModal';
 import { ArrowLeft, Sparkles, Calendar, CalendarRange } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +44,8 @@ export default function Horoscope() {
   const { t, locale } = useTranslation();
   const [activeTab, setActiveTab] = useState<'day' | 'week' | 'month'>('day');
   const [horoscopeData, setHoroscopeData] = useState<HoroscopeData | null>(null);
+  const [weeklyPlanOpen, setWeeklyPlanOpen] = useState(false);
+  const [monthlyPlanOpen, setMonthlyPlanOpen] = useState(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -194,6 +198,7 @@ export default function Horoscope() {
                     <Button
                       variant="default"
                       className="w-full"
+                      onClick={() => setWeeklyPlanOpen(true)}
                       data-testid="button-weekly-plan"
                     >
                       <Calendar className="w-4 h-4 mr-2" />
@@ -205,6 +210,7 @@ export default function Horoscope() {
                     <Button
                       variant="default"
                       className="w-full"
+                      onClick={() => setMonthlyPlanOpen(true)}
                       data-testid="button-monthly-plan"
                     >
                       <CalendarRange className="w-4 h-4 mr-2" />
@@ -216,6 +222,16 @@ export default function Horoscope() {
             )}
           </TabsContent>
         </Tabs>
+
+        <WeeklyPlanModal 
+          open={weeklyPlanOpen} 
+          onOpenChange={setWeeklyPlanOpen} 
+        />
+        
+        <MonthlyPlanModal 
+          open={monthlyPlanOpen} 
+          onOpenChange={setMonthlyPlanOpen} 
+        />
       </div>
     </div>
   );
