@@ -757,10 +757,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transits: []
       }, locale);
 
-      // Save to database
+      // Determine date range for saving
+      const now = dayjs().tz(user.timezone);
+      let startDate = now.format('YYYY-MM-DD');
+      let endDate = now.format('YYYY-MM-DD');
+
+      // Save to database with date range
       await storage.createHoroscopeReading({
         userId,
         period,
+        startDate,
+        endDate,
         forecast: JSON.stringify(result),
       });
 
@@ -820,16 +827,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Calculate week_start_iso if not provided (next Monday)
+      // Calculate week start (always Monday of current week)
       let weekStart = week_start_iso;
       if (!weekStart) {
         const now = dayjs().tz(user.timezone);
-        const daysUntilMonday = (8 - now.day()) % 7;
-        const nextMonday = daysUntilMonday === 0 ? now : now.add(daysUntilMonday, 'day');
-        weekStart = nextMonday.format('YYYY-MM-DD');
+        // Get Monday of current week (0=Sunday, 1=Monday, ..., 6=Saturday)
+        const dayOfWeek = now.day();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days
+        const monday = now.subtract(daysFromMonday, 'day');
+        weekStart = monday.format('YYYY-MM-DD');
       }
 
-      console.log('[WEEKLY_PLAN] Week start calculated:', weekStart);
+      // Calculate week end (Sunday)
+      const weekEnd = dayjs(weekStart).add(6, 'day').format('YYYY-MM-DD');
+
+      console.log('[WEEKLY_PLAN] Week range:', weekStart, 'to', weekEnd);
 
       // Generate weekly plan
       console.log('[WEEKLY_PLAN] Calling generateWeeklyPlan...');
@@ -845,6 +857,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, locale);
 
       console.log('[WEEKLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
+
+      // Save weekly plan to database with date range
+      await storage.createHoroscopeReading({
+        userId,
+        period: 'week',
+        startDate: weekStart,
+        endDate: weekEnd,
+        forecast: JSON.stringify(result),
+      });
 
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {
@@ -908,14 +929,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Calculate month_iso if not provided (first day of current month)
+      // Calculate month start (always first day of current month)
       let monthStart = month_iso;
       if (!monthStart) {
         const now = dayjs().tz(user.timezone);
         monthStart = now.startOf('month').format('YYYY-MM-DD');
       }
 
-      console.log('[MONTHLY_PLAN] Month start calculated:', monthStart);
+      // Calculate month end (last day of the month)
+      const monthEnd = dayjs(monthStart).endOf('month').format('YYYY-MM-DD');
+
+      console.log('[MONTHLY_PLAN] Month range:', monthStart, 'to', monthEnd);
 
       // Generate monthly plan
       console.log('[MONTHLY_PLAN] Calling generateMonthlyPlan...');
@@ -931,6 +955,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, locale);
 
       console.log('[MONTHLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
+
+      // Save monthly plan to database with date range
+      await storage.createHoroscopeReading({
+        userId,
+        period: 'month',
+        startDate: monthStart,
+        endDate: monthEnd,
+        forecast: JSON.stringify(result),
+      });
 
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {

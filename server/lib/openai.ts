@@ -611,6 +611,9 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
     ? "Ты опытный астролог-практик. Составляешь недельные планы с конкретными рекомендациями. Возвращаешь только валидный JSON."
     : "You are a practical astrologer. You create weekly plans with concrete recommendations. Return only valid JSON.";
 
+  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-5');
+  console.log('[generateWeeklyPlan] Prompt length:', finalPrompt.length);
+
   const completion = await openai.chat.completions.create({
     model: "gpt-5",
     messages: [
@@ -627,8 +630,15 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
     max_completion_tokens: 3000
   });
 
+  console.log('[generateWeeklyPlan] OpenAI response received');
+  console.log('[generateWeeklyPlan] Completion object:', JSON.stringify(completion, null, 2));
+
   const content = completion.choices[0]?.message?.content;
+  console.log('[generateWeeklyPlan] Content extracted:', content ? 'YES' : 'NO');
+  console.log('[generateWeeklyPlan] Content length:', content?.length || 0);
+
   if (!content) {
+    console.error('[generateWeeklyPlan] No content in response. Full completion:', JSON.stringify(completion, null, 2));
     throw new Error('Failed to generate weekly plan');
   }
 

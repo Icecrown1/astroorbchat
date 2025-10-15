@@ -174,6 +174,8 @@ export const horoscopeReadings = pgTable("horoscope_readings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   period: varchar("period", { length: 20 }).notNull(),
+  startDate: varchar("start_date", { length: 10 }),
+  endDate: varchar("end_date", { length: 10 }),
   forecast: text("forecast").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
