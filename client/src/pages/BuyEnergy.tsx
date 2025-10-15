@@ -8,7 +8,7 @@ import { Loader } from '@/components/Loader';
 import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 
@@ -23,7 +23,10 @@ export default function BuyEnergy() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
-  const [walletConnected, setWalletConnected] = useState(false);
+  const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
+  const walletConnected = !!wallet;
+  const [pendingTonPurchase, setPendingTonPurchase] = useState<typeof ENERGY_PACKS[0] | null>(null);
 
   // Check Telegram version for Stars support
   const isTelegramVersionSupported = () => {
@@ -34,14 +37,14 @@ export default function BuyEnergy() {
 
   const supportsStars = isTelegramVersionSupported();
 
+  // Trigger TON purchase after wallet connects
   useEffect(() => {
-    const checkWallet = () => {
-      setWalletConnected(isWalletConnected());
-    };
-    checkWallet();
-    const interval = setInterval(checkWallet, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (walletConnected && pendingTonPurchase) {
+      console.log('Wallet connected, processing pending TON purchase...');
+      tonMutation.mutate(pendingTonPurchase);
+      setPendingTonPurchase(null);
+    }
+  }, [walletConnected, pendingTonPurchase]);
 
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
     queryKey: ['/api/payments/price'],
@@ -59,11 +62,17 @@ export default function BuyEnergy() {
     },
     onSuccess: async (data, pack) => {
       try {
-        await sendTransaction(
-          data.walletAddress,
-          data.amountTON,
-          data.payload
-        );
+        const transaction = {
+          validUntil: Math.floor(Date.now() / 1000) + 600,
+          messages: [
+            {
+              address: data.walletAddress,
+              amount: data.amountTON,
+              payload: data.payload || '',
+            },
+          ],
+        };
+        await tonConnectUI.sendTransaction(transaction);
         queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
         toast({
           title: t.common.success,
@@ -247,18 +256,18 @@ export default function BuyEnergy() {
                       setSelectedPack(pack.amount);
                       if (!walletConnected) {
                         try {
-                          console.log('Attempting to connect TON wallet...');
-                          await connectWallet();
-                          setWalletConnected(true);
-                          console.log('TON wallet connected successfully');
-                          tonMutation.mutate(pack);
+                          console.log('Opening TON Connect modal for pack:', pack);
+                          setPendingTonPurchase(pack);
+                          await tonConnectUI.openModal();
+                          console.log('TON Connect modal opened, waiting for wallet connection...');
                         } catch (error: any) {
-                          console.error('Failed to connect wallet:', error);
+                          console.error('Failed to open wallet modal:', error);
+                          setPendingTonPurchase(null);
                           toast({
                             title: locale === 'ru' ? 'Ошибка подключения' : 'Connection Error',
                             description: locale === 'ru'
-                              ? 'Не удалось подключить TON кошелек. Попробуйте снова или используйте Stars.'
-                              : 'Failed to connect TON wallet. Try again or use Stars payment.',
+                              ? 'Не удалось открыть окно подключения кошелька. Попробуйте снова.'
+                              : 'Failed to open wallet connection modal. Try again.',
                             variant: 'destructive',
                           });
                         }

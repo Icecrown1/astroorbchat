@@ -41,13 +41,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Payment Systems
 - **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration
+  - **TON Connect Setup**: Uses `@tonconnect/ui-react` Provider with manifest at `/.well-known/tonconnect-manifest.json`
+  - **Wallet Integration**: `useTonConnectUI()` hook provides wallet connection state and transaction methods
+  - **Modal Flow**: Opens TON Connect modal → User selects wallet → Connects → Sends transaction
 - **Telegram Stars**: In-app purchases using Telegram's native Stars currency (⭐)
+  - **Version Requirement**: Requires Telegram WebApp version 6.1+ (method `openInvoice` not available in 6.0)
+  - **Version Check**: Frontend validates Telegram version before allowing Stars payments, shows warning for outdated versions
   - **Pricing**: 20 orbs = 190 Stars, 50 orbs = 375 Stars, 120 orbs = 750 Stars (~62.5 Stars per USD)
   - **Security Features**:
     - Server-side price validation (prevents client-side tampering)
     - Webhook secret token authentication (optional, via TELEGRAM_WEBHOOK_SECRET)
     - Idempotency checks (prevents duplicate energy crediting)
-    - Race condition protection (atomic status updates with 'processing' state)
+    - Race condition protection (atomic status updates using `isNull()` for NULL checks)
     - Amount verification (ensures paid amount matches expected)
   - **Payment Flow**: Invoice creation → WebApp.openInvoice() → pre_checkout_query (validation) → successful_payment (fulfillment) → energy crediting
   - **Refund Support**: telegram_payment_charge_id stored for refund capability
