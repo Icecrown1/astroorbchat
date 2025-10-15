@@ -19,8 +19,11 @@ import { useQuery } from '@tanstack/react-query';
 interface DayPlan {
   date: string;
   day_of_week: string;
-  summary: string;
-  advice: string;
+  money: string;
+  work: string;
+  study: string;
+  love: string;
+  health: string;
 }
 
 interface WeeklyPlanData {
@@ -154,10 +157,10 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
             {planData.days.map((day, index) => (
               <Card 
                 key={day.date} 
-                className="p-4 hover-elevate" 
+                className="p-4" 
                 data-testid={`card-day-${index}`}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-4 mb-3">
                   <div className="text-center min-w-[60px]">
                     <div className="text-2xl font-bold text-primary">
                       {new Date(day.date).getDate()}
@@ -166,11 +169,27 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
                       {day.day_of_week}
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold mb-2">{day.summary}</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {day.advice}
-                    </p>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">💰 {t.horoscope.money}:</span>
+                      <p className="text-muted-foreground mt-1">{day.money}</p>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">💼 {t.horoscope.work}:</span>
+                      <p className="text-muted-foreground mt-1">{day.work}</p>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">📚 {t.horoscope.study}:</span>
+                      <p className="text-muted-foreground mt-1">{day.study}</p>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">💕 {t.horoscope.love}:</span>
+                      <p className="text-muted-foreground mt-1">{day.love}</p>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">🏥 {t.horoscope.health}:</span>
+                      <p className="text-muted-foreground mt-1">{day.health}</p>
+                    </div>
                   </div>
                 </div>
               </Card>

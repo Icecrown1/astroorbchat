@@ -573,8 +573,11 @@ export interface WeeklyPlanResult {
   days: Array<{
     date: string;
     day_of_week: string;
-    summary: string;
-    advice: string;
+    money: string;
+    work: string;
+    study: string;
+    love: string;
+    health: string;
   }>;
 }
 
