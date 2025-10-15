@@ -623,11 +623,11 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
     ? "Ты опытный астролог-практик. Составляешь недельные планы с конкретными рекомендациями. Возвращаешь только валидный JSON."
     : "You are a practical astrologer. You create weekly plans with concrete recommendations. Return only valid JSON.";
 
-  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-5');
+  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-4.1-turbo');
   console.log('[generateWeeklyPlan] Prompt length:', finalPrompt.length);
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4.1-turbo",
     messages: [
       {
         role: "system",
@@ -639,7 +639,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты недели: 
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 6000
+    max_completion_tokens: 4000
   });
 
   console.log('[generateWeeklyPlan] OpenAI response received');
@@ -717,7 +717,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты месяца: 
     : "You are a practical astrologer. You create monthly plans considering weeks and key dates. Return only valid JSON.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4.1-turbo",
     messages: [
       {
         role: "system",
@@ -729,7 +729,7 @@ ${input.transits && input.transits.length > 0 ? `Транзиты месяца: 
       }
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 8000
+    max_completion_tokens: 5000
   });
 
   const content = completion.choices[0]?.message?.content;
