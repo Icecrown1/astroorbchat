@@ -38,6 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
 - **Schema**: Tables for `users`, `subscriptions`, `payments`, `usageLogs`, `natal_readings`, `horoscope_readings`, `compatibility_readings`, `ai_questions`, `importantDateUnlocks`, `externalNatals`, `starPayments`.
 - **Energy Costs**: Basic natal chart and horoscope readings cost 1 orb each, compatibility analysis costs 2 orbs. Energy resets daily to 10 orbs.
+- **Profile Update Restriction**: Users can only update their profile (name, gender, age, birth data) once per 30 days via `lastProfileUpdate` timestamp check in `/api/user/update`. Returns error with days remaining if attempted too soon. Profile updates DO NOT affect existing subscriptions.
 
 ### Payment Systems
 - **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration with blockchain verification
@@ -67,9 +68,10 @@ Preferred communication style: Simple, everyday language.
 ### Subscription System
 - **Tiers**: Standard ($9/month, 100 daily orbs) and Pro ($15/month, 250 daily orbs)
 - **Benefits**: 
-  - **Immediate Energy**: Upon purchase, users instantly receive 100 orbs (Standard) or 250 orbs (Pro)
-  - **Daily Energy**: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day at reset
-  - Free Weekly/Monthly plans (normally 1 orb each for non-subscribers)
+  - **Standard Tier**: 100 daily orbs, free weekly plan, free monthly plan, basic support
+  - **Pro Tier**: 250 daily orbs, free weekly plan, free monthly plan, priority processing, premium support
+  - **Immediate Energy**: Upon purchase, users instantly receive 100 orbs (Standard) or 250 orbs (Pro) - adds to existing balance
+  - **Daily Energy**: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day at reset (overwrites to tier amount)
   - Benefits active for both 'active' and 'canceled' statuses until currentPeriodEnd
 - **Payment**: TON blockchain only (same flow as energy packs)
 - **Expiration Logic**:
