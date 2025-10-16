@@ -121,4 +121,32 @@ Preferred communication style: Simple, everyday language.
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.
 - **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`) for wallet connection, TON API for transactions and price fetching.
 - **AI Services**: OpenAI API (GPT-5) for astrological interpretations.
-- **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `VITE_BOT_USERNAME`, `TON_WALLET_ADDRESS`, `SESSION_SECRET`, `TELEGRAM_WEBHOOK_SECRET` (optional, for Stars webhook security).
+- **Environment Variables**: 
+  - Core: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`
+  - AI: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
+  - TON: `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`
+  - Telegram: `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` (optional, for Stars webhook security)
+  - Auth: `ALLOW_TEST_AUTH` (set to `'true'` in development ONLY to enable `/api/auth/test` endpoint)
+  - Login: `LOGIN_ALLOWED_SKEW_SECONDS` (auth timestamp tolerance, default: 86400 = 24h)
+
+## Authentication Flows
+1. **Telegram Mini App** → `/api/auth/telegram` with `initData` validation
+2. **Web Browser (Login Widget)** → `/api/auth/tg-login` with HMAC-SHA256 verification
+3. **Development Testing** → `/api/auth/test` (only when `ALLOW_TEST_AUTH=true`, creates test users with `test_*` tgIds)
+
+## Known Issues & Fixes
+### Duplicate User Creation (Fixed)
+**Problem**: Users accessing app via browser (without Mini App context) were creating duplicate "test_*" accounts instead of using existing profiles.
+
+**Root Cause**: Frontend was falling back to `/api/auth/test` when no `initData` available, creating new test users.
+
+**Solution Implemented**:
+- Register.tsx now checks for Telegram WebApp context with 500ms delay for initData injection
+- If not in Mini App → redirects to `/login` (Login Widget)
+- `/api/auth/test` requires explicit `ALLOW_TEST_AUTH=true` flag (not just NODE_ENV check)
+- Prevents accidental test user creation in staging/production
+
+**Migration Plan for Existing Duplicates**:
+1. Identify users with `tgId LIKE 'test_%'` in production database
+2. If user has matching real account (same Telegram ID from Login Widget), merge data
+3. Delete orphaned test accounts or mark as deprecated

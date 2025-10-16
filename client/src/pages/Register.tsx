@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { Loader } from '@/components/Loader';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -33,10 +34,150 @@ const TIMEZONES = Intl.supportedValuesOf('timeZone');
 export default function Register() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<any>({});
+  const [isCheckingTelegram, setIsCheckingTelegram] = useState(true);
   const [, navigate] = useLocation();
   const { setAuth } = useAuth();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+
+  // Check if running in Telegram Mini App context with event-driven + polling fallback
+  useEffect(() => {
+    let isMounted = true;
+    let cleanupFn: (() => void) | null = null;
+    
+    const checkTelegramContext = async () => {
+      // Check if Telegram WebApp is available
+      const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
+      
+      if (!isMounted) return;
+      
+      if (!isTelegramWebApp) {
+        // Not in Telegram context at all - redirect to web login
+        navigate('/login');
+        return;
+      }
+      
+      const startTime = Date.now();
+      const maxWaitTime = 30000; // 30 seconds max for slow networks
+      
+      // Event-driven approach with polling fallback
+      const waitForInitData = (): Promise<boolean> => {
+        return new Promise((resolve) => {
+          const telegram = window.Telegram?.WebApp;
+          let resolved = false;
+          let pollInterval: NodeJS.Timeout | null = null;
+          let timeoutHandle: NodeJS.Timeout | null = null;
+          const timeouts: NodeJS.Timeout[] = [];
+          let readyHandler: (() => void) | null = null;
+          
+          const cleanup = () => {
+            if (pollInterval) clearInterval(pollInterval);
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            timeouts.forEach(t => clearTimeout(t));
+            // Unsubscribe from web_app_ready event
+            if (telegram && readyHandler && typeof (telegram as any).offEvent === 'function') {
+              try {
+                (telegram as any).offEvent('web_app_ready', readyHandler);
+              } catch (e) {
+                console.warn('[Telegram Auth] Failed to unsubscribe from web_app_ready:', e);
+              }
+            }
+          };
+          
+          cleanupFn = cleanup;
+          
+          const checkAndResolve = () => {
+            if (resolved || !isMounted) return;
+            
+            const initData = getInitData();
+            if (initData && initData.length > 0) {
+              const loadTime = Date.now() - startTime;
+              console.log('[Telegram Auth] InitData loaded in', loadTime, 'ms');
+              resolved = true;
+              cleanup();
+              resolve(true);
+              return true;
+            }
+            return false;
+          };
+          
+          // Check immediately first
+          if (checkAndResolve()) return;
+          
+          // Subscribe to web_app_ready event (if available in runtime)
+          if (telegram && typeof (telegram as any).onEvent === 'function') {
+            try {
+              readyHandler = () => {
+                console.log('[Telegram Auth] web_app_ready event fired');
+                checkAndResolve();
+              };
+              (telegram as any).onEvent('web_app_ready', readyHandler);
+            } catch (e) {
+              console.warn('[Telegram Auth] Failed to subscribe to web_app_ready:', e);
+            }
+          }
+          
+          // Call ready() to signal WebApp initialization
+          if (telegram && typeof telegram.ready === 'function') {
+            telegram.ready();
+            // Check shortly after ready() to catch fast initData injection
+            timeouts.push(setTimeout(() => checkAndResolve(), 100));
+            timeouts.push(setTimeout(() => checkAndResolve(), 300));
+          }
+          
+          // Set up adaptive polling as additional fallback
+          let currentDelay = 200;
+          
+          const startPolling = (delay: number) => {
+            if (pollInterval) clearInterval(pollInterval);
+            if (resolved || !isMounted) return;
+            
+            pollInterval = setInterval(() => {
+              if (!isMounted) {
+                cleanup();
+                return;
+              }
+              checkAndResolve();
+            }, delay);
+          };
+          
+          // Start with fast polling, then slow down
+          startPolling(200);
+          timeouts.push(setTimeout(() => !resolved && isMounted && startPolling(500), 2000));
+          timeouts.push(setTimeout(() => !resolved && isMounted && startPolling(1000), 5000));
+          
+          // Maximum timeout of 30 seconds
+          timeoutHandle = setTimeout(() => {
+            if (resolved || !isMounted) return;
+            console.warn('[Telegram Auth] Timeout after 30s, no initData found');
+            cleanup();
+            resolved = true;
+            resolve(false);
+          }, maxWaitTime);
+        });
+      };
+      
+      const hasInitData = await waitForInitData();
+      
+      if (!isMounted) return;
+      
+      if (hasInitData) {
+        // Valid Telegram Mini App context - allow registration
+        setIsCheckingTelegram(false);
+      } else {
+        // After 30 seconds, no initData found - redirect to login
+        navigate('/login');
+      }
+    };
+    
+    checkTelegramContext();
+    
+    // Cleanup on unmount
+    return () => {
+      isMounted = false;
+      if (cleanupFn) cleanupFn();
+    };
+  }, [navigate]);
 
   const step1Schema = useMemo(() => z.object({
     name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),
@@ -105,22 +246,23 @@ export default function Register() {
     try {
       const initData = getInitData();
       
-      // Use test endpoint in development or when no valid initData
-      const isProduction = import.meta.env.PROD;
-      const hasValidInitData = initData && initData.length > 0;
-      
-      let url = '/api/auth/test';
-      let body = finalData;
-      
-      if (isProduction && hasValidInitData) {
-        url = '/api/auth/telegram';
-        body = { initData, ...finalData };
+      // Must have valid Telegram initData to register through Mini App
+      if (!initData || initData.length === 0) {
+        toast({
+          title: t.common.error,
+          description: locale === 'ru' 
+            ? 'Регистрация доступна только через Telegram Mini App' 
+            : 'Registration is only available through Telegram Mini App',
+          variant: 'destructive',
+        });
+        navigate('/login');
+        return;
       }
 
-      const response = await fetch(url, {
+      const response = await fetch('/api/auth/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ initData, ...finalData }),
         credentials: 'include',
       });
 
@@ -167,6 +309,20 @@ export default function Register() {
   };
 
   const progress = (step / 3) * 100;
+
+  // Show loading while checking Telegram context
+  if (isCheckingTelegram) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader />
+          <p className="mt-4 text-muted-foreground">
+            {locale === 'ru' ? 'Проверка контекста Telegram...' : 'Checking Telegram context...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 flex items-center justify-center">

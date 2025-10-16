@@ -78,18 +78,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/tg-login", handleTelegramLoginWidget);
 
   app.post("/api/auth/test", async (req, res) => {
-    console.log('=== /api/auth/test endpoint hit ===');
-    console.log('NODE_ENV:', process.env.NODE_ENV);
+    // STRICT: Only allow when explicitly enabled via ALLOW_TEST_AUTH flag
+    // This prevents accidental usage in staging/production even if NODE_ENV is misconfigured
+    const isTestAuthAllowed = process.env.ALLOW_TEST_AUTH === 'true';
+    
+    if (!isTestAuthAllowed) {
+      console.log('=== /api/auth/test BLOCKED ===');
+      console.log('ALLOW_TEST_AUTH:', process.env.ALLOW_TEST_AUTH);
+      console.log('NODE_ENV:', process.env.NODE_ENV);
+      return res.status(403).json({ 
+        ok: false, 
+        error: "Test authentication is disabled. Please use Telegram Mini App or Login Widget." 
+      });
+    }
+    
+    console.log('=== /api/auth/test endpoint hit (test auth enabled) ===');
     console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
     
     try {
-      // Allow test endpoint in development or when NODE_ENV is not set (development default)
-      const isProduction = process.env.NODE_ENV === 'production';
-      if (isProduction) {
-        console.log('Blocked: in production mode');
-        return res.status(403).json({ ok: false, error: "Test auth only available in development" });
-      }
 
       const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone, referralCode: inputReferralCode } = req.body;
       const testUsername = `test_user_${Date.now()}`;
