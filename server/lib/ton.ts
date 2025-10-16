@@ -119,18 +119,38 @@ export async function findRecentTransaction(
         continue;
       }
       
-      // Log comparison details
+      // Log comparison details with type information
       console.log('[TON] Comparing transaction:', {
         txHash: txHash.substring(0, 10) + '...',
         txAmount,
+        txAmountType: typeof txAmount,
         expectedAmount,
-        amountMatch: txAmount === expectedAmount,
+        expectedAmountType: typeof expectedAmount,
+        strictMatch: txAmount === expectedAmount,
         txTime: new Date(txTime * 1000).toISOString(),
         cutoffTime: new Date(cutoffTime * 1000).toISOString(),
         timeMatch: txTime >= cutoffTime
       });
       
-      if (txAmount === expectedAmount && txTime >= cutoffTime) {
+      // More flexible amount matching (allow small differences due to fees/rounding)
+      const txAmountNum = BigInt(txAmount);
+      const expectedAmountNum = BigInt(expectedAmount);
+      const tolerance = BigInt(Math.floor(Number(expectedAmountNum) * 0.001)); // 0.1% tolerance
+      const amountDiff = txAmountNum > expectedAmountNum 
+        ? txAmountNum - expectedAmountNum 
+        : expectedAmountNum - txAmountNum;
+      
+      const amountMatch = amountDiff <= tolerance;
+      
+      console.log('[TON] Amount comparison:', {
+        txAmountNum: txAmountNum.toString(),
+        expectedAmountNum: expectedAmountNum.toString(),
+        difference: amountDiff.toString(),
+        tolerance: tolerance.toString(),
+        match: amountMatch
+      });
+      
+      if (amountMatch && txTime >= cutoffTime) {
         console.log('[TON] ✅ Found matching transaction:', {
           hash: txHash,
           amount: txAmount,
