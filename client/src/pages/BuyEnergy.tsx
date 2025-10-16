@@ -186,18 +186,23 @@ export default function BuyEnergy() {
 
   const starsMutation = useMutation({
     mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+      console.log('[Stars Payment] Starting mutation for pack:', pack);
       const response = await apiRequest('POST', '/api/payments/stars/create', {
         kind: 'energy_pack',
         pack: {
           energy: pack.amount,
         },
       });
+      console.log('[Stars Payment] API response:', response);
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
     onSuccess: (data, pack) => {
+      console.log('[Stars Payment] Success! Invoice data:', data);
       try {
+        console.log('[Stars Payment] Opening invoice with link:', data.invoiceLink);
         WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          console.log('[Stars Payment] Invoice callback status:', status);
           if (status === 'paid') {
             queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
             toast({
@@ -219,6 +224,7 @@ export default function BuyEnergy() {
           }
         });
       } catch (error: any) {
+        console.error('[Stars Payment] Error opening invoice:', error);
         toast({
           title: t.common.error,
           description: error.message || t.errors.calculationFailed,
@@ -227,6 +233,7 @@ export default function BuyEnergy() {
       }
     },
     onError: (error: any) => {
+      console.error('[Stars Payment] Mutation error:', error);
       toast({
         title: t.common.error,
         description: error.message || t.errors.calculationFailed,
@@ -358,6 +365,7 @@ export default function BuyEnergy() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedPack(pack.amount);
+                      console.log('[Stars Payment] Button clicked! Pack:', pack, 'supportsStars:', supportsStars);
                       if (!supportsStars) {
                         toast({
                           title: locale === 'ru' ? 'Обновите Telegram' : 'Update Telegram',
@@ -368,6 +376,7 @@ export default function BuyEnergy() {
                         });
                         return;
                       }
+                      console.log('[Stars Payment] Calling starsMutation.mutate()');
                       starsMutation.mutate(pack);
                     }}
                     disabled={(starsMutation.isPending && selectedPack === pack.amount) || !supportsStars}
