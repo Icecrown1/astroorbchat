@@ -807,6 +807,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const interpretation = await getAstrologyInterpretation("solar", solar, locale, user.gender);
 
+      // Localized insights
+      const insights = locale === 'ru' ? [
+        'Сегодняшняя космическая энергия поддерживает новые начинания',
+        'Сосредоточьтесь на личностном росте и самовыражении',
+        'Доверяйте своей интуиции в принятии решений',
+      ] : [
+        "Today's cosmic energy supports new beginnings",
+        'Focus on personal growth and self-expression',
+        'Trust your intuition in decision-making',
+      ];
+
       // Only deduct energy after successful execution
       await storage.updateUser(userId, { energy: user.energy - cost });
       await storage.createUsageLog({ userId, feature: "solar", cost });
@@ -816,11 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           solar,
           interpretation,
-          insights: [
-            "Today's cosmic energy supports new beginnings",
-            "Focus on personal growth and self-expression",
-            "Trust your intuition in decision-making",
-          ],
+          insights,
         },
       });
     } catch (error: any) {

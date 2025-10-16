@@ -120,6 +120,9 @@ export const translations = {
       generated: 'Solar Chart Generated',
       solarReady: 'Your daily solar return is ready',
       generationFailed: 'Generation Failed',
+      insight1: "Today's cosmic energy supports new beginnings",
+      insight2: 'Focus on personal growth and self-expression',
+      insight3: 'Trust your intuition in decision-making',
     },
     horoscope: {
       title: 'Daily Horoscope',
@@ -518,6 +521,9 @@ export const translations = {
       generated: 'Соляр создан',
       solarReady: 'Ваш ежедневный соляр готов',
       generationFailed: 'Не удалось создать',
+      insight1: 'Сегодняшняя космическая энергия поддерживает новые начинания',
+      insight2: 'Сосредоточьтесь на личностном росте и самовыражении',
+      insight3: 'Доверяйте своей интуиции в принятии решений',
     },
     horoscope: {
       title: 'Ежедневный гороскоп',
