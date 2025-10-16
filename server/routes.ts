@@ -192,6 +192,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEV ONLY: Free subscription activation for testing
+  app.post("/api/dev/subscribe", requireAuth, async (req, res) => {
+    // Only allow in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ ok: false, error: "Only available in development mode" });
+    }
+    
+    try {
+      const userId = (req as any).userId;
+      const { tier } = req.body;
+      
+      if (!tier || (tier !== 'standard' && tier !== 'pro')) {
+        return res.status(400).json({ ok: false, error: "Invalid tier. Use 'standard' or 'pro'" });
+      }
+      
+      const startedAt = new Date();
+      const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+      
+      const existingSub = await storage.getSubscription(userId);
+      
+      if (existingSub) {
+        await storage.updateSubscription(existingSub.id, {
+          tier,
+          status: 'active',
+          currentPeriodEnd,
+        });
+      } else {
+        await storage.createSubscription({
+          userId,
+          tier,
+          status: 'active',
+          startedAt,
+          currentPeriodEnd,
+        });
+      }
+      
+      res.json({ 
+        ok: true, 
+        data: { 
+          message: `DEV: ${tier} subscription activated for 30 days`,
+          tier,
+          currentPeriodEnd 
+        } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Natal chart init (FREE - creates user's own natal chart)
   app.post("/api/natal/init", requireAuth, async (req, res) => {
     try {

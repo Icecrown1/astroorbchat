@@ -82,6 +82,10 @@ Preferred communication style: Simple, everyday language.
   - After period ends, status automatically becomes 'expired'
 - **Status Flow**: active → (user cancels) → canceled → (period ends) → expired
 - **UI**: Subscribe.tsx shows status cards (active/canceled/expired), cancel button for active subs, days remaining
+- **Dev Mode**: In development, "Dev: Free Subscribe" button activates subscription instantly without payment
+  - Backend: `/api/dev/subscribe` endpoint (only works when NODE_ENV=development)
+  - Frontend: Button visible only when import.meta.env.DEV is true
+  - Security: Production-safe (disabled in production builds)
 
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.

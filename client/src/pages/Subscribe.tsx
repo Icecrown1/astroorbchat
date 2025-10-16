@@ -119,6 +119,28 @@ export default function Subscribe() {
     },
   });
 
+  const devSubscribeMutation = useMutation({
+    mutationFn: async (tier: 'standard' | 'pro') => {
+      const response = await apiRequest('POST', '/api/dev/subscribe', { tier });
+      if (!response.ok) throw new Error(response.error || 'Failed to activate dev subscription');
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      toast({
+        title: 'Dev Subscription Activated',
+        description: `${data.tier} subscription active for 30 days (FREE in dev mode)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || 'Failed to activate',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     if (pricesData?.ok && pricesData.data?.tonRate) {
       return (usdPrice / pricesData.data.tonRate).toFixed(2);
@@ -333,6 +355,32 @@ export default function Subscribe() {
                     </>
                   )}
                 </Button>
+
+                {/* DEV ONLY: Free subscription button */}
+                {import.meta.env.DEV && (
+                  <Button
+                    className="w-full mt-2"
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      devSubscribeMutation.mutate(tier.tier as 'standard' | 'pro');
+                    }}
+                    disabled={devSubscribeMutation.isPending}
+                    data-testid={`button-dev-subscribe-${tier.tier}`}
+                  >
+                    {devSubscribeMutation.isPending ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        Activating...
+                      </>
+                    ) : (
+                      <>
+                        Dev: Free Subscribe
+                      </>
+                    )}
+                  </Button>
+                )}
               </Card>
             ))}
           </div>
