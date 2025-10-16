@@ -129,7 +129,8 @@ export default function Compatibility() {
                       onClick={() => {
                         setSelectedGuestId(chart.id);
                         form.setValue('partnerName', chart.name);
-                        form.setValue('partnerDate', chart.birthdayDate);
+                        const formattedDate = chart.birthdayDate ? chart.birthdayDate.split('T')[0] : '';
+                        form.setValue('partnerDate', formattedDate);
                         form.setValue('partnerTime', chart.birthTime || '');
                       }}
                       data-testid={`button-select-guest-${chart.id}`}
