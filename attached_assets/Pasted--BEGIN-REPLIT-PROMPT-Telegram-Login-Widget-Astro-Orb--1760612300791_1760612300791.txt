@@ -1,0 +1,261 @@
+[BEGIN REPLIT PROMPT]
+
+Цель: внедрить Telegram Login Widget в Astro Orb — отдельный веб-логин на вашем домене с выпуском JWT и связкой с текущей авторизацией по initData. Никаких TODO/заглушек. Отдать ПОЛНЫЕ файлы.
+
+## Контекст
+- Фронтенд: apps/web (React + Vite + TS).
+- Бэкенд: apps/api (Express + TS), уже есть /auth/telegram (проверка initData из Mini App).
+- БД: Prisma (модель User есть).
+- Требуется добавить **веб-страницу Login** с Telegram Login Widget и новый серверный эндпоинт верификации данных виджета.
+
+## .env.sample — ДОБАВИТЬ
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF.... # токен бота
+TELEGRAM_BOT_USERNAME=astro_orb_bot # username без @
+PUBLIC_WEB_ORIGIN=https://app.example.com # домен, где открыт Login
+LOGIN_ALLOWED_SKEW_SECONDS=86400 # 24 часа допустимое окно для auth_date
+
+php
+Копировать код
+
+## Backend — проверка подписи Login Widget
+
+### 1) apps/api/src/auth/tgLoginVerify.ts (НОВЫЙ, ПОЛНЫЙ)
+```ts
+import crypto from "crypto";
+import type { Request, Response } from "express";
+import { prisma } from "../prisma";
+import { signAccessToken, signRefreshToken } from "../auth/jwt"; // уже существуют
+import { z } from "zod";
+
+const env = {
+  BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
+  ALLOWED_SKEW: Number(process.env.LOGIN_ALLOWED_SKEW_SECONDS || "86400"),
+};
+
+const Input = z.object({
+  id: z.number(),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  username: z.string().optional(),
+  photo_url: z.string().optional(),
+  auth_date: z.string(), // unix ts в секундах
+  hash: z.string(),
+});
+
+function checkTelegramLogin(data: Record<string, string>) {
+  // По спецификации: secret_key = SHA256(bot_token)
+  const secretKey = crypto.createHash("sha256").update(env.BOT_TOKEN).digest();
+  // Собрать data_check_string: отсортированные ключи, кроме hash
+  const fields = Object.keys(data)
+    .filter((k) => k !== "hash")
+    .sort()
+    .map((k) => `${k}=${data[k]}`)
+    .join("\n");
+  const hmac = crypto.createHmac("sha256", secretKey).update(fields).digest("hex");
+  return hmac === data.hash;
+}
+
+export async function tgLoginVerifyHandler(req: Request, res: Response) {
+  const parsed = Input.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, error: "BAD_INPUT" });
+  }
+  const payload = parsed.data;
+
+  // Проверка времени
+  const nowSec = Math.floor(Date.now() / 1000);
+  const authSec = Number(payload.auth_date);
+  if (!Number.isFinite(authSec) || Math.abs(nowSec - authSec) > env.ALLOWED_SKEW) {
+    return res.status(401).json({ ok: false, error: "AUTH_EXPIRED" });
+  }
+
+  // Проверка подписи
+  const valid = checkTelegramLogin(
+    Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, String(v)]))
+  );
+  if (!valid) {
+    return res.status(401).json({ ok: false, error: "INVALID_HASH" });
+  }
+
+  // Создаём/обновляем пользователя по tgId
+  const tgId = String(payload.id);
+  const name = [payload.first_name, payload.last_name].filter(Boolean).join(" ") || payload.username || "User";
+  const user = await prisma.user.upsert({
+    where: { tgId },
+    update: {
+      username: payload.username ?? undefined,
+      name,
+      // не перетираем пол/дату — они задаются в регистрации Mini App
+    },
+    create: {
+      tgId,
+      username: payload.username ?? null,
+      name,
+      gender: "other",
+      age: 18,
+      birthdayDate: new Date(0), // заглушка-дату потом исправит регистрация
+      timezone: "Europe/Moscow",
+      energy: 10,
+      energyResetAt: new Date(),
+      referralCode: `R${Math.random().toString(36).slice(2,8).toUpperCase()}`,
+    },
+  });
+
+  const access = signAccessToken({ uid: user.id, tgId });
+  const refresh = signRefreshToken({ uid: user.id, tgId });
+
+  return res.json({
+    ok: true,
+    data: {
+      accessToken: access,
+      refreshToken: refresh,
+      user: { id: user.id, tgId: user.tgId, name: user.name, username: user.username },
+    },
+  });
+}
+2) apps/api/src/routes/auth.ts — ДОПОЛНИТЬ (ПОЛНЫЙ ФАЙЛ, ЕСЛИ ЕГО НЕТ — СОЗДАТЬ)
+ts
+Копировать код
+import { Router } from "express";
+import { tgLoginVerifyHandler } from "../auth/tgLoginVerify";
+import { telegramInitDataAuthHandler } from "../auth/verifyTelegram"; // уже существующий для Mini App
+
+const router = Router();
+
+// Mini App initData (уже было)
+router.post("/telegram", telegramInitDataAuthHandler);
+
+// Login Widget — новая точка
+router.post("/tg-login", tgLoginVerifyHandler);
+
+export default router;
+3) apps/api/src/index.ts — РЕГИСТРИРУЕМ РОУТ (ФРАГМЕНТ)
+ts
+Копировать код
+import authRoutes from "./routes/auth";
+// ...
+app.use("/auth", authRoutes);
+Frontend — страница Login с Telegram Login Widget
+4) apps/web/index.html — ДОБАВИТЬ СКРИПТ ВИДЖЕТА (если ещё не подключали)
+html
+Копировать код
+<script async src="https://telegram.org/js/telegram-widget.js?22"></script>
+5) apps/web/src/routes/Login.tsx (НОВЫЙ, ПОЛНЫЙ)
+tsx
+Копировать код
+import React, { useEffect, useRef } from "react";
+import { http } from "../lib/api"; // обёртка с baseURL
+
+declare global {
+  interface Window {
+    TelegramLoginWidget?: any;
+  }
+}
+
+export default function Login() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Создаём виджет через data-атрибуты — безопасно и просто
+    const div = document.createElement("div");
+    div.setAttribute("id", "tg-login");
+    div.setAttribute("class", "flex justify-center");
+    div.setAttribute("data-telegram-login", import.meta.env.VITE_TG_BOT_USERNAME || "astro_orb_bot");
+    div.setAttribute("data-size", "large");
+    div.setAttribute("data-radius", "12");
+    div.setAttribute("data-request-access", "write");
+    // Коллбек в JS — передаём данные в наш API
+    (window as any).onTelegramAuth = async (user: any) => {
+      try {
+        const { data } = await http.post("/auth/tg-login", user);
+        if (data?.ok) {
+          localStorage.setItem("accessToken", data.data.accessToken);
+          localStorage.setItem("refreshToken", data.data.refreshToken);
+          // редирект в Mini App/личный кабинет
+          window.location.href = "/"; 
+        } else {
+          alert("Ошибка входа: " + (data?.error || "unknown"));
+        }
+      } catch (e: any) {
+        alert("Ошибка сети при входе");
+      }
+    };
+    div.setAttribute("data-onauth", "onTelegramAuth(user)");
+
+    containerRef.current.appendChild(div);
+
+    // Если скрипт подгружен позже — он сам инициализирует виджет по data-атрибутам
+  }, []);
+
+  return (
+    <div className="w-full h-screen flex items-center justify-center">
+      <div ref={containerRef} />
+    </div>
+  );
+}
+6) apps/web/src/lib/api.ts — УБЕДИТЬСЯ, ЧТО БАЗОВОЙ ОБЁРТКИ ХВАТАЕТ
+Ничего особого: http.post("/auth/tg-login", user) работает как обычный POST (JSON).
+
+7) apps/web/src/routes/App.tsx (или роутер) — ДОБАВИТЬ РОУТ
+tsx
+Копировать код
+// ...
+<Route path="/login" element={<Login />} />
+Безопасность
+Проверка подписи виджета реализована: secret_key = SHA256(BOT_TOKEN), HMAC_SHA256(data_check_string).
+
+Ограничение по времени auth_date (по умолчанию 24 часа).
+
+Релогин через виджет не перетирает чувствительные поля профиля — их задаёт регистрация в Mini App.
+
+README.md — ДОБАВИТЬ раздел «Telegram Login Widget (веб-логин)»
+Вставить:
+
+Зачем: веб-логин на вашем домене, удобный для лендингов, десктопа и deep-link из соцсетей.
+
+Как настроить у @BotFather:
+
+/setdomain → укажите точный домен (совпадает с PUBLIC_WEB_ORIGIN), обязательно HTTPS.
+Пример: app.example.com.
+
+/setmenu (опционально) → добавьте кнопку Web App, если хотите вход из меню бота.
+
+Проверьте CSP/Headers на фронте: не блокируйте https://telegram.org/js/telegram-widget.js.
+
+Как проверить:
+
+открыть ${PUBLIC_WEB_ORIGIN}/login, нажать «Войти с Telegram», в консоли сервера видеть POST /auth/tg-login → user+JWT.
+
+Убедиться, что после логина локально сохранены токены и происходит редирект.
+
+Acceptance Criteria
+Страница /login отображает Telegram Login Widget, вход по кнопке выпускает JWT и авторизует пользователя.
+
+Серверный эндпоинт /auth/tg-login верифицирует подпись/время auth_date и создаёт/обновляет пользователя по tgId.
+
+Никаких заглушек; все файлы сданные полностью; переменные окружения отражены в .env.sample.
+
+Инструкция в README по /setdomain у @BotFather добавлена.
+
+Вывести ПОЛНЫЙ список новых/изменённых файлов
+apps/api/src/auth/tgLoginVerify.ts
+
+apps/api/src/routes/auth.ts
+
+apps/api/src/index.ts (фрагмент регистрации /auth)
+
+apps/web/index.html
+
+apps/web/src/routes/Login.tsx
+
+apps/web/src/lib/api.ts (если менялся)
+
+apps/web/src/App.tsx или файл роутера (если менялся)
+
+.env.sample
+
+README.md
+
+[END REPLIT PROMPT]

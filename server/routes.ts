@@ -13,6 +13,7 @@ import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportant
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
+import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -72,6 +73,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ ok: false, error: error.message });
     }
   });
+
+  // Telegram Login Widget (web login)
+  app.post("/api/auth/tg-login", handleTelegramLoginWidget);
 
   app.post("/api/auth/test", async (req, res) => {
     console.log('=== /api/auth/test endpoint hit ===');

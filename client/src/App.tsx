@@ -9,6 +9,7 @@ import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import NotFound from '@/pages/not-found';
+import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import MyNatalChart from '@/pages/MyNatalChart';
@@ -37,13 +38,14 @@ function Router() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated && location !== '/register') {
+    if (!isAuthenticated && location !== '/register' && location !== '/login') {
       navigate('/register');
     }
   }, [isAuthenticated, location, navigate]);
 
   return (
     <Switch>
+      <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/my-natal-chart" component={MyNatalChart} />

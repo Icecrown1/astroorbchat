@@ -93,6 +93,30 @@ Preferred communication style: Simple, everyday language.
   - Frontend: Button visible only when import.meta.env.DEV is true
   - Security: Production-safe (disabled in production builds)
 
+### Telegram Login Widget (Web Login)
+- **Purpose**: Alternative authentication method for web users (non-Mini App), enabling login via Telegram on any device/browser
+- **Implementation**:
+  - **Frontend**: `/login` page with Telegram Login Widget embedded via `telegram-widget.js` script
+  - **Backend**: `/api/auth/tg-login` endpoint verifies widget signature and issues JWT token
+- **Security Features**:
+  - **Signature Verification**: Uses HMAC-SHA256 with secret_key = SHA256(BOT_TOKEN)
+  - **Replay Protection**: Validates `auth_date` with configurable time window (default 24 hours via `LOGIN_ALLOWED_SKEW_SECONDS`)
+  - **Data Integrity**: Verifies hash against sorted data_check_string from widget callback
+- **User Flow**:
+  1. User visits `/login` → Widget renders with bot username from `VITE_BOT_USERNAME`
+  2. User clicks "Login with Telegram" → Telegram verifies identity and returns signed data
+  3. Frontend sends data to `/api/auth/tg-login` → Backend verifies signature
+  4. On success: JWT token issued, user redirected to `/dashboard`
+  5. New users created with placeholder profile data (completed during Mini App registration)
+- **Setup Requirements** (via @BotFather):
+  - `/setdomain` → Set exact production domain (must match deployment URL, HTTPS required)
+  - Example: `https://yourapp.replit.app` or custom domain
+  - Widget will only work on the registered domain
+- **Environment Variables**:
+  - `TELEGRAM_BOT_TOKEN`: Bot token (required for signature verification)
+  - `VITE_BOT_USERNAME`: Bot username without @ (used by widget, e.g., `astro_orb_bot`)
+  - `LOGIN_ALLOWED_SKEW_SECONDS`: Auth timestamp tolerance in seconds (default: 86400 = 24h)
+
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.
 - **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`) for wallet connection, TON API for transactions and price fetching.
