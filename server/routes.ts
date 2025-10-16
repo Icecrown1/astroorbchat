@@ -14,6 +14,7 @@ import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNa
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
+import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment, signPayload, verifyPayload } from "./lib/telegramStars";
 import { z } from "zod";
 import dayjs from 'dayjs';
 
@@ -2253,6 +2254,245 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ ok: true });
     } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Telegram Stars payment routes
+  const createStarsInvoiceSchema = z.object({
+    kind: z.enum(["energy_pack", "subscription"]),
+    pack: z.object({
+      energy: z.number().refine(val => [20, 50, 120].includes(val))
+    }).optional(),
+    tier: z.enum(["standard", "pro"]).optional(),
+  });
+
+  app.post("/api/payments/stars/create", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const validated = createStarsInvoiceSchema.parse(req.body);
+
+      // Determine pricing based on kind and pack/tier
+      let title: string;
+      let description: string;
+      let priceStars: number;
+      let energyAmount: number | undefined;
+      let tier: string | undefined;
+
+      if (validated.kind === "energy_pack" && validated.pack) {
+        const packConfig = {
+          20: { stars: 190, label: "20 Orbs Energy Pack" },
+          50: { stars: 375, label: "50 Orbs Energy Pack" },
+          120: { stars: 750, label: "120 Orbs Energy Pack" },
+        }[validated.pack.energy as 20 | 50 | 120];
+
+        if (!packConfig) {
+          return res.status(400).json({ ok: false, error: "Invalid energy pack" });
+        }
+
+        title = packConfig.label;
+        description = `Purchase ${validated.pack.energy} orbs of energy`;
+        priceStars = packConfig.stars;
+        energyAmount = validated.pack.energy;
+      } else if (validated.kind === "subscription" && validated.tier) {
+        const tierConfig = {
+          standard: { stars: 565, label: "Standard Subscription (1 month)" },
+          pro: { stars: 940, label: "Pro Subscription (1 month)" },
+        }[validated.tier];
+
+        title = tierConfig.label;
+        description = `${validated.tier === 'standard' ? 'Standard (100 daily orbs)' : 'Pro (250 daily orbs)'} for 1 month`;
+        priceStars = tierConfig.stars;
+        tier = validated.tier;
+      } else {
+        return res.status(400).json({ ok: false, error: "Invalid request: must specify pack or tier" });
+      }
+
+      // Create payment record with signed payload
+      const payloadData = {
+        userId,
+        kind: validated.kind,
+        pack: validated.pack,
+        tier,
+        timestamp: Date.now(),
+      };
+
+      const signedPayload = signPayload(payloadData);
+
+      const starPayment = await storage.createStarPayment({
+        userId,
+        kind: validated.kind,
+        energyAmount,
+        amountStars: priceStars,
+        invoicePayload: signedPayload,
+      });
+
+      // Create invoice link
+      const invoiceResult = await createInvoiceLink({
+        title,
+        description,
+        payload: signedPayload,
+        prices: [{ label: title, amount: priceStars }],
+      });
+
+      if (!invoiceResult.ok) {
+        return res.status(500).json({ ok: false, error: invoiceResult.error || "Failed to create invoice" });
+      }
+
+      res.json({
+        ok: true,
+        data: {
+          invoiceUrl: invoiceResult.invoiceLink,
+          paymentId: starPayment.id,
+        },
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
+      console.error('[Stars] Create invoice error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Telegram webhook endpoint for Stars payments
+  app.post("/webhooks/telegram/:secret?", async (req, res) => {
+    try {
+      const { secret } = req.params;
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+      // Verify webhook secret if configured
+      if (webhookSecret && secret !== webhookSecret) {
+        console.warn('[Telegram Webhook] Invalid secret');
+        return res.status(403).json({ ok: false, error: "Invalid webhook secret" });
+      }
+
+      const update = req.body;
+      console.log('[Telegram Webhook] Received update:', JSON.stringify(update, null, 2));
+
+      // Handle pre_checkout_query - MUST respond within 10 seconds!
+      if (update.pre_checkout_query) {
+        const { id: queryId, invoice_payload } = update.pre_checkout_query;
+        
+        console.log('[Telegram Webhook] Pre-checkout query:', { queryId, invoice_payload });
+
+        // Verify payload signature
+        const verification = verifyPayload(invoice_payload);
+        if (!verification.valid) {
+          console.error('[Telegram Webhook] Invalid payload signature');
+          await answerPreCheckoutQuery({
+            preCheckoutQueryId: queryId,
+            ok: false,
+            errorMessage: "Order validation failed",
+          });
+          return res.json({ ok: true });
+        }
+
+        // Check if payment exists
+        const payment = await storage.getStarPaymentByPayload(invoice_payload);
+        if (!payment || payment.status !== 'pending') {
+          console.error('[Telegram Webhook] Payment not found or already processed');
+          await answerPreCheckoutQuery({
+            preCheckoutQueryId: queryId,
+            ok: false,
+            errorMessage: "Order validation failed",
+          });
+          return res.json({ ok: true });
+        }
+
+        // Everything is OK - approve the payment
+        await answerPreCheckoutQuery({
+          preCheckoutQueryId: queryId,
+          ok: true,
+        });
+
+        console.log('[Telegram Webhook] Pre-checkout approved');
+        return res.json({ ok: true });
+      }
+
+      // Handle successful_payment
+      if (update.message?.successful_payment) {
+        const { telegram_payment_charge_id, invoice_payload } = update.message.successful_payment;
+        
+        console.log('[Telegram Webhook] Successful payment:', { telegram_payment_charge_id, invoice_payload });
+
+        // Verify payload
+        const verification = verifyPayload(invoice_payload);
+        if (!verification.valid) {
+          console.error('[Telegram Webhook] Invalid payload signature in successful_payment');
+          return res.json({ ok: true });
+        }
+
+        // Atomic update to prevent race conditions
+        const payment = await storage.atomicStartProcessing(invoice_payload, telegram_payment_charge_id);
+        
+        if (!payment) {
+          console.warn('[Telegram Webhook] Payment already processed or not found');
+          return res.json({ ok: true });
+        }
+
+        // Credit energy or activate subscription
+        if (payment.kind === "energy_pack" && payment.energyAmount) {
+          const user = await storage.getUser(payment.userId);
+          if (user) {
+            await storage.updateUser(payment.userId, {
+              energy: user.energy + payment.energyAmount,
+            });
+            console.log(`[Telegram Webhook] Credited ${payment.energyAmount} energy to user ${payment.userId}`);
+          }
+        } else if (payment.kind === "subscription") {
+          const payloadData = verification.data;
+          const tier = payloadData.tier as "standard" | "pro";
+          
+          const startedAt = new Date();
+          const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+
+          const existingSub = await storage.getSubscription(payment.userId);
+          
+          if (existingSub) {
+            await storage.updateSubscription(existingSub.id, {
+              tier,
+              status: "active",
+              currentPeriodEnd,
+            });
+          } else {
+            await storage.createSubscription({
+              userId: payment.userId,
+              tier,
+              status: "active",
+              startedAt,
+              currentPeriodEnd,
+            });
+          }
+
+          // Credit subscription energy immediately
+          const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+          const user = await storage.getUser(payment.userId);
+          if (user) {
+            await storage.updateUser(payment.userId, {
+              energy: user.energy + subscriptionEnergy,
+            });
+          }
+
+          await handleSubscriptionReferralBonus(storage, payment.userId);
+          console.log(`[Telegram Webhook] Activated ${tier} subscription for user ${payment.userId}`);
+        }
+
+        // Mark payment as completed
+        await storage.updateStarPaymentStatus(invoice_payload, {
+          status: 'completed',
+          completedAt: new Date(),
+        });
+
+        console.log('[Telegram Webhook] Payment completed successfully');
+        return res.json({ ok: true });
+      }
+
+      // Log other update types
+      console.log('[Telegram Webhook] Unhandled update type:', Object.keys(update));
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[Telegram Webhook] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
