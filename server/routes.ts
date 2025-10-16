@@ -2354,11 +2354,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { secret } = req.params;
       const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      const telegramSecretToken = req.headers['x-telegram-bot-api-secret-token'];
 
-      // Verify webhook secret if configured
-      if (webhookSecret && secret !== webhookSecret) {
-        console.warn('[Telegram Webhook] Invalid secret');
-        return res.status(403).json({ ok: false, error: "Invalid webhook secret" });
+      // SECURITY: Verify webhook authenticity (path secret OR header token)
+      const isPathSecretValid = webhookSecret && secret === webhookSecret;
+      const isHeaderTokenValid = webhookSecret && telegramSecretToken === webhookSecret;
+
+      if (!isPathSecretValid && !isHeaderTokenValid) {
+        console.warn('[Telegram Webhook] Unauthorized request - invalid or missing secret');
+        return res.status(403).json({ ok: false, error: "Unauthorized" });
       }
 
       const update = req.body;
