@@ -128,12 +128,6 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
                   </span>
                 )}
               </div>
-
-              {hasSubscription && (
-                <p className="text-sm text-chart-2 font-medium mb-4">
-                  {t.subscribe.freeForSubscribers}
-                </p>
-              )}
             </div>
 
             <Button

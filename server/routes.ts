@@ -228,6 +228,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // IMPORTANT: Credit subscription energy immediately (add to existing balance)
+      const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+      const user = await storage.getUser(userId);
+      if (user) {
+        await storage.updateUser(userId, {
+          energy: user.energy + subscriptionEnergy,
+        });
+      }
+      
       res.json({ 
         ok: true, 
         data: { 
