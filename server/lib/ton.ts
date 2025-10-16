@@ -1,3 +1,22 @@
+import { Address } from '@ton/core';
+
+/**
+ * Normalizes any TON address to canonical raw format (0:...)
+ * Accepts both user-friendly (EQ.../UQ...) and raw (0:...) formats
+ */
+export function normalizeTonAddress(address: string): string {
+  try {
+    // Try parsing as user-friendly address first
+    const parsed = Address.parse(address);
+    // Return in raw format: "0:abc123..."
+    return parsed.toRawString();
+  } catch (error) {
+    console.error('[TON] Failed to normalize address:', address, error);
+    // Return original if parsing fails
+    return address;
+  }
+}
+
 export async function getTonPrice(): Promise<number> {
   try {
     const response = await fetch('https://tonapi.io/v2/rates?tokens=ton&currencies=usd');
@@ -71,10 +90,14 @@ export async function findUserTransaction(
   excludeTxHashes: Set<string> = new Set()
 ): Promise<{ hash: string; amount: string; timestamp: number } | null> {
   try {
+    // Normalize recipient address to raw format for consistent comparison
+    const normalizedRecipient = normalizeTonAddress(recipientAddress);
+    
     console.log('=====================================');
     console.log('[TON] NEW SEARCH METHOD - Looking for transaction FROM user wallet:');
     console.log('[TON] User wallet:', userWalletAddress);
-    console.log('[TON] To recipient:', recipientAddress);
+    console.log('[TON] To recipient (original):', recipientAddress);
+    console.log('[TON] To recipient (normalized):', normalizedRecipient);
     console.log('[TON] Expected amount:', expectedAmount, 'nanoTON');
     console.log('[TON] Max age:', maxAgeMinutes, 'minutes');
     console.log('=====================================');
@@ -112,15 +135,19 @@ export async function findUserTransaction(
           const destination = msg.destination?.address;
           const amount = msg.value || '0';
           
+          // Normalize destination address for comparison
+          const normalizedDestination = destination ? normalizeTonAddress(destination) : null;
+          
           console.log('[TON] Checking outgoing message:', {
             hash: txHash.substring(0, 16) + '...',
             destination: destination?.substring(0, 16) + '...',
+            destinationNormalized: normalizedDestination?.substring(0, 16) + '...',
             amount,
             time: new Date(txTime * 1000).toISOString()
           });
           
-          // Check if this message goes to our address - SIMPLIFIED: any amount accepted
-          if (destination === recipientAddress) {
+          // Check if this message goes to our address (compare normalized addresses)
+          if (normalizedDestination === normalizedRecipient) {
             const amountNum = BigInt(amount);
             const expectedNum = BigInt(expectedAmount);
             

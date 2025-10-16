@@ -7,7 +7,7 @@ import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram"
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
-import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction } from "./lib/ton";
+import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
@@ -1949,6 +1949,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tonRate = await getTonPrice();
       const amountTON = convertUSDToTON(validated.amountUSD, tonRate);
 
+      // Normalize user wallet address to raw format (0:...) for consistent comparison
+      const normalizedUserAddress = validated.userWalletAddress 
+        ? normalizeTonAddress(validated.userWalletAddress)
+        : null;
+
+      console.log('[TON_CREATE] User wallet address:', {
+        original: validated.userWalletAddress,
+        normalized: normalizedUserAddress
+      });
+
       const payment = await storage.createPayment({
         userId,
         kind: validated.kind,
@@ -1958,7 +1968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
         txHash: `pending_${Date.now()}`,
         status: "pending",
-        userWalletAddress: validated.userWalletAddress || null, // Save sender's wallet address
+        userWalletAddress: normalizedUserAddress, // Save normalized sender's wallet address
       });
 
       res.json({
@@ -2032,6 +2042,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Search for transaction FROM user's wallet TO our wallet
       console.log('[TON_CONFIRM] Searching for transaction FROM user wallet TO our wallet');
+      console.log('[TON_CONFIRM] User wallet address:', payment.userWalletAddress);
+      console.log('[TON_CONFIRM] Our wallet address:', walletAddress);
+      console.log('[TON_CONFIRM] Expected amount (nanoTON):', amountInNanoTON);
       const matchedTx = await findUserTransaction(
         payment.userWalletAddress,
         walletAddress,
