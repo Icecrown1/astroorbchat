@@ -2350,18 +2350,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Telegram webhook endpoint for Stars payments
-  app.post("/webhooks/telegram/:secret?", async (req, res) => {
+  app.post("/webhooks/telegram", async (req, res) => {
     try {
-      const { secret } = req.params;
       const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
       const telegramSecretToken = req.headers['x-telegram-bot-api-secret-token'];
 
-      // SECURITY: Verify webhook authenticity (path secret OR header token)
-      const isPathSecretValid = webhookSecret && secret === webhookSecret;
-      const isHeaderTokenValid = webhookSecret && telegramSecretToken === webhookSecret;
-
-      if (!isPathSecretValid && !isHeaderTokenValid) {
-        console.warn('[Telegram Webhook] Unauthorized request - invalid or missing secret');
+      // SECURITY: Verify webhook authenticity via X-Telegram-Bot-Api-Secret-Token header
+      if (webhookSecret && telegramSecretToken !== webhookSecret) {
+        console.warn('[Telegram Webhook] Unauthorized request - invalid or missing secret token');
         return res.status(403).json({ ok: false, error: "Unauthorized" });
       }
 

@@ -291,15 +291,14 @@ export async function registerWebhookAtStartup(): Promise<void> {
   }
 
   try {
-    // Construct webhook URL with optional secret
-    const webhookUrl = webhookSecret 
-      ? `https://${serverUrl}/webhooks/telegram/${webhookSecret}`
-      : `https://${serverUrl}/webhooks/telegram`;
+    // Webhook URL (secret is passed via API parameter, NOT in URL)
+    const webhookUrl = `https://${serverUrl}/webhooks/telegram`;
 
     const result = await setWebhook(webhookUrl, webhookSecret);
 
     if (result.ok) {
-      console.log(`[Telegram Webhook] ✅ Registered: ${webhookUrl}`);
+      const secretInfo = webhookSecret ? ' (with secret_token)' : '';
+      console.log(`[Telegram Webhook] ✅ Registered: ${webhookUrl}${secretInfo}`);
     } else {
       console.error('[Telegram Webhook] ❌ Registration failed:', result.error);
     }
