@@ -1,0 +1,207 @@
+[BEGIN REPLIT PROMPT]
+
+Цель: Исправить и довести до продакшена оплату Telegram Stars (XTR) в Astro Orb. Устранить отмены платежей: гарантировать ответ на pre_checkout и приём successful_payment. Добавить рефанд, логи, и фронтенд-кнопку «Оплатить Stars».
+
+## Контекст проекта
+- Бэкенд: apps/api (Express + TS). Уже есть TonConnect. Добавляем независимый модуль Stars.
+- Фронтенд: apps/web — экран BuyEnergy/Subscribe с кнопкой «Оплатить Stars».
+- БД: Prisma (Payment). Используем существующую таблицу `Payment`, добавим поля для Stars.
+
+## Изменения в БД (Prisma)
+Файл: `prisma/schema.prisma`
+1) В модель `Payment` ДОБАВИТЬ поля:
+```prisma
+  provider       String   @default("none") // "ton" | "stars"
+  starsChargeId  String?  // telegram_payment_charge_id из successful_payment
+  starsPayload   String?  // payload, который мы подписали
+Создать миграцию. Обновить индексы при необходимости (@@index([provider, status])).
+
+Бэкенд — Stars
+1) Новый модуль Telegram API
+Файл: apps/api/src/payments/stars.ts (ПОЛНЫЙ)
+
+Экспорт:
+
+createStarsInvoice(args) — вызывает Bot API createInvoiceLink ИЛИ sendInvoice для цифровых товаров:
+
+currency: "XTR", provider_token: "" (для digital).
+
+prices: [{ label, amount }] — amount в минимальных единицах Stars.
+
+payload — наш подписанный payload (userId, kind, packId/tier, nonce).
+
+опционально start_parameter (одиноч/мульти-чат по кейсу).
+
+answerPreCheckout(ok, error?) — обёртка над Bot API answerPreCheckoutQuery.
+
+refundStars(telegram_payment_charge_id, amount?) — Bot API refundStarPayment.
+
+HTTP вызовы делать через node-fetch/axios. BOT_TOKEN брать из .env.
+
+2) Вебхук Telegram
+Файл: apps/api/src/routes/telegramWebhook.ts (НОВЫЙ, ПОЛНЫЙ)
+
+Эндпоинт: POST /webhooks/telegram/:secret
+
+Обрабатывает три типа update:
+
+pre_checkout_query — валидировать invoice_payload (наше HMAC). Если всё ок, вызывать answerPreCheckoutQuery({ ok: true }). Сделать это < 10 сек.
+
+message.successful_payment — зачесть покупку:
+
+создать/обновить Payment со status="confirmed", provider="stars", starsChargeId, amountUSD (по внутреннему курсу из price.ts), amountTON (необязательно), kind/tier/energyAmount по payload.
+
+начислить энергию/активировать подписку.
+
+Любой другой — логировать (pino).
+
+Если payload невалиден — answerPreCheckoutQuery({ ok: false, error_message: "Order validation failed" }).
+
+Важно: если бот не ответит на pre_checkout в 10 секунд, платёж будет автоматически отменён. (Это и есть ваша текущая симптоматика.) 
+core.telegram.org
+
+3) Роуты API для клиента Mini App
+Файл: apps/api/src/routes/payments.ts — ДОБАВИТЬ:
+
+POST /payments/stars/create
+
+Тело:
+
+ts
+Копировать код
+{ kind: "energy_pack" | "subscription",
+  pack?: { energy: 20|50|120 },   // если pack
+  tier?: "standard"|"pro"         // если подписка
+}
+Создаёт черновик Payment(status="pending", provider="stars").
+
+Формирует payload { paymentId, userId, kind, pack, tier, ts }, HMAC-подпись.
+
+Вызывает createStarsInvoice(...) и возвращает { ok:true, data:{ invoice_url } }.
+
+GET /payments/stars/public-key (если используете верификацию подписи на клиенте) — можно опустить.
+
+В существующем /payments/price — вернуть цену в Stars (XTR) для каждого товара (конверсия из USD по вашей таблице).
+
+4) Конфигурация окружения
+Файл: .env.sample — ДОБАВИТЬ:
+
+ini
+Копировать код
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_WEBHOOK_SECRET=change_me
+TELEGRAM_WEBHOOK_URL=https://YOUR_API_URL/webhooks/telegram/change_me
+5) Логи и защита
+В apps/api/src/middleware/error.ts — ничего особого, но ошибки платежей логировать с уровнем warn.
+
+В apps/api/src/index.ts — зарегистрировать роут вебхука и, если задан TELEGRAM_WEBHOOK_URL, автоматически вызвать setWebhook при старте (через Bot API).
+
+6) Тесты backend (Jest + Supertest)
+Файл: apps/api/src/tests/api.spec.ts — ДОБАВИТЬ:
+
+Мок Bot API.
+
+Тест /payments/stars/create → 200 и invoice_url.
+
+Тест вебхука: pre_checkout_query → answerPreCheckoutQuery(ok=true) вызывается.
+
+Тест вебхука: successful_payment → статус платежа становится confirmed, энергия/подписка начислены.
+
+Негатив: неподписанный payload → answerPreCheckoutQuery(ok=false).
+
+Фронтенд — Stars
+1) Клиентский API
+Файл: apps/web/src/lib/api.ts — ДОБАВИТЬ:
+
+ts
+Копировать код
+export const createStarsInvoice = (payload) =>
+  http.post('/payments/stars/create', payload);
+2) Экран покупки (BuyEnergy/Subscribe)
+Файл: apps/web/src/routes/BuyEnergy.tsx (и/или Subscribe.tsx) — ОБНОВИТЬ ПОЛНОСТЬЮ:
+
+Кнопка «Оплатить Stars»
+
+const { invoice_url } = await createStarsInvoice({ kind:"energy_pack", pack:{ energy:20 } })
+
+Если доступна window.Telegram?.WebApp?.openInvoice:
+
+ts
+Копировать код
+window.Telegram.WebApp.openInvoice(invoice_url, (status) => {
+  // status: "paid" | "cancelled" | "failed"
+  if (status === "paid") refetchBalance(); // сервер начислит через webhook
+  if (status === "cancelled") toast("Платёж отменён");
+  if (status === "failed") toast("Не удалось оплатить");
+});
+Фоллбек: window.open(invoice_url, "_blank").
+
+UI-подсказка: «Оплата цифровых товаров выполняется в Stars (XTR).»
+
+Mini App может открывать инвойс внутри себя; опорный способ — openInvoice/инвойс-ссылка. (Сервер всё равно обязан обработать pre_checkout_query и successful_payment.) 
+DEV Community
++1
+
+3) Тосты/состояния
+Прелоадер на время открытия.
+
+Тост «Платёж отменён» — уже есть в вашем UI, оставить.
+
+После paid — запрос /user/me и обновить энергию/подписку на клиенте.
+
+Чек-лист @BotFather / настройки Telegram (сделать руками)
+/setdomain — установить домен мини-приложения (чтобы WebApp корректно открывал инвойсы).
+
+Webhook бота: укажите URL https://YOUR_API_URL/webhooks/telegram/TELEGRAM_WEBHOOK_SECRET через Bot API setWebhook (автоконфиг при старте сервера включён выше).
+
+Платежи Stars: не нужен provider_token — для цифровых товаров валидно пустое значение, валюта строго XTR. 
+core.telegram.org
+
+Добавьте команды /terms и /paysupport (требование доки «Going Live»). 
+core.telegram.org
+
+Для песочницы используйте тестовую среду Stars (см. ссылку в разделе Testing Payments). 
+core.telegram.org
+
+Убедитесь, что бот получает апдейты (webhook активен, TLS валиден, сервер отвечает <1-2 сек). Иначе pre_checkout_query не будет подтверждён, и Telegram отменит платёж через ~10 сек. 
+core.telegram.org
+
+Acceptance Criteria
+/payments/stars/create возвращает invoice_url (XTR).
+
+Вебхук обрабатывает pre_checkout_query (ок в 10 сек) и successful_payment; платежи перестают «самоотменяться».
+
+После successful_payment начисляются сферы/активируется подписка; в Payment сохраняется starsChargeId.
+
+Фронтенд открывает инвойс openInvoice, корректно обрабатывает paid/cancelled/failed.
+
+Тесты проходят; .env.sample обновлён; README обновлён (короткий how-to).
+
+Добавлен метод refundStarPayment и административный скрипт/роут (по флагу) для тестового рефанда.
+
+Изменённые/новые файлы (вывести ПОЛНОСТЬЮ)
+prisma/schema.prisma
+
+prisma/migrations/**/*
+
+apps/api/src/payments/stars.ts
+
+apps/api/src/routes/telegramWebhook.ts
+
+apps/api/src/routes/payments.ts
+
+apps/api/src/index.ts (регистрация вебхука)
+
+apps/api/src/routes/energy.ts (если нужны мелкие правки начислений)
+
+apps/api/src/tests/api.spec.ts
+
+apps/web/src/lib/api.ts
+
+apps/web/src/routes/BuyEnergy.tsx
+
+apps/web/src/routes/Subscribe.tsx (если есть кнопка Stars)
+
+README.md
+
+[END REPLIT PROMPT]
