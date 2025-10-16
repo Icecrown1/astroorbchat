@@ -37,11 +37,11 @@ export default function Subscribe() {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
 
-  // Check Telegram version for Stars support
+  // Check Telegram version for Stars support (6.0+)
   const isTelegramVersionSupported = () => {
     const version = WebApp.version;
-    const [major, minor] = version.split('.').map(Number);
-    return major > 6 || (major === 6 && minor >= 1);
+    const [major] = version.split('.').map(Number);
+    return major >= 6;
   };
 
   const supportsStars = isTelegramVersionSupported();
@@ -385,8 +385,8 @@ export default function Subscribe() {
                         toast({
                           title: locale === 'ru' ? 'Обновите Telegram' : 'Update Telegram',
                           description: locale === 'ru' 
-                            ? 'Для оплаты Stars требуется Telegram версии 6.1 или выше. Пожалуйста, обновите приложение.'
-                            : 'Stars payment requires Telegram version 6.1 or higher. Please update your app.',
+                            ? 'Для оплаты Stars требуется Telegram версии 6.0 или выше. Пожалуйста, обновите приложение.'
+                            : 'Stars payment requires Telegram version 6.0 or higher. Please update your app.',
                           variant: 'destructive',
                         });
                         return;
