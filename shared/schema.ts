@@ -19,6 +19,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   energy: integer("energy").notNull().default(10),
   energyResetAt: timestamp("energy_reset_at").notNull().defaultNow(),
+  lastProfileUpdate: timestamp("last_profile_update"),
   referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
   referredById: varchar("referred_by_id", { length: 255 }),
   isAdmin: boolean("is_admin").notNull().default(false),

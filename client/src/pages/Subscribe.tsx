@@ -151,29 +151,29 @@ export default function Subscribe() {
   const getLocalizedFeatures = (tier: string) => {
     if (tier === 'standard') {
       return locale === 'ru' ? [
-        '100 сфер энергии ежедневно',
-        'Все функции астрологии',
-        'Ежедневный гороскоп',
+        '100 сфер ежедневно',
+        'Бесплатный план на неделю',
+        'Бесплатный план на месяц',
         'Базовая поддержка'
       ] : [
-        '100 energy orbs daily',
-        'All astrology features',
-        'Daily horoscope',
+        '100 orbs daily',
+        'Free weekly plan',
+        'Free monthly plan',
         'Basic support'
       ];
     } else {
       return locale === 'ru' ? [
-        '250 сфер энергии ежедневно',
-        'Все функции астрологии',
-        'Приоритетные ответы ИИ',
-        'Премиум поддержка',
-        'Продвинутые прозрения'
+        '250 сфер ежедневно',
+        'Бесплатный план на неделю',
+        'Бесплатный план на месяц',
+        'Приоритет в обработке',
+        'Премиум поддержка'
       ] : [
-        '250 energy orbs daily',
-        'All astrology features',
-        'Priority AI responses',
-        'Premium support',
-        'Advanced insights'
+        '250 orbs daily',
+        'Free weekly plan',
+        'Free monthly plan',
+        'Priority processing',
+        'Premium support'
       ];
     }
   };

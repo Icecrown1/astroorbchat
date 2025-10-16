@@ -146,6 +146,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
 
+      // Get current user to check last profile update
+      const currentUser = await storage.getUser(userId);
+      
+      if (currentUser?.lastProfileUpdate) {
+        const lastUpdate = new Date(currentUser.lastProfileUpdate);
+        const now = new Date();
+        const daysSinceUpdate = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Require 30 days (1 month) between profile updates
+        if (daysSinceUpdate < 30) {
+          const daysRemaining = 30 - daysSinceUpdate;
+          return res.status(400).json({ 
+            ok: false, 
+            error: `Profile can only be updated once per month. You can update again in ${daysRemaining} days.`,
+            daysRemaining 
+          });
+        }
+      }
+
       const user = await storage.updateUser(userId, {
         name,
         gender,
@@ -154,6 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthTime,
         birthPlace,
         timezone,
+        lastProfileUpdate: new Date(),
       });
 
       res.json({ ok: true, data: user });
