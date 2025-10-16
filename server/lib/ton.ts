@@ -62,6 +62,96 @@ export async function verifyTonTransaction(
   }
 }
 
+// NEW: Find transaction FROM user's wallet TO our wallet
+export async function findUserTransaction(
+  userWalletAddress: string,
+  recipientAddress: string,
+  expectedAmount: string,
+  maxAgeMinutes: number = 10,
+  excludeTxHashes: Set<string> = new Set()
+): Promise<{ hash: string; amount: string; timestamp: number } | null> {
+  try {
+    console.log('=====================================');
+    console.log('[TON] NEW SEARCH METHOD - Looking for transaction FROM user wallet:');
+    console.log('[TON] User wallet:', userWalletAddress);
+    console.log('[TON] To recipient:', recipientAddress);
+    console.log('[TON] Expected amount:', expectedAmount, 'nanoTON');
+    console.log('[TON] Max age:', maxAgeMinutes, 'minutes');
+    console.log('=====================================');
+
+    const response = await fetch(
+      `https://tonapi.io/v2/blockchain/accounts/${userWalletAddress}/transactions?limit=50`
+    );
+    
+    if (!response.ok) {
+      console.error('[TON] Failed to fetch user transactions:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    const transactions = data.transactions || [];
+    
+    console.log(`[TON] Fetched ${transactions.length} transactions from user's wallet`);
+    
+    const cutoffTime = Math.floor(Date.now() / 1000) - (maxAgeMinutes * 60);
+    
+    // Find outgoing transactions to our address
+    for (const tx of transactions) {
+      const txTime = tx.utime || 0;
+      const txHash = tx.hash;
+      
+      // Skip old transactions
+      if (txTime < cutoffTime) continue;
+      
+      // Skip already used
+      if (excludeTxHashes.has(txHash)) continue;
+      
+      // Check outgoing messages
+      if (tx.out_msgs && tx.out_msgs.length > 0) {
+        for (const msg of tx.out_msgs) {
+          const destination = msg.destination?.address;
+          const amount = msg.value || '0';
+          
+          console.log('[TON] Checking outgoing message:', {
+            hash: txHash.substring(0, 16) + '...',
+            destination: destination?.substring(0, 16) + '...',
+            amount,
+            time: new Date(txTime * 1000).toISOString()
+          });
+          
+          // Check if this message goes to our address with correct amount
+          if (destination === recipientAddress) {
+            const amountNum = BigInt(amount);
+            const expectedNum = BigInt(expectedAmount);
+            const tolerance = BigInt(Math.floor(Number(expectedNum) * 0.001));
+            const diff = amountNum > expectedNum ? amountNum - expectedNum : expectedNum - amountNum;
+            
+            if (diff <= tolerance) {
+              console.log('[TON] ✅ MATCH FOUND!', {
+                txHash: txHash.substring(0, 16) + '...',
+                amount,
+                destination: destination.substring(0, 16) + '...'
+              });
+              return {
+                hash: txHash,
+                amount,
+                timestamp: txTime
+              };
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('[TON] ❌ No matching transaction found from user wallet');
+    return null;
+  } catch (error) {
+    console.error('[TON] Error searching user transactions:', error);
+    return null;
+  }
+}
+
+// OLD METHOD: Find transaction on recipient's address (less reliable)
 export async function findRecentTransaction(
   walletAddress: string,
   expectedAmount: string,

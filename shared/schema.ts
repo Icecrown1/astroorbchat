@@ -122,6 +122,7 @@ export const payments = pgTable("payments", {
   amountTON: decimal("amount_ton", { precision: 18, scale: 9 }).notNull(),
   txHash: varchar("tx_hash", { length: 255 }).notNull().unique(),
   status: varchar("status", { length: 20 }).notNull(),
+  userWalletAddress: varchar("user_wallet_address", { length: 255 }), // TON wallet address of the sender
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   txHashIdx: index("payments_tx_hash_idx").on(table.txHash),

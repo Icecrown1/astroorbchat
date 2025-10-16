@@ -1720,6 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     tier: z.enum(["standard", "pro"]).optional(),
     energyAmount: z.number().optional(),
     amountUSD: z.number(),
+    userWalletAddress: z.string().optional(), // TON wallet address of sender
   });
 
   app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
@@ -1749,6 +1750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
         txHash: `pending_${Date.now()}`,
         status: "pending",
+        userWalletAddress: validated.userWalletAddress || null, // Save sender's wallet address
       });
 
       res.json({
@@ -1808,20 +1810,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .map(p => p.txHash)
       );
 
-      // Find matching transaction on blockchain (excluding already used ones)
-      console.log('[TON_CONFIRM] Searching for transaction:', {
-        paymentId: validated.paymentId,
-        walletAddress,
-        expectedAmount: payment.amountTON,
-        usedTxHashesCount: usedTxHashes.size,
-      });
+      // IMPORTANT: Convert amount to nanoTON for comparison
+      const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
 
-      const matchedTx = await findRecentTransaction(
-        walletAddress,
-        payment.amountTON || '0',
-        10, // 10 minutes max age
-        usedTxHashes // Exclude already used transactions
-      );
+      let matchedTx = null;
+
+      // NEW METHOD: If we have user's wallet address, search FROM their wallet
+      if (payment.userWalletAddress) {
+        console.log('[TON_CONFIRM] Using NEW search method - FROM user wallet');
+        const { findUserTransaction } = await import('./lib/ton.js');
+        matchedTx = await findUserTransaction(
+          payment.userWalletAddress,
+          walletAddress,
+          amountInNanoTON,
+          10, // 10 minutes max age
+          usedTxHashes
+        );
+      } else {
+        // FALLBACK: Old method for payments without userWalletAddress
+        console.log('[TON_CONFIRM] Using OLD search method - ON recipient wallet (fallback)');
+        matchedTx = await findRecentTransaction(
+          walletAddress,
+          amountInNanoTON,
+          10,
+          usedTxHashes
+        );
+      }
 
       if (!matchedTx) {
         console.error('[TON_CONFIRM] No matching unused transaction found on blockchain');
