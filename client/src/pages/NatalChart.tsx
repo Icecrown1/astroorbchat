@@ -115,8 +115,8 @@ export default function GuestNatalCharts() {
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {locale === 'ru' 
-                    ? 'Введите данные рождения для создания натальной карты. Стоимость: 1 орб' 
-                    : 'Enter birth data to create a natal chart. Cost: 1 orb'}
+                    ? 'Введите данные рождения для создания натальной карты. Стоимость: 2 орба' 
+                    : 'Enter birth data to create a natal chart. Cost: 2 orbs'}
                 </p>
               </div>
               <GuestChartForm />

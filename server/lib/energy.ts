@@ -6,11 +6,11 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export const ENERGY_COSTS = {
-  solar: 2,
-  horoscope: 1,
+  solar: 11,
+  horoscope: 2,
   compatibility: 2,
   ask: 1,
-  natal_external: 1,
+  natal_external: 2,
   important_date_detail: 1,
   compatibility_professional: 4,  // Профессиональная синастрия
   weekly_plan: 1,  // План на неделю
