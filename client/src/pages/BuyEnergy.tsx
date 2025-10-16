@@ -78,43 +78,38 @@ export default function BuyEnergy() {
           ],
         };
 
-        console.log('[TON] Sending transaction via TON Connect...', transaction);
+        console.log('[TON] Opening wallet to sign transaction...');
         
-        let result;
-        try {
-          result = await tonConnectUI.sendTransaction(transaction);
-          console.log('[TON] Transaction sent successfully, confirming payment...', result);
-        } catch (sendError: any) {
-          console.error('[TON] sendTransaction error:', sendError);
-          // Transaction might be sent but SDK lost context due to HMR/reconnection
-          // Show user to wait and check their balance
-          toast({
-            title: locale === 'ru' ? 'Транзакция отправлена' : 'Transaction sent',
-            description: locale === 'ru' 
-              ? 'Проверяем подтверждение на блокчейне... Обновите страницу через несколько секунд если энергия не начислится'
-              : 'Checking blockchain confirmation... Refresh the page in a few seconds if energy is not credited',
-          });
-          // Try to confirm anyway using paymentId (backend will search blockchain)
-          result = null; // No BOC available, backend will search by amount/time
-        }
+        // Fire transaction request (don't wait for result - it's unreliable due to HMR)
+        tonConnectUI.sendTransaction(transaction)
+          .then(result => console.log('[TON] Transaction signed:', result))
+          .catch(err => console.log('[TON] Transaction error (may be false alarm):', err));
 
-        // Retry confirmation with exponential backoff (blockchain needs time)
+        // Show notification to user
+        toast({
+          title: locale === 'ru' ? 'Подтвердите транзакцию' : 'Confirm transaction',
+          description: locale === 'ru' 
+            ? 'Подпишите транзакцию в кошельке. Проверка на блокчейне начнется автоматически'
+            : 'Sign the transaction in your wallet. Blockchain verification will start automatically',
+        });
+
+        // Wait for user to sign (give them time to interact with wallet)
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Start polling blockchain for transaction
         const maxRetries = 10;
         const retryDelay = 3000; // 3 seconds
         let lastError = '';
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          console.log(`[TON] Confirmation attempt ${attempt}/${maxRetries}`);
+          console.log(`[TON] Blockchain check ${attempt}/${maxRetries}...`);
           
-          const confirmPayload: any = { paymentId: data.paymentId };
-          if (result?.boc) {
-            confirmPayload.boc = result.boc;
-          }
-          
-          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', confirmPayload);
+          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
+            paymentId: data.paymentId,
+          });
 
           if (confirmResponse.ok) {
-            console.log('[TON] Payment confirmed, energy credited');
+            console.log('[TON] ✅ Transaction found and confirmed!');
             queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
             toast({
               title: t.common.success,
@@ -124,10 +119,19 @@ export default function BuyEnergy() {
             return;
           }
 
-          lastError = confirmResponse.error || 'Failed to confirm payment';
+          lastError = confirmResponse.error || 'Transaction not found';
           
           // If not found on blockchain, wait and retry
           if (lastError.includes('not found on blockchain') && attempt < maxRetries) {
+            // Show progress to user
+            if (attempt % 3 === 0) {
+              toast({
+                title: locale === 'ru' ? 'Ищем транзакцию...' : 'Searching for transaction...',
+                description: locale === 'ru' 
+                  ? `Проверка блокчейна (${attempt}/${maxRetries})...`
+                  : `Checking blockchain (${attempt}/${maxRetries})...`,
+              });
+            }
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
           }
@@ -137,7 +141,11 @@ export default function BuyEnergy() {
         }
 
         // All retries failed
-        throw new Error(lastError || 'Failed to confirm payment after multiple attempts');
+        throw new Error(
+          locale === 'ru' 
+            ? 'Транзакция не найдена на блокчейне. Проверьте баланс через несколько минут или обратитесь в поддержку'
+            : 'Transaction not found on blockchain. Check your balance in a few minutes or contact support'
+        );
       } catch (error: any) {
         console.error('[TON] Error:', error);
         toast({
