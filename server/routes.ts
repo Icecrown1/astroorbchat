@@ -2308,30 +2308,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Invalid request: must specify pack or tier" });
       }
 
-      // Create payment record with signed payload
-      const payloadData = {
-        userId,
-        kind: validated.kind,
-        pack: validated.pack,
-        tier,
-        timestamp: Date.now(),
-      };
+      // Generate short unique payload (well within 128 byte limit)
+      const shortPayload = `star_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const signedPayload = signPayload(payloadData);
-
+      // Create payment record with short payload
       const starPayment = await storage.createStarPayment({
         userId,
         kind: validated.kind,
         energyAmount,
         amountStars: priceStars,
-        invoicePayload: signedPayload,
+        invoicePayload: shortPayload,
       });
 
-      // Create invoice link
+      // Create invoice link with short payload
       const invoiceResult = await createInvoiceLink({
         title,
         description,
-        payload: signedPayload,
+        payload: shortPayload,
         prices: [{ label: title, amount: priceStars }],
       });
 
