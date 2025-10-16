@@ -10,6 +10,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
 import { useTranslation } from '@/contexts/LocaleContext';
+import WebApp from '@twa-dev/sdk';
 
 const SUBSCRIPTION_TIERS = [
   {
@@ -35,6 +36,15 @@ export default function Subscribe() {
   const { t, locale } = useTranslation();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
+
+  // Check Telegram version for Stars support
+  const isTelegramVersionSupported = () => {
+    const version = WebApp.version;
+    const [major, minor] = version.split('.').map(Number);
+    return major > 6 || (major === 6 && minor >= 1);
+  };
+
+  const supportsStars = isTelegramVersionSupported();
 
   useEffect(() => {
     const checkWallet = () => {
@@ -78,6 +88,55 @@ export default function Subscribe() {
           description: `${tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}! ${tier.dailyEnergy} ${t.common.orbs}`,
         });
         navigate('/dashboard');
+      } catch (error: any) {
+        toast({
+          title: t.common.error,
+          description: error.message || t.errors.calculationFailed,
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const starsMutation = useMutation({
+    mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
+      const response = await apiRequest('POST', '/api/payments/stars/create', {
+        kind: 'subscription',
+        tier: tier.tier,
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data, tier) => {
+      try {
+        WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          if (status === 'paid') {
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            toast({
+              title: t.common.success,
+              description: `${tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro} ${t.subscribe.subscribeWith}!`,
+            });
+            navigate('/dashboard');
+          } else if (status === 'cancelled') {
+            toast({
+              title: locale === 'ru' ? 'Платеж отменен' : 'Payment cancelled',
+              description: locale === 'ru' ? 'Вы отменили платеж' : 'You cancelled the payment',
+            });
+          } else if (status === 'failed') {
+            toast({
+              title: t.common.error,
+              description: locale === 'ru' ? 'Платеж не прошел' : 'Payment failed',
+              variant: 'destructive',
+            });
+          }
+        });
       } catch (error: any) {
         toast({
           title: t.common.error,
@@ -297,6 +356,9 @@ export default function Subscribe() {
                   <p className="text-sm text-muted-foreground">
                     ≈ {getTonPrice(tier.price)} TON{t.subscribe.perMonth}
                   </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {locale === 'ru' ? 'или' : 'or'} {pricesData?.data?.subscriptions?.[tier.tier as 'standard' | 'pro']?.stars || (tier.tier === 'standard' ? 565 : 940)} ⭐ Stars
+                  </p>
                 </div>
 
                 <div className="space-y-3 mb-6">
@@ -312,49 +374,87 @@ export default function Subscribe() {
                   ))}
                 </div>
 
-                <Button
-                  className="w-full"
-                  variant={selectedTier === tier.tier ? 'default' : 'outline'}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!walletConnected) {
-                      try {
-                        await connectWallet();
-                        setWalletConnected(true);
-                        mutation.mutate(tier);
-                      } catch (error: any) {
+                <div className="space-y-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTier(tier.tier);
+                      if (!supportsStars) {
                         toast({
-                          title: t.common.error,
-                          description: error.message || 'Failed to connect wallet',
+                          title: locale === 'ru' ? 'Обновите Telegram' : 'Update Telegram',
+                          description: locale === 'ru' 
+                            ? 'Для оплаты Stars требуется Telegram версии 6.1 или выше. Пожалуйста, обновите приложение.'
+                            : 'Stars payment requires Telegram version 6.1 or higher. Please update your app.',
                           variant: 'destructive',
                         });
+                        return;
                       }
-                    } else {
-                      mutation.mutate(tier);
-                    }
-                  }}
-                  disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
-                  data-testid={`button-subscribe-${tier.tier}`}
-                >
-                  {mutation.isPending && selectedTier === tier.tier ? (
-                    <>
-                      <Loader className="mr-2" size="sm" />
-                      {t.subscribe.subscribing}
-                    </>
-                  ) : currentSubscription?.tier === tier.tier ? (
-                    t.subscribe.currentPlan
-                  ) : !walletConnected ? (
-                    <>
-                      <Wallet className="w-4 h-4 mr-2" />
-                      {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      {t.subscribe.subscribeWith}
-                    </>
-                  )}
-                </Button>
+                      starsMutation.mutate(tier);
+                    }}
+                    disabled={(starsMutation.isPending && selectedTier === tier.tier) || !supportsStars || currentSubscription?.tier === tier.tier}
+                    data-testid={`button-subscribe-stars-${tier.tier}`}
+                  >
+                    {starsMutation.isPending && selectedTier === tier.tier ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.subscribe.subscribing}
+                      </>
+                    ) : currentSubscription?.tier === tier.tier ? (
+                      t.subscribe.currentPlan
+                    ) : (
+                      <>
+                        <span className="mr-2">⭐</span>
+                        {locale === 'ru' ? 'Оплатить Stars' : 'Pay with Stars'}
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!walletConnected) {
+                        try {
+                          await connectWallet();
+                          setWalletConnected(true);
+                          mutation.mutate(tier);
+                        } catch (error: any) {
+                          toast({
+                            title: t.common.error,
+                            description: error.message || 'Failed to connect wallet',
+                            variant: 'destructive',
+                          });
+                        }
+                      } else {
+                        mutation.mutate(tier);
+                      }
+                    }}
+                    disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
+                    data-testid={`button-subscribe-${tier.tier}`}
+                  >
+                    {mutation.isPending && selectedTier === tier.tier ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.subscribe.subscribing}
+                      </>
+                    ) : currentSubscription?.tier === tier.tier ? (
+                      t.subscribe.currentPlan
+                    ) : !walletConnected ? (
+                      <>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        {t.subscribe.subscribeWith}
+                      </>
+                    )}
+                  </Button>
+                </div>
 
                 {/* DEV ONLY: Free subscription button */}
                 {import.meta.env.DEV && (
@@ -386,11 +486,22 @@ export default function Subscribe() {
           </div>
         )}
 
+        {!supportsStars && (
+          <Card className="mt-6 p-4 bg-destructive/10 border-destructive/20">
+            <p className="text-sm text-destructive text-center">
+              {locale === 'ru' ? 
+                '⚠️ Ваша версия Telegram не поддерживает Stars. Обновите приложение или используйте TON.' :
+                '⚠️ Your Telegram version doesn\'t support Stars. Update your app or use TON payment.'
+              }
+            </p>
+          </Card>
+        )}
+
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' 
-              ? 'Подписка оплачивается ежемесячно через блокчейн TON. Отмена в любое время. Энергия обновляется ежедневно в полночь.'
-              : 'Subscriptions are billed monthly via TON blockchain. Cancel anytime. Energy resets daily at midnight.'
+              ? 'Подписка оплачивается ежемесячно через Telegram Stars ⭐ или TON блокчейн. Отмена в любое время. Энергия обновляется ежедневно в полночь.'
+              : 'Subscriptions are billed monthly via Telegram Stars ⭐ or TON blockchain. Cancel anytime. Energy resets daily at midnight.'
             }
           </p>
         </Card>
