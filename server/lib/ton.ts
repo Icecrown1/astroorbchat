@@ -88,10 +88,14 @@ export async function findRecentTransaction(
     const data = await response.json();
     const transactions = data.transactions || [];
     
+    console.log('=====================================');
+    console.log('[TON] RAW API RESPONSE:', JSON.stringify(data, null, 2));
+    console.log('=====================================');
     console.log(`[TON] Fetched ${transactions.length} transactions from blockchain`);
     
     const cutoffTime = Math.floor(Date.now() / 1000) - (maxAgeMinutes * 60);
     console.log('[TON] Cutoff time:', new Date(cutoffTime * 1000).toISOString());
+    console.log('[TON] Expected amount (nanoTON):', expectedAmount);
     
     // Log ALL recent transactions for debugging (both incoming and outgoing)
     const recentAll = transactions
@@ -137,20 +141,29 @@ export async function findRecentTransaction(
       
       // Skip if already used
       if (excludeTxHashes.has(txHash)) {
-        console.log('[TON] Skipping already used transaction:', txHash);
+        console.log('[TON] ⏭️ Skipping already used transaction:', txHash.substring(0, 16) + '...');
         continue;
       }
       
+      // Log full transaction structure for debugging
+      console.log('-------------------------------------');
+      console.log('[TON] 🔍 Examining transaction:', {
+        hash: txHash.substring(0, 16) + '...',
+        time: new Date(txTime * 1000).toISOString(),
+        foundAmount: txAmount,
+        hasInMsg: !!tx.in_msg,
+        hasOutMsgs: !!tx.out_msgs && tx.out_msgs.length > 0,
+        outMsgsCount: tx.out_msgs?.length || 0,
+        fullTx: JSON.stringify(tx, null, 2).substring(0, 500) + '...' // First 500 chars
+      });
+      
       // Log comparison details with type information
-      console.log('[TON] Comparing transaction:', {
-        txHash: txHash.substring(0, 10) + '...',
-        txAmount,
-        txAmountType: typeof txAmount,
+      console.log('[TON] 📊 Amount comparison:', {
+        foundAmount: txAmount,
+        foundAmountType: typeof txAmount,
         expectedAmount,
         expectedAmountType: typeof expectedAmount,
         strictMatch: txAmount === expectedAmount,
-        txTime: new Date(txTime * 1000).toISOString(),
-        cutoffTime: new Date(cutoffTime * 1000).toISOString(),
         timeMatch: txTime >= cutoffTime
       });
       

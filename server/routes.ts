@@ -1723,6 +1723,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
+    console.log('=====================================');
+    console.log('[TON_CREATE] Request received:', { userId: (req as any).userId, body: req.body });
+    console.log('=====================================');
     try {
       const userId = (req as any).userId;
       const validated = createPaymentSchema.parse(req.body);
@@ -1770,6 +1773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/ton/confirm", requireAuth, async (req, res) => {
+    console.log('=====================================');
+    console.log('[TON_CONFIRM] Request received:', { userId: (req as any).userId, body: req.body });
+    console.log('=====================================');
     try {
       const userId = (req as any).userId;
       const validated = confirmTonPaymentSchema.parse(req.body);
