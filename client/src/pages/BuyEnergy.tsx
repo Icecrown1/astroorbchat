@@ -186,10 +186,11 @@ export default function BuyEnergy() {
 
   const starsMutation = useMutation({
     mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
-      const response = await apiRequest('POST', '/api/payments/stars/create-invoice', {
+      const response = await apiRequest('POST', '/api/payments/stars/create', {
         kind: 'energy_pack',
-        energyAmount: pack.amount,
-        amountStars: pack.starsPrice,
+        pack: {
+          energy: pack.amount,
+        },
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;

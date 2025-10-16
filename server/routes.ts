@@ -2342,7 +2342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ok: true,
         data: {
-          invoiceUrl: invoiceResult.invoiceLink,
+          invoiceLink: invoiceResult.invoiceLink,
           paymentId: starPayment.id,
         },
       });
