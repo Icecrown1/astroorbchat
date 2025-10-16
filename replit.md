@@ -41,3 +41,29 @@ Preferred communication style: Simple, everyday language.
     - TON: `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`
     - Telegram: `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
     - Auth: `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`
+
+## Recent Bug Fixes
+
+### Compatibility Date Auto-Population (Fixed - Oct 16, 2025)
+**Problem**: Birth date field remained empty when clicking saved guest charts to auto-fill compatibility form.
+
+**Solution**: Changed from `new Date().toISOString()` (which caused timezone shifts) to simple string split: `chart.birthdayDate.split('T')[0]` to extract YYYY-MM-DD from ISO datetime. Added null/empty guard.
+
+**File**: `client/src/pages/Compatibility.tsx`
+
+### TypeScript Errors in Subscribe.tsx (Fixed - Oct 16, 2025)
+**Problem**: Property access errors on empty object types `{}` for useQuery hooks.
+
+**Solution**: Added `UserMeResponse` and `PricesResponse` interfaces matching backend contracts. Applied proper generic type parameters to both useQuery hooks.
+
+**Files**: `client/src/pages/Subscribe.tsx`
+
+### Solar Return Incomplete Localization (Fixed - Oct 16, 2025)
+**Problem**: Mixed Russian/English text in Solar Return UI - hardcoded English insights and mixed-language AI prompt.
+
+**Solution**: 
+- Added locale-based insight arrays in `server/routes.ts` (lines 813-822)
+- Fully translated `server/lib/prompts/solar.md` to Russian
+- Added translations for insights to `client/src/lib/translations.ts`
+
+**Files**: `server/routes.ts`, `server/lib/prompts/solar.md`, `client/src/lib/translations.ts`
