@@ -93,23 +93,45 @@ export async function findRecentTransaction(
     const cutoffTime = Math.floor(Date.now() / 1000) - (maxAgeMinutes * 60);
     console.log('[TON] Cutoff time:', new Date(cutoffTime * 1000).toISOString());
     
-    // Log all recent incoming transactions for debugging
-    const recentIncoming = transactions
-      .filter((tx: any) => tx.in_msg && tx.utime >= cutoffTime)
+    // Log ALL recent transactions for debugging (both incoming and outgoing)
+    const recentAll = transactions
+      .filter((tx: any) => tx.utime >= cutoffTime)
       .map((tx: any) => ({
         hash: tx.hash,
-        amount: tx.in_msg.value,
+        inAmount: tx.in_msg?.value || null,
+        outAmounts: tx.out_msgs?.map((m: any) => m.value) || [],
         time: new Date(tx.utime * 1000).toISOString(),
         used: excludeTxHashes.has(tx.hash)
       }));
     
-    console.log('[TON] Recent incoming transactions:', JSON.stringify(recentIncoming, null, 2));
+    console.log('[TON] ALL recent transactions:', JSON.stringify(recentAll, null, 2));
     
     // Find matching transaction by amount and time, excluding already used ones
+    // Check both incoming AND outgoing messages for our amount
     for (const tx of transactions) {
-      if (!tx.in_msg) continue;
+      let txAmount = '0';
       
-      const txAmount = tx.in_msg.value || '0';
+      // Check incoming message first
+      if (tx.in_msg?.value) {
+        txAmount = tx.in_msg.value;
+      }
+      // If no incoming, check outgoing messages (for self-transfers or internal messages)
+      else if (tx.out_msgs && tx.out_msgs.length > 0) {
+        // Find outgoing message with our expected amount
+        const matchingOut = tx.out_msgs.find((msg: any) => {
+          const outAmount = msg.value || '0';
+          const diff = Math.abs(Number(outAmount) - Number(expectedAmount));
+          return diff < Number(expectedAmount) * 0.001; // 0.1% tolerance
+        });
+        if (matchingOut) {
+          txAmount = matchingOut.value;
+        } else {
+          continue; // No matching amount in out messages
+        }
+      } else {
+        continue; // No messages at all
+      }
+      
       const txTime = tx.utime || 0;
       const txHash = tx.hash;
       
