@@ -44,6 +44,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Bug Fixes
 
+### TON Payment Verification Error (Fixed - Oct 16, 2025)
+**Problem**: "Transaction not found on blockchain" error when verifying TON payments. Backend was searching for incoming transactions TO our wallet instead of searching user's wallet for outgoing transactions.
+
+**Solution**: 
+- **Backend**: Changed from `findRecentTransaction` (searches our wallet) to `findUserTransaction` (searches user's wallet) in `/api/payments/ton/confirm`
+- **Logic**: User sends TON FROM their wallet TO our wallet, so we must search their transaction history
+- **Validation**: Added check to ensure `payment.userWalletAddress` exists before searching blockchain
+- **Frontend**: Added wallet address validation to prevent payment creation when `wallet?.account?.address` is undefined
+
+**Files**: `server/routes.ts`, `server/lib/ton.ts`, `client/src/pages/BuyEnergy.tsx`
+
 ### Compatibility Date Auto-Population (Fixed - Oct 16, 2025)
 **Problem**: Birth date field remained empty when clicking saved guest charts to auto-fill compatibility form.
 
