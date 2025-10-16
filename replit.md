@@ -45,12 +45,16 @@ Preferred communication style: Simple, everyday language.
 ## Recent Bug Fixes
 
 ### TON Payment Verification Error (Fixed - Oct 16, 2025)
-**Problem**: "Transaction not found on blockchain" error when verifying TON payments. Backend was searching for incoming transactions TO our wallet instead of searching user's wallet for outgoing transactions.
+**Problem**: "Transaction not found on blockchain" error when verifying TON payments due to two issues:
+1. Backend was searching for incoming transactions TO our wallet instead of searching user's wallet for outgoing transactions
+2. Address format mismatch: TON Connect returns user-friendly format (EQ.../UQ...) but TON API returns raw format (0:...)
 
 **Solution**: 
-- **Backend**: Changed from `findRecentTransaction` (searches our wallet) to `findUserTransaction` (searches user's wallet) in `/api/payments/ton/confirm`
-- **Logic**: User sends TON FROM their wallet TO our wallet, so we must search their transaction history
-- **Validation**: Added check to ensure `payment.userWalletAddress` exists before searching blockchain
+- **Search Direction Fix**: Changed from `findRecentTransaction` (searches our wallet) to `findUserTransaction` (searches user's wallet) in `/api/payments/ton/confirm`
+- **Address Normalization**: Added `normalizeTonAddress()` helper using `@ton/core` to convert all addresses to canonical raw format (0:...)
+  - Normalizes `userWalletAddress` at payment creation before saving to database
+  - Normalizes both recipient (our wallet) and destination (from TON API) addresses before comparison in `findUserTransaction`
+- **Validation**: Added checks to ensure `payment.userWalletAddress` exists and wallet address is available before creating payment
 - **Frontend**: Added wallet address validation to prevent payment creation when `wallet?.account?.address` is undefined
 
 **Files**: `server/routes.ts`, `server/lib/ton.ts`, `client/src/pages/BuyEnergy.tsx`
