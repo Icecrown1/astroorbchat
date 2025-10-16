@@ -1,152 +1,43 @@
 # Astro Orb - AI-Powered Astrology Telegram Mini App
 
 ## Overview
-Astro Orb is an AI-powered Telegram Mini App that provides astrology readings including natal charts, solar returns, horoscopes, and personalized insights. It features a gamified energy system, TON blockchain payment integration, and referral mechanics. The project aims to deliver accurate astrological interpretations using OpenAI and precise astronomical calculations, all within a user-friendly, full-stack TypeScript application with a React frontend and Express backend.
+Astro Orb is an AI-powered Telegram Mini App offering personalized astrology readings like natal charts, solar returns, and horoscopes. It integrates a gamified energy system, TON blockchain payments, and referral mechanics. The project aims to deliver accurate, AI-driven astrological interpretations within a user-friendly, full-stack TypeScript application with a React frontend and Express backend. Its core purpose is to make complex astrological insights accessible and engaging.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend
-- **Frameworks**: React 18, TypeScript, Vite, wouter for routing.
-- **UI/UX**: shadcn/ui with Radix UI, Tailwind CSS for styling, dark mode with custom cosmic theme, Telegram native UI aesthetics.
+### UI/UX
+- **Frontend**: React 18, TypeScript, Vite, wouter for routing.
+- **Styling**: shadcn/ui, Radix UI, Tailwind CSS, dark mode with a cosmic theme, Telegram native UI aesthetics.
 - **State Management**: Zustand for global state, TanStack Query for server state, React Hook Form with Zod for forms.
-- **Key Features**: Telegram WebApp SDK integration, TON Connect UI, canvas-based natal chart visualization, real-time energy countdown, multi-step registration.
+- **Key Features**: Telegram WebApp SDK, TON Connect UI, canvas-based natal chart visualization, real-time energy countdown, multi-step registration.
 
-### Backend
-- **Server**: Express.js with TypeScript.
-- **Authentication**: JWT-based with Telegram InitData validation (HMAC-SHA256).
+### Technical Implementation
+- **Backend**: Express.js with TypeScript.
+- **Authentication**: JWT-based with Telegram InitData validation (HMAC-SHA256) and Telegram Login Widget support.
 - **API**: RESTful endpoints for authentication, astrology, payments, referrals, and user management.
-- **Astrology Engine**: Utilizes Swiss Ephemeris via a Python bridge for accurate astronomical calculations (natal charts, solar returns, horoscopes, compatibility).
-- **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards.
-- **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, with custom prompts for various reading types and gender-based tone personalization.
-  - **GPT-5 Optimization**: Compact prompt system reduces size by 90% to prevent reasoning token exhaustion. Uses helper functions (`extractKeyPlanetPositions`, `summarizeTransits`) instead of full JSON.
-  - **Prompt Helpers**: `findHouseForPlanet` calculates house positions, `extractKeyPlanetPositions` creates compact planet summaries, `summarizeTransits` preserves all transit data in concise format.
-  - **Full Localization**: All prompts (labels, planets, aspects) fully localized for ru/en. Planet translations (Sun→Солнце), aspect translations (square→квадрат).
-  - **Token Limits**: `max_completion_tokens=5000` for weekly/monthly plans balances quality and cost.
-- **Personalized Compatibility**: All compatibility interpretations use real user names (e.g., "Марина и Алексей" / "Marina and Alex") throughout the analysis. The AI prompts enforce name usage (minimum 1 name per section), and backend validates that names appear in the response. This personalization increases engagement and makes readings feel individually crafted.
-- **Data Caching**: Multi-locale caching for natal charts (`{ru: {...}, en: {...}}`), automatic locale generation on-demand.
-- **Horoscope System**: 
-  - **Daily Horoscope**: Three time periods (Morning/Day/Evening) with five life themes (Money/Work/Study/Love/Health). Evening includes self-care recommendations. Deeply personalized using natal chart data (planets in houses, aspects, stelliums).
-  - **Weekly Plan**: Structured by weekdays (Mon-Sun) with 5 themes per day. Always calculates from Monday to Sunday of current week, even if requested mid-week. Free for subscribers, 1 orb for others.
-  - **Monthly Plan**: Full month coverage with week-by-week breakdown. Always spans entire month (1st to last day). Free for subscribers, 1 orb for others.
-  - **Date Storage**: All horoscopes saved with `startDate` and `endDate` fields for proper period tracking.
-  - **Personalization**: All forecasts use natal chart analysis (house rulers, planetary positions, aspects) for individual predictions, not generic readings.
+- **Astrology Engine**: Python-based Swiss Ephemeris for precise astronomical calculations (natal charts, solar returns, horoscopes, compatibility).
+- **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, utilizing custom, compact prompts for various reading types and gender-based tone personalization. Includes full localization of prompts and ensures personalized compatibility readings with user names.
+- **Horoscope System**: Offers daily, weekly, and monthly personalized horoscopes, deeply integrated with natal chart data for individual predictions, not generic readings. Horoscopes are stored with `startDate` and `endDate` for proper period tracking.
+- **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards. Users can update their profile once every 30 days.
 
-### Data Storage
-- **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
-- **Schema**: Tables for `users`, `subscriptions`, `payments`, `usageLogs`, `natal_readings`, `horoscope_readings`, `compatibility_readings`, `ai_questions`, `importantDateUnlocks`, `externalNatals`, `starPayments`.
-- **Energy Costs**: Basic natal chart and horoscope readings cost 1 orb each, compatibility analysis costs 2 orbs. Energy resets daily to 10 orbs.
-- **Profile Update Restriction**: Users can only update their profile (name, gender, age, birth data) once per 30 days via `lastProfileUpdate` timestamp check in `/api/user/update`. Returns error with days remaining if attempted too soon. Profile updates DO NOT affect existing subscriptions.
-
-### Payment Systems
-- **TON Blockchain**: Cryptocurrency payments via TON Connect wallet integration with blockchain verification
-  - **TON Connect Setup**: Uses `@tonconnect/ui-react` Provider with manifest at `/.well-known/tonconnect-manifest.json`
-  - **Wallet Integration**: `useTonConnectUI()` hook provides wallet connection state and transaction methods
-  - **Payment Flow**: Create pending payment → Send TON transaction → Backend polls TON API → Finds transaction by amount+time → Verifies & credits energy
-  - **Verification Method**: Uses `findRecentTransaction()` to poll TON API (tonapi.io) for incoming transactions matching exact amount within 10-minute window
-  - **Security Features**:
-    - Blockchain verification via TON API (amount + timestamp matching)
-    - txHash uniqueness check (prevents replay attacks)
-    - User ownership validation (payment.userId === userId)
-    - 10-minute expiry window for transaction matching
-    - Idempotency support (safe to retry confirmation)
-- **Telegram Stars**: In-app purchases using Telegram's native Stars currency (⭐)
-  - **Version Requirement**: Requires Telegram WebApp version 6.1+ (method `openInvoice` not available in 6.0)
-  - **Version Check**: Frontend validates Telegram version before allowing Stars payments, shows warning for outdated versions
-  - **Pricing**: 20 orbs = 190 Stars, 50 orbs = 375 Stars, 120 orbs = 750 Stars (~62.5 Stars per USD)
-  - **Security Features**:
-    - Server-side price validation (prevents client-side tampering)
-    - Webhook secret token authentication (optional, via TELEGRAM_WEBHOOK_SECRET)
-    - Idempotency checks (prevents duplicate energy crediting)
-    - Race condition protection (atomic status updates using `isNull()` for NULL checks)
-    - Amount verification (ensures paid amount matches expected)
-  - **Payment Flow**: Invoice creation → WebApp.openInvoice() → pre_checkout_query (validation) → successful_payment (fulfillment) → energy crediting
-  - **Refund Support**: telegram_payment_charge_id stored for refund capability
-
-### Subscription System
-- **Tiers**: Standard ($9/month, 100 daily orbs) and Pro ($15/month, 250 daily orbs)
-- **Benefits**: 
-  - **Standard Tier**: 100 daily orbs, free weekly plan, free monthly plan, basic support
-  - **Pro Tier**: 250 daily orbs, free weekly plan, free monthly plan, priority processing, premium support
-  - **Immediate Energy**: Upon purchase, users instantly receive 100 orbs (Standard) or 250 orbs (Pro) - adds to existing balance
-  - **Daily Energy**: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day at reset (overwrites to tier amount)
-  - Benefits active for both 'active' and 'canceled' statuses until currentPeriodEnd
-- **Payment**: TON blockchain only (same flow as energy packs)
-- **Expiration Logic**:
-  - `checkSubscriptionExpiry()` helper checks if currentPeriodEnd has passed
-  - Automatically updates status from 'active'/'canceled' → 'expired' when period ends
-  - Called BEFORE checking subscription benefits (weekly/monthly plans) to prevent post-expiry access
-  - Also checked during daily energy reset in `checkAndResetEnergy()`
-- **Cancellation**:
-  - Users can cancel via `/api/user/subscription/cancel` endpoint
-  - Status changes to 'canceled' but benefits remain until currentPeriodEnd
-  - After period ends, status automatically becomes 'expired'
-- **Status Flow**: active → (user cancels) → canceled → (period ends) → expired
-- **UI**: 
-  - Subscribe.tsx shows status cards (active/canceled/expired), cancel button for active subs, days remaining
-  - Weekly/Monthly Plan modals show "✨ БЕСПЛАТНО для подписчиков" / "✨ FREE for subscribers" for users with 'active' or 'canceled' status
-  - PaymentHistory.tsx includes back button for easy navigation to dashboard
-- **Dev Mode**: In development, "Dev: Free Subscribe" button activates subscription instantly without payment
-  - Backend: `/api/dev/subscribe` endpoint (only works when NODE_ENV=development)
-  - Frontend: Button visible only when import.meta.env.DEV is true
-  - Security: Production-safe (disabled in production builds)
-
-### Telegram Login Widget (Web Login)
-- **Purpose**: Alternative authentication method for web users (non-Mini App), enabling login via Telegram on any device/browser
-- **Implementation**:
-  - **Frontend**: `/login` page with Telegram Login Widget embedded via `telegram-widget.js` script
-  - **Backend**: `/api/auth/tg-login` endpoint verifies widget signature and issues JWT token
-- **Security Features**:
-  - **Signature Verification**: Uses HMAC-SHA256 with secret_key = SHA256(BOT_TOKEN)
-  - **Replay Protection**: Validates `auth_date` with configurable time window (default 24 hours via `LOGIN_ALLOWED_SKEW_SECONDS`)
-  - **Data Integrity**: Verifies hash against sorted data_check_string from widget callback
-- **User Flow**:
-  1. User visits `/login` → Widget renders with bot username from `VITE_BOT_USERNAME`
-  2. User clicks "Login with Telegram" → Telegram verifies identity and returns signed data
-  3. Frontend sends data to `/api/auth/tg-login` → Backend verifies signature
-  4. On success: JWT token issued, user redirected to `/dashboard`
-  5. New users created with placeholder profile data (completed during Mini App registration)
-- **Setup Requirements** (via @BotFather):
-  - `/setdomain` → Set exact production domain (must match deployment URL, HTTPS required)
-  - Example: `https://yourapp.replit.app` or custom domain
-  - Widget will only work on the registered domain
-- **Environment Variables**:
-  - `TELEGRAM_BOT_TOKEN`: Bot token (required for signature verification)
-  - `VITE_BOT_USERNAME`: Bot username without @ (used by widget, e.g., `astro_orb_bot`)
-  - `LOGIN_ALLOWED_SKEW_SECONDS`: Auth timestamp tolerance in seconds (default: 86400 = 24h)
+### System Design Choices
+- **Data Caching**: Multi-locale caching for natal charts with on-demand locale generation.
+- **Payment Systems**:
+    - **TON Blockchain**: Cryptocurrency payments via TON Connect, with server-side blockchain verification for transactions.
+    - **Telegram Stars**: In-app purchases with server-side price validation, webhook security, and idempotency checks.
+- **Subscription System**: Features Standard and Pro tiers with varying daily orb allowances, free weekly/monthly plans, and immediate energy boosts upon purchase. Subscriptions are managed with `active`, `canceled`, and `expired` statuses, with benefits remaining until the end of the current period.
 
 ## External Dependencies
-- **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.
-- **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`) for wallet connection, TON API for transactions and price fetching.
+- **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality.
+- **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`), TON API for transactions and price fetching.
 - **AI Services**: OpenAI API (GPT-5) for astrological interpretations.
-- **Environment Variables**: 
-  - Core: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`
-  - AI: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
-  - TON: `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`
-  - Telegram: `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` (optional, for Stars webhook security)
-  - Auth: `ALLOW_TEST_AUTH` (set to `'true'` in development ONLY to enable `/api/auth/test` endpoint)
-  - Login: `LOGIN_ALLOWED_SKEW_SECONDS` (auth timestamp tolerance, default: 86400 = 24h)
-
-## Authentication Flows
-1. **Telegram Mini App** → `/api/auth/telegram` with `initData` validation
-2. **Web Browser (Login Widget)** → `/api/auth/tg-login` with HMAC-SHA256 verification
-3. **Development Testing** → `/api/auth/test` (only when `ALLOW_TEST_AUTH=true`, creates test users with `test_*` tgIds)
-
-## Known Issues & Fixes
-### Duplicate User Creation (Fixed)
-**Problem**: Users accessing app via browser (without Mini App context) were creating duplicate "test_*" accounts instead of using existing profiles.
-
-**Root Cause**: Frontend was falling back to `/api/auth/test` when no `initData` available, creating new test users.
-
-**Solution Implemented**:
-- Register.tsx now checks for Telegram WebApp context with 500ms delay for initData injection
-- If not in Mini App → redirects to `/login` (Login Widget)
-- `/api/auth/test` requires explicit `ALLOW_TEST_AUTH=true` flag (not just NODE_ENV check)
-- Prevents accidental test user creation in staging/production
-
-**Migration Plan for Existing Duplicates**:
-1. Identify users with `tgId LIKE 'test_%'` in production database
-2. If user has matching real account (same Telegram ID from Login Widget), merge data
-3. Delete orphaned test accounts or mark as deprecated
+- **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
+- **Environment Variables**:
+    - Core: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`
+    - AI: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
+    - TON: `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`
+    - Telegram: `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
+    - Auth: `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`
