@@ -46,7 +46,7 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
     queryKey: ['/api/user/me'],
   });
 
-  const hasSubscription = (user as any)?.subscription?.status === 'active';
+  const hasSubscription = (user as any)?.subscription?.status === 'active' || (user as any)?.subscription?.status === 'canceled';
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -116,12 +116,18 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
                 {t.horoscope.weeklyTitle}
               </p>
               
-              {!hasSubscription && (
-                <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium mb-4">
-                  <Lock className="w-4 h-4" />
-                  {t.horoscope.costOne}
-                </div>
-              )}
+              <div className="flex items-center justify-center gap-2 text-sm font-medium mb-4">
+                {hasSubscription ? (
+                  <span className="text-chart-3">
+                    {locale === 'ru' ? '✨ БЕСПЛАТНО для подписчиков' : '✨ FREE for subscribers'}
+                  </span>
+                ) : (
+                  <span className="text-primary flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    {t.horoscope.costOne}
+                  </span>
+                )}
+              </div>
 
               {hasSubscription && (
                 <p className="text-sm text-chart-2 font-medium mb-4">

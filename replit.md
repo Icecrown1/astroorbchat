@@ -67,7 +67,8 @@ Preferred communication style: Simple, everyday language.
 ### Subscription System
 - **Tiers**: Standard ($9/month, 100 daily orbs) and Pro ($15/month, 250 daily orbs)
 - **Benefits**: 
-  - Daily energy: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day
+  - **Immediate Energy**: Upon purchase, users instantly receive 100 orbs (Standard) or 250 orbs (Pro)
+  - **Daily Energy**: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day at reset
   - Free Weekly/Monthly plans (normally 1 orb each for non-subscribers)
   - Benefits active for both 'active' and 'canceled' statuses until currentPeriodEnd
 - **Payment**: TON blockchain only (same flow as energy packs)
@@ -81,7 +82,10 @@ Preferred communication style: Simple, everyday language.
   - Status changes to 'canceled' but benefits remain until currentPeriodEnd
   - After period ends, status automatically becomes 'expired'
 - **Status Flow**: active → (user cancels) → canceled → (period ends) → expired
-- **UI**: Subscribe.tsx shows status cards (active/canceled/expired), cancel button for active subs, days remaining
+- **UI**: 
+  - Subscribe.tsx shows status cards (active/canceled/expired), cancel button for active subs, days remaining
+  - Weekly/Monthly Plan modals show "✨ БЕСПЛАТНО для подписчиков" / "✨ FREE for subscribers" for users with 'active' or 'canceled' status
+  - PaymentHistory.tsx includes back button for easy navigation to dashboard
 - **Dev Mode**: In development, "Dev: Free Subscribe" button activates subscription instantly without payment
   - Backend: `/api/dev/subscribe` endpoint (only works when NODE_ENV=development)
   - Frontend: Button visible only when import.meta.env.DEV is true

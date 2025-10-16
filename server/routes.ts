@@ -2201,6 +2201,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         await handleSubscriptionReferralBonus(storage, payment.userId);
+        
+        // IMPORTANT: Credit subscription energy immediately (add to existing balance)
+        const subscriptionEnergy = payment.tier === 'standard' ? 100 : 250;
+        const user = await storage.getUser(payment.userId);
+        if (user) {
+          await storage.updateUser(payment.userId, {
+            energy: user.energy + subscriptionEnergy,
+          });
+        }
       }
 
       res.json({ ok: true });

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Receipt, Wallet, Calendar, TrendingUp, ArrowUpRight } from "lucide-react";
+import { Loader2, Receipt, Wallet, Calendar, TrendingUp, ArrowUpRight, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/contexts/LocaleContext";
@@ -19,6 +20,7 @@ interface Payment {
 }
 
 export default function PaymentHistory() {
+  const [, navigate] = useLocation();
   const { t } = useTranslation();
   const { data, isLoading, error } = useQuery<{ ok: boolean; data: Payment[] }>({
     queryKey: ["/api/payments/history"],
@@ -113,11 +115,21 @@ export default function PaymentHistory() {
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">{t.paymentHistory.title}</h1>
-          <p className="text-muted-foreground mt-1" data-testid="text-page-description">
-            {t.paymentHistory.viewAll}
-          </p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/dashboard')}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">{t.paymentHistory.title}</h1>
+            <p className="text-muted-foreground mt-1" data-testid="text-page-description">
+              {t.paymentHistory.viewAll}
+            </p>
+          </div>
         </div>
 
         {payments.length === 0 ? (
