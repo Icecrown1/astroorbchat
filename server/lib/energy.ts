@@ -28,6 +28,28 @@ export function getNextResetTime(userTimezone: string): Date {
   return tomorrow.toDate();
 }
 
+// CRITICAL: Check and update subscription expiry status
+// Call this BEFORE checking subscription benefits anywhere
+export async function checkSubscriptionExpiry(storage: any, userId: string): Promise<any> {
+  const subscription = await storage.getSubscription(userId);
+  
+  if (!subscription || !subscription.currentPeriodEnd) {
+    return subscription;
+  }
+  
+  const now = new Date();
+  const periodEnd = new Date(subscription.currentPeriodEnd);
+  
+  // If period ended and not already expired, mark as expired
+  if (now > periodEnd && subscription.status !== 'expired') {
+    console.log('[SUBSCRIPTION] Marking as expired for user:', userId);
+    await storage.updateSubscription(subscription.id, { status: 'expired' });
+    return { ...subscription, status: 'expired' };
+  }
+  
+  return subscription;
+}
+
 export async function checkAndResetEnergy(storage: any, userId: string): Promise<void> {
   const user = await storage.getUser(userId);
   if (!user) return;
@@ -36,10 +58,24 @@ export async function checkAndResetEnergy(storage: any, userId: string): Promise
   const resetAt = new Date(user.energyResetAt);
 
   if (now >= resetAt) {
-    const subscription = await storage.getSubscription(userId);
+    let subscription = await storage.getSubscription(userId);
+    
+    // CRITICAL: Check if subscription expired and update status
+    if (subscription && subscription.currentPeriodEnd) {
+      const periodEnd = new Date(subscription.currentPeriodEnd);
+      
+      // If period ended, mark as expired (works for both active and canceled)
+      if (now > periodEnd && subscription.status !== 'expired') {
+        console.log('[SUBSCRIPTION] Subscription expired for user:', userId);
+        await storage.updateSubscription(subscription.id, { status: 'expired' });
+        subscription = { ...subscription, status: 'expired' };
+      }
+    }
+    
     let newEnergy = 10;
 
-    if (subscription?.status === 'active') {
+    // Both 'active' and 'canceled' get benefits until period ends
+    if (subscription?.status === 'active' || subscription?.status === 'canceled') {
       newEnergy = SUBSCRIPTION_DAILY_ENERGY[subscription.tier as 'standard' | 'pro'] || 10;
     }
 

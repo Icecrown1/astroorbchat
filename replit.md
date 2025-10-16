@@ -64,6 +64,25 @@ Preferred communication style: Simple, everyday language.
   - **Payment Flow**: Invoice creation → WebApp.openInvoice() → pre_checkout_query (validation) → successful_payment (fulfillment) → energy crediting
   - **Refund Support**: telegram_payment_charge_id stored for refund capability
 
+### Subscription System
+- **Tiers**: Standard ($9/month, 100 daily orbs) and Pro ($15/month, 250 daily orbs)
+- **Benefits**: 
+  - Daily energy: 100 orbs (Standard) or 250 orbs (Pro) automatically credited each day
+  - Free Weekly/Monthly plans (normally 1 orb each for non-subscribers)
+  - Benefits active for both 'active' and 'canceled' statuses until currentPeriodEnd
+- **Payment**: TON blockchain only (same flow as energy packs)
+- **Expiration Logic**:
+  - `checkSubscriptionExpiry()` helper checks if currentPeriodEnd has passed
+  - Automatically updates status from 'active'/'canceled' → 'expired' when period ends
+  - Called BEFORE checking subscription benefits (weekly/monthly plans) to prevent post-expiry access
+  - Also checked during daily energy reset in `checkAndResetEnergy()`
+- **Cancellation**:
+  - Users can cancel via `/api/user/subscription/cancel` endpoint
+  - Status changes to 'canceled' but benefits remain until currentPeriodEnd
+  - After period ends, status automatically becomes 'expired'
+- **Status Flow**: active → (user cancels) → canceled → (period ends) → expired
+- **UI**: Subscribe.tsx shows status cards (active/canceled/expired), cancel button for active subs, days remaining
+
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality and UI controls.
 - **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`) for wallet connection, TON API for transactions and price fetching.

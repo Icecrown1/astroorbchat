@@ -95,6 +95,30 @@ export default function Subscribe() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/user/subscription/cancel', {});
+      if (!response.ok) throw new Error(response.error || 'Failed to cancel subscription');
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      toast({
+        title: locale === 'ru' ? 'Подписка отменена' : 'Subscription Canceled',
+        description: locale === 'ru' 
+          ? `Доступ сохранится до ${new Date(data.currentPeriodEnd).toLocaleDateString()}`
+          : `Access remains until ${new Date(data.currentPeriodEnd).toLocaleDateString()}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || 'Failed to cancel',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     if (pricesData?.ok && pricesData.data?.tonRate) {
       return (usdPrice / pricesData.data.tonRate).toFixed(2);
@@ -152,7 +176,7 @@ export default function Subscribe() {
 
         {currentSubscription?.status === 'active' && (
           <Card className="p-4 mb-6 bg-chart-3/10 border-chart-3/20">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="font-medium">{t.subscribe.currentPlan}: {currentSubscription.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}</p>
                 <p className="text-sm text-muted-foreground">
@@ -160,6 +184,61 @@ export default function Subscribe() {
                 </p>
               </div>
               <Badge className="bg-chart-3">{locale === 'ru' ? 'Активна' : 'Active'}</Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                if (confirm(locale === 'ru' 
+                  ? 'Отменить подписку? Доступ сохранится до конца периода.'
+                  : 'Cancel subscription? Access will remain until period end.')) {
+                  cancelMutation.mutate();
+                }
+              }}
+              disabled={cancelMutation.isPending}
+              data-testid="button-cancel-subscription"
+            >
+              {cancelMutation.isPending ? (
+                <>
+                  <Loader className="mr-2" size="sm" />
+                  {locale === 'ru' ? 'Отмена...' : 'Canceling...'}
+                </>
+              ) : (
+                locale === 'ru' ? 'Отменить подписку' : 'Cancel Subscription'
+              )}
+            </Button>
+          </Card>
+        )}
+
+        {currentSubscription?.status === 'canceled' && (
+          <Card className="p-4 mb-6 bg-orange-500/10 border-orange-500/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{t.subscribe.currentPlan}: {currentSubscription.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}</p>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'ru' ? 'Доступ до' : 'Access until'} {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant="outline" className="border-orange-500 text-orange-500">
+                {locale === 'ru' ? 'Отменена' : 'Canceled'}
+              </Badge>
+            </div>
+          </Card>
+        )}
+
+        {currentSubscription?.status === 'expired' && (
+          <Card className="p-4 mb-6 bg-destructive/10 border-destructive/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{locale === 'ru' ? 'Подписка истекла' : 'Subscription Expired'}</p>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'ru' ? 'Истекла' : 'Expired on'} {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant="outline" className="border-destructive text-destructive">
+                {locale === 'ru' ? 'Истекла' : 'Expired'}
+              </Badge>
             </div>
           </Card>
         )}

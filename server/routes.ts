@@ -6,7 +6,7 @@ import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
-import { checkAndResetEnergy, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
+import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
@@ -131,7 +131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await checkAndResetEnergy(storage, userId);
       
       const user = await storage.getUser(userId);
-      const subscription = await storage.getSubscription(userId);
+      // IMPORTANT: Check subscription expiry to keep dashboard status accurate
+      const subscription = await checkSubscriptionExpiry(storage, userId);
       const natalChart = await storage.getNatalChart(userId);
 
       res.json({ ok: true, data: { ...user, subscription, natalInitialized: !!natalChart } });
@@ -156,6 +157,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ ok: true, data: user });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Cancel subscription
+  app.post("/api/user/subscription/cancel", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      const subscription = await storage.getSubscription(userId);
+      
+      if (!subscription) {
+        return res.status(404).json({ ok: false, error: "No active subscription found" });
+      }
+      
+      if (subscription.status !== 'active') {
+        return res.status(400).json({ ok: false, error: "Subscription is not active" });
+      }
+      
+      // Update status to canceled - user keeps benefits until currentPeriodEnd
+      await storage.updateSubscription(subscription.id, { status: 'canceled' });
+      
+      res.json({ 
+        ok: true, 
+        data: { 
+          message: "Subscription canceled successfully. Benefits remain until period end.",
+          currentPeriodEnd: subscription.currentPeriodEnd 
+        } 
+      });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
@@ -809,9 +840,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[WEEKLY_PLAN] Natal chart exists');
 
-      // Check subscription status
-      const subscription = await storage.getSubscription(userId);
-      const hasActiveSubscription = subscription?.status === 'active';
+      // Check subscription status (CRITICAL: check expiry first!)
+      const subscription = await checkSubscriptionExpiry(storage, userId);
+      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'canceled';
 
       console.log('[WEEKLY_PLAN] Has active subscription:', hasActiveSubscription);
 
@@ -912,9 +943,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[MONTHLY_PLAN] Natal chart exists');
 
-      // Check subscription status
-      const subscription = await storage.getSubscription(userId);
-      const hasActiveSubscription = subscription?.status === 'active';
+      // Check subscription status (CRITICAL: check expiry first!)
+      const subscription = await checkSubscriptionExpiry(storage, userId);
+      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'canceled';
 
       console.log('[MONTHLY_PLAN] Has active subscription:', hasActiveSubscription);
 
