@@ -1724,6 +1724,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
+    const fs = await import('fs');
+    const logData = `\n\n[${new Date().toISOString()}] TON_CREATE REQUEST\nUserID: ${(req as any).userId}\nBody: ${JSON.stringify(req.body, null, 2)}\n`;
+    fs.appendFileSync('/tmp/ton-debug.log', logData);
+    
     console.log('=====================================');
     console.log('[TON_CREATE] Request received:', { userId: (req as any).userId, body: req.body });
     console.log('=====================================');
