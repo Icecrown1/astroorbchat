@@ -226,6 +226,39 @@ export default function BuyEnergy() {
     },
   });
 
+  const checkPendingMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/payments/ton/check-pending', {});
+      if (!response.ok) throw new Error(response.error || 'Failed to check payments');
+      return response.data;
+    },
+    onSuccess: (data: any) => {
+      if (data.found > 0) {
+        queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+        toast({
+          title: locale === 'ru' ? 'Платежи найдены!' : 'Payments found!',
+          description: locale === 'ru' 
+            ? `Начислено ${data.creditedEnergy} энергии`
+            : `Credited ${data.creditedEnergy} energy`,
+        });
+      } else {
+        toast({
+          title: locale === 'ru' ? 'Платежи не найдены' : 'No payments found',
+          description: locale === 'ru'
+            ? 'Незавершенных транзакций не обнаружено'
+            : 'No pending transactions found',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     const data = pricesData as any;
     if (data?.ok && data.data?.tonRate) {
@@ -246,10 +279,26 @@ export default function BuyEnergy() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-display font-bold">{t.buyEnergy.title}</h1>
             <p className="text-muted-foreground">{t.buyEnergy.subtitle}</p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => checkPendingMutation.mutate()}
+            disabled={checkPendingMutation.isPending}
+            data-testid="button-check-pending"
+          >
+            {checkPendingMutation.isPending ? (
+              <Loader />
+            ) : (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {locale === 'ru' ? 'Проверить' : 'Check'}
+              </>
+            )}
+          </Button>
         </div>
 
         {pricesLoading ? (

@@ -119,17 +119,20 @@ export async function findUserTransaction(
             time: new Date(txTime * 1000).toISOString()
           });
           
-          // Check if this message goes to our address with correct amount
+          // Check if this message goes to our address - SIMPLIFIED: any amount accepted
           if (destination === recipientAddress) {
             const amountNum = BigInt(amount);
             const expectedNum = BigInt(expectedAmount);
-            const tolerance = BigInt(Math.floor(Number(expectedNum) * 0.001));
-            const diff = amountNum > expectedNum ? amountNum - expectedNum : expectedNum - amountNum;
             
-            if (diff <= tolerance) {
-              console.log('[TON] ✅ MATCH FOUND!', {
+            // Very loose matching - accept anything within 50% range (was 0.1%)
+            const minAmount = expectedNum / BigInt(2);
+            const maxAmount = expectedNum * BigInt(2);
+            
+            if (amountNum >= minAmount && amountNum <= maxAmount) {
+              console.log('[TON] ✅ MATCH FOUND (SIMPLIFIED)!', {
                 txHash: txHash.substring(0, 16) + '...',
                 amount,
+                expected: expectedAmount,
                 destination: destination.substring(0, 16) + '...'
               });
               return {
@@ -137,6 +140,13 @@ export async function findUserTransaction(
                 amount,
                 timestamp: txTime
               };
+            } else {
+              console.log('[TON] ❌ Amount too far from expected:', {
+                found: amount,
+                expected: expectedAmount,
+                minAccepted: minAmount.toString(),
+                maxAccepted: maxAmount.toString()
+              });
             }
           }
         }

@@ -1674,6 +1674,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual check for ALL pending payments
+  app.post("/api/payments/ton/check-pending", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      
+      // Get all pending TON payments for this user
+      const allPayments = await storage.getAllPayments();
+      const pendingPayments = allPayments.filter(
+        p => p.userId === userId && p.status === 'pending' && p.kind === 'energy_pack'
+      );
+
+      if (pendingPayments.length === 0) {
+        return res.json({ ok: true, message: 'No pending payments', found: 0 });
+      }
+
+      console.log(`[CHECK_PENDING] Found ${pendingPayments.length} pending payments for user ${userId}`);
+
+      const walletAddress = process.env.TON_WALLET_ADDRESS;
+      if (!walletAddress) {
+        return res.status(500).json({ ok: false, error: 'Payment system not configured' });
+      }
+
+      let foundCount = 0;
+      let creditedEnergy = 0;
+
+      // Try to find transactions for each pending payment
+      for (const payment of pendingPayments) {
+        if (!payment.userWalletAddress) {
+          console.log('[CHECK_PENDING] Skipping payment without user wallet address:', payment.id);
+          continue;
+        }
+
+        const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
+        
+        const { findUserTransaction } = await import('./lib/ton.js');
+        const matchedTx = await findUserTransaction(
+          payment.userWalletAddress,
+          walletAddress,
+          amountInNanoTON,
+          60, // Check last 60 minutes (very generous)
+          new Set()
+        );
+
+        if (matchedTx) {
+          foundCount++;
+          
+          // Credit energy
+          const user = await storage.getUser(userId);
+          if (user && payment.energyAmount) {
+            await storage.updateUser(userId, {
+              energy: user.energy + payment.energyAmount,
+            });
+            creditedEnergy += payment.energyAmount;
+          }
+
+          // Mark as completed
+          await storage.updatePayment(payment.id, {
+            status: 'completed',
+            txHash: matchedTx.hash,
+          });
+
+          console.log('[CHECK_PENDING] ✅ Found and credited payment:', payment.id);
+        }
+      }
+
+      res.json({
+        ok: true,
+        message: `Checked ${pendingPayments.length} payments, found ${foundCount}`,
+        found: foundCount,
+        creditedEnergy,
+      });
+    } catch (error: any) {
+      console.error('[CHECK_PENDING] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/referral/code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
