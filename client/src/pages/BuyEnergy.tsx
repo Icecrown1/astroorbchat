@@ -48,7 +48,15 @@ export default function BuyEnergy() {
       console.log('[TON_FRONTEND] Wallet state:', wallet);
       
       // Get user's wallet address for tracking
-      const userWalletAddress = wallet?.account?.address || null;
+      const userWalletAddress = wallet?.account?.address;
+      
+      if (!userWalletAddress) {
+        throw new Error(
+          locale === 'ru'
+            ? 'Адрес кошелька недоступен. Пожалуйста, переподключите кошелек.'
+            : 'Wallet address not available. Please reconnect your wallet.'
+        );
+      }
       
       console.log('[TON_FRONTEND] Sending request with userWalletAddress:', userWalletAddress);
       

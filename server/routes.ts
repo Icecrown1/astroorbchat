@@ -7,7 +7,7 @@ import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram"
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
-import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction } from "./lib/ton";
+import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
@@ -2021,9 +2021,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // IMPORTANT: Convert amount to nanoTON for comparison
       const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
 
-      // SIMPLIFIED: Just find ANY recent transaction to our wallet
-      console.log('[TON_CONFIRM] Searching for ANY recent transaction to our wallet');
-      const matchedTx = await findRecentTransaction(
+      // Check if we have user's wallet address
+      if (!payment.userWalletAddress) {
+        console.error('[TON_CONFIRM] User wallet address not found in payment');
+        return res.status(400).json({ 
+          ok: false, 
+          error: "Payment missing user wallet address. Please try creating a new payment." 
+        });
+      }
+
+      // Search for transaction FROM user's wallet TO our wallet
+      console.log('[TON_CONFIRM] Searching for transaction FROM user wallet TO our wallet');
+      const matchedTx = await findUserTransaction(
+        payment.userWalletAddress,
         walletAddress,
         amountInNanoTON,
         15, // Extended to 15 minutes
