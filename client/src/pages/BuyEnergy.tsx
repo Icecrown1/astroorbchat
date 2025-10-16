@@ -89,16 +89,24 @@ export default function BuyEnergy() {
         toast({
           title: locale === 'ru' ? 'Подтвердите транзакцию' : 'Confirm transaction',
           description: locale === 'ru' 
-            ? 'Подпишите транзакцию в кошельке. Проверка на блокчейне начнется автоматически'
-            : 'Sign the transaction in your wallet. Blockchain verification will start automatically',
+            ? 'Подпишите транзакцию в кошельке, затем подождите проверки'
+            : 'Sign the transaction in your wallet, then wait for verification',
         });
 
-        // Wait for user to sign (give them time to interact with wallet)
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Wait for user to sign in wallet (realistic time: 10-15 seconds)
+        await new Promise(resolve => setTimeout(resolve, 12000)); // 12 seconds
+
+        // Show that we're starting to check
+        toast({
+          title: locale === 'ru' ? 'Проверяем блокчейн...' : 'Checking blockchain...',
+          description: locale === 'ru' 
+            ? 'Ищем вашу транзакцию, это может занять до минуты'
+            : 'Searching for your transaction, this may take up to a minute',
+        });
 
         // Start polling blockchain for transaction
-        const maxRetries = 10;
-        const retryDelay = 3000; // 3 seconds
+        const maxRetries = 15; // 15 attempts = 45 seconds of searching
+        const retryDelay = 3000; // 3 seconds between attempts
         let lastError = '';
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -123,13 +131,13 @@ export default function BuyEnergy() {
           
           // If not found on blockchain, wait and retry
           if (lastError.includes('not found on blockchain') && attempt < maxRetries) {
-            // Show progress to user
-            if (attempt % 3 === 0) {
+            // Show progress to user every 5 attempts
+            if (attempt === 5 || attempt === 10) {
               toast({
-                title: locale === 'ru' ? 'Ищем транзакцию...' : 'Searching for transaction...',
+                title: locale === 'ru' ? 'Все еще ищем...' : 'Still searching...',
                 description: locale === 'ru' 
-                  ? `Проверка блокчейна (${attempt}/${maxRetries})...`
-                  : `Checking blockchain (${attempt}/${maxRetries})...`,
+                  ? `Проверка ${attempt}/${maxRetries}. Транзакции на блокчейне могут занять время`
+                  : `Check ${attempt}/${maxRetries}. Blockchain transactions can take time`,
               });
             }
             await new Promise(resolve => setTimeout(resolve, retryDelay));
