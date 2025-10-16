@@ -1894,29 +1894,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // IMPORTANT: Convert amount to nanoTON for comparison
       const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
 
-      let matchedTx = null;
-
-      // NEW METHOD: If we have user's wallet address, search FROM their wallet
-      if (payment.userWalletAddress) {
-        console.log('[TON_CONFIRM] Using NEW search method - FROM user wallet');
-        const { findUserTransaction } = await import('./lib/ton.js');
-        matchedTx = await findUserTransaction(
-          payment.userWalletAddress,
-          walletAddress,
-          amountInNanoTON,
-          10, // 10 minutes max age
-          usedTxHashes
-        );
-      } else {
-        // FALLBACK: Old method for payments without userWalletAddress
-        console.log('[TON_CONFIRM] Using OLD search method - ON recipient wallet (fallback)');
-        matchedTx = await findRecentTransaction(
-          walletAddress,
-          amountInNanoTON,
-          10,
-          usedTxHashes
-        );
-      }
+      // SIMPLIFIED: Just find ANY recent transaction to our wallet
+      console.log('[TON_CONFIRM] Searching for ANY recent transaction to our wallet');
+      const matchedTx = await findRecentTransaction(
+        walletAddress,
+        amountInNanoTON,
+        15, // Extended to 15 minutes
+        usedTxHashes
+      );
 
       if (!matchedTx) {
         console.error('[TON_CONFIRM] No matching unused transaction found on blockchain');

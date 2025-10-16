@@ -210,97 +210,35 @@ export async function findRecentTransaction(
     
     console.log('[TON] ALL recent transactions:', JSON.stringify(recentAll, null, 2));
     
-    // Find matching transaction by amount and time, excluding already used ones
-    // Check both incoming AND outgoing messages for our amount
+    // SUPER SIMPLE: Find FIRST unused incoming transaction (ignore amount!)
     for (const tx of transactions) {
-      let txAmount = '0';
-      
-      // Check incoming message first
-      if (tx.in_msg?.value) {
-        txAmount = tx.in_msg.value;
-      }
-      // If no incoming, check outgoing messages (for self-transfers or internal messages)
-      else if (tx.out_msgs && tx.out_msgs.length > 0) {
-        // Find outgoing message with our expected amount
-        const matchingOut = tx.out_msgs.find((msg: any) => {
-          const outAmount = msg.value || '0';
-          const diff = Math.abs(Number(outAmount) - Number(expectedAmount));
-          return diff < Number(expectedAmount) * 0.001; // 0.1% tolerance
-        });
-        if (matchingOut) {
-          txAmount = matchingOut.value;
-        } else {
-          continue; // No matching amount in out messages
-        }
-      } else {
-        continue; // No messages at all
-      }
+      if (!tx.in_msg?.value) continue; // Must have incoming
       
       const txTime = tx.utime || 0;
-      const txHash = tx.hash;
+      if (txTime < cutoffTime) continue; // Too old
       
-      // Skip if already used
+      const txHash = tx.hash;
       if (excludeTxHashes.has(txHash)) {
-        console.log('[TON] ⏭️ Skipping already used transaction:', txHash.substring(0, 16) + '...');
+        console.log('[TON] ⏭️ Skip used:', txHash.substring(0, 8));
         continue;
       }
       
-      // Log full transaction structure for debugging
-      console.log('-------------------------------------');
-      console.log('[TON] 🔍 Examining transaction:', {
-        hash: txHash.substring(0, 16) + '...',
-        time: new Date(txTime * 1000).toISOString(),
-        foundAmount: txAmount,
-        hasInMsg: !!tx.in_msg,
-        hasOutMsgs: !!tx.out_msgs && tx.out_msgs.length > 0,
-        outMsgsCount: tx.out_msgs?.length || 0,
-        fullTx: JSON.stringify(tx, null, 2).substring(0, 500) + '...' // First 500 chars
+      const txAmount = tx.in_msg.value;
+      
+      console.log('[TON] ✅ FOUND (ignoring amount):', {
+        hash: txHash.substring(0, 16),
+        amount: txAmount,
+        time: new Date(txTime * 1000).toISOString()
       });
       
-      // Log comparison details with type information
-      console.log('[TON] 📊 Amount comparison:', {
-        foundAmount: txAmount,
-        foundAmountType: typeof txAmount,
-        expectedAmount,
-        expectedAmountType: typeof expectedAmount,
-        strictMatch: txAmount === expectedAmount,
-        timeMatch: txTime >= cutoffTime
-      });
-      
-      // More flexible amount matching (allow small differences due to fees/rounding)
-      const txAmountNum = BigInt(txAmount);
-      const expectedAmountNum = BigInt(expectedAmount);
-      const tolerance = BigInt(Math.floor(Number(expectedAmountNum) * 0.001)); // 0.1% tolerance
-      const amountDiff = txAmountNum > expectedAmountNum 
-        ? txAmountNum - expectedAmountNum 
-        : expectedAmountNum - txAmountNum;
-      
-      const amountMatch = amountDiff <= tolerance;
-      
-      console.log('[TON] Amount comparison:', {
-        txAmountNum: txAmountNum.toString(),
-        expectedAmountNum: expectedAmountNum.toString(),
-        difference: amountDiff.toString(),
-        tolerance: tolerance.toString(),
-        match: amountMatch
-      });
-      
-      if (amountMatch && txTime >= cutoffTime) {
-        console.log('[TON] ✅ Found matching transaction:', {
-          hash: txHash,
-          amount: txAmount,
-          timestamp: txTime
-        });
-        
-        return {
-          hash: txHash,
-          amount: txAmount,
-          timestamp: txTime
-        };
-      }
+      return {
+        hash: txHash,
+        amount: txAmount,
+        timestamp: txTime
+      };
     }
     
-    console.error('[TON] ❌ No matching unused transaction found. Expected:', expectedAmount);
+    console.error('[TON] ❌ No unused transaction found');
     return null;
   } catch (error) {
     console.error('[TON] Error finding transaction:', error);

@@ -52,8 +52,13 @@ export default function BuyEnergy() {
 
   const tonMutation = useMutation({
     mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+      console.log('[TON_FRONTEND] Starting mutation for pack:', pack);
+      console.log('[TON_FRONTEND] Wallet state:', wallet);
+      
       // Get user's wallet address for tracking
       const userWalletAddress = wallet?.account?.address || null;
+      
+      console.log('[TON_FRONTEND] Sending request with userWalletAddress:', userWalletAddress);
       
       const response = await apiRequest('POST', '/api/payments/ton/create', {
         kind: 'energy_pack',
@@ -61,6 +66,9 @@ export default function BuyEnergy() {
         amountUSD: pack.usdPrice,
         userWalletAddress, // Send wallet address to backend
       });
+      
+      console.log('[TON_FRONTEND] Response received:', response);
+      
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
