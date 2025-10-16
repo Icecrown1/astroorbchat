@@ -186,23 +186,22 @@ export default function BuyEnergy() {
 
   const starsMutation = useMutation({
     mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
-      console.log('[Stars Payment] Starting mutation for pack:', pack);
+      alert('🟢 Step 1: Starting Stars payment for ' + pack.amount + ' orbs');
       const response = await apiRequest('POST', '/api/payments/stars/create', {
         kind: 'energy_pack',
         pack: {
           energy: pack.amount,
         },
       });
-      console.log('[Stars Payment] API response:', response);
+      alert('🟢 Step 2: API response: ' + JSON.stringify(response).substring(0, 100));
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
     onSuccess: (data, pack) => {
-      console.log('[Stars Payment] Success! Invoice data:', data);
+      alert('🟢 Step 3: Got invoice link: ' + data.invoiceLink.substring(0, 50));
       try {
-        console.log('[Stars Payment] Opening invoice with link:', data.invoiceLink);
         WebApp.openInvoice(data.invoiceLink, (status: string) => {
-          console.log('[Stars Payment] Invoice callback status:', status);
+          alert('🟢 Step 4: Invoice status = ' + status);
           if (status === 'paid') {
             queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
             toast({
@@ -224,7 +223,7 @@ export default function BuyEnergy() {
           }
         });
       } catch (error: any) {
-        console.error('[Stars Payment] Error opening invoice:', error);
+        alert('🔴 Error opening invoice: ' + error.message);
         toast({
           title: t.common.error,
           description: error.message || t.errors.calculationFailed,
@@ -233,7 +232,7 @@ export default function BuyEnergy() {
       }
     },
     onError: (error: any) => {
-      console.error('[Stars Payment] Mutation error:', error);
+      alert('🔴 Mutation error: ' + error.message);
       toast({
         title: t.common.error,
         description: error.message || t.errors.calculationFailed,

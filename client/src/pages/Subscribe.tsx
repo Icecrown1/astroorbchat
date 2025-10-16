@@ -107,16 +107,20 @@ export default function Subscribe() {
 
   const starsMutation = useMutation({
     mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
+      alert('🟢 Step 1: Starting Stars subscription for ' + tier.tier);
       const response = await apiRequest('POST', '/api/payments/stars/create', {
         kind: 'subscription',
         tier: tier.tier,
       });
+      alert('🟢 Step 2: API response: ' + JSON.stringify(response).substring(0, 100));
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
     onSuccess: (data, tier) => {
+      alert('🟢 Step 3: Got invoice link: ' + data.invoiceLink.substring(0, 50));
       try {
         WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          alert('🟢 Step 4: Invoice status = ' + status);
           if (status === 'paid') {
             queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
             toast({
@@ -138,6 +142,7 @@ export default function Subscribe() {
           }
         });
       } catch (error: any) {
+        alert('🔴 Error opening invoice: ' + error.message);
         toast({
           title: t.common.error,
           description: error.message || t.errors.calculationFailed,
@@ -146,6 +151,7 @@ export default function Subscribe() {
       }
     },
     onError: (error: any) => {
+      alert('🔴 Mutation error: ' + error.message);
       toast({
         title: t.common.error,
         description: error.message || t.errors.calculationFailed,
