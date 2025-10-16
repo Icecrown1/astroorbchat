@@ -253,6 +253,7 @@ export const starPayments = pgTable("star_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   kind: varchar("kind", { length: 50 }).notNull(),
+  tier: varchar("tier", { length: 20 }), // For subscriptions: "standard" or "pro"
   energyAmount: integer("energy_amount"),
   amountStars: integer("amount_stars").notNull(),
   invoicePayload: varchar("invoice_payload", { length: 255 }).notNull().unique(),

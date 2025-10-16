@@ -2315,6 +2315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const starPayment = await storage.createStarPayment({
         userId,
         kind: validated.kind,
+        tier, // For subscriptions
         energyAmount,
         amountStars: priceStars,
         invoicePayload: shortPayload,
@@ -2369,19 +2370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('[Telegram Webhook] Pre-checkout query:', { queryId, invoice_payload });
 
-        // Verify payload signature
-        const verification = verifyPayload(invoice_payload);
-        if (!verification.valid) {
-          console.error('[Telegram Webhook] Invalid payload signature');
-          await answerPreCheckoutQuery({
-            preCheckoutQueryId: queryId,
-            ok: false,
-            errorMessage: "Order validation failed",
-          });
-          return res.json({ ok: true });
-        }
-
-        // Check if payment exists
+        // Check if payment exists in database
         const payment = await storage.getStarPaymentByPayload(invoice_payload);
         if (!payment || payment.status !== 'pending') {
           console.error('[Telegram Webhook] Payment not found or already processed');
@@ -2409,13 +2398,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('[Telegram Webhook] Successful payment:', { telegram_payment_charge_id, invoice_payload });
 
-        // Verify payload
-        const verification = verifyPayload(invoice_payload);
-        if (!verification.valid) {
-          console.error('[Telegram Webhook] Invalid payload signature in successful_payment');
-          return res.json({ ok: true });
-        }
-
         // Atomic update to prevent race conditions
         const payment = await storage.atomicStartProcessing(invoice_payload, telegram_payment_charge_id);
         
@@ -2433,9 +2415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             console.log(`[Telegram Webhook] Credited ${payment.energyAmount} energy to user ${payment.userId}`);
           }
-        } else if (payment.kind === "subscription") {
-          const payloadData = verification.data;
-          const tier = payloadData.tier as "standard" | "pro";
+        } else if (payment.kind === "subscription" && payment.tier) {
+          const tier = payment.tier as "standard" | "pro";
           
           const startedAt = new Date();
           const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
