@@ -272,3 +272,38 @@ export async function getWebhookInfo(): Promise<{ ok: boolean; info?: any; error
     return { ok: false, error: error.message };
   }
 }
+
+/**
+ * Auto-register webhook at server startup
+ */
+export async function registerWebhookAtStartup(): Promise<void> {
+  const serverUrl = process.env.SERVER_URL || process.env.REPLIT_DEV_DOMAIN;
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+  if (!BOT_TOKEN) {
+    console.warn('[Telegram Webhook] TELEGRAM_BOT_TOKEN not configured - webhook registration skipped');
+    return;
+  }
+
+  if (!serverUrl) {
+    console.warn('[Telegram Webhook] SERVER_URL or REPLIT_DEV_DOMAIN not configured - webhook registration skipped');
+    return;
+  }
+
+  try {
+    // Construct webhook URL with optional secret
+    const webhookUrl = webhookSecret 
+      ? `https://${serverUrl}/webhooks/telegram/${webhookSecret}`
+      : `https://${serverUrl}/webhooks/telegram`;
+
+    const result = await setWebhook(webhookUrl, webhookSecret);
+
+    if (result.ok) {
+      console.log(`[Telegram Webhook] ✅ Registered: ${webhookUrl}`);
+    } else {
+      console.error('[Telegram Webhook] ❌ Registration failed:', result.error);
+    }
+  } catch (error: any) {
+    console.error('[Telegram Webhook] Registration error:', error.message);
+  }
+}
