@@ -11,6 +11,22 @@ import { useToast } from '@/hooks/use-toast';
 import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
+import type { User, Subscription } from '@shared/schema';
+
+interface UserMeResponse {
+  ok: boolean;
+  data: User & {
+    subscription?: Subscription | null;
+    natalInitialized?: boolean;
+  };
+}
+
+interface PricesResponse {
+  ok: boolean;
+  data: {
+    tonRate: number;
+  };
+}
 
 const SUBSCRIPTION_TIERS = [
   {
@@ -47,11 +63,11 @@ export default function Subscribe() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data: pricesData, isLoading: pricesLoading } = useQuery({
+  const { data: pricesData, isLoading: pricesLoading } = useQuery<PricesResponse>({
     queryKey: ['/api/payments/price'],
   });
 
-  const { data: userData } = useQuery({
+  const { data: userData } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
 
