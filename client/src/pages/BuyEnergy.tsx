@@ -28,14 +28,6 @@ export default function BuyEnergy() {
   const walletConnected = !!wallet;
   const [pendingTonPurchase, setPendingTonPurchase] = useState<typeof ENERGY_PACKS[0] | null>(null);
 
-  // Check Telegram version for Stars support (6.0+)
-  const isTelegramVersionSupported = () => {
-    const version = WebApp.version;
-    const [major] = version.split('.').map(Number);
-    return major >= 6;
-  };
-
-  const supportsStars = isTelegramVersionSupported();
 
   // Trigger TON purchase after wallet connects
   useEffect(() => {
@@ -184,62 +176,6 @@ export default function BuyEnergy() {
     },
   });
 
-  const starsMutation = useMutation({
-    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
-      alert('🟢 Step 1: Starting Stars payment for ' + pack.amount + ' orbs');
-      const response = await apiRequest('POST', '/api/payments/stars/create', {
-        kind: 'energy_pack',
-        pack: {
-          energy: pack.amount,
-        },
-      });
-      alert('🟢 Step 2: API response: ' + JSON.stringify(response).substring(0, 100));
-      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
-      return response.data;
-    },
-    onSuccess: (data, pack) => {
-      alert('🟢 Step 3: Got invoice link: ' + data.invoiceLink.substring(0, 50));
-      try {
-        WebApp.openInvoice(data.invoiceLink, (status: string) => {
-          alert('🟢 Step 4: Invoice status = ' + status);
-          if (status === 'paid') {
-            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-            toast({
-              title: t.common.success,
-              description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
-            });
-            navigate('/dashboard');
-          } else if (status === 'cancelled') {
-            toast({
-              title: locale === 'ru' ? 'Платеж отменен' : 'Payment cancelled',
-              description: locale === 'ru' ? 'Вы отменили платеж' : 'You cancelled the payment',
-            });
-          } else if (status === 'failed') {
-            toast({
-              title: t.common.error,
-              description: locale === 'ru' ? 'Платеж не прошел' : 'Payment failed',
-              variant: 'destructive',
-            });
-          }
-        });
-      } catch (error: any) {
-        alert('🔴 Error opening invoice: ' + error.message);
-        toast({
-          title: t.common.error,
-          description: error.message || t.errors.calculationFailed,
-          variant: 'destructive',
-        });
-      }
-    },
-    onError: (error: any) => {
-      alert('🔴 Mutation error: ' + error.message);
-      toast({
-        title: t.common.error,
-        description: error.message || t.errors.calculationFailed,
-        variant: 'destructive',
-      });
-    },
-  });
 
   const checkPendingMutation = useMutation({
     mutationFn: async () => {
@@ -351,49 +287,10 @@ export default function BuyEnergy() {
                     <p className="text-sm text-muted-foreground">
                       ≈ {getTonPrice(pack.usdPrice)} TON
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {locale === 'ru' ? 'или' : 'or'} {pack.starsPrice} ⭐ Stars
-                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Button
-                    className="w-full"
-                    variant="default"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPack(pack.amount);
-                      console.log('[Stars Payment] Button clicked! Pack:', pack, 'supportsStars:', supportsStars);
-                      if (!supportsStars) {
-                        toast({
-                          title: locale === 'ru' ? 'Обновите Telegram' : 'Update Telegram',
-                          description: locale === 'ru' 
-                            ? 'Для оплаты Stars требуется Telegram версии 6.0 или выше. Пожалуйста, обновите приложение.'
-                            : 'Stars payment requires Telegram version 6.0 or higher. Please update your app.',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      console.log('[Stars Payment] Calling starsMutation.mutate()');
-                      starsMutation.mutate(pack);
-                    }}
-                    disabled={(starsMutation.isPending && selectedPack === pack.amount) || !supportsStars}
-                    data-testid={`button-buy-stars-${pack.amount}`}
-                  >
-                    {starsMutation.isPending && selectedPack === pack.amount ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        {t.buyEnergy.purchasing}
-                      </>
-                    ) : (
-                      <>
-                        <span className="mr-2">⭐</span>
-                        {locale === 'ru' ? 'Оплатить Stars' : 'Pay with Stars'}
-                      </>
-                    )}
-                  </Button>
-
                   <Button
                     className="w-full"
                     variant="outline"
@@ -447,22 +344,11 @@ export default function BuyEnergy() {
           </div>
         )}
 
-        {!supportsStars && (
-          <Card className="mt-6 p-4 bg-destructive/10 border-destructive/20">
-            <p className="text-sm text-destructive text-center">
-              {locale === 'ru' ? 
-                '⚠️ Ваша версия Telegram не поддерживает Stars. Обновите приложение или используйте TON.' :
-                '⚠️ Your Telegram version doesn\'t support Stars. Update your app or use TON payment.'
-              }
-            </p>
-          </Card>
-        )}
-
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' ? 
-              'Оплата через Telegram Stars ⭐ или TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
-              'Pay with Telegram Stars ⭐ or TON blockchain. Energy is added instantly after confirmation.'
+              'Оплата через TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
+              'Pay with TON blockchain. Energy is added instantly after confirmation.'
             }
           </p>
         </Card>
