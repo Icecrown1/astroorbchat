@@ -55,6 +55,9 @@ export async function getAstrologyInterpretation(
   const replacements: Record<string, Record<string, string>> = {
     natal: {
       planets: JSON.stringify(data.planets, null, 2),
+      angles: JSON.stringify(data.angles, null, 2),
+      houses: JSON.stringify(data.houses?.cusps || [], null, 2),
+      houseSystem: data.houses?.system || 'Placidus',
       aspects: JSON.stringify(data.aspects, null, 2)
     },
     solar: {

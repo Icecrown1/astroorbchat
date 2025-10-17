@@ -7,4 +7,11 @@ User's Chart:
 
 Question: {{question}}
 
-Provide insightful, actionable advice grounded in astrological wisdom.
+**Important**: When answering, consider ALL available chart data:
+- Planetary positions in signs and houses
+- Ascendant (ASC) - the person's outer personality and approach to life
+- Midheaven (MC) - career, public image, life direction
+- House placements - which life areas are emphasized
+- Aspects between planets and angles
+
+Provide insightful, actionable advice grounded in astrological wisdom, using houses and angles in your analysis.
