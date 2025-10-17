@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (user) {
         await storage.updateUser(userId, {
-          purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
+          purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
         });
       }
       
@@ -1773,7 +1773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
+              purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
             });
             console.log('[TELEGRAM_WEBHOOK] Energy credited:', payment.energyAmount, 'to user:', payment.userId);
           }
@@ -1856,7 +1856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(userId);
           if (user && payment.energyAmount) {
             await storage.updateUser(userId, {
-              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
+              purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
             });
             creditedEnergy += payment.energyAmount;
           }
@@ -2071,7 +2071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(userId);
         if (user) {
           await storage.updateUser(userId, {
-            purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
+            purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
           });
           console.log('[TON_CONFIRM] Energy credited:', payment.energyAmount, 'to user:', userId);
         }
@@ -2246,7 +2246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(payment.userId);
         if (user) {
           await storage.updateUser(payment.userId, {
-            purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
+            purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
           });
         }
       } else if (payment.kind === "subscription" && payment.tier) {
@@ -2283,7 +2283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(payment.userId);
         if (user) {
           await storage.updateUser(payment.userId, {
-            purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
+            purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
           });
         }
       }
@@ -2446,7 +2446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
+              purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
             });
             console.log(`[Telegram Webhook] Credited ${payment.energyAmount} energy to user ${payment.userId}`);
           }
@@ -2479,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
+              purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
             });
           }
 
