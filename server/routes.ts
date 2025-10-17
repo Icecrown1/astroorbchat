@@ -142,11 +142,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await checkAndResetEnergy(storage, userId);
       
       const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
       // IMPORTANT: Check subscription expiry to keep dashboard status accurate
       const subscription = await checkSubscriptionExpiry(storage, userId);
       const natalChart = await storage.getNatalChart(userId);
 
-      res.json({ ok: true, data: { ...user, subscription, natalInitialized: !!natalChart } });
+      res.json({ ok: true, data: { 
+        ...user, 
+        energy: (user.freeEnergy || 0) + (user.purchasedEnergy || 0),
+        subscription, 
+        natalInitialized: !!natalChart 
+      } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
