@@ -21,7 +21,8 @@ import {
   Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { useEffect, useMemo } from 'react';
 import type { User, Subscription } from '@shared/schema';
 
 interface UserMeResponse {
@@ -29,6 +30,7 @@ interface UserMeResponse {
   data: User & {
     subscription?: Subscription | null;
     natalInitialized?: boolean;
+    energy: number;
   };
 }
 
@@ -86,6 +88,27 @@ export default function Dashboard() {
   const { data, isLoading } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
+
+  const { data: referralData } = useQuery<{
+    ok: boolean;
+    data: {
+      referrals: Array<{ createdAt: Date }>;
+    };
+  }>({
+    queryKey: ['/api/referral/code'],
+  });
+
+  const hasNewReferrals = useMemo(() => {
+    if (!referralData?.ok || !referralData.data.referrals.length) return false;
+    
+    const lastViewed = localStorage.getItem('lastViewedReferrals');
+    if (!lastViewed) return referralData.data.referrals.length > 0;
+    
+    const lastViewedTime = new Date(lastViewed).getTime();
+    return referralData.data.referrals.some(
+      r => new Date(r.createdAt).getTime() > lastViewedTime
+    );
+  }, [referralData]);
 
   useEffect(() => {
     if (data?.ok && data.data) {
@@ -184,12 +207,20 @@ export default function Dashboard() {
           </Button>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full relative"
             onClick={() => navigate('/referral')}
             data-testid="button-referral"
           >
             <Users className="w-4 h-4 mr-2" />
             {t.nav.referral}
+            {hasNewReferrals && (
+              <Badge 
+                className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                data-testid="badge-new-referrals"
+              >
+                !
+              </Badge>
+            )}
           </Button>
           <Button
             variant="outline"

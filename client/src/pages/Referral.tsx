@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEffect } from 'react';
 
 interface ReferralCodeResponse {
   ok: boolean;
@@ -35,6 +36,13 @@ export default function Referral() {
   const { data, isLoading } = useQuery<ReferralCodeResponse>({
     queryKey: ['/api/referral/code'],
   });
+
+  // Mark referrals as viewed when page loads
+  useEffect(() => {
+    if (data?.ok) {
+      localStorage.setItem('lastViewedReferrals', new Date().toISOString());
+    }
+  }, [data]);
 
   const referralLink = data?.ok && data.data?.referralCode 
     ? `https://t.me/${import.meta.env.VITE_BOT_USERNAME}?startapp=${data.data.referralCode}`
