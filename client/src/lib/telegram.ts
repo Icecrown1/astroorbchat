@@ -16,7 +16,7 @@ export function initTelegram() {
   
   // Set header color to match Solar Gold design
   if (telegram.setHeaderColor) {
-    telegram.setHeaderColor('#9C6B1F'); // Deep Amber from Solar Gold palette
+    telegram.setHeaderColor('#D4A642'); // Solar Gold
   }
   
   if (telegram.setBackgroundColor) {

@@ -102,6 +102,7 @@
 
   /* Gradient definitions - AstroOrb */
   --gradient-primary: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--soft-rose)), hsl(var(--opal-violet)));
+  --gradient-palette: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--deep-amber)), hsl(var(--iridescent-blue)), hsl(var(--soft-rose)), hsl(var(--opal-violet)), hsl(var(--pearl-white)));
   --gradient-aura: radial-gradient(circle, hsl(var(--pearl-white)) 10%, hsl(var(--iridescent-blue)) 60%, transparent 100%);
   --gradient-cosmic: linear-gradient(135deg, hsl(var(--chart-1)), hsl(var(--chart-2)));
   --gradient-energy: linear-gradient(135deg, hsl(var(--chart-3)), hsl(var(--chart-2)));
@@ -229,6 +230,7 @@
 
   /* Gradient definitions - AstroOrb Dark Mode */
   --gradient-primary: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--deep-amber)));
+  --gradient-palette: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--deep-amber)), hsl(var(--iridescent-blue)), hsl(var(--soft-rose)), hsl(var(--opal-violet)), hsl(var(--pearl-white)));
   --gradient-aura: radial-gradient(circle, hsla(207 50% 60% / 0.18) 0%, hsla(254 40% 68% / 0.14) 40%, transparent 70%);
   --gradient-cosmic: linear-gradient(135deg, hsl(var(--chart-1)), hsl(var(--chart-2)));
   --gradient-energy: linear-gradient(135deg, hsl(var(--chart-3)), hsl(var(--chart-2)));

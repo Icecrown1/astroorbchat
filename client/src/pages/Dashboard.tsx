@@ -127,9 +127,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Aura Background Effect - AstroOrb */}
+      {/* Full Palette Gradient Background - AstroOrb */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-gradient-aura opacity-40" />
+        <div className="absolute inset-0 bg-gradient-palette opacity-20" />
       </div>
 
       <div className="container max-w-4xl mx-auto px-4 py-6 pb-20">

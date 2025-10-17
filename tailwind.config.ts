@@ -90,6 +90,7 @@ export default {
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
+        "gradient-palette": "var(--gradient-palette)",
         "gradient-aura": "var(--gradient-aura)",
         "gradient-cosmic": "var(--gradient-cosmic)",
         "gradient-energy": "var(--gradient-energy)",

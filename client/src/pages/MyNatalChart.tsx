@@ -219,9 +219,9 @@ export default function MyNatalChart() {
 
     return (
       <div className="min-h-screen bg-background p-4 pb-20">
-        {/* Aura Background Effect - AstroOrb */}
+        {/* Full Palette Gradient Background - AstroOrb */}
         <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-gradient-aura opacity-35" />
+          <div className="absolute inset-0 bg-gradient-palette opacity-20" />
         </div>
         
         <div className="container max-w-4xl mx-auto">
