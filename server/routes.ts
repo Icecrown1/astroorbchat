@@ -373,19 +373,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
       
-      const birthDate = new Date(data.birthdayDate);
+      // Parse date safely to avoid timezone issues
+      const birthdayStr = data.birthdayDate;
+      const [datePart] = birthdayStr.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      
       const birthTimeStr = data.birthTime || "12:00";
-      const [hours, minutes] = birthTimeStr.split(":").map(Number);
+      const [localHours, localMinutes] = birthTimeStr.split(":").map(Number);
       
       // Geocode birth city to get coordinates
       const coords = await geocodeCityWithFallback(data.birthPlace || null);
       
+      // Convert local time to UTC for Swiss Ephemeris
+      const userTimezone = data.timezone || 'UTC';
+      const localDateTimeStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(localHours).padStart(2, '0')}:${String(localMinutes).padStart(2, '0')}:00`;
+      const localDateTime = dayjs.tz(localDateTimeStr, userTimezone);
+      const utcDateTime = localDateTime.utc();
+      
       const pythonChart = await calculateNatalChartPython({
-        year: birthDate.getFullYear(),
-        month: birthDate.getMonth() + 1,
-        day: birthDate.getDate(),
-        hour: hours,
-        minute: minutes,
+        year: utcDateTime.year(),
+        month: utcDateTime.month() + 1,
+        day: utcDateTime.date(),
+        hour: utcDateTime.hour(),
+        minute: utcDateTime.minute(),
         latitude: coords.lat,
         longitude: coords.lon,
       });
