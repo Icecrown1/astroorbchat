@@ -72,17 +72,18 @@ export async function checkAndResetEnergy(storage: any, userId: string): Promise
       }
     }
     
-    let newEnergy = 10;
+    let newFreeEnergy = 10;
 
     // Both 'active' and 'canceled' get benefits until period ends
     if (subscription?.status === 'active' || subscription?.status === 'canceled') {
-      newEnergy = SUBSCRIPTION_DAILY_ENERGY[subscription.tier as 'standard' | 'pro'] || 10;
+      newFreeEnergy = SUBSCRIPTION_DAILY_ENERGY[subscription.tier as 'standard' | 'pro'] || 10;
     }
 
     const nextReset = getNextResetTime(user.timezone);
     
+    // Reset only free energy, keep purchased energy intact
     await storage.updateUser(userId, {
-      energy: newEnergy,
+      freeEnergy: newFreeEnergy,
       energyResetAt: nextReset,
     });
   }
@@ -101,12 +102,30 @@ export async function deductEnergy(
   }
 
   const cost = ENERGY_COSTS[feature];
+  const totalEnergy = user.freeEnergy + user.purchasedEnergy;
 
-  if (user.energy < cost) {
+  if (totalEnergy < cost) {
     return { ok: false, error: 'Insufficient energy' };
   }
 
-  await storage.updateUser(userId, { energy: user.energy - cost });
+  // Deduct from free energy first, then from purchased energy
+  let newFreeEnergy = user.freeEnergy;
+  let newPurchasedEnergy = user.purchasedEnergy;
+
+  if (user.freeEnergy >= cost) {
+    // Enough free energy to cover the cost
+    newFreeEnergy = user.freeEnergy - cost;
+  } else {
+    // Use all free energy and remaining from purchased
+    const remainingCost = cost - user.freeEnergy;
+    newFreeEnergy = 0;
+    newPurchasedEnergy = user.purchasedEnergy - remainingCost;
+  }
+
+  await storage.updateUser(userId, { 
+    freeEnergy: newFreeEnergy,
+    purchasedEnergy: newPurchasedEnergy 
+  });
   await storage.createUsageLog({ userId, feature, cost });
 
   return { ok: true };
