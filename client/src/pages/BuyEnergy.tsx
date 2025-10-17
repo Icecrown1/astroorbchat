@@ -23,6 +23,7 @@ export default function BuyEnergy() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<'TON' | 'USDT'>('TON');
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
   const walletConnected = !!wallet;
@@ -64,6 +65,7 @@ export default function BuyEnergy() {
         kind: 'energy_pack',
         energyAmount: pack.amount,
         amountUSD: pack.usdPrice,
+        currency: selectedCurrency,
         userWalletAddress, // Send wallet address to backend
       });
       
@@ -218,12 +220,18 @@ export default function BuyEnergy() {
     },
   });
 
-  const getTonPrice = (usdPrice: number) => {
+  const getCryptoPrice = (usdPrice: number) => {
     const data = pricesData as any;
-    if (data?.ok && data.data?.tonRate) {
-      return (usdPrice / data.data.tonRate).toFixed(2);
+    if (selectedCurrency === 'USDT') {
+      // USDT is pegged to $1, so it's 1:1 with USD
+      return usdPrice.toFixed(2);
+    } else {
+      // TON price
+      if (data?.ok && data.data?.tonRate) {
+        return (usdPrice / data.data.tonRate).toFixed(2);
+      }
+      return (usdPrice / 7.5).toFixed(2);
     }
-    return (usdPrice / 7.5).toFixed(2);
   };
 
   return (
@@ -265,7 +273,35 @@ export default function BuyEnergy() {
             <Loader />
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <>
+            {/* Currency Selector */}
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-3">
+                {locale === 'ru' ? 'Выберите валюту для оплаты:' : 'Choose payment currency:'}
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant={selectedCurrency === 'TON' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setSelectedCurrency('TON')}
+                  data-testid="button-currency-ton"
+                >
+                  <Wallet className="w-4 h-4 mr-2" />
+                  TON
+                </Button>
+                <Button
+                  variant={selectedCurrency === 'USDT' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setSelectedCurrency('USDT')}
+                  data-testid="button-currency-usdt"
+                >
+                  <Wallet className="w-4 h-4 mr-2" />
+                  USDT
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
             {ENERGY_PACKS.map((pack, index) => (
               <Card
                 key={pack.amount}
@@ -293,7 +329,7 @@ export default function BuyEnergy() {
                   <div className="text-center">
                     <p className="text-2xl font-bold">${pack.usdPrice}</p>
                     <p className="text-sm text-muted-foreground">
-                      ≈ {getTonPrice(pack.usdPrice)} TON
+                      ≈ {getCryptoPrice(pack.usdPrice)} {selectedCurrency}
                     </p>
                   </div>
                 </div>
@@ -337,12 +373,12 @@ export default function BuyEnergy() {
                     ) : !walletConnected ? (
                       <>
                         <Wallet className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Подключить TON' : 'Connect TON'}
+                        {locale === 'ru' ? `Подключить ${selectedCurrency}` : `Connect ${selectedCurrency}`}
                       </>
                     ) : (
                       <>
                         <Wallet className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Оплатить TON' : 'Pay with TON'}
+                        {locale === 'ru' ? `Оплатить ${selectedCurrency}` : `Pay with ${selectedCurrency}`}
                       </>
                     )}
                   </Button>
@@ -350,13 +386,14 @@ export default function BuyEnergy() {
               </Card>
             ))}
           </div>
+          </>
         )}
 
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' ? 
-              'Оплата через TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
-              'Pay with TON blockchain. Energy is added instantly after confirmation.'
+              `Оплата через ${selectedCurrency} блокчейн. Энергия зачисляется мгновенно после подтверждения.` :
+              `Pay with ${selectedCurrency} blockchain. Energy is added instantly after confirmation.`
             }
           </p>
         </Card>
