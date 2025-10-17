@@ -22,6 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, utilizing custom, compact prompts for various reading types and gender-based tone personalization. Includes full localization of prompts and ensures personalized compatibility readings with user names.
 - **Horoscope System**: Offers daily, weekly, and monthly personalized horoscopes, deeply integrated with natal chart data for individual predictions, not generic readings. Horoscopes are stored with `startDate` and `endDate` for proper period tracking.
 - **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards. Users can update their profile once every 30 days.
+- **Energy System Architecture**: Dual-field energy system with `freeEnergy` (resets daily) and `purchasedEnergy` (persists until spent). Daily reset only affects free energy, preserving purchased orbs indefinitely.
 
 ### System Design Choices
 - **Data Caching**: Multi-locale caching for natal charts with on-demand locale generation.
@@ -82,3 +83,16 @@ Preferred communication style: Simple, everyday language.
 - Added translations for insights to `client/src/lib/translations.ts`
 
 **Files**: `server/routes.ts`, `server/lib/prompts/solar.md`, `client/src/lib/translations.ts`
+
+### Energy System Dual-Field Implementation (Fixed - Oct 17, 2025)
+**Problem**: Daily energy reset was overwriting ALL energy (including purchased orbs), causing users to lose paid energy. System used single `energy` field that reset to 10 every day.
+
+**Solution**: Implemented dual-field energy system:
+- **Database**: Split `energy` field into `freeEnergy` (default 10, resets daily) and `purchasedEnergy` (default 0, persists indefinitely)
+- **Migration**: SQL migration transferred existing energy to new fields: if energy ≤ 10 → all to `freeEnergy`, if > 10 → 10 to `freeEnergy`, remainder to `purchasedEnergy`
+- **Reset Logic**: `checkAndResetEnergy()` now only resets `freeEnergy`, keeping `purchasedEnergy` intact
+- **Deduction Logic**: `deductEnergy()` deducts from `freeEnergy` first, then from `purchasedEnergy` if needed
+- **Purchase Logic**: All energy purchases (TON, Stars, subscription bonuses) add to `purchasedEnergy`
+- **API**: `/api/energy` returns combined energy `freeEnergy + purchasedEnergy`
+
+**Files**: `shared/schema.ts`, `server/lib/energy.ts`, `server/routes.ts`, `server/storage.ts`
