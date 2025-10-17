@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { calculateNatalChartPython, type NatalChartResult } from "./pythonNatal";
 import { getAstrologyInterpretation } from "./openai";
+import { geocodeCityWithFallback } from "./geocoding";
 import type { User, NatalChart } from "@shared/schema";
 
 export async function computeNatalFromUser(user: User, locale: string = 'ru'): Promise<NatalChartResult & { interpretation: string }> {
@@ -8,8 +9,8 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
   const birthTimeStr = user.birthTime || "12:00";
   const [hours, minutes] = birthTimeStr.split(":").map(Number);
   
-  const latitude = 55.7558; // Moscow fallback
-  const longitude = 37.6173; // Moscow fallback
+  // Geocode birth city to get coordinates
+  const coords = await geocodeCityWithFallback(user.birthPlace);
   
   const pythonChart = await calculateNatalChartPython({
     year: birthDate.getFullYear(),
@@ -17,8 +18,8 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
     day: birthDate.getDate(),
     hour: hours,
     minute: minutes,
-    latitude,
-    longitude,
+    latitude: coords.lat,
+    longitude: coords.lon,
   });
   
   // Generate AI interpretation

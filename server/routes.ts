@@ -13,6 +13,7 @@ import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportant
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
+import { geocodeCityWithFallback } from "./lib/geocoding";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment, signPayload, verifyPayload } from "./lib/telegramStars";
 import { z } from "zod";
@@ -377,8 +378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const birthTimeStr = data.birthTime || "12:00";
       const [hours, minutes] = birthTimeStr.split(":").map(Number);
       
-      const latitude = 55.7558; // Moscow fallback
-      const longitude = 37.6173;
+      // Geocode birth city to get coordinates
+      const coords = await geocodeCityWithFallback(data.birthPlace || null);
       
       const pythonChart = await calculateNatalChartPython({
         year: birthDate.getFullYear(),
@@ -386,8 +387,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         day: birthDate.getDate(),
         hour: hours,
         minute: minutes,
-        latitude,
-        longitude,
+        latitude: coords.lat,
+        longitude: coords.lon,
       });
       
       // Generate AI interpretation
@@ -561,8 +562,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const birthDate = new Date(user.birthdayDate);
       const [hours, minutes] = user.birthTime.split(':').map(Number);
       
-      const latitude = 55.7558;
-      const longitude = 37.6173;
+      // Geocode birth city to get coordinates
+      const coords = await geocodeCityWithFallback(user.birthPlace);
 
       const pythonChart = await calculateNatalChartPython({
         year: birthDate.getFullYear(),
@@ -570,8 +571,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         day: birthDate.getDate(),
         hour: hours,
         minute: minutes,
-        latitude,
-        longitude,
+        latitude: coords.lat,
+        longitude: coords.lon,
         house_system: 'Placidus',
       });
 
@@ -788,8 +789,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const solarDate = new Date(solarYear, birthDate.getMonth(), birthDate.getDate());
       
       const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
-      const latitude = 55.7558; // Moscow fallback
-      const longitude = 37.6173; // Moscow fallback
+      
+      // Geocode birth city to get coordinates
+      const coords = await geocodeCityWithFallback(user.birthPlace);
       
       const solarChartData = await calculateNatalChartPython({
         year: solarDate.getFullYear(),
@@ -797,8 +799,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         day: solarDate.getDate(),
         hour: hours,
         minute: minutes,
-        latitude,
-        longitude,
+        latitude: coords.lat,
+        longitude: coords.lon,
         house_system: 'Placidus',
       });
       
@@ -1201,9 +1203,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
         const birthDate = new Date(user.birthdayDate);
         
-        // Use Moscow as fallback coordinates if birthPlace not available
-        const latitude = 55.7558; // Moscow
-        const longitude = 37.6173; // Moscow
+        // Geocode birth city to get coordinates
+        const coords = await geocodeCityWithFallback(user.birthPlace);
         
         person1ChartData = await calculateNatalChartPython({
           year: birthDate.getFullYear(),
@@ -1211,8 +1212,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           day: birthDate.getDate(),
           hour: hours,
           minute: minutes,
-          latitude,
-          longitude,
+          latitude: coords.lat,
+          longitude: coords.lon,
           house_system: 'Placidus',
         });
       }
@@ -1220,8 +1221,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Partner's chart (always calculate fresh, this is what costs energy)
       const partnerDate = new Date(partner.date);
       const [partnerHours = 12, partnerMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
-      const partnerLatitude = 55.7558; // Moscow fallback
-      const partnerLongitude = 37.6173; // Moscow fallback
+      
+      // Geocode partner's birth city to get coordinates
+      const partnerCoords = await geocodeCityWithFallback(partner.place);
       
       const person2ChartData = await calculateNatalChartPython({
         year: partnerDate.getFullYear(),
@@ -1229,8 +1231,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         day: partnerDate.getDate(),
         hour: partnerHours,
         minute: partnerMinutes,
-        latitude: partnerLatitude,
-        longitude: partnerLongitude,
+        latitude: partnerCoords.lat,
+        longitude: partnerCoords.lon,
         house_system: 'Placidus',
       });
 
