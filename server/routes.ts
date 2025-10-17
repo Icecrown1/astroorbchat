@@ -18,6 +18,11 @@ import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment, signPayload, verifyPayload } from "./lib/telegramStars";
 import { z } from "zod";
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 interface StoredNatalChart extends NatalChartResult {
   interpretation?: string;
@@ -417,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerId: userId,
         name: data.name,
         gender: data.gender,
-        birthdayDate: birthDate,
+        birthdayDate: new Date(data.birthdayDate),
         birthTime: data.birthTime || null,
         birthPlace: data.birthPlace || null,
         timezone: data.timezone,
@@ -1208,19 +1213,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (natalChart && natalChart.data) {
         person1ChartData = natalChart.data as NatalChartResult;
       } else {
-        // Parse birth time
-        const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
-        const birthDate = new Date(user.birthdayDate);
+        // Parse date and time with timezone conversion
+        const birthdayStr = typeof user.birthdayDate === 'string' ? user.birthdayDate : user.birthdayDate.toISOString();
+        const [datePart] = birthdayStr.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        
+        const [localHours = 12, localMinutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
         
         // Geocode birth city to get coordinates
         const coords = await geocodeCityWithFallback(user.birthPlace);
         
+        // Convert local time to UTC for Swiss Ephemeris
+        const userTimezone = user.timezone || 'UTC';
+        const localDateTimeStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(localHours).padStart(2, '0')}:${String(localMinutes).padStart(2, '0')}:00`;
+        const localDateTime = dayjs.tz(localDateTimeStr, userTimezone);
+        const utcDateTime = localDateTime.utc();
+        
         person1ChartData = await calculateNatalChartPython({
-          year: birthDate.getFullYear(),
-          month: birthDate.getMonth() + 1,
-          day: birthDate.getDate(),
-          hour: hours,
-          minute: minutes,
+          year: utcDateTime.year(),
+          month: utcDateTime.month() + 1,
+          day: utcDateTime.date(),
+          hour: utcDateTime.hour(),
+          minute: utcDateTime.minute(),
           latitude: coords.lat,
           longitude: coords.lon,
           house_system: 'Placidus',
@@ -1228,18 +1242,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Partner's chart (always calculate fresh, this is what costs energy)
-      const partnerDate = new Date(partner.date);
-      const [partnerHours = 12, partnerMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
+      // Parse partner date and time with timezone conversion
+      const partnerDateStr = partner.date;
+      const [partnerDatePart] = partnerDateStr.split('T');
+      const [partnerYear, partnerMonth, partnerDay] = partnerDatePart.split('-').map(Number);
+      
+      const [partnerLocalHours = 12, partnerLocalMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
       
       // Geocode partner's birth city to get coordinates
       const partnerCoords = await geocodeCityWithFallback(partner.place);
       
+      // Convert local time to UTC for Swiss Ephemeris (use UTC as default timezone for partner)
+      const partnerTimezone = partner.timezone || 'UTC';
+      const partnerLocalDateTimeStr = `${partnerYear}-${String(partnerMonth).padStart(2, '0')}-${String(partnerDay).padStart(2, '0')} ${String(partnerLocalHours).padStart(2, '0')}:${String(partnerLocalMinutes).padStart(2, '0')}:00`;
+      const partnerLocalDateTime = dayjs.tz(partnerLocalDateTimeStr, partnerTimezone);
+      const partnerUtcDateTime = partnerLocalDateTime.utc();
+      
       const person2ChartData = await calculateNatalChartPython({
-        year: partnerDate.getFullYear(),
-        month: partnerDate.getMonth() + 1,
-        day: partnerDate.getDate(),
-        hour: partnerHours,
-        minute: partnerMinutes,
+        year: partnerUtcDateTime.year(),
+        month: partnerUtcDateTime.month() + 1,
+        day: partnerUtcDateTime.date(),
+        hour: partnerUtcDateTime.hour(),
+        minute: partnerUtcDateTime.minute(),
         latitude: partnerCoords.lat,
         longitude: partnerCoords.lon,
         house_system: 'Placidus',
