@@ -36,7 +36,7 @@ export function EnergyBadge({ className }: { className?: string }) {
     <div
       className={cn(
         'inline-flex items-center gap-2 px-4 py-2 rounded-full',
-        'bg-gradient-to-r from-chart-1 to-chart-2',
+        'bg-gradient-to-r from-chart-1 to-chart-3',
         'shadow-lg shadow-primary/20',
         className
       )}
