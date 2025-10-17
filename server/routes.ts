@@ -1402,14 +1402,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
+      // Check if natal chart exists in database (foundation for personalized answers)
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart || !natalChart.data) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+
       const cost = ENERGY_COSTS.ask;
       if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
-      // Execute the reading
-      const chart = calculateNatalChart(new Date(user.birthdayDate));
-      const answer = await getAstrologyInterpretation("ask", { chart, question }, locale, user.gender);
+      // Execute the reading using full natal chart data as foundation
+      const answer = await getAstrologyInterpretation("ask", { 
+        chart: natalChart.data, 
+        question 
+      }, locale, user.gender);
 
       await storage.createAiQuestion({
         userId,
