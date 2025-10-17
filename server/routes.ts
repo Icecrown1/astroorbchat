@@ -2063,8 +2063,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .map(p => p.txHash)
       );
 
-      // IMPORTANT: Convert amount to nanoTON for comparison
-      const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
+      // Get currency and decimals
+      const currency = payment.currency || 'TON';
+      const decimals = currency === 'USDT' ? 1_000_000 : 1_000_000_000;
+      
+      // Convert amount to smallest units for comparison
+      const amountInSmallestUnits = (parseFloat(payment.amountTON || '0') * decimals).toFixed(0);
 
       // Check if we have user's wallet address
       if (!payment.userWalletAddress) {
@@ -2077,13 +2081,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Search for transaction FROM user's wallet TO our wallet
       console.log('[TON_CONFIRM] Searching for transaction FROM user wallet TO our wallet');
+      console.log('[TON_CONFIRM] Currency:', currency);
       console.log('[TON_CONFIRM] User wallet address:', payment.userWalletAddress);
       console.log('[TON_CONFIRM] Our wallet address:', walletAddress);
-      console.log('[TON_CONFIRM] Expected amount (nanoTON):', amountInNanoTON);
+      console.log('[TON_CONFIRM] Expected amount:', amountInSmallestUnits, currency === 'USDT' ? 'micro-USDT' : 'nanoTON');
       const matchedTx = await findUserTransaction(
         payment.userWalletAddress,
         walletAddress,
-        amountInNanoTON,
+        amountInSmallestUnits,
         15, // Extended to 15 minutes
         usedTxHashes
       );
