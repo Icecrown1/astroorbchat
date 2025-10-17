@@ -10,13 +10,21 @@ import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
 import { useTranslation } from '@/contexts/LocaleContext';
 
+interface ReferralCodeResponse {
+  ok: boolean;
+  data: {
+    referralCode: string;
+    referrals: any[];
+  };
+}
+
 export default function Referral() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
   const { t, locale } = useTranslation();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<ReferralCodeResponse>({
     queryKey: ['/api/referral/code'],
   });
 
