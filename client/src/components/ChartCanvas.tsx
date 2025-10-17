@@ -14,6 +14,24 @@ interface Aspect {
   angle: number;
 }
 
+interface Angle {
+  longitude: number;
+  sign: string;
+  degree_in_sign: number;
+}
+
+interface Angles {
+  Ascendant: Angle;
+  MC: Angle;
+  Descendant: Angle;
+  IC: Angle;
+}
+
+interface Houses {
+  system: string;
+  cusps: number[]; // 12 house cusps in degrees 0-360
+}
+
 interface PlanetPosition {
   name: string;
   x: number;
@@ -24,6 +42,8 @@ interface PlanetPosition {
 interface ChartCanvasProps {
   planets: Planet[];
   aspects: Aspect[];
+  angles?: Angles;
+  houses?: Houses;
   className?: string;
   onPlanetClick?: (planetName: string) => void;
 }
@@ -83,7 +103,7 @@ const ASPECT_COLORS: Record<string, string> = {
   opposition: '#f59e0b', // amber
 };
 
-export function ChartCanvas({ planets, aspects, className, onPlanetClick }: ChartCanvasProps) {
+export function ChartCanvas({ planets, aspects, angles, houses, className, onPlanetClick }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const planetPositionsRef = useRef<PlanetPosition[]>([]);
 
@@ -99,6 +119,7 @@ export function ChartCanvas({ planets, aspects, className, onPlanetClick }: Char
     const outerRadius = size / 2 - 10;
     const innerRadius = outerRadius - 50;
     const planetRadius = innerRadius - 50;
+    const houseLinesRadius = innerRadius + 20; // House lines between inner and outer circles
 
     // Clear canvas
     ctx.clearRect(0, 0, size, size);
@@ -176,6 +197,64 @@ export function ChartCanvas({ planets, aspects, className, onPlanetClick }: Char
       ctx.fillText(ZODIAC_SYMBOLS[i], labelX, labelY);
       
       ctx.shadowBlur = 0;
+    }
+
+    // 5.5. Линии домов (если есть данные)
+    if (houses && houses.cusps && houses.cusps.length === 12) {
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)'; // Purple/violet with transparency
+      ctx.lineWidth = 1.5;
+      
+      houses.cusps.forEach((cuspDegree) => {
+        const angle = (cuspDegree - 90) * (Math.PI / 180);
+        const innerX = center + Math.cos(angle) * innerRadius;
+        const innerY = center + Math.sin(angle) * innerRadius;
+        const outerX = center + Math.cos(angle) * houseLinesRadius;
+        const outerY = center + Math.sin(angle) * houseLinesRadius;
+        
+        ctx.beginPath();
+        ctx.moveTo(innerX, innerY);
+        ctx.lineTo(outerX, outerY);
+        ctx.stroke();
+      });
+    }
+
+    // 5.6. Маркеры ASC и MC (если есть данные)
+    if (angles) {
+      ctx.font = 'bold 14px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Ascendant (ASC)
+      if (angles.Ascendant) {
+        const ascAngle = (angles.Ascendant.longitude - 90) * (Math.PI / 180);
+        const ascX = center + Math.cos(ascAngle) * (houseLinesRadius + 15);
+        const ascY = center + Math.sin(ascAngle) * (houseLinesRadius + 15);
+        
+        // Background for better visibility
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        const metrics = ctx.measureText('ASC');
+        ctx.fillRect(ascX - metrics.width / 2 - 3, ascY - 7, metrics.width + 6, 14);
+        
+        // Text
+        ctx.fillStyle = '#8b5cf6'; // Violet
+        ctx.fillText('ASC', ascX, ascY);
+      }
+      
+      // Midheaven (MC)
+      if (angles.MC) {
+        const mcAngle = (angles.MC.longitude - 90) * (Math.PI / 180);
+        const mcX = center + Math.cos(mcAngle) * (houseLinesRadius + 15);
+        const mcY = center + Math.sin(mcAngle) * (houseLinesRadius + 15);
+        
+        // Background for better visibility
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        const metrics = ctx.measureText('MC');
+        ctx.fillRect(mcX - metrics.width / 2 - 3, mcY - 7, metrics.width + 6, 14);
+        
+        // Text
+        ctx.fillStyle = '#8b5cf6'; // Violet
+        ctx.fillText('MC', mcX, mcY);
+      }
     }
 
     // 6. Аспекты (линии между планетами)
@@ -262,7 +341,7 @@ export function ChartCanvas({ planets, aspects, className, onPlanetClick }: Char
       ctx.shadowBlur = 0;
     });
 
-  }, [planets, aspects]);
+  }, [planets, aspects, angles, houses]);
 
   // Обработчик кликов по canvas
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
