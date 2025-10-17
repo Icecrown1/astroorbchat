@@ -116,6 +116,17 @@ Preferred communication style: Simple, everyday language.
 
 **Files**: `server/lib/cities.ts`, `server/lib/geocoding.ts`, `server/routes.ts`, `server/lib/natalService.ts`
 
+### Natal Chart Caching Optimization (Fixed - Oct 17, 2025)
+**Problem**: Natal chart data was being refetched on every page visit, causing slow loading and unnecessary server load. Initial attempt to remove locale from queryKey caused cache pollution where users saw wrong-language AI interpretations after locale switching.
+
+**Solution**: Implemented proper multi-locale caching strategy:
+- **Query Key Structure**: `queryKey: ['/api/natal/me', locale]` - includes locale to prevent cross-locale cache pollution
+- **Stale Time**: Added `staleTime: 1000 * 60 * 60` (1 hour) - data considered fresh for 1 hour, reducing redundant API calls
+- **Cache Invalidation**: `invalidateQueries({ queryKey: ['/api/natal/me'] })` clears ALL locale variants when chart is created/recalculated
+- **Result**: Fast page loads from cache, correct locale-specific AI interpretations, reduced server load
+
+**Files**: `client/src/pages/MyNatalChart.tsx`
+
 ## Recent Features
 
 ### Referral Notification System (Added - Oct 17, 2025)
