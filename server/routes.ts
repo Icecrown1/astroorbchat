@@ -7,7 +7,7 @@ import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram"
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
-import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
+import { getTonPrice, getUSDTPrice, convertUSDToTON, convertUSDToCrypto, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
@@ -1947,6 +1947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     tier: z.enum(["standard", "pro"]).optional(),
     energyAmount: z.number().optional(),
     amountUSD: z.number(),
+    currency: z.enum(["TON", "USDT"]).default("TON"),
     userWalletAddress: z.string().optional(), // TON wallet address of sender
   });
 
@@ -1969,29 +1970,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const tonRate = await getTonPrice();
-      const amountTON = convertUSDToTON(validated.amountUSD, tonRate);
+      // Get price for selected currency
+      const currency = validated.currency || 'TON';
+      const cryptoPrice = currency === 'USDT' ? await getUSDTPrice() : await getTonPrice();
+      const amountCrypto = convertUSDToCrypto(validated.amountUSD, currency, cryptoPrice);
 
       // Normalize user wallet address to raw format (0:...) for consistent comparison
       const normalizedUserAddress = validated.userWalletAddress 
         ? normalizeTonAddress(validated.userWalletAddress)
         : null;
 
-      console.log('[TON_CREATE] User wallet address:', {
-        original: validated.userWalletAddress,
-        normalized: normalizedUserAddress
+      console.log('[TON_CREATE] Payment details:', {
+        currency,
+        cryptoPrice,
+        amountUSD: validated.amountUSD,
+        amountCrypto,
+        userAddress: normalizedUserAddress
       });
 
+      // For USDT, amountTON stores the amount in smallest units (6 decimals)
+      // For TON, it's in nanoTON (9 decimals)
+      const decimals = currency === 'USDT' ? 1_000_000 : 1_000_000_000;
+      
       const payment = await storage.createPayment({
         userId,
         kind: validated.kind,
         tier: validated.tier || null,
         energyAmount: validated.energyAmount || null,
         amountUSD: validated.amountUSD.toString(),
-        amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
+        amountTON: (parseFloat(amountCrypto) / decimals).toString(),
+        currency,
         txHash: `pending_${Date.now()}`,
         status: "pending",
-        userWalletAddress: normalizedUserAddress, // Save normalized sender's wallet address
+        userWalletAddress: normalizedUserAddress,
       });
 
       res.json({
@@ -1999,7 +2010,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           paymentId: payment.id,
           walletAddress: process.env.TON_WALLET_ADDRESS,
-          amountTON,
+          amountTON: amountCrypto, // Keep same name for compatibility
+          currency,
         },
       });
     } catch (error: any) {
