@@ -15,8 +15,16 @@ export async function applyReferralBonus(storage: any, userId: string, referralC
 
   await storage.updateUser(userId, { referredById: referrer.id });
 
-  const currentEnergy = referrer.energy || 0;
-  await storage.updateUser(referrer.id, { energy: currentEnergy + 5 });
+  const currentPurchasedEnergy = referrer.purchasedEnergy || 0;
+  await storage.updateUser(referrer.id, { purchasedEnergy: currentPurchasedEnergy + 5 });
+
+  // Create referral reward record
+  await storage.createReferralReward({
+    referrerId: referrer.id,
+    referredUserId: userId,
+    rewardType: 'signup',
+    energyAmount: 5,
+  });
 
   return true;
 }
@@ -27,8 +35,16 @@ export async function handleSubscriptionReferralBonus(storage: any, userId: stri
   if (user?.referredById) {
     const referrer = await storage.getUser(user.referredById);
     if (referrer) {
-      const currentEnergy = referrer.energy || 0;
-      await storage.updateUser(referrer.id, { energy: currentEnergy + 10 });
+      const currentPurchasedEnergy = referrer.purchasedEnergy || 0;
+      await storage.updateUser(referrer.id, { purchasedEnergy: currentPurchasedEnergy + 10 });
+
+      // Create referral reward record
+      await storage.createReferralReward({
+        referrerId: referrer.id,
+        referredUserId: userId,
+        rewardType: 'subscription',
+        energyAmount: 10,
+      });
     }
   }
 }

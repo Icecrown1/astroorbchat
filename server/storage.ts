@@ -12,6 +12,7 @@ import {
   externalNatals,
   importantDateUnlocks,
   starPayments,
+  referralRewards,
   type User, 
   type InsertUser,
   type Subscription,
@@ -35,7 +36,9 @@ import {
   type ImportantDateUnlock,
   type InsertImportantDateUnlock,
   type StarPayment,
-  type InsertStarPayment
+  type InsertStarPayment,
+  type ReferralReward,
+  type InsertReferralReward
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull } from "drizzle-orm";
@@ -103,6 +106,10 @@ export interface IStorage {
   getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined>;
   updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined>;
   atomicStartProcessing(invoicePayload: string, telegramChargeId: string): Promise<StarPayment | null>;
+  
+  // Referral reward operations
+  createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
+  getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]>;
   
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -490,6 +497,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated || undefined;
+  }
+
+  // Referral reward operations
+  async createReferralReward(reward: InsertReferralReward): Promise<ReferralReward> {
+    const [newReward] = await db.insert(referralRewards).values(reward).returning();
+    return newReward;
+  }
+
+  async getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]> {
+    return await db
+      .select()
+      .from(referralRewards)
+      .where(eq(referralRewards.referrerId, referrerId))
+      .orderBy(desc(referralRewards.createdAt));
   }
 }
 

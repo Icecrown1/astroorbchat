@@ -45,6 +45,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   payments: many(payments),
   usageLogs: many(usageLogs),
+  referralRewardsGiven: many(referralRewards, {
+    relationName: "ReferrerRewards",
+  }),
+  referralRewardsReceived: many(referralRewards, {
+    relationName: "ReferredUserRewards",
+  }),
   natalChart: one(natalCharts, {
     fields: [users.id],
     references: [natalCharts.userId],
@@ -152,6 +158,30 @@ export const usageLogsRelations = relations(usageLogs, ({ one }) => ({
   user: one(users, {
     fields: [usageLogs.userId],
     references: [users.id],
+  }),
+}));
+
+export const referralRewards = pgTable("referral_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerId: varchar("referrer_id", { length: 255 }).notNull(),
+  referredUserId: varchar("referred_user_id", { length: 255 }).notNull(),
+  rewardType: varchar("reward_type", { length: 20 }).notNull(), // 'signup' or 'subscription'
+  energyAmount: integer("energy_amount").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  referrerIdIdx: index("referral_rewards_referrer_id_idx").on(table.referrerId),
+}));
+
+export const referralRewardsRelations = relations(referralRewards, ({ one }) => ({
+  referrer: one(users, {
+    fields: [referralRewards.referrerId],
+    references: [users.id],
+    relationName: "ReferrerRewards",
+  }),
+  referredUser: one(users, {
+    fields: [referralRewards.referredUserId],
+    references: [users.id],
+    relationName: "ReferredUserRewards",
   }),
 }));
 
@@ -453,3 +483,7 @@ export type InsertImportantDateUnlock = z.infer<typeof insertImportantDateUnlock
 
 export type StarPayment = typeof starPayments.$inferSelect;
 export type InsertStarPayment = z.infer<typeof insertStarPaymentSchema>;
+
+export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({ id: true, createdAt: true });
+export type ReferralReward = typeof referralRewards.$inferSelect;
+export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
