@@ -14,7 +14,15 @@ interface ReferralCodeResponse {
   ok: boolean;
   data: {
     referralCode: string;
-    referrals: any[];
+    referrals: Array<{
+      id: string;
+      userName: string;
+      rewardType: string;
+      energyAmount: number;
+      createdAt: Date;
+    }>;
+    totalRewards: number;
+    totalReferrals: number;
   };
 }
 
@@ -147,21 +155,44 @@ export default function Referral() {
 
         {data?.data?.referrals && data.data.referrals.length > 0 && (
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">{t.referral.yourReferrals}</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">{t.referral.yourReferrals}</h2>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Всего рефералов' : 'Total Referrals'}</p>
+                <p className="text-2xl font-bold text-primary">{data.data.totalReferrals}</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-chart-2/10 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Всего получено наград' : 'Total Rewards Earned'}</p>
+                  <p className="text-3xl font-bold text-primary mt-1">
+                    +{data.data.totalRewards} {t.common.orbs}
+                  </p>
+                </div>
+                <Gift className="w-12 h-12 text-primary/50" />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              {data.data.referrals.map((referral: any, index: number) => (
+              {data.data.referrals.map((referral) => (
                 <div
-                  key={index}
+                  key={referral.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted"
+                  data-testid={`referral-item-${referral.id}`}
                 >
                   <div>
-                    <p className="font-medium">{referral.name}</p>
+                    <p className="font-medium">{referral.userName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {locale === 'ru' ? 'Регистрация' : 'Joined'} {new Date(referral.createdAt).toLocaleDateString()}
+                      {referral.rewardType === 'signup' 
+                        ? (locale === 'ru' ? 'Регистрация' : 'Joined')
+                        : (locale === 'ru' ? 'Оформил подписку' : 'Subscribed')
+                      } · {new Date(referral.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Badge>
-                    +{referral.subscription ? '15' : '5'} {t.common.orbs}
+                  <Badge variant={referral.rewardType === 'subscription' ? 'default' : 'secondary'}>
+                    +{referral.energyAmount} {t.common.orbs}
                   </Badge>
                 </div>
               ))}
