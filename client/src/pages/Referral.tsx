@@ -21,7 +21,7 @@ export default function Referral() {
   });
 
   const referralLink = data?.ok && data.data?.referralCode 
-    ? `https://t.me/${import.meta.env.VITE_BOT_USERNAME}?start=${data.data.referralCode}`
+    ? `https://t.me/${import.meta.env.VITE_BOT_USERNAME}?startapp=${data.data.referralCode}`
     : '';
 
   const handleCopy = async () => {
