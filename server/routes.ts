@@ -1886,13 +1886,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/referral/code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
-      const referrals: any[] = [];
+      
+      // Get all referral rewards for this user
+      const rewards = await storage.getReferralRewardsByReferrerId(user.id);
+      
+      // Fetch user details for each referred user
+      const referralsWithDetails = await Promise.all(
+        rewards.map(async (reward) => {
+          const referredUser = await storage.getUser(reward.referredUserId);
+          return {
+            id: reward.id,
+            userName: referredUser?.name || 'Unknown',
+            rewardType: reward.rewardType,
+            energyAmount: reward.energyAmount,
+            createdAt: reward.createdAt,
+          };
+        })
+      );
 
       res.json({
         ok: true,
         data: {
           referralCode: user.referralCode,
-          referrals,
+          referrals: referralsWithDetails,
+          totalRewards: rewards.reduce((sum, r) => sum + r.energyAmount, 0),
+          totalReferrals: rewards.filter(r => r.rewardType === 'signup').length,
         },
       });
     } catch (error: any) {
