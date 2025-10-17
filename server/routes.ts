@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Set initial energy and reset time
         await storage.updateUser(user.id, {
-          energy: 10,
+          freeEnergy: 10,
           energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
         });
 
@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthPlace: birthPlace || null,
           timezone: timezone || "America/New_York",
           referralCode,
-          energy: 10,
+          freeEnergy: 10,
           energyResetAt: getNextResetTime(timezone || "America/New_York"),
         };
 
@@ -264,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (user) {
         await storage.updateUser(userId, {
-          energy: user.energy + subscriptionEnergy,
+          purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
         });
       }
       
@@ -361,7 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const cost = ENERGY_COSTS.natal_external;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
       
@@ -406,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: natalData,
       });
       
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: "natal_external", cost });
       
       res.json({ ok: true, data: externalNatal });
@@ -484,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ok: true,
         data: {
-          energy: user?.energy || 0,
+          energy: user ? (user.freeEnergy + user.purchasedEnergy) : 0,
           resetAt: user?.energyResetAt || new Date(),
         },
       });
@@ -772,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cost = ENERGY_COSTS.solar;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
@@ -819,7 +819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       // Only deduct energy after successful execution
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: "solar", cost });
 
       res.json({
@@ -858,7 +858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cost = ENERGY_COSTS.horoscope;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(402).json({ ok: false, error: "Insufficient energy" });
       }
 
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[HOROSCOPE] Saved to database');
 
       // Only deduct energy after successful execution
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: "horoscope", cost });
 
       console.log('[HOROSCOPE] Request completed successfully');
@@ -925,7 +925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      console.log('[WEEKLY_PLAN] User energy:', user.energy);
+      console.log('[WEEKLY_PLAN] User energy:', (user.freeEnergy + user.purchasedEnergy));
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
@@ -945,8 +945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Subscribers get it free, others pay 1 orb
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.weekly_plan;
-        if (user.energy < cost) {
-          console.log('[WEEKLY_PLAN] Insufficient energy:', user.energy, '< cost:', cost);
+        if ((user.freeEnergy + user.purchasedEnergy) < cost) {
+          console.log('[WEEKLY_PLAN] Insufficient energy:', (user.freeEnergy + user.purchasedEnergy), '< cost:', cost);
           return res.status(402).json({ ok: false, error: "Insufficient energy" });
         }
       }
@@ -995,7 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.weekly_plan;
-        await storage.updateUser(userId, { energy: user.energy - cost });
+        await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
         await storage.createUsageLog({ userId, feature: "weekly_plan", cost });
         console.log('[WEEKLY_PLAN] Energy deducted:', cost);
       }
@@ -1028,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      console.log('[MONTHLY_PLAN] User energy:', user.energy);
+      console.log('[MONTHLY_PLAN] User energy:', (user.freeEnergy + user.purchasedEnergy));
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
@@ -1048,8 +1048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Subscribers get it free, others pay 1 orb
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.monthly_plan;
-        if (user.energy < cost) {
-          console.log('[MONTHLY_PLAN] Insufficient energy:', user.energy, '< cost:', cost);
+        if ((user.freeEnergy + user.purchasedEnergy) < cost) {
+          console.log('[MONTHLY_PLAN] Insufficient energy:', (user.freeEnergy + user.purchasedEnergy), '< cost:', cost);
           return res.status(402).json({ ok: false, error: "Insufficient energy" });
         }
       }
@@ -1094,7 +1094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Deduct energy only if not subscriber
       if (!hasActiveSubscription) {
         const cost = ENERGY_COSTS.monthly_plan;
-        await storage.updateUser(userId, { energy: user.energy - cost });
+        await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
         await storage.createUsageLog({ userId, feature: "monthly_plan", cost });
         console.log('[MONTHLY_PLAN] Energy deducted:', cost);
       }
@@ -1181,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cost = professional ? ENERGY_COSTS.compatibility_professional : ENERGY_COSTS.compatibility;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
@@ -1312,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only deduct energy after successful execution
       const featureName = professional ? "compatibility_professional" : "compatibility";
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: featureName, cost });
 
       const strengths = locale === 'ru' ? [
@@ -1363,7 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cost = ENERGY_COSTS.ask;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
@@ -1378,7 +1378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Only deduct energy after successful execution
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: "ask", cost });
 
       res.json({ ok: true, data: { answer } });
@@ -1522,7 +1522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const cost = ENERGY_COSTS.important_date_detail;
-      if (user.energy < cost) {
+      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
       
@@ -1587,7 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const interpretation = await interpretImportantDate(interpretationInput, locale);
       
       // Deduct energy and log usage
-      await storage.updateUser(userId, { energy: user.energy - cost });
+      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
       await storage.createUsageLog({ userId, feature: "important_date_detail", cost });
       
       // Update unlock record with interpretation
@@ -1768,7 +1768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              energy: user.energy + payment.energyAmount,
+              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
             });
             console.log('[TELEGRAM_WEBHOOK] Energy credited:', payment.energyAmount, 'to user:', payment.userId);
           }
@@ -1851,7 +1851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(userId);
           if (user && payment.energyAmount) {
             await storage.updateUser(userId, {
-              energy: user.energy + payment.energyAmount,
+              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
             });
             creditedEnergy += payment.energyAmount;
           }
@@ -2066,7 +2066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(userId);
         if (user) {
           await storage.updateUser(userId, {
-            energy: user.energy + payment.energyAmount,
+            purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
           });
           console.log('[TON_CONFIRM] Energy credited:', payment.energyAmount, 'to user:', userId);
         }
@@ -2142,7 +2142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const validated = updateEnergySchema.parse(req.body);
       
-      await storage.updateUserEnergy(userId, validated.energy);
+      // Set purchased energy to the specified amount (admin override)
+      await storage.updateUser(userId, { purchasedEnergy: validated.energy });
       res.json({ ok: true });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -2240,7 +2241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(payment.userId);
         if (user) {
           await storage.updateUser(payment.userId, {
-            energy: user.energy + payment.energyAmount,
+            purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
           });
         }
       } else if (payment.kind === "subscription" && payment.tier) {
@@ -2277,7 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.getUser(payment.userId);
         if (user) {
           await storage.updateUser(payment.userId, {
-            energy: user.energy + subscriptionEnergy,
+            purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
           });
         }
       }
@@ -2440,7 +2441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              energy: user.energy + payment.energyAmount,
+              purchasedEnergy: user.purchasedEnergy + payment.energyAmount,
             });
             console.log(`[Telegram Webhook] Credited ${payment.energyAmount} energy to user ${payment.userId}`);
           }
@@ -2473,7 +2474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUser(payment.userId);
           if (user) {
             await storage.updateUser(payment.userId, {
-              energy: user.energy + subscriptionEnergy,
+              purchasedEnergy: user.purchasedEnergy + subscriptionEnergy,
             });
           }
 

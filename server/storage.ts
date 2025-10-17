@@ -108,7 +108,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getAllPayments(): Promise<Payment[]>;
   getAllSubscriptions(): Promise<Subscription[]>;
-  updateUserEnergy(userId: string, energy: number): Promise<User | undefined>;
+  addPurchasedEnergy(userId: string, amount: number): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -477,13 +477,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(subscriptions.createdAt));
   }
 
-  async updateUserEnergy(userId: string, energy: number): Promise<User | undefined> {
-    const [user] = await db
+  async addPurchasedEnergy(userId: string, amount: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const [updated] = await db
       .update(users)
-      .set({ energy, updatedAt: new Date() })
+      .set({ 
+        purchasedEnergy: user.purchasedEnergy + amount, 
+        updatedAt: new Date() 
+      })
       .where(eq(users.id, userId))
       .returning();
-    return user || undefined;
+    return updated || undefined;
   }
 }
 
