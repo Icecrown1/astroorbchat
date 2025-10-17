@@ -219,6 +219,11 @@ export default function MyNatalChart() {
 
     return (
       <div className="min-h-screen bg-background p-4 pb-20">
+        {/* Aura Background Effect - AstroOrb */}
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-gradient-aura opacity-35" />
+        </div>
+        
         <div className="container max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <Button
@@ -262,6 +267,11 @@ export default function MyNatalChart() {
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
+      {/* Aura Background Effect - AstroOrb */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-gradient-aura opacity-35" />
+      </div>
+      
       <div className="container max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
