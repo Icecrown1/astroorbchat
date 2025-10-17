@@ -96,3 +96,24 @@ Preferred communication style: Simple, everyday language.
 - **API**: `/api/energy` returns combined energy `freeEnergy + purchasedEnergy`
 
 **Files**: `shared/schema.ts`, `server/lib/energy.ts`, `server/routes.ts`, `server/storage.ts`
+
+## Recent Features
+
+### Referral Notification System (Added - Oct 17, 2025)
+**Feature**: Users now receive visual notifications when someone joins via their referral link and they earn rewards.
+
+**Implementation**:
+- **Database**: Added `referralRewards` table to track referral history with `referrerId`, `referredUserId`, `rewardType` (signup/subscription), `energyAmount`, and `createdAt`
+- **Referral System**: Updated `applyReferralBonus()` and `handleSubscriptionReferralBonus()` to:
+  - Credit rewards to `purchasedEnergy` (preserving dual-field energy system)
+  - Create `referralReward` record for each reward event
+- **API Enhancement**: `/api/referral/code` now returns:
+  - Full list of referrals with user names, reward types, amounts, and timestamps
+  - Aggregate statistics: `totalReferrals` and `totalRewards`
+- **UI Updates**:
+  - **Referral Page**: Displays referral history with statistics showing total referrals and total rewards earned
+  - **Dashboard**: Shows notification badge (!) on referral button when new referrals are detected
+  - **Notification Logic**: Uses localStorage to track `lastViewedReferrals` timestamp; badge appears when referrals exist newer than last view
+- **User Flow**: When user visits referral page, localStorage is updated, clearing the notification badge
+
+**Files**: `shared/schema.ts`, `server/lib/referral.ts`, `server/routes.ts`, `server/storage.ts`, `client/src/pages/Referral.tsx`, `client/src/pages/Dashboard.tsx`
