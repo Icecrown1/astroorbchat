@@ -71,7 +71,7 @@ const PLANET_SYMBOLS: Record<string, string> = {
   'South Node': '☋'
 };
 
-// Цветовая тема карты
+// Цветовая тема карты - AstroOrb Palette
 const THEME_COLORS = {
   // Пастельные оттенки для секторов зодиака (по 12 знакам)
   zodiacSectors: [
@@ -88,19 +88,19 @@ const THEME_COLORS = {
     '#e2e0f0', // Водолей - серо-лиловый
     '#dfeaf2'  // Рыбы - небесный
   ],
-  zodiacSymbol: '#b87333',      // Бронзовый для символов знаков
-  planetSymbol: '#9333ea',      // Фиолетовый для планет
+  zodiacSymbol: '#D4A642',      // Solar Gold для символов знаков
+  planetSymbol: '#D4A642',      // Solar Gold для планет
   border: 'rgba(0, 0, 0, 0.25)',
-  centerGradientStart: '#f5e0b0',
-  centerGradientEnd: 'rgba(245, 224, 176, 0)'
+  centerGradientStart: '#D4A642', // Solar Gold центр
+  centerGradientEnd: 'rgba(212, 166, 66, 0)' // Solar Gold fade
 };
 
 const ASPECT_COLORS: Record<string, string> = {
-  conjunction: '#9333ea', // primary
-  sextile: '#06b6d4', // cyan
+  conjunction: '#D4A642', // Solar Gold
+  sextile: '#9BC3E3', // Iridescent Blue
   square: '#ef4444', // red
   trine: '#10b981', // green
-  opposition: '#f59e0b', // amber
+  opposition: '#9C6B1F', // Deep Amber
 };
 
 export function ChartCanvas({ planets, aspects, angles, houses, className, onPlanetClick }: ChartCanvasProps) {
