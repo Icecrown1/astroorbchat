@@ -3,11 +3,31 @@ import { calculateNatalChartPython, type NatalChartResult } from "./pythonNatal"
 import { getAstrologyInterpretation } from "./openai";
 import { geocodeCityWithFallback } from "./geocoding";
 import type { User, NatalChart } from "@shared/schema";
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function getTimezoneOffset(tz: string, year: number, month: number, day: number): number {
+  // Create a date in the specified timezone
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} 12:00:00`;
+  const tzDate = dayjs.tz(dateStr, tz);
+  const utcDate = dayjs.utc(dateStr);
+  
+  // Return offset in minutes
+  return tzDate.utcOffset();
+}
 
 export async function computeNatalFromUser(user: User, locale: string = 'ru'): Promise<NatalChartResult & { interpretation: string }> {
-  const birthDate = new Date(user.birthdayDate);
+  // Parse birthday date safely (extract year/month/day from string directly to avoid timezone issues)
+  const birthdayStr = typeof user.birthdayDate === 'string' ? user.birthdayDate : user.birthdayDate.toISOString();
+  const [datePart] = birthdayStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  
   const birthTimeStr = user.birthTime || "12:00";
-  const [hours, minutes] = birthTimeStr.split(":").map(Number);
+  const [localHours, localMinutes] = birthTimeStr.split(":").map(Number);
   
   console.log('[NATAL SERVICE] Computing natal chart for user:', {
     userId: user.id,
@@ -15,7 +35,9 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
     birthdayDate: user.birthdayDate,
     birthTime: user.birthTime,
     birthPlace: user.birthPlace,
-    timezone: user.timezone
+    timezone: user.timezone,
+    parsedDate: { year, month, day },
+    localTime: { hours: localHours, minutes: localMinutes }
   });
   
   // Geocode birth city to get coordinates
@@ -23,16 +45,28 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
   
   console.log('[NATAL SERVICE] Geocoded coordinates:', coords);
   
+  // Convert local time to UTC for Swiss Ephemeris
+  const userTimezone = user.timezone || 'UTC';
+  
+  // Create datetime in user's timezone
+  const localDateTimeStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(localHours).padStart(2, '0')}:${String(localMinutes).padStart(2, '0')}:00`;
+  const localDateTime = dayjs.tz(localDateTimeStr, userTimezone);
+  
+  // Convert to UTC
+  const utcDateTime = localDateTime.utc();
+  
   const pythonInput = {
-    year: birthDate.getFullYear(),
-    month: birthDate.getMonth() + 1,
-    day: birthDate.getDate(),
-    hour: hours,
-    minute: minutes,
+    year: utcDateTime.year(),
+    month: utcDateTime.month() + 1, // dayjs months are 0-indexed
+    day: utcDateTime.date(),
+    hour: utcDateTime.hour(),
+    minute: utcDateTime.minute(),
     latitude: coords.lat,
     longitude: coords.lon,
   };
   
+  console.log('[NATAL SERVICE] Local time:', localDateTime.format('YYYY-MM-DD HH:mm:ss'), userTimezone);
+  console.log('[NATAL SERVICE] UTC time:', utcDateTime.format('YYYY-MM-DD HH:mm:ss'));
   console.log('[NATAL SERVICE] Sending to Python:', pythonInput);
   
   const pythonChart = await calculateNatalChartPython(pythonInput);
