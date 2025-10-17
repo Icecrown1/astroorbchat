@@ -250,6 +250,8 @@ export default function GuestNatalChartView() {
               <ChartCanvas
                 planets={chartData.planets}
                 aspects={chartData.aspects || []}
+                angles={chartData.angles}
+                houses={chartData.houses}
                 onPlanetClick={setSelectedPlanet}
               />
             </div>
