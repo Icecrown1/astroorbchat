@@ -97,6 +97,25 @@ Preferred communication style: Simple, everyday language.
 
 **Files**: `shared/schema.ts`, `server/lib/energy.ts`, `server/routes.ts`, `server/storage.ts`
 
+### Geocoding Implementation - Accurate Ascendant Calculations (Fixed - Oct 17, 2025)
+**Problem**: ALL natal charts used hardcoded Moscow coordinates (55.7558°N, 37.6173°E) for Ascendant calculation, causing incorrect results for users in other cities. User birthPlace was stored as text but never geocoded.
+
+**Solution**: Implemented comprehensive geocoding system:
+- **Local Cities Database**: Created `server/lib/cities.ts` with 150+ cities (Russia, CIS, Europe, Asia, Americas, Australia) and coordinates
+- **Geocoding Utility**: Created `server/lib/geocoding.ts` with two-tier system:
+  - Primary: Local database search (instant, no API calls)
+  - Fallback: Nominatim API (OpenStreetMap) for cities not in database
+  - Moscow fallback only if city not found anywhere
+- **Implementation**: Updated all natal chart calculation endpoints:
+  - `/api/natal/external` - external natal charts
+  - `/api/natal/recalculate` - deprecated endpoint
+  - `/api/astrology/solar` - solar return calculations
+  - `/api/astrology/compatibility` - compatibility charts (both user & partner)
+  - `server/lib/natalService.ts` - core natal computation function
+- **Result**: Now ALL users get accurate Ascendant, houses, and angles based on their actual birth location
+
+**Files**: `server/lib/cities.ts`, `server/lib/geocoding.ts`, `server/routes.ts`, `server/lib/natalService.ts`
+
 ## Recent Features
 
 ### Referral Notification System (Added - Oct 17, 2025)
