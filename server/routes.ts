@@ -80,9 +80,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/tg-login", handleTelegramLoginWidget);
 
   app.post("/api/auth/test", async (req, res) => {
-    // STRICT: Only allow when explicitly enabled via ALLOW_TEST_AUTH flag
-    // This prevents accidental usage in staging/production even if NODE_ENV is misconfigured
-    const isTestAuthAllowed = process.env.ALLOW_TEST_AUTH === 'true';
+    // Allow in development or when explicitly enabled via ALLOW_TEST_AUTH flag
+    const isTestAuthAllowed = process.env.NODE_ENV === 'development' || process.env.ALLOW_TEST_AUTH === 'true';
     
     if (!isTestAuthAllowed) {
       console.log('=== /api/auth/test BLOCKED ===');
