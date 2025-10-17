@@ -51,8 +51,8 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Sun"}</title>
-          <circle cx="32" cy="32" r="16" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <circle cx="32" cy="32" r="4" fill={fill}/>
+          <circle cx="32" cy="32" r="14" fill="none" stroke={fill} strokeWidth="3"/>
+          <circle cx="32" cy="32" r="5" fill={fill}/>
         </svg>
       );
 
@@ -61,8 +61,8 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Moon"}</title>
-          <path d="M32 16 A16 16 0 1 0 32 48 A12 12 0 1 1 32 16 Z" 
-                fill="none" stroke={fill} strokeWidth="2.5"/>
+          <path d="M32 16 A16 16 0 1 0 32 48 A11 11 0 1 1 32 16 Z" 
+                fill="none" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -71,10 +71,10 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Mercury"}</title>
-          <circle cx="32" cy="30" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <path d="M24 20 Q32 14 40 20" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="32" y1="38" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
-          <line x1="28" y1="44" x2="36" y2="44" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="32" cy="30" r="7" fill="none" stroke={fill} strokeWidth="3"/>
+          <path d="M25 22 Q32 16 39 22" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="32" y1="37" x2="32" y2="48" stroke={fill} strokeWidth="3"/>
+          <line x1="27" y1="44" x2="37" y2="44" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -83,9 +83,9 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Venus"}</title>
-          <circle cx="32" cy="24" r="10" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="32" y1="34" x2="32" y2="50" stroke={fill} strokeWidth="2.5"/>
-          <line x1="24" y1="42" x2="40" y2="42" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="32" cy="24" r="9" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="32" y1="33" x2="32" y2="48" stroke={fill} strokeWidth="3"/>
+          <line x1="25" y1="42" x2="39" y2="42" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -94,10 +94,10 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Mars"}</title>
-          <circle cx="28" cy="36" r="10" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="36" y1="28" x2="48" y2="16" stroke={fill} strokeWidth="2.5"/>
-          <line x1="48" y1="16" x2="48" y2="22" stroke={fill} strokeWidth="2.5"/>
-          <line x1="48" y1="16" x2="42" y2="16" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="28" cy="36" r="9" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="35" y1="29" x2="47" y2="17" stroke={fill} strokeWidth="3"/>
+          <line x1="47" y1="17" x2="47" y2="24" stroke={fill} strokeWidth="3"/>
+          <line x1="47" y1="17" x2="40" y2="17" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -106,9 +106,9 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Jupiter"}</title>
-          <line x1="20" y1="16" x2="20" y2="48" stroke={fill} strokeWidth="2.5"/>
-          <path d="M20 28 Q32 20 44 28" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="28" y1="36" x2="36" y2="36" stroke={fill} strokeWidth="2.5"/>
+          <line x1="22" y1="18" x2="22" y2="46" stroke={fill} strokeWidth="3"/>
+          <path d="M22 30 Q32 22 42 30" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="30" y1="37" x2="38" y2="37" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -117,9 +117,9 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Saturn"}</title>
-          <line x1="32" y1="16" x2="32" y2="40" stroke={fill} strokeWidth="2.5"/>
-          <line x1="20" y1="28" x2="44" y2="28" stroke={fill} strokeWidth="2.5"/>
-          <path d="M16 48 Q24 38 32 40" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="18" x2="32" y2="38" stroke={fill} strokeWidth="3"/>
+          <line x1="22" y1="28" x2="42" y2="28" stroke={fill} strokeWidth="3"/>
+          <path d="M18 46 Q26 38 32 40" fill="none" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -128,10 +128,10 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Uranus"}</title>
-          <circle cx="32" cy="36" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="24" y1="16" x2="24" y2="36" stroke={fill} strokeWidth="2.5"/>
-          <line x1="40" y1="16" x2="40" y2="36" stroke={fill} strokeWidth="2.5"/>
-          <circle cx="32" cy="16" r="3" fill={fill}/>
+          <circle cx="32" cy="36" r="7" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="25" y1="18" x2="25" y2="36" stroke={fill} strokeWidth="3"/>
+          <line x1="39" y1="18" x2="39" y2="36" stroke={fill} strokeWidth="3"/>
+          <circle cx="32" cy="18" r="4" fill={fill}/>
         </svg>
       );
 
@@ -140,10 +140,10 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Neptune"}</title>
-          <line x1="32" y1="18" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
-          <line x1="20" y1="18" x2="44" y2="18" stroke={fill} strokeWidth="2.5"/>
-          <path d="M24 18 Q24 32 20 40" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <path d="M40 18 Q40 32 44 40" fill="none" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="20" x2="32" y2="46" stroke={fill} strokeWidth="3"/>
+          <line x1="22" y1="20" x2="42" y2="20" stroke={fill} strokeWidth="3"/>
+          <path d="M26 20 Q26 32 22 40" fill="none" stroke={fill} strokeWidth="3"/>
+          <path d="M38 20 Q38 32 42 40" fill="none" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -152,33 +152,33 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Pluto"}</title>
-          <circle cx="32" cy="22" r="8" fill="none" stroke={fill} strokeWidth="2.5"/>
-          <line x1="24" y1="22" x2="24" y2="48" stroke={fill} strokeWidth="2.5"/>
-          <line x1="18" y1="38" x2="38" y2="38" stroke={fill} strokeWidth="2.5"/>
+          <circle cx="32" cy="24" r="7" fill="none" stroke={fill} strokeWidth="3"/>
+          <line x1="25" y1="24" x2="25" y2="46" stroke={fill} strokeWidth="3"/>
+          <line x1="20" y1="38" x2="36" y2="38" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
     case "North Node":
-      // Ω - Horseshoe shape (upward)
+      // ☊ - Rahu (Horseshoe shape upward)
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
-          <title>{title ?? "North Node"}</title>
-          <path d="M20 40 Q20 20 32 20 Q44 20 44 40" 
-                fill="none" stroke={fill} strokeWidth="2.5" strokeLinecap="round"/>
-          <circle cx="20" cy="40" r="3" fill={fill}/>
-          <circle cx="44" cy="40" r="3" fill={fill}/>
+          <title>{title ?? "Rahu"}</title>
+          <path d="M22 42 Q22 22 32 22 Q42 22 42 42" 
+                fill="none" stroke={fill} strokeWidth="3" strokeLinecap="round"/>
+          <circle cx="22" cy="42" r="4" fill={fill}/>
+          <circle cx="42" cy="42" r="4" fill={fill}/>
         </svg>
       );
 
     case "South Node":
-      // Ω inverted - Horseshoe shape (downward)
+      // ☋ - Ketu (Horseshoe shape downward)
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
-          <title>{title ?? "South Node"}</title>
-          <path d="M20 24 Q20 44 32 44 Q44 44 44 24" 
-                fill="none" stroke={fill} strokeWidth="2.5" strokeLinecap="round"/>
-          <circle cx="20" cy="24" r="3" fill={fill}/>
-          <circle cx="44" cy="24" r="3" fill={fill}/>
+          <title>{title ?? "Ketu"}</title>
+          <path d="M22 22 Q22 42 32 42 Q42 42 42 22" 
+                fill="none" stroke={fill} strokeWidth="3" strokeLinecap="round"/>
+          <circle cx="22" cy="22" r="4" fill={fill}/>
+          <circle cx="42" cy="22" r="4" fill={fill}/>
         </svg>
       );
 
@@ -187,9 +187,9 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Ascendant"}</title>
-          <line x1="16" y1="32" x2="48" y2="32" stroke={fill} strokeWidth="2.5"/>
-          <line x1="48" y1="32" x2="42" y2="26" stroke={fill} strokeWidth="2.5"/>
-          <line x1="48" y1="32" x2="42" y2="38" stroke={fill} strokeWidth="2.5"/>
+          <line x1="18" y1="32" x2="46" y2="32" stroke={fill} strokeWidth="3"/>
+          <line x1="46" y1="32" x2="40" y2="26" stroke={fill} strokeWidth="3"/>
+          <line x1="46" y1="32" x2="40" y2="38" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
@@ -198,9 +198,9 @@ export default function PlanetIcon({
       return (
         <svg {...common} className={`${className ?? ""} ${animClass}`}>
           <title>{title ?? "Midheaven"}</title>
-          <line x1="32" y1="16" x2="32" y2="48" stroke={fill} strokeWidth="2.5"/>
-          <line x1="32" y1="16" x2="26" y2="22" stroke={fill} strokeWidth="2.5"/>
-          <line x1="32" y1="16" x2="38" y2="22" stroke={fill} strokeWidth="2.5"/>
+          <line x1="32" y1="18" x2="32" y2="46" stroke={fill} strokeWidth="3"/>
+          <line x1="32" y1="18" x2="26" y2="24" stroke={fill} strokeWidth="3"/>
+          <line x1="32" y1="18" x2="38" y2="24" stroke={fill} strokeWidth="3"/>
         </svg>
       );
 
