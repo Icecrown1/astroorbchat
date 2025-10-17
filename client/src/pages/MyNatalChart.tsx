@@ -102,9 +102,10 @@ export default function MyNatalChart() {
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
   const [expandedPlanet, setExpandedPlanet] = useState<string | null>(null);
 
-  // Load user's OWN natal chart from cache
+  // Load user's OWN natal chart from cache with locale-specific interpretations
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
-    queryKey: [`/api/natal/me?locale=${locale}`],
+    queryKey: ['/api/natal/me', locale], // Include locale for proper caching of interpretations
+    staleTime: 1000 * 60 * 60, // 1 hour - reduce recalculations while keeping data fresh
     queryFn: async () => {
       // Get auth token from localStorage
       const authData = localStorage.getItem('astro-orb-auth');
@@ -145,7 +146,7 @@ export default function MyNatalChart() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] }); // Invalidate all locales
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Карта создана!' : 'Chart created!',
@@ -168,7 +169,7 @@ export default function MyNatalChart() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/natal/me?locale=${locale}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] }); // Invalidate all locales
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Карта пересчитана' : 'Chart recalculated',
