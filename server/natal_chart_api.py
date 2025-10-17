@@ -67,13 +67,25 @@ def calculate_natal_chart(birth_data):
     longitude = birth_data['longitude']
     house_system = birth_data.get('house_system', 'Placidus')
     
+    # ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ
+    print(f"[NATAL CALC] INPUT DATA:", file=sys.stderr)
+    print(f"  Date: {year}-{month:02d}-{day:02d}", file=sys.stderr)
+    print(f"  Time: {hour:02d}:{minute:02d}", file=sys.stderr)
+    print(f"  Location: {latitude}°N, {longitude}°E", file=sys.stderr)
+    print(f"  House system: {house_system}", file=sys.stderr)
+    
     # Преобразуем в десятичные часы
     decimal_hour = hour + minute / 60.0
+    print(f"  Decimal hour: {decimal_hour}", file=sys.stderr)
     
     # Юлианский день
     jd_ut = swe.julday(year, month, day, decimal_hour, swe.GREG_CAL)
     delta_t = swe.deltat(jd_ut)
     jd_tt = jd_ut + delta_t / 86400.0
+    
+    print(f"  Julian Day (UT): {jd_ut}", file=sys.stderr)
+    print(f"  Delta T: {delta_t} sec", file=sys.stderr)
+    print(f"  Julian Day (TT): {jd_tt}", file=sys.stderr)
     
     # Рассчитываем позиции планет
     planets_data = {}
@@ -116,6 +128,10 @@ def calculate_natal_chart(birth_data):
     # Рассчитываем дома и углы
     house_code = HOUSE_SYSTEMS.get(house_system, b'P')
     cusps, ascmc = swe.houses(jd_tt, latitude, longitude, house_code)
+    
+    print(f"[NATAL CALC] HOUSES & ANGLES:", file=sys.stderr)
+    print(f"  Ascendant: {ascmc[0]:.4f}° = {get_zodiac_sign(ascmc[0])} {ascmc[0] % 30:.2f}°", file=sys.stderr)
+    print(f"  MC: {ascmc[1]:.4f}° = {get_zodiac_sign(ascmc[1])} {ascmc[1] % 30:.2f}°", file=sys.stderr)
     
     angles = {
         'Ascendant': {

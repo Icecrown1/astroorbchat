@@ -9,10 +9,21 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
   const birthTimeStr = user.birthTime || "12:00";
   const [hours, minutes] = birthTimeStr.split(":").map(Number);
   
+  console.log('[NATAL SERVICE] Computing natal chart for user:', {
+    userId: user.id,
+    name: user.name,
+    birthdayDate: user.birthdayDate,
+    birthTime: user.birthTime,
+    birthPlace: user.birthPlace,
+    timezone: user.timezone
+  });
+  
   // Geocode birth city to get coordinates
   const coords = await geocodeCityWithFallback(user.birthPlace);
   
-  const pythonChart = await calculateNatalChartPython({
+  console.log('[NATAL SERVICE] Geocoded coordinates:', coords);
+  
+  const pythonInput = {
     year: birthDate.getFullYear(),
     month: birthDate.getMonth() + 1,
     day: birthDate.getDate(),
@@ -20,7 +31,11 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
     minute: minutes,
     latitude: coords.lat,
     longitude: coords.lon,
-  });
+  };
+  
+  console.log('[NATAL SERVICE] Sending to Python:', pythonInput);
+  
+  const pythonChart = await calculateNatalChartPython(pythonInput);
   
   // Generate AI interpretation
   const interpretation = await getAstrologyInterpretation(
