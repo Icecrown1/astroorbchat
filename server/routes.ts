@@ -353,16 +353,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const data = externalNatalSchema.parse(req.body);
       
-      await checkAndResetEnergy(storage, userId);
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ ok: false, error: "User not found" });
+      // Deduct energy first (will check and reset if needed)
+      const deductResult = await deductEnergy(storage, userId, "natal_external");
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
       }
       
-      const cost = ENERGY_COSTS.natal_external;
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
       }
       
       const birthDate = new Date(data.birthdayDate);
@@ -405,9 +404,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timezone: data.timezone,
         data: natalData,
       });
-      
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: "natal_external", cost });
       
       res.json({ ok: true, data: externalNatal });
     } catch (error: any) {
