@@ -7,7 +7,7 @@ import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram"
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
-import { getTonPrice, getUSDTPrice, convertUSDToTON, convertUSDToCrypto, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
+import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
@@ -1947,7 +1947,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     tier: z.enum(["standard", "pro"]).optional(),
     energyAmount: z.number().optional(),
     amountUSD: z.number(),
-    currency: z.enum(["TON", "USDT"]).default("TON"),
     userWalletAddress: z.string().optional(), // TON wallet address of sender
   });
 
@@ -1970,10 +1969,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get price for selected currency
-      const currency = validated.currency || 'TON';
-      const cryptoPrice = currency === 'USDT' ? await getUSDTPrice() : await getTonPrice();
-      const amountCrypto = convertUSDToCrypto(validated.amountUSD, currency, cryptoPrice);
+      // Get TON price and convert USD to TON
+      const tonPrice = await getTonPrice();
+      const amountTON = convertUSDToTON(validated.amountUSD, tonPrice);
 
       // Normalize user wallet address to raw format (0:...) for consistent comparison
       const normalizedUserAddress = validated.userWalletAddress 
@@ -1981,16 +1979,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : null;
 
       console.log('[TON_CREATE] Payment details:', {
-        currency,
-        cryptoPrice,
+        tonPrice,
         amountUSD: validated.amountUSD,
-        amountCrypto,
+        amountTON,
         userAddress: normalizedUserAddress
       });
-
-      // For USDT, amountTON stores the amount in smallest units (6 decimals)
-      // For TON, it's in nanoTON (9 decimals)
-      const decimals = currency === 'USDT' ? 1_000_000 : 1_000_000_000;
       
       const payment = await storage.createPayment({
         userId,
@@ -1998,8 +1991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tier: validated.tier || null,
         energyAmount: validated.energyAmount || null,
         amountUSD: validated.amountUSD.toString(),
-        amountTON: (parseFloat(amountCrypto) / decimals).toString(),
-        currency,
+        amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
         txHash: `pending_${Date.now()}`,
         status: "pending",
         userWalletAddress: normalizedUserAddress,
@@ -2010,8 +2002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           paymentId: payment.id,
           walletAddress: process.env.TON_WALLET_ADDRESS,
-          amountTON: amountCrypto, // Keep same name for compatibility
-          currency,
+          amountTON,
         },
       });
     } catch (error: any) {
@@ -2063,12 +2054,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .map(p => p.txHash)
       );
 
-      // Get currency and decimals
-      const currency = payment.currency || 'TON';
-      const decimals = currency === 'USDT' ? 1_000_000 : 1_000_000_000;
-      
-      // Convert amount to smallest units for comparison
-      const amountInSmallestUnits = (parseFloat(payment.amountTON || '0') * decimals).toFixed(0);
+      // Convert amount to nanoTON for comparison
+      const amountInNanoTON = (parseFloat(payment.amountTON || '0') * 1_000_000_000).toFixed(0);
 
       // Check if we have user's wallet address
       if (!payment.userWalletAddress) {
@@ -2081,14 +2068,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Search for transaction FROM user's wallet TO our wallet
       console.log('[TON_CONFIRM] Searching for transaction FROM user wallet TO our wallet');
-      console.log('[TON_CONFIRM] Currency:', currency);
       console.log('[TON_CONFIRM] User wallet address:', payment.userWalletAddress);
       console.log('[TON_CONFIRM] Our wallet address:', walletAddress);
-      console.log('[TON_CONFIRM] Expected amount:', amountInSmallestUnits, currency === 'USDT' ? 'micro-USDT' : 'nanoTON');
+      console.log('[TON_CONFIRM] Expected amount:', amountInNanoTON, 'nanoTON');
       const matchedTx = await findUserTransaction(
         payment.userWalletAddress,
         walletAddress,
-        amountInSmallestUnits,
+        amountInNanoTON,
         15, // Extended to 15 minutes
         usedTxHashes
       );

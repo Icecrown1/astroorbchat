@@ -1,0 +1,155 @@
+[BEGIN REPLIT PROMPT]
+
+Задача: Встроить в AstroOrb вычислительный модуль расчёта Асцендента (ASC) (+ MC) по твоему системному промту. Никаких заглушек. Полные файлы. Реализовать: парсинг входа, время → JD → GST/LST, наклон эклиптики, формулы ASC/MC, сидерика (айанамша), валидации, API-роут, автотесты с числовыми допусками, README.
+
+Контекст проекта
+	•	Backend: apps/api (Express + TS)
+	•	Тесты: Jest + Supertest
+	•	Структура астрологии: apps/api/src/astrology/*
+	•	БД не меняем.
+
+Что сделать
+
+1) Новый модуль расчётов
+
+Файл: apps/api/src/astrology/asc.ts — ПОЛНЫЙ
+
+Требования к реализации:
+	•	Валидация входа Zod:
+
+{
+  birth: {
+    date_iso: string (YYYY-MM-DD),
+    time_iso: string (HH:MM:SS),
+    tz_offset_minutes: number,
+    lat: number, // -90..+90
+    lon: number  // -180..+180 (нормализовать)
+  },
+  zodiac_type: "tropical" | "sidereal",
+  ayanamsha: string // если tropical → "none"
+}
+
+
+	•	Временная часть:
+	•	Собрать локальное время, вычесть tz_offset_minutes → UTC.
+	•	Посчитать Julian Date (TT≈UTC для наших нужд; допуск).
+	•	Звёздное время:
+	•	GMST по Meeus (достаточно точная формула):
+
+T = (JD_UTC - 2451545.0)/36525
+GMST_sec = 67310.54841 + (876600*3600 + 8640184.812866)*T + 0.093104*T^2 - 6.2e-6*T^3
+GMST_deg = normalize( GMST_sec / 240 )
+
+
+	•	LST = normalize( GMST_deg + lon_deg )
+
+	•	Наклон эклиптики (средний; IAU 2006 достаточно):
+
+ε = 23°26′21.448″ - 46.8150″*T - 0.00059″*T^2 + 0.001813″*T^3
+
+
+	•	Геометрия (в радианах) — строго формулы пользователя:
+
+λ_MC  = atan2( sin(θ)*cos(ε), cos(θ) )           → deg → normalize
+λ_ASC = atan2( -cos(θ), sin(θ)*cos(ε)+tan(φ)*sin(ε) ) → deg → normalize
+
+где θ=LST(rad), φ=lat(rad), ε=obliquity(rad).
+
+	•	Сидерический вариант:
+	•	Поддержать хотя бы Lahiri (остальные — выбросить 400 “AYANAMSHA_UNSUPPORTED”).
+	•	Реализация Lahiri: используем приближение (средняя прецессия) с якорем на J2000:
+
+ψ2000 = 23.85675°  // Lahiri at J2000.0
+rate  = 1.3962634° per century
+ψ = normalize( ψ2000 + rate*T + 0.000087*T*T )  // простая квадратика; точности <±0.1°
+
+
+	•	λ_ASC_sidereal = normalize( λ_ASC_tropical - ψ )
+
+	•	Представление:
+	•	Знак/градусы/минуты по выбранному зодиаку.
+	•	normalize_deg(x) в [0,360).
+	•	Notices:
+	•	|lat| ≥ 66 → пушить предупреждение.
+	•	если tz_offset_minutes отсутствует/NaN → ошибка 400; если время примерное (не передаём здесь флаг) — модуль оставляет массив пустым (этот флаг будет в другом уровне).
+	•	Возврат:
+
+{
+  asc_deg_tropical: number,
+  asc_deg_sidereal?: number,
+  asc_sign: string,     // по выбранному зодиаку
+  asc_dms: string,      // "Знак XX° YY′"
+  mc_deg_tropical: number,
+  notices: string[],
+  meta: {
+    zodiac_type: "tropical"|"sidereal",
+    ayanamsha_used?: string, // "Lahiri (ψ=xx.xxx°)"
+    obliquity_deg: number,
+    gst_deg: number,
+    lst_deg: number
+  }
+}
+
+
+
+2) API-роут
+
+Файл: apps/api/src/routes/astrology.ts — ДОБАВИТЬ эндпоинт (выдать ПОЛНЫЙ файл, если меняется структура):
+	•	POST /astrology/asc
+	•	Тело — как во входной схеме.
+	•	Вызывает computeAsc(data).
+	•	Возвращает JSON из модуля.
+	•	Ошибки 400 — с понятными сообщениями: BAD_INPUT, AYANAMSHA_UNSUPPORTED, TIME_FORMAT_INVALID, и т.п.
+
+3) Экспорт функции
+
+Файл: apps/api/src/astrology/index.ts — (если есть) экспортировать computeAsc.
+
+4) Тесты
+
+Файл: apps/api/src/tests/asc.spec.ts — ПОЛНЫЙ
+
+Тесты (с допусками, потому что GST/ε/ψ зависят от формул):
+	•	Тест 1 (тропик): вход из твоего примера
+Ожидаем:
+	•	asc_deg_tropical ≈ 239.0 ±0.8°
+	•	asc_sign = “Скорпион”
+	•	mc_deg_tropical ≈ 159.0 ±0.8°
+	•	meta.zodiac_type = "tropical"
+	•	Тест 2 (сидерика Lahiri):
+	•	asc_deg_sidereal = normalize( tropical - ψ ); проверить, что в разумных пределах.
+	•	meta.ayanamsha_used содержит "Lahiri (ψ=".
+	•	Тест 3 (валидация):
+	•	Плохой time_iso → 400 "TIME_FORMAT_INVALID".
+	•	Широта 70.0 → notices содержит предупреждение.
+	•	Тест 4 (нормализация):
+	•	Вход lon = -190 → не падает; LST в [0,360).
+
+5) README
+
+Файл: README.md — ДОБАВИТЬ раздел «Расчёт Асцендента (ASC)»
+	•	Кратко формулы (как в промте), вход/выход, пример запроса/ответа.
+	•	Указать: поддерживаем zodiac_type: tropical|sidereal, ayanamsha сейчас — Lahiri.
+	•	Предупреждение о высоких широтах и точности времени.
+
+6) Обновить index маршрутов (если нужно)
+
+Файл: apps/api/src/index.ts — Убедиться, что роут /astrology/asc доступен.
+
+Acceptance Criteria
+	•	POST /astrology/asc принимает JSON и возвращает корректные ASC/MC.
+	•	Тропический тест (пример) проходит в заданных допусках, знак верный.
+	•	Сидерический режим с Lahiri работает и возвращает asc_deg_sidereal + ayanamsha_used.
+	•	Валидации и предупреждения реализованы.
+	•	Код без TODO и заглушек; типы TS строгие.
+	•	Тесты Jest проходят.
+
+Вывести ПОЛНЫЙ список новых/изменённых файлов
+	•	apps/api/src/astrology/asc.ts
+	•	apps/api/src/astrology/index.ts (если есть)
+	•	apps/api/src/routes/astrology.ts
+	•	apps/api/src/index.ts (если менялся импорт роутов)
+	•	apps/api/src/tests/asc.spec.ts
+	•	README.md
+
+[END REPLIT PROMPT]

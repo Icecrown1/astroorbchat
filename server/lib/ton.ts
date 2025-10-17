@@ -1,8 +1,5 @@
 import { Address } from '@ton/core';
 
-// USDT Jetton contract address on TON blockchain
-export const USDT_CONTRACT_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
-
 /**
  * Normalizes any TON address to canonical raw format (0:...)
  * Accepts both user-friendly (EQ.../UQ...) and raw (0:...) formats
@@ -35,40 +32,9 @@ export async function getTonPrice(): Promise<number> {
   return parseFloat(process.env.TON_PRICE_FALLBACK_USD_PER_TON || '7.5');
 }
 
-export async function getUSDTPrice(): Promise<number> {
-  try {
-    // USDT is a stablecoin, should always be ~$1
-    // We can get the actual price from TON API
-    const response = await fetch('https://tonapi.io/v2/rates?tokens=usdt&currencies=usd');
-    const data = await response.json();
-    
-    if (data?.rates?.USDT?.prices?.USD) {
-      return data.rates.USDT.prices.USD;
-    }
-  } catch (error) {
-    console.error('Failed to fetch USDT price:', error);
-  }
-
-  // Fallback: USDT is pegged to $1
-  return 1.0;
-}
-
 export function convertUSDToTON(usdAmount: number, tonPriceUSD: number): string {
   const tonAmount = usdAmount / tonPriceUSD;
   return (tonAmount * 1_000_000_000).toFixed(0);
-}
-
-export function convertUSDToUSDT(usdAmount: number, usdtPriceUSD: number = 1.0): string {
-  const usdtAmount = usdAmount / usdtPriceUSD;
-  // USDT has 6 decimals on TON
-  return (usdtAmount * 1_000_000).toFixed(0);
-}
-
-export function convertUSDToCrypto(usdAmount: number, currency: 'TON' | 'USDT', cryptoPriceUSD: number): string {
-  if (currency === 'USDT') {
-    return convertUSDToUSDT(usdAmount, cryptoPriceUSD);
-  }
-  return convertUSDToTON(usdAmount, cryptoPriceUSD);
 }
 
 export async function verifyTonTransaction(
