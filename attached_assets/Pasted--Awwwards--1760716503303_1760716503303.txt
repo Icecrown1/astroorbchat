@@ -1,0 +1,260 @@
+Отвечу как ведущий продуктовый дизайнер мобильных интерфейсов (лауреат Awwwards) и системный архитектор дизайн-систем.
+
+Ниже — готовый промт для Replit AI: он внедрит твою палитру в AstroOrb как единый «источник истины» — CSS-переменные, токены TS, Tailwind-тему, градиентные пресеты и применение в ключевых компонентах (кнопки, иконки планет, карточки). Без плейсхолдеров, всё с конкретными значениями.
+
+⸻
+
+
+[BEGIN REPLIT PROMPT]
+
+Цель: интегрировать новую фирменную палитру и градиенты в AstroOrb. Ввести системные цветовые токены (CSS variables + TypeScript), обновить Tailwind тему, и применить их в кнопках, фоновых блоках и иконках планет. Никаких TODO и заглушек; отдать ПОЛНЫЕ файлы, где требуется.
+
+## Палитра (из ТЗ)
+
+--solar-gold:      #D4A642; /* основной акцент */
+--deep-amber:      #9C6B1F; /* тени/глубина солнца */
+--pearl-white:     #FAFAF8; /* фон */
+--iridescent-blue: #9BC3E3; /* отблески */
+--soft-rose:       #EAB9C3; /* спектральное свечение */
+--opal-violet:     #B2A4E0; /* дополнительный контраст */
+
+Градиенты:
+--grad-primary: linear-gradient(135deg, #D4A642, #EAB9C3, #B2A4E0);
+--grad-aura: radial-gradient(circle, #FAFAF8 10%, #9BC3E3 60%, transparent 100%);
+
+## 1) Глобальные CSS-переменные
+
+Файл: `apps/web/src/styles.css` — ДОБАВИТЬ/ОБНОВИТЬ блок в :root и тёмную схему.
+
+```css
+:root {
+  --solar-gold: #D4A642;
+  --deep-amber: #9C6B1F;
+  --pearl-white: #FAFAF8;
+  --iridescent-blue: #9BC3E3;
+  --soft-rose: #EAB9C3;
+  --opal-violet: #B2A4E0;
+
+  --grad-primary: linear-gradient(135deg, #D4A642, #EAB9C3, #B2A4E0);
+  --grad-aura: radial-gradient(circle, #FAFAF8 10%, #9BC3E3 60%, transparent 100%);
+
+  /* производные токены */
+  --text-primary: #1E1E1A;
+  --text-secondary: rgba(30,30,26,0.65);
+  --surface: #FFFFFF;
+  --surface-muted: #FAFAF8;
+  --border: rgba(0,0,0,0.08);
+  --focus-ring: rgba(212,166,66,0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #F5F4F1;
+    --text-secondary: rgba(245,244,241,0.7);
+    --surface: #151417;
+    --surface-muted: #1B1A1E;
+    --border: rgba(255,255,255,0.08);
+    --grad-primary: linear-gradient(135deg, #D4A642, #B68F3B, #9C6B1F);
+    --grad-aura: radial-gradient(circle, rgba(155,195,227,0.18) 0%, rgba(178,164,224,0.14) 40%, transparent 70%);
+  }
+}
+
+/* Базовые утилиты */
+.bg-surface { background: var(--surface); }
+.bg-surface-muted { background: var(--surface-muted); }
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.border-default { border-color: var(--border); }
+
+/* Кнопка с главным градиентом */
+.btn-gradient {
+  background: var(--grad-primary);
+  color: #1E1E1A;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(156,107,31,0.18);
+  transition: transform .06s ease, box-shadow .2s ease;
+}
+.btn-gradient:active { transform: translateY(1px) scale(.99); }
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--solar-gold);
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+/* Фокус и a11y */
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Аура/фон секции */
+.section-aura { background: var(--grad-aura); border-radius: 18px; }
+
+2) TS-токены темы
+
+Файл: apps/web/src/theme/tokens.ts — НОВЫЙ (ПОЛНЫЙ)
+
+export const Colors = {
+  solarGold: '#D4A642',
+  deepAmber: '#9C6B1F',
+  pearlWhite: '#FAFAF8',
+  iridescentBlue: '#9BC3E3',
+  softRose: '#EAB9C3',
+  opalViolet: '#B2A4E0',
+} as const;
+
+export const Gradients = {
+  primary: 'linear-gradient(135deg, #D4A642, #EAB9C3, #B2A4E0)',
+  aura: 'radial-gradient(circle, #FAFAF8 10%, #9BC3E3 60%, transparent 100%)',
+} as const;
+
+export type ThemeVariant = 'light' | 'dark';
+
+export const Theme = {
+  light: {
+    textPrimary: '#1E1E1A',
+    textSecondary: 'rgba(30,30,26,0.65)',
+    surface: '#FFFFFF',
+    surfaceMuted: '#FAFAF8',
+    border: 'rgba(0,0,0,0.08)',
+  },
+  dark: {
+    textPrimary: '#F5F4F1',
+    textSecondary: 'rgba(245,244,241,0.7)',
+    surface: '#151417',
+    surfaceMuted: '#1B1A1E',
+    border: 'rgba(255,255,255,0.08)',
+  }
+} as const;
+
+3) Tailwind конфиг
+
+Файл: apps/web/tailwind.config.js — ОБНОВИТЬ цвета и градиенты.
+
+module.exports = {
+  content: ["./index.html","./src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        solar:  { gold: "#D4A642", amber: "#9C6B1F" },
+        pearl:  { white: "#FAFAF8" },
+        iris:   { blue: "#9BC3E3" },
+        rose:   { soft: "#EAB9C3" },
+        opal:   { violet: "#B2A4E0" },
+        surface:{ DEFAULT: "var(--surface)", muted: "var(--surface-muted)" },
+        text:   { primary: "var(--text-primary)", secondary: "var(--text-secondary)" },
+        border: { DEFAULT: "var(--border)" }
+      },
+      borderRadius: { xl: "14px", '2xl': "18px" },
+      boxShadow: {
+        gold: "0 2px 10px rgba(156,107,31,0.18)"
+      },
+      backgroundImage: {
+        'grad-primary': 'var(--grad-primary)',
+        'grad-aura': 'var(--grad-aura)'
+      }
+    }
+  },
+  plugins: []
+}
+
+4) Обновить иконки планет под новую палитру
+
+Файл: apps/web/src/components/PlanetIcon.tsx — ИСПРАВИТЬ ПАЛИТРУ (файл целиком не переписывать, только заменить цвета):
+	•	fill: var(--solar-gold) вместо старых значений;
+	•	stroke: var(--deep-amber);
+	•	эффекты свечения/лучей — использовать rgba(212,166,66,0.55).
+
+Пример фрагмента (Sun):
+
+const fill = getComputedStyle(document.documentElement).getPropertyValue('--solar-gold').trim() || '#D4A642';
+const stroke = getComputedStyle(document.documentElement).getPropertyValue('--deep-amber').trim() || '#9C6B1F';
+...
+<radialGradient id="gSun" cx="50%" cy="50%" r="50%">
+  <stop offset="0%" stopColor="#ffe7a8" />
+  <stop offset="60%" stopColor={fill} />
+  <stop offset="100%" stopColor={stroke} />
+</radialGradient>
+
+5) Кнопки и карточки — применить токены
+
+Файл: apps/web/src/components/Button.tsx — НОВЫЙ (ПОЛНЫЙ)
+
+import React from 'react';
+
+type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'gradient' | 'outline';
+};
+export default function Button({ variant='gradient', className='', ...rest }: Props) {
+  if (variant === 'outline') {
+    return <button {...rest} className={`btn-outline ${className}`} />;
+  }
+  return <button {...rest} className={`btn-gradient ${className}`} />;
+}
+
+Файл: apps/web/src/components/Card.tsx — НОВЫЙ
+
+import React from 'react';
+export default function Card({ children }: {children: React.ReactNode}) {
+  return (
+    <div className="bg-surface border border-default rounded-2xl p-16 shadow-gold">
+      {children}
+    </div>
+  );
+}
+
+6) Применить на ключевых экранах
+
+Файл: apps/web/src/routes/BuyEnergy.tsx — ОБНОВИТЬ оформление кнопок:
+
+<Button onClick={handleStarsPay}>Оплатить Stars</Button>
+<Button variant="outline" onClick={handleTonPay}>Оплатить TON</Button>
+
+Файл: apps/web/src/routes/NatalChart.tsx — добавить аурный фон под «Положения планет» и «Важные даты»:
+
+<section className="section-aura p-12 mb-16">
+  <h3 className="text-primary font-semibold mb-8">Положения планет</h3>
+  {/* ... */}
+</section>
+
+7) Доступность/контраст
+	•	Для текста на градиентной кнопке использовать #1E1E1A (контраст ≥ 4.5 на среднем участке градиента).
+	•	Фокус-кольцо --focus-ring уже задано.
+	•	Иконки на бледном фоне усиливать обводкой var(--deep-amber).
+
+8) Документация
+
+Файл: README.md — ДОБАВИТЬ раздел «Цветовая система AstroOrb»:
+	•	Вставить все значения HEX/RGB.
+	•	Где использовать:
+	•	Solar Gold — акценты и иконки;
+	•	Deep Amber — тени/обводки/внутренние границы иконок;
+	•	Pearl White — фон;
+	•	Iridescent Blue/Soft Rose/Opal Violet — вспомогательные акценты, градиенты.
+	•	Примеры классов Tailwind: bg-grad-primary, bg-grad-aura, text-text-primary, bg-surface.
+
+9) Acceptance Criteria
+	•	Переменные палитры доступны через CSS и TS-токены.
+	•	Tailwind умеет bg-grad-primary и bg-grad-aura.
+	•	Кнопки «Оплатить Stars/TON» используют новую стилистику (градиент/outline).
+	•	Иконки планет перешли на solar-gold/deep-amber.
+	•	Секции «Положения планет» и «Важные даты» имеют фоновую «ауру».
+	•	A11y: видимый фокус, достаточный контраст.
+
+Вывести ПОЛНЫЙ список изменённых/новых файлов
+	•	apps/web/src/styles.css
+	•	apps/web/tailwind.config.js
+	•	apps/web/src/theme/tokens.ts
+	•	apps/web/src/components/PlanetIcon.tsx
+	•	apps/web/src/components/Button.tsx
+	•	apps/web/src/components/Card.tsx
+	•	apps/web/src/routes/BuyEnergy.tsx
+	•	apps/web/src/routes/NatalChart.tsx
+	•	README.md
+
+[END REPLIT PROMPT]
+
+---
+
+Критично как оппонент: палитра светлая — проверь контраст на Pearl White (#FAFAF8). Для мелкого текста держи цвет не светлее `#333`, а на градиенте — избегай белых надписей без тени. И добавь dark-scheme (я включил), чтобы Telegram в тёмной теме не «серел» интерфейс.
