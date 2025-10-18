@@ -147,3 +147,46 @@ Preferred communication style: Simple, everyday language.
 - **User Flow**: When user visits referral page, localStorage is updated, clearing the notification badge
 
 **Files**: `shared/schema.ts`, `server/lib/referral.ts`, `server/routes.ts`, `server/storage.ts`, `client/src/pages/Referral.tsx`, `client/src/pages/Dashboard.tsx`
+
+### Telegram Stars Admin Panel (Added - Oct 18, 2025)
+**Feature**: Admin panel for managing Telegram Stars revenue with proper pagination support for transaction history.
+
+**Critical Implementation Details**:
+- **Pagination**: Uses Telegram's **opaque string tokens** (not numeric offsets)
+  - `next_offset` is a string token returned by Telegram API
+  - First request omits offset parameter (undefined)
+  - Subsequent requests use exact token from previous response
+  - Loop terminates when `next_offset` is undefined/empty
+  - Safety limit: 100 pages (10,000 transactions)
+
+**Backend Components**:
+- **getStarTransactions()**: Fetches transactions with opaque token pagination
+  - Parameters: `offset?: string`, `limit: number`
+  - Returns: `{ ok, transactions, nextOffset?: string, error? }`
+  - First call: `offset = undefined` (omit from request body)
+  - Follow-up calls: `offset = <token from previous response>`
+- **getStarsBalance()**: Calculates total balance from ALL transactions
+  - Iterates through all pages using `next_offset` tokens
+  - Tracks: `totalIncoming` (from users), `totalOutgoing` (withdrawals)
+  - Returns accurate balance even with thousands of transactions
+
+**API Endpoints**:
+- `GET /api/admin/stars/balance`: Returns total Stars balance (requires admin rights)
+- `GET /api/admin/stars/transactions?offset=<token>&limit=50`: Returns paginated transactions with `nextOffset` for client-side pagination
+- **Security**: Protected by `requireAdmin` middleware checking `user.isAdmin` field
+
+**Frontend**:
+- **Admin.tsx**: Enhanced existing admin panel with Stars section
+  - Displays available/pending balance, total incoming/outgoing
+  - Transaction history table with pagination controls
+  - Detailed withdrawal instructions (BotFather → Fragment → TON wallet)
+  - Minimum withdrawal: 1000 Stars, 21-day hold period
+  - Conversion rate: $0.013/Star via Fragment
+
+**Withdrawal Flow**:
+1. Admin views balance in BotFather → Bot Settings → Balance
+2. Clicks "Withdraw" button → generates Fragment URL
+3. Opens Fragment URL → enters TON wallet address
+4. Stars automatically convert to TON at fixed rate
+
+**Files**: `server/lib/telegramStars.ts`, `server/routes.ts`, `client/src/pages/Admin.tsx`, `server/middleware/auth.ts`
