@@ -121,9 +121,9 @@ export function Loader({ className, size = 'md', withPhrases = false }: LoaderPr
   const [fadeIn, setFadeIn] = useState(true);
 
   const sizeClasses = {
-    sm: 'w-10 h-10',
-    md: 'w-20 h-20',
-    lg: 'w-28 h-28',
+    sm: 'w-12 h-12',
+    md: 'w-32 h-32',
+    lg: 'w-40 h-40',
   };
 
   useEffect(() => {
