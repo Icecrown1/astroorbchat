@@ -90,6 +90,7 @@ export default function Compatibility() {
           date: data.partnerDate,
           time: data.partnerTime || null,
           place: data.partnerPlace || null,
+          timezone: data.partnerTimezone || 'UTC',
         },
         relationshipType: data.relationshipType,
         guestChartId: selectedGuestId,
@@ -167,6 +168,7 @@ export default function Compatibility() {
                         form.setValue('partnerDate', formattedDate);
                         form.setValue('partnerTime', chart.birthTime || '');
                         form.setValue('partnerPlace', chart.birthPlace || '');
+                        form.setValue('partnerTimezone', chart.timezone || 'UTC');
                       }}
                       data-testid={`button-select-guest-${chart.id}`}
                     >
