@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, CreditCard, Check, Sparkles, Wallet } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, Star } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
@@ -33,6 +33,7 @@ const SUBSCRIPTION_TIERS = [
     tier: 'standard',
     name: 'Standard',
     price: 9,
+    starsPrice: 565,
     dailyEnergy: 100,
     features: ['100 energy orbs daily', 'All astrology features', 'Daily horoscope', 'Basic support'],
   },
@@ -40,6 +41,7 @@ const SUBSCRIPTION_TIERS = [
     tier: 'pro',
     name: 'Pro',
     price: 15,
+    starsPrice: 940,
     dailyEnergy: 250,
     features: ['250 energy orbs daily', 'All astrology features', 'Priority AI responses', 'Premium support', 'Advanced insights'],
     popular: true,
@@ -155,6 +157,70 @@ export default function Subscribe() {
       toast({
         title: t.common.error,
         description: error.message || 'Failed to activate',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const starsMutation = useMutation({
+    mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
+      const response = await apiRequest('POST', '/api/payments/stars/create', {
+        kind: 'subscription',
+        tier: tier.tier
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data, tier) => {
+      if (data.invoiceLink && WebApp.openInvoice) {
+        WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          if (status === 'paid') {
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            toast({
+              title: t.common.success,
+              description: `${tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}! ${tier.dailyEnergy} ${t.common.orbs}`,
+            });
+            navigate('/dashboard');
+          } else if (status === 'cancelled') {
+            toast({
+              title: locale === 'ru' ? 'Платёж отменён' : 'Payment cancelled',
+              description: locale === 'ru' 
+                ? 'Вы можете попробовать снова'
+                : 'You can try again',
+            });
+          } else if (status === 'failed') {
+            toast({
+              title: t.common.error,
+              description: locale === 'ru' 
+                ? 'Платёж не прошёл'
+                : 'Payment failed',
+              variant: 'destructive',
+            });
+          } else if (status === 'pending') {
+            toast({
+              title: locale === 'ru' ? 'Ожидание оплаты' : 'Awaiting payment',
+              description: locale === 'ru' 
+                ? 'Завершите оплату в Telegram'
+                : 'Complete payment in Telegram',
+            });
+          } else {
+            console.log('[Stars] Unknown invoice status:', status);
+          }
+        });
+      } else {
+        toast({
+          title: t.common.error,
+          description: locale === 'ru'
+            ? 'Не удалось открыть инвойс'
+            : 'Failed to open invoice',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
         variant: 'destructive',
       });
     },
@@ -314,7 +380,11 @@ export default function Subscribe() {
                     <span className="text-muted-foreground">{t.subscribe.perMonth}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    ≈ {getTonPrice(tier.price)} TON{t.subscribe.perMonth}
+                    ≈ {getTonPrice(tier.price)} TON
+                  </p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3 text-yellow-500" />
+                    {tier.starsPrice} Stars {t.subscribe.perMonth}
                   </p>
                 </div>
 
@@ -332,6 +402,28 @@ export default function Subscribe() {
                 </div>
 
                 <div className="space-y-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      starsMutation.mutate(tier);
+                    }}
+                    disabled={starsMutation.isPending || currentSubscription?.tier === tier.tier}
+                    data-testid={`button-subscribe-stars-${tier.tier}`}
+                  >
+                    {starsMutation.isPending ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.subscribe.subscribing}
+                      </>
+                    ) : (
+                      <>
+                        <Star className="w-4 h-4 mr-2 text-yellow-500" />
+                        {locale === 'ru' ? 'Оплатить Stars' : 'Pay with Stars'}
+                      </>
+                    )}
+                  </Button>
                   <Button
                     className="w-full"
                     variant="outline"
@@ -354,7 +446,7 @@ export default function Subscribe() {
                       }
                     }}
                     disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
-                    data-testid={`button-subscribe-${tier.tier}`}
+                    data-testid={`button-subscribe-ton-${tier.tier}`}
                   >
                     {mutation.isPending && selectedTier === tier.tier ? (
                       <>

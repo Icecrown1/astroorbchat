@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet, Star } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
@@ -218,6 +218,72 @@ export default function BuyEnergy() {
     },
   });
 
+  const starsMutation = useMutation({
+    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+      const response = await apiRequest('POST', '/api/payments/stars/create', {
+        kind: 'energy_pack',
+        pack: { energy: pack.amount }
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.invoiceLink && WebApp.openInvoice) {
+        WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          if (status === 'paid') {
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            toast({
+              title: t.common.success,
+              description: locale === 'ru' 
+                ? 'Энергия успешно начислена!'
+                : 'Energy credited successfully!',
+            });
+            navigate('/dashboard');
+          } else if (status === 'cancelled') {
+            toast({
+              title: locale === 'ru' ? 'Платёж отменён' : 'Payment cancelled',
+              description: locale === 'ru' 
+                ? 'Вы можете попробовать снова'
+                : 'You can try again',
+            });
+          } else if (status === 'failed') {
+            toast({
+              title: t.common.error,
+              description: locale === 'ru' 
+                ? 'Платёж не прошёл'
+                : 'Payment failed',
+              variant: 'destructive',
+            });
+          } else if (status === 'pending') {
+            toast({
+              title: locale === 'ru' ? 'Ожидание оплаты' : 'Awaiting payment',
+              description: locale === 'ru' 
+                ? 'Завершите оплату в Telegram'
+                : 'Complete payment in Telegram',
+            });
+          } else {
+            console.log('[Stars] Unknown invoice status:', status);
+          }
+        });
+      } else {
+        toast({
+          title: t.common.error,
+          description: locale === 'ru'
+            ? 'Не удалось открыть инвойс'
+            : 'Failed to open invoice',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     const data = pricesData as any;
     if (data?.ok && data.data?.tonRate) {
@@ -301,10 +367,37 @@ export default function BuyEnergy() {
                     <p className="text-sm text-muted-foreground">
                       ≈ {getTonPrice(pack.usdPrice)} TON
                     </p>
+                    <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                      <Star className="w-3 h-3 text-yellow-500" />
+                      {pack.starsPrice} Stars
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPack(pack.amount);
+                      starsMutation.mutate(pack);
+                    }}
+                    disabled={starsMutation.isPending && selectedPack === pack.amount}
+                    data-testid={`button-buy-stars-${pack.amount}`}
+                  >
+                    {starsMutation.isPending && selectedPack === pack.amount ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.buyEnergy.purchasing}
+                      </>
+                    ) : (
+                      <>
+                        <Star className="w-4 h-4 mr-2 text-yellow-500" />
+                        {locale === 'ru' ? 'Оплатить Stars' : 'Pay with Stars'}
+                      </>
+                    )}
+                  </Button>
                   <Button
                     className="w-full"
                     variant="outline"
@@ -362,8 +455,8 @@ export default function BuyEnergy() {
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' ? 
-              'Оплата через TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
-              'Pay with TON blockchain. Energy is added instantly after confirmation.'
+              'Оплата через Telegram Stars или TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
+              'Pay with Telegram Stars or TON blockchain. Energy is added instantly after confirmation.'
             }
           </p>
         </Card>
