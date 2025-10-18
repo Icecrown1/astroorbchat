@@ -1513,6 +1513,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, locale, user.gender);
       }
 
+      // Extract compatibility rating from AI response
+      let compatibilityRating: string | null = null;
+      let cleanedAnalysis = analysis;
+      
+      const ratingMatch = analysis.match(/RATING:\s*(\d+\.?\d*)/i);
+      if (ratingMatch) {
+        compatibilityRating = parseFloat(ratingMatch[1]).toFixed(2);
+        // Remove the rating line from the analysis text
+        cleanedAnalysis = analysis.replace(/RATING:\s*\d+\.?\d*\s*/i, '').trim();
+      }
+
       await storage.createCompatibilityReading({
         userId,
         partnerName: partner.name,
@@ -1520,7 +1531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         partnerDate: new Date(partner.date),
         relationshipType: relationshipType,
         guestChartId: finalGuestChartId || null,
-        analysis,
+        analysis: cleanedAnalysis,
+        compatibilityRating,
         isProfessional: professional,
         professionalInterpretation: professionalInterpretation as any,
         houseOverlays: houseOverlays as any,
@@ -1553,7 +1565,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ok: true,
         data: {
           partners: `${user.name} & ${partner.name}`,
-          analysis,
+          analysis: cleanedAnalysis,
+          compatibilityRating: compatibilityRating ? parseFloat(compatibilityRating) : null,
           professionalInterpretation,
           houseOverlays,
           strengths,
