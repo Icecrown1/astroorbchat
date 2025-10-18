@@ -1457,6 +1457,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sign: data.sign,
           position: data.longitude,
         })),
+        houses: person1ChartData.houses,
+        angles: person1ChartData.angles,
         aspects: [], // Aspects calculated by Python
       };
 
@@ -1466,6 +1468,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sign: data.sign,
           position: data.longitude,
         })),
+        houses: person2ChartData.houses,
+        angles: person2ChartData.angles,
         aspects: [],
       };
 
