@@ -26,6 +26,7 @@ interface GuestChart {
   birthdayDate: string;
   birthTime?: string | null;
   birthPlace?: string | null;
+  timezone?: string | null;
 }
 
 export function GuestChartForm() {
@@ -220,6 +221,7 @@ export function GuestChartForm() {
                     {new Date(chart.birthdayDate).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US')}
                     {chart.birthTime && ` • ${chart.birthTime}`}
                     {chart.birthPlace && ` • ${chart.birthPlace}`}
+                    {chart.timezone && ` • ${chart.timezone}`}
                   </p>
                 </div>
               </div>
