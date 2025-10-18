@@ -64,19 +64,24 @@ export default function Login() {
 
     // Define callback function
     window.onTelegramAuth = async (user: any) => {
+      console.log('[Telegram Widget] Callback triggered with user:', user);
       try {
+        console.log('[Telegram Widget] Sending request to /api/auth/tg-login');
         const response = await apiRequest("POST", "/api/auth/tg-login", user);
+        console.log('[Telegram Widget] Response received:', response);
         
         if (response?.ok && response?.data) {
           const { user: userData, token } = response.data;
           
+          console.log('[Telegram Widget] Login successful, redirecting to dashboard');
           // Save auth data to store (will persist to localStorage)
           setAuth(userData, token);
           
           // Redirect to dashboard
           setLocation("/dashboard");
         } else {
-          alert(`Login error: ${response?.error || "Unknown error"}`);
+          console.error('[Telegram Widget] Login failed:', response);
+          alert(`Login error: ${response?.error || "Unknown error"}\n\nDetails: ${JSON.stringify(response?.details || {})}`);
         }
       } catch (error: any) {
         console.error("Login error:", error);
