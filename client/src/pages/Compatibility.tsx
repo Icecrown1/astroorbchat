@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
 import { CompatibilityRating } from '@/components/CompatibilityRating';
-import { ArrowLeft, Heart, HeartCrack, UserPlus, Users } from 'lucide-react';
+import { CompatibilityArchive } from '@/components/CompatibilityArchive';
+import { ArrowLeft, Heart, HeartCrack, UserPlus, Users, Archive } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -41,6 +42,7 @@ export default function Compatibility() {
   const { t, locale } = useTranslation();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('new');
 
   const { data: guestCharts } = useQuery<{ ok: boolean; data: GuestChart[] }>({
     queryKey: ['/api/natal/external'],
@@ -123,6 +125,19 @@ export default function Compatibility() {
     },
   });
 
+  const handleViewReading = (reading: any) => {
+    setCompatibilityData({
+      partners: reading.partnerName,
+      analysis: reading.analysis,
+      compatibilityRating: reading.compatibilityRating ? parseFloat(reading.compatibilityRating) : null,
+      professionalInterpretation: reading.professionalInterpretation,
+      houseOverlays: reading.houseOverlays,
+      strengths: [],
+      challenges: [],
+    });
+    setActiveTab('new');
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
       <div className="container max-w-4xl mx-auto">
@@ -141,7 +156,20 @@ export default function Compatibility() {
           </div>
         </div>
 
-        {!compatibilityData && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="new" data-testid="tab-new-analysis">
+              <Heart className="w-4 h-4 mr-2" />
+              {locale === 'ru' ? 'Новый анализ' : 'New Analysis'}
+            </TabsTrigger>
+            <TabsTrigger value="archive" data-testid="tab-archive">
+              <Archive className="w-4 h-4 mr-2" />
+              {locale === 'ru' ? 'Архив' : 'Archive'}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="new">
+            {!compatibilityData && (
           <Card className="p-6">
             <div className="mb-6">
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-5/20 to-chart-2/20 mb-4">
@@ -415,6 +443,12 @@ export default function Compatibility() {
             </Button>
           </div>
         )}
+        </TabsContent>
+
+        <TabsContent value="archive">
+          <CompatibilityArchive onViewReading={handleViewReading} />
+        </TabsContent>
+      </Tabs>
       </div>
     </div>
   );
