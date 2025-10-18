@@ -1647,6 +1647,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/compatibility/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      // Auto-cleanup: delete compatibility readings older than 2 weeks
+      await storage.deleteOldCompatibilityReadings(userId);
+      
+      const readings = await storage.getCompatibilityReadingsByUserId(userId, limit);
+      res.json({ ok: true, data: readings });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/compatibility/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { id } = req.params;
+      
+      const reading = await storage.getCompatibilityReading(id);
+      if (!reading) {
+        return res.status(404).json({ ok: false, error: "Compatibility reading not found" });
+      }
+      
+      // Verify ownership
+      if (reading.userId !== userId) {
+        return res.status(403).json({ ok: false, error: "Forbidden" });
+      }
+      
+      res.json({ ok: true, data: reading });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/compatibility/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { id } = req.params;
+      
+      // Verify ownership before deleting
+      const reading = await storage.getCompatibilityReading(id);
+      if (!reading) {
+        return res.status(404).json({ ok: false, error: "Compatibility reading not found" });
+      }
+      
+      if (reading.userId !== userId) {
+        return res.status(403).json({ ok: false, error: "Forbidden" });
+      }
+      
+      await storage.deleteCompatibilityReading(id);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/astrology/horoscope/history", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
