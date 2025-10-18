@@ -2570,6 +2570,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Panel - Stars Revenue Management
+  app.get("/api/admin/stars/balance", requireAdmin, async (req, res) => {
+    try {
+      const { getStarsBalance } = await import('./lib/telegramStars');
+      const result = await getStarsBalance();
+      
+      if (!result.ok) {
+        return res.status(500).json({ ok: false, error: result.error });
+      }
+
+      res.json({
+        ok: true,
+        balance: result.balance,
+        totalIncoming: result.totalIncoming,
+        totalOutgoing: result.totalOutgoing,
+        transactionCount: result.transactionCount,
+        minimumWithdrawal: 1000,
+        conversionRate: 0.013, // USD per Star
+      });
+    } catch (error: any) {
+      console.error('[Admin] Stars balance error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/admin/stars/transactions", requireAdmin, async (req, res) => {
+    try {
+      const { getStarTransactions } = await import('./lib/telegramStars');
+      // offset is an opaque string token from Telegram, not a number
+      const offset = req.query.offset as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const result = await getStarTransactions(offset, limit);
+      
+      if (!result.ok) {
+        return res.status(500).json({ ok: false, error: result.error });
+      }
+
+      res.json({
+        ok: true,
+        transactions: result.transactions,
+        nextOffset: result.nextOffset,
+      });
+    } catch (error: any) {
+      console.error('[Admin] Stars transactions error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/.well-known/tonconnect-manifest.json", (req, res) => {
     res.json({
       url: process.env.SERVER_URL || "https://astro-orb.replit.app",

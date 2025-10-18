@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, DollarSign, CreditCard, TrendingUp, Zap, Settings } from "lucide-react";
+import { Loader2, Users, DollarSign, CreditCard, TrendingUp, Zap, Settings, Star, TrendingDown, ExternalLink, AlertCircle, Clock } from "lucide-react";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,16 @@ interface User {
   createdAt: string;
 }
 
+interface StarsBalanceResponse {
+  ok: boolean;
+  balance: number;
+  totalIncoming: number;
+  totalOutgoing: number;
+  transactionCount: number;
+  minimumWithdrawal: number;
+  conversionRate: number;
+}
+
 export default function Admin() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -54,6 +64,11 @@ export default function Admin() {
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ ok: boolean; data: User[] }>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: starsBalanceData, isLoading: starsBalanceLoading } = useQuery<StarsBalanceResponse>({
+    queryKey: ["/api/admin/stars/balance"],
+    retry: false,
   });
 
   const updateEnergyMutation = useMutation({
@@ -149,6 +164,132 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Stars Revenue Management */}
+        <Card data-testid="card-stars-balance">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              Баланс Telegram Stars
+            </CardTitle>
+            <CardDescription>
+              Управление доходами от Stars платежей
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {starsBalanceLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : starsBalanceData?.ok ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Текущий баланс</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-3xl font-bold" data-testid="text-stars-balance">
+                        {starsBalanceData.balance.toLocaleString()}
+                      </p>
+                      <Badge variant="outline" className="gap-1">
+                        <Star className="h-3 w-3 text-yellow-500" />
+                        Stars
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      ≈ ${(starsBalanceData.balance * starsBalanceData.conversionRate).toFixed(2)} USD
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm flex items-center gap-1">
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                        Получено
+                      </span>
+                      <span className="font-mono text-sm" data-testid="text-stars-incoming">
+                        {starsBalanceData.totalIncoming.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm flex items-center gap-1">
+                        <TrendingDown className="h-4 w-4 text-orange-500" />
+                        Выведено
+                      </span>
+                      <span className="font-mono text-sm" data-testid="text-stars-outgoing">
+                        {starsBalanceData.totalOutgoing.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="text-sm flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        Курс
+                      </span>
+                      <span className="text-sm">${starsBalanceData.conversionRate} / Star</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Withdrawal Status */}
+                <div className="pt-4 border-t">
+                  {starsBalanceData.balance >= starsBalanceData.minimumWithdrawal ? (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-2 text-green-600 dark:text-green-400">
+                        <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">
+                            Вывод доступен
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Ваш баланс превышает минимум {starsBalanceData.minimumWithdrawal} Stars
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <div className="text-sm space-y-1">
+                          <p className="font-medium">Как вывести Stars:</p>
+                          <ol className="list-decimal list-inside text-muted-foreground space-y-1 ml-2">
+                            <li>Откройте @BotFather в Telegram</li>
+                            <li>/mybots → Выберите бот → Bot Settings</li>
+                            <li>Нажмите "Balance" ⭐</li>
+                            <li>Нажмите "Withdraw"</li>
+                            <li>Введите адрес TON кошелька на Fragment</li>
+                          </ol>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => window.open('https://t.me/BotFather', '_blank')}
+                          data-testid="button-open-botfather"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Открыть @BotFather
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <Clock className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Недостаточно для вывода
+                        </p>
+                        <p className="text-xs">
+                          Минимум: {starsBalanceData.minimumWithdrawal} Stars
+                          <br />
+                          Осталось: {(starsBalanceData.minimumWithdrawal - starsBalanceData.balance).toLocaleString()} Stars
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">Не удалось загрузить данные о Stars</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

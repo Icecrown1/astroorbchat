@@ -306,3 +306,130 @@ export async function registerWebhookAtStartup(): Promise<void> {
     console.error('[Telegram Webhook] Registration error:', error.message);
   }
 }
+
+/**
+ * Get Stars transactions for the bot
+ * https://core.telegram.org/bots/api#getstartransactions
+ * NOTE: offset is an opaque string token returned by Telegram, NOT a number
+ */
+export async function getStarTransactions(offset?: string, limit: number = 100): Promise<{ 
+  ok: boolean; 
+  transactions?: any[];
+  nextOffset?: string;
+  error?: string;
+}> {
+  try {
+    if (!BOT_TOKEN) {
+      return { ok: false, error: 'Bot token not configured' };
+    }
+
+    const body: any = { limit };
+    // Only include offset if provided (Telegram uses opaque string tokens)
+    if (offset !== undefined) {
+      body.offset = offset;
+    }
+
+    const response = await fetch(`${BOT_API_URL}/getStarTransactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    
+    if (!data.ok) {
+      console.error('[Telegram Stars] getStarTransactions failed:', data);
+      return { ok: false, error: data.description || 'Failed to get transactions' };
+    }
+
+    return { 
+      ok: true, 
+      transactions: data.result.transactions || [],
+      nextOffset: data.result.next_offset,
+    };
+  } catch (error: any) {
+    console.error('[Telegram Stars] getStarTransactions error:', error);
+    return { ok: false, error: error.message };
+  }
+}
+
+/**
+ * Calculate total Stars balance from ALL transactions (with pagination)
+ * Uses Telegram's opaque next_offset tokens for correct pagination
+ */
+export async function getStarsBalance(): Promise<{
+  ok: boolean;
+  balance?: number;
+  totalIncoming?: number;
+  totalOutgoing?: number;
+  transactionCount?: number;
+  error?: string;
+}> {
+  try {
+    let allTransactions: any[] = [];
+    let currentOffset: string | undefined = undefined; // Start without offset
+    const limit = 100;
+    let pageCount = 0;
+    const MAX_PAGES = 100; // Safety limit (10,000 transactions max)
+    let hasMore = true;
+
+    // Fetch ALL transactions using Telegram's next_offset pagination
+    // First call has no offset, subsequent calls use the opaque token from previous response
+    while (hasMore && pageCount < MAX_PAGES) {
+      const result = await getStarTransactions(currentOffset, limit);
+      
+      if (!result.ok) {
+        return { ok: false, error: result.error || 'Failed to fetch transactions' };
+      }
+
+      if (!result.transactions || result.transactions.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allTransactions = allTransactions.concat(result.transactions);
+      
+      // Use next_offset opaque token from Telegram API response
+      // When nextOffset is undefined/empty, we've reached the end
+      if (!result.nextOffset) {
+        hasMore = false;
+      } else {
+        currentOffset = result.nextOffset;
+      }
+      
+      pageCount++;
+    }
+
+    if (pageCount >= MAX_PAGES && hasMore) {
+      console.warn('[Telegram Stars] Reached safety limit of 100 pages (10,000 transactions)');
+    }
+
+    let totalIncoming = 0;
+    let totalOutgoing = 0;
+
+    for (const tx of allTransactions) {
+      const amount = tx.amount || 0;
+      
+      if (tx.source?.type === 'user') {
+        // Incoming payment from user
+        totalIncoming += amount;
+      } else if (tx.source?.type === 'fragment' && amount < 0) {
+        // Outgoing withdrawal to Fragment
+        totalOutgoing += Math.abs(amount);
+      }
+    }
+
+    const balance = totalIncoming - totalOutgoing;
+
+    return {
+      ok: true,
+      balance,
+      totalIncoming,
+      totalOutgoing,
+      transactionCount: allTransactions.length,
+    };
+  } catch (error: any) {
+    console.error('[Telegram Stars] getStarsBalance error:', error);
+    return { ok: false, error: error.message };
+  }
+}
