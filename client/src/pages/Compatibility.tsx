@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,6 +55,26 @@ export default function Compatibility() {
       relationshipType: 'romantic' as 'romantic' | 'friendship' | 'work' | 'family',
     },
   });
+
+  const formValues = form.watch();
+
+  useEffect(() => {
+    if (selectedGuestId && guestCharts?.data) {
+      const selectedChart = guestCharts.data.find(c => c.id === selectedGuestId);
+      if (selectedChart) {
+        const formDate = formValues.partnerDate;
+        const chartDate = selectedChart.birthdayDate ? selectedChart.birthdayDate.split('T')[0] : '';
+        
+        if (
+          formValues.partnerName !== selectedChart.name ||
+          formValues.partnerGender !== selectedChart.gender ||
+          formDate !== chartDate
+        ) {
+          setSelectedGuestId(null);
+        }
+      }
+    }
+  }, [formValues.partnerName, formValues.partnerGender, formValues.partnerDate, selectedGuestId, guestCharts]);
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
@@ -117,8 +137,8 @@ export default function Compatibility() {
               <p className="text-muted-foreground mb-4">
                 {t.compatibility.cosmicDynamics}
               </p>
-              <p className="text-sm text-primary font-medium mb-6">
-                {t.compatibility.cost}
+              <p className="text-sm text-primary font-medium mb-6" data-testid="text-cost">
+                {selectedGuestId ? t.compatibility.cost : t.compatibility.costWithChart}
               </p>
             </div>
 
