@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LocaleContext';
+import sunIcon from '@assets/IMG_8273_1760784912302.png';
 
 interface LoaderProps {
   className?: string;
@@ -160,9 +161,12 @@ export function Loader({ className, size = 'md', withPhrases = false }: LoaderPr
         )}
         data-testid="loader-spinner"
       >
-        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
-        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 animate-pulse"></div>
+        <img 
+          src={sunIcon} 
+          alt="Loading" 
+          className="w-full h-full animate-spin"
+          style={{ animationDuration: '3s' }}
+        />
       </div>
       {withPhrases && (
         <p 
