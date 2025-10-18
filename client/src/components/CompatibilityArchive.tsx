@@ -120,38 +120,38 @@ export function CompatibilityArchive({ onViewReading }: CompatibilityArchiveProp
 
       {readings.data.map((reading) => (
         <Card key={reading.id} className="p-6" data-testid={`compatibility-archive-${reading.id}`}>
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-lg font-semibold" data-testid={`text-partner-name-${reading.id}`}>
-                  {reading.partnerName}
-                </h3>
-                {reading.isProfessional && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                    PRO
-                  </span>
-                )}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-lg font-semibold" data-testid={`text-partner-name-${reading.id}`}>
+                {reading.partnerName}
+              </h3>
+              {reading.isProfessional && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                  PRO
+                </span>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
+              <div className="flex items-center gap-1">
+                {getRelationshipIcon(reading.relationshipType)}
+                <span>{getRelationshipLabel(reading.relationshipType)}</span>
               </div>
-              
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  {getRelationshipIcon(reading.relationshipType)}
-                  <span>{getRelationshipLabel(reading.relationshipType)}</span>
-                </div>
-                <span>•</span>
-                <span>{dayjs(reading.partnerDate).format('DD.MM.YYYY')}</span>
-                <span>•</span>
-                <span>{dayjs(reading.createdAt).fromNow()}</span>
-              </div>
+              <span>•</span>
+              <span>{dayjs(reading.partnerDate).format('DD.MM.YYYY')}</span>
+              <span>•</span>
+              <span>{dayjs(reading.createdAt).fromNow()}</span>
             </div>
 
             {reading.compatibilityRating && (
-              <CompatibilityRating 
-                rating={parseFloat(reading.compatibilityRating)} 
-                relationshipType={reading.relationshipType}
-                locale={locale}
-                compact={true}
-              />
+              <div className="mb-3">
+                <CompatibilityRating 
+                  rating={parseFloat(reading.compatibilityRating)} 
+                  relationshipType={reading.relationshipType}
+                  locale={locale}
+                  compact={true}
+                />
+              </div>
             )}
           </div>
 
