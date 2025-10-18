@@ -81,3 +81,51 @@ export function openTelegramLink(url: string) {
 export function openLink(url: string) {
   telegram.openLink(url);
 }
+
+/**
+ * Smart extraction of referral code from Telegram
+ * Tries 4 different methods to find the referral code:
+ * 1. Telegram WebApp startParam
+ * 2. Telegram initDataUnsafe start_param
+ * 3. URL Hash (#tgWebAppStartParam=CODE)
+ * 4. URL Search Parameters (?startapp=CODE or ?ref=CODE)
+ */
+export function getReferralCode(): string | null {
+  // Method 1: Telegram WebApp startParam (most reliable)
+  // Note: startParam may not be in TypeScript definitions but exists at runtime
+  const tgApp = telegram as any;
+  if (tgApp.startParam) {
+    console.log('[Referral] Found code via startParam:', tgApp.startParam);
+    return tgApp.startParam;
+  }
+
+  // Method 2: Telegram initDataUnsafe start_param
+  if (telegram.initDataUnsafe?.start_param) {
+    console.log('[Referral] Found code via initDataUnsafe.start_param:', telegram.initDataUnsafe.start_param);
+    return telegram.initDataUnsafe.start_param;
+  }
+
+  // Method 3: URL Hash (#tgWebAppStartParam=CODE)
+  if (window.location.hash) {
+    const hash = window.location.hash.slice(1); // Remove '#'
+    const hashParams = new URLSearchParams(hash);
+    const codeFromHash = hashParams.get('tgWebAppStartParam');
+    if (codeFromHash) {
+      console.log('[Referral] Found code via URL hash:', codeFromHash);
+      return codeFromHash;
+    }
+  }
+
+  // Method 4: URL Search Parameters (?startapp=CODE, ?ref=CODE, ?referral=CODE)
+  const urlParams = new URLSearchParams(window.location.search);
+  const codeFromQuery = urlParams.get('startapp') || 
+                        urlParams.get('ref') || 
+                        urlParams.get('referral');
+  if (codeFromQuery) {
+    console.log('[Referral] Found code via URL query:', codeFromQuery);
+    return codeFromQuery;
+  }
+
+  console.log('[Referral] No referral code found');
+  return null;
+}

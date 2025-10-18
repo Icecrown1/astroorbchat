@@ -141,6 +141,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dev endpoint for testing referral system
+  // Allows developers to simulate new user signups and subscriptions without creating real accounts
+  app.post("/api/dev/test-referral", requireAuth, async (req, res) => {
+    const isTestAuthAllowed = process.env.NODE_ENV === 'development' || process.env.ALLOW_TEST_AUTH === 'true';
+    
+    if (!isTestAuthAllowed) {
+      return res.status(403).json({ 
+        ok: false, 
+        error: "Test referral endpoint is only available in development mode" 
+      });
+    }
+
+    try {
+      const userId = (req as any).userId;
+      const { action } = req.body; // 'simulate_signup' or 'simulate_subscription'
+
+      if (!action || !['simulate_signup', 'simulate_subscription'].includes(action)) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Invalid action. Use "simulate_signup" or "simulate_subscription"'
+        });
+      }
+
+      // Get current user (the referrer)
+      const referrer = await storage.getUser(userId);
+      if (!referrer) {
+        return res.status(404).json({ ok: false, error: 'User not found' });
+      }
+
+      if (action === 'simulate_signup') {
+        // Create a virtual test user and apply referral bonus
+        const testUser = {
+          tgId: `virtual_test_${Date.now()}`,
+          username: `test_referred_${Date.now()}`,
+          name: `Test User ${Date.now()}`,
+          gender: 'other' as const,
+          age: 25,
+          birthdayDate: new Date(),
+          birthTime: null,
+          birthPlace: null,
+          timezone: "America/New_York",
+          referralCode: generateReferralCode(),
+          freeEnergy: 10,
+          energyResetAt: getNextResetTime("America/New_York"),
+        };
+
+        const newUser = await storage.createUser(testUser);
+
+        // Apply referral bonus (this will credit referrer and create referral reward)
+        await applyReferralBonus(storage, newUser.id, referrer.referralCode);
+
+        // Get updated referrer data
+        const updatedReferrer = await storage.getUser(userId);
+
+        return res.json({
+          ok: true,
+          data: {
+            action: 'simulate_signup',
+            testUser: {
+              id: newUser.id,
+              name: newUser.name,
+              username: newUser.username,
+            },
+            referrer: {
+              id: updatedReferrer?.id,
+              name: updatedReferrer?.name,
+              purchasedEnergy: updatedReferrer?.purchasedEnergy,
+            },
+            rewardAmount: 5,
+            message: 'Simulated new user signup via your referral code. You received +5 energy!',
+          },
+        });
+      }
+
+      if (action === 'simulate_subscription') {
+        // Find the most recently referred user for this referrer
+        const rewards = await storage.getReferralRewardsByReferrerId(userId);
+        
+        if (rewards.length === 0) {
+          return res.status(400).json({
+            ok: false,
+            error: 'No referred users found. Simulate a signup first using action: "simulate_signup"'
+          });
+        }
+
+        // Get the most recent referred user
+        const latestReward = rewards.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+
+        const referredUser = await storage.getUser(latestReward.referredUserId);
+        
+        if (!referredUser) {
+          return res.status(404).json({ ok: false, error: 'Referred user not found' });
+        }
+
+        // Apply subscription referral bonus
+        await handleSubscriptionReferralBonus(storage, referredUser.id);
+
+        // Get updated referrer data
+        const updatedReferrer = await storage.getUser(userId);
+
+        return res.json({
+          ok: true,
+          data: {
+            action: 'simulate_subscription',
+            referredUser: {
+              id: referredUser.id,
+              name: referredUser.name,
+            },
+            referrer: {
+              id: updatedReferrer?.id,
+              name: updatedReferrer?.name,
+              purchasedEnergy: updatedReferrer?.purchasedEnergy,
+            },
+            rewardAmount: 10,
+            message: 'Simulated subscription purchase by your referred user. You received +10 energy!',
+          },
+        });
+      }
+
+      res.status(400).json({ ok: false, error: 'Invalid action' });
+    } catch (error: any) {
+      console.error('[DEV] Test referral error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/user/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
@@ -1954,6 +2082,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           referrals: referralsWithDetails,
           totalRewards: rewards.reduce((sum, r) => sum + r.energyAmount, 0),
           totalReferrals: rewards.filter(r => r.rewardType === 'signup').length,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Validate referral code (check if code exists and is valid)
+  app.get("/api/referral/validate/:code", async (req, res) => {
+    try {
+      const { code } = req.params;
+      
+      if (!code || code.trim() === '') {
+        return res.json({
+          ok: true,
+          data: {
+            valid: false,
+            referrer: null,
+          },
+        });
+      }
+
+      const referrer = await storage.getUserByReferralCode(code.trim());
+      
+      if (!referrer) {
+        return res.json({
+          ok: true,
+          data: {
+            valid: false,
+            referrer: null,
+          },
+        });
+      }
+
+      // Code is valid - return referrer info (without sensitive data)
+      res.json({
+        ok: true,
+        data: {
+          valid: true,
+          referrer: {
+            name: referrer.name,
+            username: referrer.username || null,
+          },
         },
       });
     } catch (error: any) {

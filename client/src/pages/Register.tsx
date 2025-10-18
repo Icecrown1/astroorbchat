@@ -21,7 +21,7 @@ import { Loader } from '@/components/Loader';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { getInitData } from '@/lib/telegram';
+import { getInitData, getReferralCode } from '@/lib/telegram';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
 import utc from 'dayjs/plugin/utc.js';
@@ -35,6 +35,7 @@ export default function Register() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<any>({});
   const [isCheckingTelegram, setIsCheckingTelegram] = useState(true);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const { setAuth } = useAuth();
   const { toast } = useToast();
@@ -179,6 +180,23 @@ export default function Register() {
     };
   }, [navigate]);
 
+  // Extract referral code from Telegram (after Telegram context is ready)
+  useEffect(() => {
+    if (!isCheckingTelegram) {
+      const code = getReferralCode();
+      if (code) {
+        console.log('[Registration] Referral code detected:', code);
+        setReferralCode(code);
+        toast({
+          title: locale === 'ru' ? '🎁 Реферальный код применён!' : '🎁 Referral code applied!',
+          description: locale === 'ru' 
+            ? 'Вы получите бонус после регистрации' 
+            : 'You will receive a bonus after registration',
+        });
+      }
+    }
+  }, [isCheckingTelegram, locale, toast]);
+
   const step1Schema = useMemo(() => z.object({
     name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),
     gender: z.enum(['male', 'female', 'other']),
@@ -241,6 +259,7 @@ export default function Register() {
       age: parseInt(formData.age, 10),
       birthTime: formData.birthTime || null,
       birthPlace: formData.birthPlace || null,
+      ...(referralCode && { referralCode }), // Add referral code if present
     };
 
     try {
