@@ -17,6 +17,7 @@ interface GuestChart {
   gender: string;
   birthdayDate: string;
   birthTime?: string | null;
+  birthPlace?: string | null;
 }
 
 export function GuestChartForm() {
@@ -27,6 +28,7 @@ export function GuestChartForm() {
     gender: 'other' as 'male' | 'female' | 'other',
     birthdayDate: '',
     birthTime: '12:00',
+    birthPlace: '',
   });
 
   const { data: guestCharts, isLoading: chartsLoading } = useQuery<{ ok: boolean; data: GuestChart[] }>({
@@ -41,7 +43,7 @@ export function GuestChartForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00' });
+      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '' });
       toast({
         title: locale === 'ru' ? "Гостевая карта создана!" : "Guest chart created!",
         description: locale === 'ru' ? "Карта сохранена и доступна для анализа совместимости." : "Chart saved and available for compatibility analysis.",
@@ -136,6 +138,19 @@ export function GuestChartForm() {
             />
           </div>
 
+          <div>
+            <Label htmlFor="guest-birthplace">
+              {locale === 'ru' ? 'Место рождения (опционально)' : 'Birth place (optional)'}
+            </Label>
+            <Input
+              id="guest-birthplace"
+              value={formData.birthPlace}
+              onChange={(e) => setFormData({ ...formData, birthPlace: e.target.value })}
+              placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
+              data-testid="input-guest-birthplace"
+            />
+          </div>
+
           <Button
             onClick={() => createMutation.mutate()}
             disabled={!isFormValid || createMutation.isPending}
@@ -174,6 +189,7 @@ export function GuestChartForm() {
                   <p className="text-sm text-muted-foreground">
                     {new Date(chart.birthdayDate).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US')}
                     {chart.birthTime && ` • ${chart.birthTime}`}
+                    {chart.birthPlace && ` • ${chart.birthPlace}`}
                   </p>
                 </div>
               </div>

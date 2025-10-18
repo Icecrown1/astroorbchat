@@ -22,6 +22,7 @@ interface GuestChart {
   gender: string;
   birthdayDate: string;
   birthTime?: string | null;
+  birthPlace?: string | null;
 }
 
 export default function Compatibility() {
@@ -161,6 +162,7 @@ export default function Compatibility() {
                         const formattedDate = chart.birthdayDate ? chart.birthdayDate.split('T')[0] : '';
                         form.setValue('partnerDate', formattedDate);
                         form.setValue('partnerTime', chart.birthTime || '');
+                        form.setValue('partnerPlace', chart.birthPlace || '');
                       }}
                       data-testid={`button-select-guest-${chart.id}`}
                     >
