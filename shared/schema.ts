@@ -232,6 +232,7 @@ export const compatibilityReadings = pgTable("compatibility_readings", {
   relationshipType: varchar("relationship_type", { length: 20 }).notNull().default('romantic'),
   guestChartId: varchar("guest_chart_id", { length: 255 }),
   analysis: text("analysis").notNull(),
+  compatibilityRating: decimal("compatibility_rating", { precision: 4, scale: 2 }),
   isProfessional: boolean("is_professional").notNull().default(false),
   professionalInterpretation: jsonb("professional_interpretation"),
   houseOverlays: jsonb("house_overlays"),
