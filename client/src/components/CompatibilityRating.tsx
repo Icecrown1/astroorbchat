@@ -4,9 +4,10 @@ interface CompatibilityRatingProps {
   rating: number;
   relationshipType?: 'romantic' | 'friendship' | 'work' | 'family';
   locale?: string;
+  compact?: boolean;
 }
 
-export function CompatibilityRating({ rating, relationshipType = 'romantic', locale = 'en' }: CompatibilityRatingProps) {
+export function CompatibilityRating({ rating, relationshipType = 'romantic', locale = 'en', compact = false }: CompatibilityRatingProps) {
   // Determine color based on rating
   const getColorClasses = (rating: number) => {
     if (rating <= 3.0) {
@@ -81,6 +82,42 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
 
   const colors = getColorClasses(rating);
 
+  // Compact version for archive
+  if (compact) {
+    return (
+      <div 
+        className={`rounded-lg border ${colors.border} ${colors.bg} p-3 shadow-sm min-w-[140px] shrink-0`}
+        data-testid="compatibility-rating-display"
+      >
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div className={colors.text}>
+            {getRelationshipIcon()}
+          </div>
+          <h3 className="font-medium text-xs text-muted-foreground">
+            {locale === 'ru' ? 'Рейтинг совместимости' : 'Compatibility Rating'}
+          </h3>
+        </div>
+        
+        <div className={`text-4xl font-bold ${colors.text} tabular-nums mb-1.5`} data-testid="rating-value">
+          {rating.toFixed(2)}
+        </div>
+        
+        <div className={`text-xs font-medium ${colors.text} mb-2`} data-testid="rating-label">
+          {getRatingLabel(rating)}
+        </div>
+
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className={`h-full ${colors.progressBg} transition-all duration-500`}
+            style={{ width: `${(rating / 10) * 100}%` }}
+            data-testid="rating-progress"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Full version for main view
   return (
     <div 
       className={`rounded-lg border-2 ${colors.border} ${colors.bg} p-6 shadow-lg ${colors.glow}`}

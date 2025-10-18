@@ -146,7 +146,12 @@ export function CompatibilityArchive({ onViewReading }: CompatibilityArchiveProp
             </div>
 
             {reading.compatibilityRating && (
-              <CompatibilityRating rating={parseFloat(reading.compatibilityRating)} />
+              <CompatibilityRating 
+                rating={parseFloat(reading.compatibilityRating)} 
+                relationshipType={reading.relationshipType}
+                locale={locale}
+                compact={true}
+              />
             )}
           </div>
 
