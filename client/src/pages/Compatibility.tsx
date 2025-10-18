@@ -16,6 +16,14 @@ import { ArrowLeft, Heart, HeartCrack, UserPlus, Users } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
 interface GuestChart {
   id: string;
@@ -264,6 +272,25 @@ export default function Compatibility() {
                   placeholder={t.compatibility.placePlaceholder}
                   data-testid="input-partner-place"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="partnerTimezone">{locale === 'ru' ? 'Часовой пояс партнера' : 'Partner Timezone'}</Label>
+                <Select
+                  value={form.watch('partnerTimezone')}
+                  onValueChange={(value) => form.setValue('partnerTimezone', value)}
+                >
+                  <SelectTrigger id="partnerTimezone" data-testid="select-partner-timezone">
+                    <SelectValue placeholder={locale === 'ru' ? 'Выберите часовой пояс' : 'Select timezone'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
