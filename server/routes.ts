@@ -2776,27 +2776,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Telegram webhook endpoint for Stars payments
   app.post("/webhooks/telegram", async (req, res) => {
     try {
-      // TODO: Re-enable secret verification for production
-      // const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-      // const telegramSecretToken = req.headers['x-telegram-bot-api-secret-token'];
-      // if (webhookSecret && telegramSecretToken !== webhookSecret) {
-      //   console.warn('[Telegram Webhook] Unauthorized request - invalid or missing secret token');
-      //   return res.status(403).json({ ok: false, error: "Unauthorized" });
-      // }
+      // Verify webhook secret token (Telegram sends this in header)
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      const telegramSecretToken = req.headers['x-telegram-bot-api-secret-token'];
+      
+      console.log('[Telegram Webhook] Request received');
+      console.log('[Telegram Webhook] Secret token present:', !!telegramSecretToken);
+      console.log('[Telegram Webhook] Expected secret configured:', !!webhookSecret);
+      
+      if (webhookSecret && telegramSecretToken !== webhookSecret) {
+        console.warn('[Telegram Webhook] SECURITY: Invalid or missing secret token');
+        return res.status(403).json({ ok: false, error: "Unauthorized" });
+      }
 
       const update = req.body;
-      console.log('[Telegram Webhook] Received update:', JSON.stringify(update, null, 2));
+      console.log('[Telegram Webhook] Update type:', Object.keys(update).filter(k => k !== 'update_id'));
+      console.log('[Telegram Webhook] Full update:', JSON.stringify(update, null, 2));
 
       // Handle pre_checkout_query - MUST respond within 10 seconds!
       if (update.pre_checkout_query) {
-        const { id: queryId, invoice_payload } = update.pre_checkout_query;
+        const { id: queryId, invoice_payload, from, total_amount } = update.pre_checkout_query;
         
-        console.log('[Telegram Webhook] Pre-checkout query:', { queryId, invoice_payload });
+        console.log('[Telegram Webhook] ===== PRE-CHECKOUT QUERY =====');
+        console.log('[Telegram Webhook] Query ID:', queryId);
+        console.log('[Telegram Webhook] From user:', from?.id, from?.username);
+        console.log('[Telegram Webhook] Total amount:', total_amount);
+        console.log('[Telegram Webhook] Invoice payload (first 100 chars):', invoice_payload.substring(0, 100));
 
-        // Check if payment exists in database
+        // STEP 1: Verify HMAC signature of payload
+        console.log('[Telegram Webhook] Verifying HMAC signature...');
+        const verification = verifyPayload(invoice_payload);
+        
+        if (!verification.valid) {
+          console.error('[Telegram Webhook] SECURITY: Invalid HMAC signature - payload tampered or corrupted');
+          await answerPreCheckoutQuery({
+            preCheckoutQueryId: queryId,
+            ok: false,
+            errorMessage: "Order validation failed",
+          });
+          return res.json({ ok: true });
+        }
+        
+        console.log('[Telegram Webhook] HMAC signature valid ✓');
+        console.log('[Telegram Webhook] Decoded payload data:', verification.data);
+
+        // STEP 2: Check if payment exists in database
+        console.log('[Telegram Webhook] Looking up payment in database...');
         const payment = await storage.getStarPaymentByPayload(invoice_payload);
-        if (!payment || payment.status !== 'pending') {
-          console.error('[Telegram Webhook] Payment not found or already processed');
+        
+        if (!payment) {
+          console.error('[Telegram Webhook] Payment not found in database');
+          await answerPreCheckoutQuery({
+            preCheckoutQueryId: queryId,
+            ok: false,
+            errorMessage: "Order validation failed",
+          });
+          return res.json({ ok: true });
+        }
+        
+        console.log('[Telegram Webhook] Payment found:', payment.id);
+        console.log('[Telegram Webhook] Payment status:', payment.status);
+        console.log('[Telegram Webhook] Payment userId:', payment.userId);
+        console.log('[Telegram Webhook] Payment amount:', payment.amountStars);
+
+        // STEP 3: Verify payment is pending
+        if (payment.status !== 'pending') {
+          console.error('[Telegram Webhook] Payment already processed, status:', payment.status);
           await answerPreCheckoutQuery({
             preCheckoutQueryId: queryId,
             ok: false,
@@ -2805,38 +2850,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ ok: true });
         }
 
+        // STEP 4: Verify amount matches (security check)
+        if (payment.amountStars !== total_amount) {
+          console.error('[Telegram Webhook] SECURITY: Amount mismatch!', {
+            expected: payment.amountStars,
+            received: total_amount
+          });
+          await answerPreCheckoutQuery({
+            preCheckoutQueryId: queryId,
+            ok: false,
+            errorMessage: "Order validation failed",
+          });
+          return res.json({ ok: true });
+        }
+
+        console.log('[Telegram Webhook] All validation passed ✓');
+
         // Everything is OK - approve the payment
+        console.log('[Telegram Webhook] Approving pre-checkout query...');
         await answerPreCheckoutQuery({
           preCheckoutQueryId: queryId,
           ok: true,
         });
 
-        console.log('[Telegram Webhook] Pre-checkout approved');
+        console.log('[Telegram Webhook] Pre-checkout approved successfully ✓');
         return res.json({ ok: true });
       }
 
       // Handle successful_payment
       if (update.message?.successful_payment) {
-        const { telegram_payment_charge_id, invoice_payload } = update.message.successful_payment;
+        const { telegram_payment_charge_id, invoice_payload, total_amount } = update.message.successful_payment;
         
-        console.log('[Telegram Webhook] Successful payment:', { telegram_payment_charge_id, invoice_payload });
+        console.log('[Telegram Webhook] ===== SUCCESSFUL PAYMENT =====');
+        console.log('[Telegram Webhook] Charge ID:', telegram_payment_charge_id);
+        console.log('[Telegram Webhook] Invoice payload (first 100 chars):', invoice_payload.substring(0, 100));
+        console.log('[Telegram Webhook] Total amount:', total_amount);
 
         // Atomic update to prevent race conditions
+        console.log('[Telegram Webhook] Attempting atomic payment processing...');
         const payment = await storage.atomicStartProcessing(invoice_payload, telegram_payment_charge_id);
         
         if (!payment) {
-          console.warn('[Telegram Webhook] Payment already processed or not found');
+          console.warn('[Telegram Webhook] Payment already processed or not found - skipping');
           return res.json({ ok: true });
         }
 
+        console.log('[Telegram Webhook] Payment claimed for processing:', payment.id);
+        console.log('[Telegram Webhook] Payment kind:', payment.kind);
+        console.log('[Telegram Webhook] Payment userId:', payment.userId);
+
         // Credit energy or activate subscription
         if (payment.kind === "energy_pack" && payment.energyAmount) {
+          console.log('[Telegram Webhook] Processing energy pack:', payment.energyAmount, 'orbs');
           const user = await storage.getUser(payment.userId);
           if (user) {
+            const oldEnergy = user.purchasedEnergy || 0;
+            const newEnergy = oldEnergy + payment.energyAmount;
             await storage.updateUser(payment.userId, {
-              purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
+              purchasedEnergy: newEnergy,
             });
-            console.log(`[Telegram Webhook] Credited ${payment.energyAmount} energy to user ${payment.userId}`);
+            console.log(`[Telegram Webhook] ✓ Credited energy: ${oldEnergy} → ${newEnergy} (user: ${payment.userId})`);
+          } else {
+            console.error('[Telegram Webhook] User not found:', payment.userId);
           }
         } else if (payment.kind === "subscription" && payment.tier) {
           const tier = payment.tier as "standard" | "pro";
