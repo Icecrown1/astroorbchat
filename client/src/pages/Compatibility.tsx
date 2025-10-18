@@ -24,6 +24,7 @@ interface GuestChart {
   birthdayDate: string;
   birthTime?: string | null;
   birthPlace?: string | null;
+  timezone?: string | null;
 }
 
 export default function Compatibility() {
@@ -43,6 +44,7 @@ export default function Compatibility() {
     partnerDate: z.string().min(1, locale === 'ru' ? 'Дата рождения партнера обязательна' : 'Partner birth date is required'),
     partnerTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
     partnerPlace: z.string().optional(),
+    partnerTimezone: z.string().optional(),
     relationshipType: z.enum(['romantic', 'friendship', 'work', 'family']),
   }), [locale]);
 
@@ -54,6 +56,7 @@ export default function Compatibility() {
       partnerDate: '',
       partnerTime: '',
       partnerPlace: '',
+      partnerTimezone: 'UTC',
       relationshipType: 'romantic' as 'romantic' | 'friendship' | 'work' | 'family',
     },
   });
