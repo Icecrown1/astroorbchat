@@ -1,7 +1,7 @@
 # Astro Orb - AI-Powered Astrology Telegram Mini App
 
 ## Overview
-Astro Orb is an AI-powered Telegram Mini App offering personalized astrology readings like natal charts, solar returns, and horoscopes. It integrates a gamified energy system, TON blockchain payments, and referral mechanics. The project aims to deliver accurate, AI-driven astrological interpretations within a user-friendly, full-stack TypeScript application with a React frontend and Express backend. Its core purpose is to make complex astrological insights accessible and engaging.
+Astro Orb is an AI-powered Telegram Mini App designed to provide personalized astrology readings such as natal charts, solar returns, and horoscopes. The project integrates a gamified energy system, TON blockchain payments, and referral mechanics, all within a user-friendly, full-stack TypeScript application with a React frontend and Express backend. Its core mission is to make intricate astrological insights accessible and engaging through AI-driven interpretations.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -16,177 +16,25 @@ Preferred communication style: Simple, everyday language.
 
 ### Technical Implementation
 - **Backend**: Express.js with TypeScript.
-- **Authentication**: JWT-based with Telegram InitData validation (HMAC-SHA256) and Telegram Login Widget support.
+- **Authentication**: JWT-based with Telegram InitData validation and Telegram Login Widget support.
 - **API**: RESTful endpoints for authentication, astrology, payments, referrals, and user management.
-- **Astrology Engine**: Python-based Swiss Ephemeris for precise astronomical calculations (natal charts, solar returns, horoscopes, compatibility).
-- **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, utilizing custom, compact prompts for various reading types and gender-based tone personalization. Includes full localization of prompts and ensures personalized compatibility readings with user names.
-- **Horoscope System**: Offers daily, weekly, and monthly personalized horoscopes, deeply integrated with natal chart data for individual predictions, not generic readings. Horoscopes are stored with `startDate` and `endDate` for proper period tracking.
+- **Astrology Engine**: Python-based Swiss Ephemeris for precise astronomical calculations.
+- **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, using custom, compact prompts with gender-based tone personalization and full localization. Includes personalized compatibility readings.
+- **Horoscope System**: Offers daily, weekly, and monthly personalized horoscopes integrated with natal chart data for individual predictions.
 - **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards. Users can update their profile once every 30 days.
-- **Energy System Architecture**: Dual-field energy system with `freeEnergy` (resets daily) and `purchasedEnergy` (persists until spent). Daily reset only affects free energy, preserving purchased orbs indefinitely.
+- **Energy System Architecture**: Dual-field energy system with `freeEnergy` (daily reset) and `purchasedEnergy` (persists).
 
 ### System Design Choices
 - **Data Caching**: Multi-locale caching for natal charts with on-demand locale generation.
-- **Payment Systems**:
-    - **TON Blockchain**: Cryptocurrency payments via TON Connect, with server-side blockchain verification for transactions.
-    - **Telegram Stars**: In-app purchases with server-side price validation, webhook security, and idempotency checks.
-- **Subscription System**: Features Standard and Pro tiers with varying daily orb allowances, free weekly/monthly plans, and immediate energy boosts upon purchase. Subscriptions are managed with `active`, `canceled`, and `expired` statuses, with benefits remaining until the end of the current period.
+- **Payment Systems**: TON Blockchain (via TON Connect) with server-side verification, and Telegram Stars with webhook security and idempotency checks.
+- **Subscription System**: Standard and Pro tiers offering varying daily orb allowances, free weekly/monthly plans, and immediate energy boosts. Subscriptions have `active`, `canceled`, and `expired` statuses.
+- **Geocoding**: Accurate Ascendant calculations using a two-tier geocoding system: local cities database fallback to Nominatim API for precise birth location coordinates.
+- **Referral System**: Referral rewards credited to `purchasedEnergy`, tracked in a `referralRewards` table, with notifications for new referrals and detailed history/statistics in the UI.
+- **Telegram Stars Admin Panel**: Backend components for fetching paginated Telegram Stars transactions using opaque string tokens and calculating total balance. Admin panel on frontend displays balance, transaction history, and withdrawal instructions.
 
 ## External Dependencies
-- **Telegram Integration**: `@twa-dev/sdk` for Mini App functionality.
-- **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`), TON API for transactions and price fetching.
-- **AI Services**: OpenAI API (GPT-5) for astrological interpretations.
-- **Database**: PostgreSQL via Neon serverless with Drizzle ORM.
-- **Environment Variables**:
-    - Core: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`
-    - AI: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
-    - TON: `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`
-    - Telegram: `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`
-    - Auth: `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`
-
-## Recent Bug Fixes
-
-### TON Payment Verification Error (Fixed - Oct 16, 2025)
-**Problem**: "Transaction not found on blockchain" error when verifying TON payments due to two issues:
-1. Backend was searching for incoming transactions TO our wallet instead of searching user's wallet for outgoing transactions
-2. Address format mismatch: TON Connect returns user-friendly format (EQ.../UQ...) but TON API returns raw format (0:...)
-
-**Solution**: 
-- **Search Direction Fix**: Changed from `findRecentTransaction` (searches our wallet) to `findUserTransaction` (searches user's wallet) in `/api/payments/ton/confirm`
-- **Address Normalization**: Added `normalizeTonAddress()` helper using `@ton/core` to convert all addresses to canonical raw format (0:...)
-  - Normalizes `userWalletAddress` at payment creation before saving to database
-  - Normalizes both recipient (our wallet) and destination (from TON API) addresses before comparison in `findUserTransaction`
-- **Validation**: Added checks to ensure `payment.userWalletAddress` exists and wallet address is available before creating payment
-- **Frontend**: Added wallet address validation to prevent payment creation when `wallet?.account?.address` is undefined
-
-**Files**: `server/routes.ts`, `server/lib/ton.ts`, `client/src/pages/BuyEnergy.tsx`
-
-### Compatibility Date Auto-Population (Fixed - Oct 16, 2025)
-**Problem**: Birth date field remained empty when clicking saved guest charts to auto-fill compatibility form.
-
-**Solution**: Changed from `new Date().toISOString()` (which caused timezone shifts) to simple string split: `chart.birthdayDate.split('T')[0]` to extract YYYY-MM-DD from ISO datetime. Added null/empty guard.
-
-**File**: `client/src/pages/Compatibility.tsx`
-
-### TypeScript Errors in Subscribe.tsx (Fixed - Oct 16, 2025)
-**Problem**: Property access errors on empty object types `{}` for useQuery hooks.
-
-**Solution**: Added `UserMeResponse` and `PricesResponse` interfaces matching backend contracts. Applied proper generic type parameters to both useQuery hooks.
-
-**Files**: `client/src/pages/Subscribe.tsx`
-
-### Solar Return Incomplete Localization (Fixed - Oct 16, 2025)
-**Problem**: Mixed Russian/English text in Solar Return UI - hardcoded English insights and mixed-language AI prompt.
-
-**Solution**: 
-- Added locale-based insight arrays in `server/routes.ts` (lines 813-822)
-- Fully translated `server/lib/prompts/solar.md` to Russian
-- Added translations for insights to `client/src/lib/translations.ts`
-
-**Files**: `server/routes.ts`, `server/lib/prompts/solar.md`, `client/src/lib/translations.ts`
-
-### Energy System Dual-Field Implementation (Fixed - Oct 17, 2025)
-**Problem**: Daily energy reset was overwriting ALL energy (including purchased orbs), causing users to lose paid energy. System used single `energy` field that reset to 10 every day.
-
-**Solution**: Implemented dual-field energy system:
-- **Database**: Split `energy` field into `freeEnergy` (default 10, resets daily) and `purchasedEnergy` (default 0, persists indefinitely)
-- **Migration**: SQL migration transferred existing energy to new fields: if energy ≤ 10 → all to `freeEnergy`, if > 10 → 10 to `freeEnergy`, remainder to `purchasedEnergy`
-- **Reset Logic**: `checkAndResetEnergy()` now only resets `freeEnergy`, keeping `purchasedEnergy` intact
-- **Deduction Logic**: `deductEnergy()` deducts from `freeEnergy` first, then from `purchasedEnergy` if needed
-- **Purchase Logic**: All energy purchases (TON, Stars, subscription bonuses) add to `purchasedEnergy`
-- **API**: `/api/energy` returns combined energy `freeEnergy + purchasedEnergy`
-
-**Files**: `shared/schema.ts`, `server/lib/energy.ts`, `server/routes.ts`, `server/storage.ts`
-
-### Geocoding Implementation - Accurate Ascendant Calculations (Fixed - Oct 17, 2025)
-**Problem**: ALL natal charts used hardcoded Moscow coordinates (55.7558°N, 37.6173°E) for Ascendant calculation, causing incorrect results for users in other cities. User birthPlace was stored as text but never geocoded.
-
-**Solution**: Implemented comprehensive geocoding system:
-- **Local Cities Database**: Created `server/lib/cities.ts` with 150+ cities (Russia, CIS, Europe, Asia, Americas, Australia) and coordinates
-- **Geocoding Utility**: Created `server/lib/geocoding.ts` with two-tier system:
-  - Primary: Local database search (instant, no API calls)
-  - Fallback: Nominatim API (OpenStreetMap) for cities not in database
-  - Moscow fallback only if city not found anywhere
-- **Implementation**: Updated all natal chart calculation endpoints:
-  - `/api/natal/external` - external natal charts
-  - `/api/natal/recalculate` - deprecated endpoint
-  - `/api/astrology/solar` - solar return calculations
-  - `/api/astrology/compatibility` - compatibility charts (both user & partner)
-  - `server/lib/natalService.ts` - core natal computation function
-- **Result**: Now ALL users get accurate Ascendant, houses, and angles based on their actual birth location
-
-**Files**: `server/lib/cities.ts`, `server/lib/geocoding.ts`, `server/routes.ts`, `server/lib/natalService.ts`
-
-### Natal Chart Caching Optimization (Fixed - Oct 17, 2025)
-**Problem**: Natal chart data was being refetched on every page visit, causing slow loading and unnecessary server load. Initial attempt to remove locale from queryKey caused cache pollution where users saw wrong-language AI interpretations after locale switching.
-
-**Solution**: Implemented proper multi-locale caching strategy:
-- **Query Key Structure**: `queryKey: ['/api/natal/me', locale]` - includes locale to prevent cross-locale cache pollution
-- **Stale Time**: Added `staleTime: 1000 * 60 * 60` (1 hour) - data considered fresh for 1 hour, reducing redundant API calls
-- **Cache Invalidation**: `invalidateQueries({ queryKey: ['/api/natal/me'] })` clears ALL locale variants when chart is created/recalculated
-- **Result**: Fast page loads from cache, correct locale-specific AI interpretations, reduced server load
-
-**Files**: `client/src/pages/MyNatalChart.tsx`
-
-## Recent Features
-
-### Referral Notification System (Added - Oct 17, 2025)
-**Feature**: Users now receive visual notifications when someone joins via their referral link and they earn rewards.
-
-**Implementation**:
-- **Database**: Added `referralRewards` table to track referral history with `referrerId`, `referredUserId`, `rewardType` (signup/subscription), `energyAmount`, and `createdAt`
-- **Referral System**: Updated `applyReferralBonus()` and `handleSubscriptionReferralBonus()` to:
-  - Credit rewards to `purchasedEnergy` (preserving dual-field energy system)
-  - Create `referralReward` record for each reward event
-- **API Enhancement**: `/api/referral/code` now returns:
-  - Full list of referrals with user names, reward types, amounts, and timestamps
-  - Aggregate statistics: `totalReferrals` and `totalRewards`
-- **UI Updates**:
-  - **Referral Page**: Displays referral history with statistics showing total referrals and total rewards earned
-  - **Dashboard**: Shows notification badge (!) on referral button when new referrals are detected
-  - **Notification Logic**: Uses localStorage to track `lastViewedReferrals` timestamp; badge appears when referrals exist newer than last view
-- **User Flow**: When user visits referral page, localStorage is updated, clearing the notification badge
-
-**Files**: `shared/schema.ts`, `server/lib/referral.ts`, `server/routes.ts`, `server/storage.ts`, `client/src/pages/Referral.tsx`, `client/src/pages/Dashboard.tsx`
-
-### Telegram Stars Admin Panel (Added - Oct 18, 2025)
-**Feature**: Admin panel for managing Telegram Stars revenue with proper pagination support for transaction history.
-
-**Critical Implementation Details**:
-- **Pagination**: Uses Telegram's **opaque string tokens** (not numeric offsets)
-  - `next_offset` is a string token returned by Telegram API
-  - First request omits offset parameter (undefined)
-  - Subsequent requests use exact token from previous response
-  - Loop terminates when `next_offset` is undefined/empty
-  - Safety limit: 100 pages (10,000 transactions)
-
-**Backend Components**:
-- **getStarTransactions()**: Fetches transactions with opaque token pagination
-  - Parameters: `offset?: string`, `limit: number`
-  - Returns: `{ ok, transactions, nextOffset?: string, error? }`
-  - First call: `offset = undefined` (omit from request body)
-  - Follow-up calls: `offset = <token from previous response>`
-- **getStarsBalance()**: Calculates total balance from ALL transactions
-  - Iterates through all pages using `next_offset` tokens
-  - Tracks: `totalIncoming` (from users), `totalOutgoing` (withdrawals)
-  - Returns accurate balance even with thousands of transactions
-
-**API Endpoints**:
-- `GET /api/admin/stars/balance`: Returns total Stars balance (requires admin rights)
-- `GET /api/admin/stars/transactions?offset=<token>&limit=50`: Returns paginated transactions with `nextOffset` for client-side pagination
-- **Security**: Protected by `requireAdmin` middleware checking `user.isAdmin` field
-
-**Frontend**:
-- **Admin.tsx**: Enhanced existing admin panel with Stars section
-  - Displays available/pending balance, total incoming/outgoing
-  - Transaction history table with pagination controls
-  - Detailed withdrawal instructions (BotFather → Fragment → TON wallet)
-  - Minimum withdrawal: 1000 Stars, 21-day hold period
-  - Conversion rate: $0.013/Star via Fragment
-
-**Withdrawal Flow**:
-1. Admin views balance in BotFather → Bot Settings → Balance
-2. Clicks "Withdraw" button → generates Fragment URL
-3. Opens Fragment URL → enters TON wallet address
-4. Stars automatically convert to TON at fixed rate
-
-**Files**: `server/lib/telegramStars.ts`, `server/routes.ts`, `client/src/pages/Admin.tsx`, `server/middleware/auth.ts`
+- **Telegram Integration**: `@twa-dev/sdk`
+- **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`), TON API
+- **AI Services**: OpenAI API (GPT-5)
+- **Database**: PostgreSQL via Neon serverless with Drizzle ORM
+- **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`
