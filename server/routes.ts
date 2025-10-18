@@ -16,6 +16,7 @@ import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment } from "./lib/telegramStars";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
@@ -2719,21 +2720,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[Stars] Payment config:', { title, priceStars, energyAmount, tier });
 
-      // Create payment record FIRST (we'll use its ID as the invoice payload)
+      // Generate unique payload ID (short and under 128 bytes limit)
+      const payload = nanoid();
+      console.log('[Stars] Generated invoice payload:', payload, '(length:', payload.length, 'bytes)');
+
+      // Create payment record with the payload
       const starPayment = await storage.createStarPayment({
         userId,
         kind: validated.kind,
         tier,
         energyAmount,
         amountStars: priceStars,
-        invoicePayload: '', // Placeholder - will use payment.id as actual payload
+        invoicePayload: payload,
       });
       
-      // Use payment ID as payload (short, unique, and under 128 bytes limit)
-      const payload = starPayment.id;
-      
       console.log('[Stars] Payment record created with ID:', starPayment.id);
-      console.log('[Stars] Using payment ID as invoice payload (length:', payload.length, 'bytes)');
 
       // Create invoice link with payment ID as payload
       const invoiceResult = await createInvoiceLink({
