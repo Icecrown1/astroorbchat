@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/store/useAuth";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getInitData, getReferralCode, getTelegramUser } from "@/lib/telegram";
 
 declare global {
   interface Window {
@@ -16,14 +17,68 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { setAuth } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'miniapp' | 'widget' | 'dev' | null>(null);
   const isDev = import.meta.env.DEV;
 
-  // Auto-login for dev mode
+  // Try Telegram Mini App auth first, then dev mode, then widget
   useEffect(() => {
-    if (isDev) {
+    const initData = getInitData();
+    
+    if (initData) {
+      // Running as Telegram Mini App - use automatic auth
+      console.log('[Auth] Detected Telegram Mini App mode');
+      setAuthMethod('miniapp');
+      handleMiniAppLogin(initData);
+    } else if (isDev) {
+      // Development mode - use test auth
+      console.log('[Auth] Detected dev mode');
+      setAuthMethod('dev');
       handleDevLogin();
+    } else {
+      // Web mode - show Login Widget
+      console.log('[Auth] Using Telegram Login Widget');
+      setAuthMethod('widget');
     }
   }, [isDev]);
+
+  const handleMiniAppLogin = async (initData: string) => {
+    setIsLoading(true);
+    try {
+      console.log('[Mini App Auth] Starting automatic login...');
+      
+      // Get referral code if present
+      const referralCode = getReferralCode();
+      if (referralCode) {
+        console.log('[Mini App Auth] Found referral code:', referralCode);
+      }
+      
+      const tgUser = getTelegramUser();
+      console.log('[Mini App Auth] Telegram user:', tgUser);
+
+      const response = await apiRequest("POST", "/api/auth/telegram", {
+        initData,
+        name: tgUser?.first_name || "User",
+        referralCode: referralCode || undefined,
+      });
+      
+      if (response?.ok && response?.data) {
+        const { user: userData, token } = response.data;
+        console.log('[Mini App Auth] Login successful, redirecting to dashboard');
+        setAuth(userData, token);
+        setLocation("/dashboard");
+      } else {
+        console.error('[Mini App Auth] Login failed:', response);
+        // Fallback to widget on failure
+        setAuthMethod('widget');
+      }
+    } catch (error: any) {
+      console.error("[Mini App Auth] Error:", error);
+      // Fallback to widget on error
+      setAuthMethod('widget');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDevLogin = async () => {
     setIsLoading(true);
@@ -48,7 +103,7 @@ export default function Login() {
   };
 
   useEffect(() => {
-    if (isDev || !containerRef.current) return;
+    if (authMethod !== 'widget' || !containerRef.current) return;
 
     const botUsername = import.meta.env.VITE_BOT_USERNAME || "astro_orb_bot";
 
@@ -94,15 +149,16 @@ export default function Login() {
     return () => {
       window.onTelegramAuth = undefined;
     };
-  }, [setAuth, setLocation, isDev]);
+  }, [setAuth, setLocation, authMethod]);
 
-  if (isDev) {
+  // Show loading state for Mini App or Dev auth
+  if (authMethod === 'miniapp' || authMethod === 'dev') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
         <div className="max-w-md w-full space-y-8 text-center">
           <div className="space-y-4">
             <div className="flex justify-center">
-              <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30">
+              <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30 animate-pulse">
                 <Sparkles className="w-10 h-10 text-purple-300" />
               </div>
             </div>
@@ -119,10 +175,10 @@ export default function Login() {
           <div className="space-y-6 pt-8">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
               <p className="text-white mb-6">
-                {isLoading ? "Вход в dev режиме..." : "Автоматический вход для разработки"}
+                {authMethod === 'miniapp' ? "Вход через Telegram Mini App..." : "Вход в dev режиме..."}
               </p>
               
-              {!isLoading && (
+              {authMethod === 'dev' && !isLoading && (
                 <Button 
                   onClick={handleDevLogin}
                   className="w-full"
@@ -134,7 +190,7 @@ export default function Login() {
             </div>
 
             <p className="text-sm text-purple-300">
-              Dev режим: автоматическая аутентификация
+              {authMethod === 'miniapp' ? "Автоматическая аутентификация через Telegram" : "Dev режим: автоматическая аутентификация"}
             </p>
           </div>
         </div>

@@ -16,7 +16,10 @@ Preferred communication style: Simple, everyday language.
 
 ### Technical Implementation
 - **Backend**: Express.js with TypeScript.
-- **Authentication**: JWT-based with Telegram InitData validation and Telegram Login Widget support.
+- **Authentication**: Dual-mode authentication system:
+  - **Mini App Mode**: Automatic authentication via Telegram WebApp SDK (`initData` validation) for users accessing through t.me links (Menu Button "Играть")
+  - **Web Mode**: Telegram Login Widget for users accessing via direct HTTPS URL ("Открыть приложение")
+  - JWT-based session management for both modes
 - **API**: RESTful endpoints for authentication, astrology, payments, referrals, and user management.
 - **Astrology Engine**: Python-based Swiss Ephemeris for precise astronomical calculations.
 - **AI Integration**: OpenAI (GPT-5) via Replit AI Integrations for astrological interpretations, using custom, compact prompts with gender-based tone personalization and full localization. Includes personalized compatibility readings.
