@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEffect } from 'react';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 interface ReferralCodeResponse {
   ok: boolean;
@@ -76,6 +77,36 @@ export default function Referral() {
       hapticFeedback('medium');
     }
   };
+
+  // Dev-only mutation for simulating a referral signup without a real user
+  const devSimulateReferralMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/dev/test-referral', { action: 'simulate_signup' });
+    },
+    onSuccess: () => {
+      hapticFeedback('success');
+      toast({
+        title: locale === 'ru' ? 'Успех!' : 'Success!',
+        description: locale === 'ru' 
+          ? 'Реферальная регистрация симулирована. +5 энергии начислено!'
+          : 'Referral signup simulated. +5 energy credited!',
+      });
+      // Invalidate relevant queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['/api/referral/code'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/energy'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+    },
+    onError: () => {
+      hapticFeedback('error');
+      toast({
+        title: locale === 'ru' ? 'Ошибка' : 'Error',
+        description: locale === 'ru' 
+          ? 'Не удалось симулировать реферальную регистрацию'
+          : 'Failed to simulate referral signup',
+        variant: 'destructive',
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -157,6 +188,27 @@ export default function Referral() {
                   {locale === 'ru' ? 'Поделиться' : 'Share'}
                 </Button>
               </div>
+              {import.meta.env.DEV && (
+                <Button
+                  className="w-full mt-2"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => devSimulateReferralMutation.mutate()}
+                  disabled={devSimulateReferralMutation.isPending}
+                  data-testid="button-dev-simulate-referral"
+                >
+                  {devSimulateReferralMutation.isPending ? (
+                    <>
+                      <Loader size="sm" />
+                      {locale === 'ru' ? 'Симуляция...' : 'Simulating...'}
+                    </>
+                  ) : (
+                    <>
+                      {locale === 'ru' ? 'Dev: Симулировать реферала' : 'Dev: Simulate Referral'}
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           )}
         </Card>
