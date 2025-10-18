@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LocaleContext';
-import sunIcon from '@assets/IMG_8273_1760784912302.png';
+import sunIcon from '@assets/солнце_1760785218989.png';
 
 interface LoaderProps {
   className?: string;
@@ -121,9 +121,9 @@ export function Loader({ className, size = 'md', withPhrases = false }: LoaderPr
   const [fadeIn, setFadeIn] = useState(true);
 
   const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-16 h-16',
-    lg: 'w-24 h-24',
+    sm: 'w-10 h-10',
+    md: 'w-20 h-20',
+    lg: 'w-28 h-28',
   };
 
   useEffect(() => {
