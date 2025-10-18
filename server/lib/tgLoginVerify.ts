@@ -7,12 +7,12 @@ import { generateReferralCode } from "./referral";
 import { getNextResetTime } from "./energy";
 
 const TelegramLoginInput = z.object({
-  id: z.number(),
+  id: z.union([z.number(), z.string()]).transform(val => String(val)),
   first_name: z.string().optional(),
   last_name: z.string().optional(),
   username: z.string().optional(),
   photo_url: z.string().optional(),
-  auth_date: z.string(),
+  auth_date: z.union([z.number(), z.string()]).transform(val => String(val)),
   hash: z.string(),
 });
 
@@ -38,22 +38,28 @@ function verifyTelegramLoginHash(data: Record<string, string>): boolean {
 
 export async function handleTelegramLoginWidget(req: Request, res: Response) {
   try {
+    console.log('[Telegram Login Widget] Received data:', JSON.stringify(req.body, null, 2));
+    
     const parsed = TelegramLoginInput.safeParse(req.body);
     
     if (!parsed.success) {
+      console.error('[Telegram Login Widget] Validation failed:', parsed.error.format());
       return res.status(400).json({ 
         ok: false, 
-        error: "Invalid input data" 
+        error: "Invalid input data",
+        details: parsed.error.format()
       });
     }
     
     const loginData = parsed.data;
+    console.log('[Telegram Login Widget] Validation passed, user ID:', loginData.id);
     
     // Check auth_date (prevent replay attacks)
     const nowSeconds = Math.floor(Date.now() / 1000);
     const authSeconds = Number(loginData.auth_date);
     
     if (!Number.isFinite(authSeconds) || Math.abs(nowSeconds - authSeconds) > ALLOWED_SKEW_SECONDS) {
+      console.error('[Telegram Login Widget] Auth expired. Now:', nowSeconds, 'Auth:', authSeconds);
       return res.status(401).json({ 
         ok: false, 
         error: "Authentication expired" 
@@ -66,11 +72,14 @@ export async function handleTelegramLoginWidget(req: Request, res: Response) {
     );
     
     if (!verifyTelegramLoginHash(dataAsStrings)) {
+      console.error('[Telegram Login Widget] Invalid signature');
       return res.status(401).json({ 
         ok: false, 
         error: "Invalid signature" 
       });
     }
+    
+    console.log('[Telegram Login Widget] Signature verified successfully');
     
     // Get or create user
     const tgId = String(loginData.id);
@@ -99,7 +108,8 @@ export async function handleTelegramLoginWidget(req: Request, res: Response) {
       
       // Set initial energy
       await storage.updateUser(user.id, {
-        energy: 10,
+        freeEnergy: 10,
+        purchasedEnergy: 0,
         energyResetAt: getNextResetTime("Europe/Moscow"),
       });
       
