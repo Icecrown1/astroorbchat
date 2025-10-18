@@ -38,6 +38,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // SECURITY: Verify critical environment variables at startup
+  const REQUIRED_SECRETS = ['SESSION_SECRET', 'JWT_SECRET', 'DATABASE_URL', 'TELEGRAM_BOT_TOKEN'];
+  for (const secret of REQUIRED_SECRETS) {
+    if (!process.env[secret]) {
+      console.error(`[STARTUP] FATAL ERROR: Required environment variable ${secret} is not set`);
+      process.exit(1);
+    }
+  }
+  console.log('[STARTUP] ✓ All required secrets configured');
+
   const server = await registerRoutes(app);
 
   // Register Telegram webhook for Stars payments

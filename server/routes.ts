@@ -2728,8 +2728,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountStars: priceStars,
         timestamp: Date.now(),
       };
-      const signedPayload = signPayload(payloadData);
-      console.log('[Stars] Generated signed payload (first 50 chars):', signedPayload.substring(0, 50));
+      
+      let signedPayload: string;
+      try {
+        signedPayload = signPayload(payloadData);
+        console.log('[Stars] Generated signed payload (first 50 chars):', signedPayload.substring(0, 50));
+      } catch (error: any) {
+        console.error('[Stars] CRITICAL: Failed to sign payload -', error.message);
+        return res.status(500).json({ 
+          ok: false, 
+          error: "Payment system configuration error - please contact support" 
+        });
+      }
 
       // Create payment record with signed payload
       const starPayment = await storage.createStarPayment({

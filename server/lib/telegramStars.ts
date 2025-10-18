@@ -28,9 +28,14 @@ export interface RefundParams {
 
 /**
  * Create HMAC signature for invoice payload
+ * SECURITY: Requires SESSION_SECRET environment variable
  */
 export function signPayload(data: any): string {
-  const secret = process.env.SESSION_SECRET || 'default-secret';
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error('[Telegram Stars] SECURITY ERROR: SESSION_SECRET not configured - cannot sign payload');
+  }
+  
   const payload = JSON.stringify(data);
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payload);
@@ -39,16 +44,22 @@ export function signPayload(data: any): string {
 
 /**
  * Verify HMAC signature from invoice payload
+ * SECURITY: Requires SESSION_SECRET environment variable
  */
 export function verifyPayload(signedPayload: string): { valid: boolean; data?: any } {
   try {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) {
+      console.error('[Telegram Stars] SECURITY ERROR: SESSION_SECRET not configured - cannot verify payload');
+      return { valid: false };
+    }
+
     const [payloadBase64, signature] = signedPayload.split('.');
     if (!payloadBase64 || !signature) {
       return { valid: false };
     }
 
     const payload = Buffer.from(payloadBase64, 'base64').toString('utf-8');
-    const secret = process.env.SESSION_SECRET || 'default-secret';
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(payload);
     const expectedSignature = hmac.digest('hex');
