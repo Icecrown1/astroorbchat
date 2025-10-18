@@ -41,7 +41,7 @@ import {
   type InsertReferralReward
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -78,7 +78,10 @@ export interface IStorage {
   
   // Compatibility reading operations
   createCompatibilityReading(reading: InsertCompatibilityReading): Promise<CompatibilityReading>;
+  getCompatibilityReading(id: string): Promise<CompatibilityReading | undefined>;
   getCompatibilityReadingsByUserId(userId: string, limit?: number): Promise<CompatibilityReading[]>;
+  deleteCompatibilityReading(id: string): Promise<void>;
+  deleteOldCompatibilityReadings(userId: string): Promise<number>;
   
   // AI question operations
   createAiQuestion(question: InsertAiQuestion): Promise<AiQuestion>;
@@ -289,6 +292,14 @@ export class DatabaseStorage implements IStorage {
     return reading;
   }
 
+  async getCompatibilityReading(id: string): Promise<CompatibilityReading | undefined> {
+    const [reading] = await db
+      .select()
+      .from(compatibilityReadings)
+      .where(eq(compatibilityReadings.id, id));
+    return reading || undefined;
+  }
+
   async getCompatibilityReadingsByUserId(userId: string, limit: number = 10): Promise<CompatibilityReading[]> {
     return await db
       .select()
@@ -296,6 +307,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(compatibilityReadings.userId, userId))
       .orderBy(desc(compatibilityReadings.createdAt))
       .limit(limit);
+  }
+
+  async deleteCompatibilityReading(id: string): Promise<void> {
+    await db.delete(compatibilityReadings).where(eq(compatibilityReadings.id, id));
+  }
+
+  async deleteOldCompatibilityReadings(userId: string): Promise<number> {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    const result = await db
+      .delete(compatibilityReadings)
+      .where(
+        and(
+          eq(compatibilityReadings.userId, userId),
+          lt(compatibilityReadings.createdAt, twoWeeksAgo)
+        )
+      );
+    
+    return result.rowCount || 0;
   }
 
   // AI question operations
