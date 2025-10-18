@@ -10,6 +10,14 @@ import { UserPlus, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
 interface GuestChart {
   id: string;
@@ -29,6 +37,7 @@ export function GuestChartForm() {
     birthdayDate: '',
     birthTime: '12:00',
     birthPlace: '',
+    timezone: dayjs.tz.guess(),
   });
 
   const { data: guestCharts, isLoading: chartsLoading } = useQuery<{ ok: boolean; data: GuestChart[] }>({
@@ -43,7 +52,7 @@ export function GuestChartForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '' });
+      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '', timezone: dayjs.tz.guess() });
       toast({
         title: locale === 'ru' ? "Гостевая карта создана!" : "Guest chart created!",
         description: locale === 'ru' ? "Карта сохранена и доступна для анализа совместимости." : "Chart saved and available for compatibility analysis.",
@@ -149,6 +158,27 @@ export function GuestChartForm() {
               placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
               data-testid="input-guest-birthplace"
             />
+          </div>
+
+          <div>
+            <Label htmlFor="guest-timezone">
+              {locale === 'ru' ? 'Часовой пояс' : 'Timezone'}
+            </Label>
+            <Select
+              value={formData.timezone}
+              onValueChange={(value) => setFormData({ ...formData, timezone: value })}
+            >
+              <SelectTrigger id="guest-timezone" data-testid="select-guest-timezone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button
