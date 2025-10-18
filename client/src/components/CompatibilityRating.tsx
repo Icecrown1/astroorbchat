@@ -15,6 +15,7 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
         bg: 'bg-red-50 dark:bg-red-950/20',
         border: 'border-red-200 dark:border-red-800',
         text: 'text-red-700 dark:text-red-400',
+        progressBg: 'bg-red-700 dark:bg-red-400',
         glow: 'shadow-red-500/20',
       };
     } else if (rating <= 5.0) {
@@ -23,6 +24,7 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
         bg: 'bg-orange-50 dark:bg-orange-950/20',
         border: 'border-orange-200 dark:border-orange-800',
         text: 'text-orange-700 dark:text-orange-400',
+        progressBg: 'bg-orange-600 dark:bg-orange-400',
         glow: 'shadow-orange-500/20',
       };
     } else if (rating <= 7.0) {
@@ -31,6 +33,7 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
         bg: 'bg-emerald-50 dark:bg-emerald-950/20',
         border: 'border-emerald-200 dark:border-emerald-800',
         text: 'text-emerald-700 dark:text-emerald-400',
+        progressBg: 'bg-emerald-600 dark:bg-emerald-400',
         glow: 'shadow-emerald-500/20',
       };
     } else {
@@ -39,6 +42,7 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
         bg: 'bg-green-50 dark:bg-green-950/20',
         border: 'border-green-200 dark:border-green-800',
         text: 'text-green-700 dark:text-green-400',
+        progressBg: 'bg-green-600 dark:bg-green-400',
         glow: 'shadow-green-500/20',
       };
     }
@@ -108,7 +112,7 @@ export function CompatibilityRating({ rating, relationshipType = 'romantic', loc
       {/* Visual progress bar */}
       <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
         <div 
-          className={`h-full ${colors.text.replace('text-', 'bg-')} transition-all duration-500`}
+          className={`h-full ${colors.progressBg} transition-all duration-500`}
           style={{ width: `${(rating / 10) * 100}%` }}
           data-testid="rating-progress"
         />

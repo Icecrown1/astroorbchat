@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
+import { CompatibilityRating } from '@/components/CompatibilityRating';
 import { ArrowLeft, Heart, HeartCrack, UserPlus, Users } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -317,6 +318,17 @@ export default function Compatibility() {
                   {t.compatibility.result}
                 </p>
               </div>
+
+              {compatibilityData.compatibilityRating && (
+                <div className="mb-6">
+                  <CompatibilityRating
+                    rating={compatibilityData.compatibilityRating}
+                    relationshipType={form.watch('relationshipType')}
+                    locale={locale}
+                  />
+                </div>
+              )}
+
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <p className="text-foreground leading-relaxed whitespace-pre-line">
                   {compatibilityData.analysis}
