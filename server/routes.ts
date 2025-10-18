@@ -1396,36 +1396,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Partner's chart (always calculate fresh, this is what costs energy)
-      // Parse partner date and time with timezone conversion
-      const partnerDateStr = partner.date;
-      const [partnerDatePart] = partnerDateStr.split('T');
-      const [partnerYear, partnerMonth, partnerDay] = partnerDatePart.split('-').map(Number);
+      // Partner's chart - use saved data if exists, otherwise calculate fresh
+      let person2ChartData: NatalChartResult;
       
-      const [partnerLocalHours = 12, partnerLocalMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
-      
-      // Geocode partner's birth city to get coordinates
-      const partnerCoords = await geocodeCityWithFallback(partner.place);
-      
-      // Convert local time to UTC for Swiss Ephemeris (use UTC as default timezone for partner)
-      const partnerTimezone = partner.timezone || 'UTC';
-      const partnerLocalDateTimeStr = `${partnerYear}-${String(partnerMonth).padStart(2, '0')}-${String(partnerDay).padStart(2, '0')} ${String(partnerLocalHours).padStart(2, '0')}:${String(partnerLocalMinutes).padStart(2, '0')}:00`;
-      const partnerLocalDateTime = dayjs.tz(partnerLocalDateTimeStr, partnerTimezone);
-      const partnerUtcDateTime = partnerLocalDateTime.utc();
-      
-      const person2ChartData = await calculateNatalChartPython({
-        year: partnerUtcDateTime.year(),
-        month: partnerUtcDateTime.month() + 1,
-        day: partnerUtcDateTime.date(),
-        hour: partnerUtcDateTime.hour(),
-        minute: partnerUtcDateTime.minute(),
-        latitude: partnerCoords.lat,
-        longitude: partnerCoords.lon,
-        house_system: 'Placidus',
-      });
+      if (finalGuestChartId && !needsNewGuestChart) {
+        // Use existing guest chart data
+        const existingChart = await storage.getExternalNatal(finalGuestChartId);
+        if (!existingChart || !existingChart.data) {
+          return res.status(404).json({ ok: false, error: "Guest chart data not found" });
+        }
+        person2ChartData = existingChart.data as NatalChartResult;
+        console.log('Using existing guest chart data for:', existingChart.name);
+      } else {
+        // Calculate fresh chart for new guest
+        const partnerDateStr = partner.date;
+        const [partnerDatePart] = partnerDateStr.split('T');
+        const [partnerYear, partnerMonth, partnerDay] = partnerDatePart.split('-').map(Number);
+        
+        const [partnerLocalHours = 12, partnerLocalMinutes = 0] = (partner.time || '12:00').split(':').map(Number);
+        
+        // Geocode partner's birth city to get coordinates
+        const partnerCoords = await geocodeCityWithFallback(partner.place);
+        
+        // Convert local time to UTC for Swiss Ephemeris (use UTC as default timezone for partner)
+        const partnerTimezone = partner.timezone || 'UTC';
+        const partnerLocalDateTimeStr = `${partnerYear}-${String(partnerMonth).padStart(2, '0')}-${String(partnerDay).padStart(2, '0')} ${String(partnerLocalHours).padStart(2, '0')}:${String(partnerLocalMinutes).padStart(2, '0')}:00`;
+        const partnerLocalDateTime = dayjs.tz(partnerLocalDateTimeStr, partnerTimezone);
+        const partnerUtcDateTime = partnerLocalDateTime.utc();
+        
+        person2ChartData = await calculateNatalChartPython({
+          year: partnerUtcDateTime.year(),
+          month: partnerUtcDateTime.month() + 1,
+          day: partnerUtcDateTime.date(),
+          hour: partnerUtcDateTime.hour(),
+          minute: partnerUtcDateTime.minute(),
+          latitude: partnerCoords.lat,
+          longitude: partnerCoords.lon,
+          house_system: 'Placidus',
+        });
 
-      // Create guest chart if needed
-      if (needsNewGuestChart) {
+        // Create guest chart
         const newGuestChart = await storage.createExternalNatal({
           ownerId: userId,
           name: partner.name,
@@ -1437,6 +1447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: person2ChartData as any,
         });
         finalGuestChartId = newGuestChart.id;
+        console.log('Created new guest chart for:', partner.name);
       }
 
       // Transform for AI interpretation (convert to array format expected by AI)
