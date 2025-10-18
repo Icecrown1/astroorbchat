@@ -70,7 +70,10 @@ export async function getAstrologyInterpretation(
     },
     compatibility: {
       host_name: data.host_name || 'Person 1',
+      host_gender: data.host_gender || 'other',
       partner_name: data.partner_name || 'Person 2',
+      partner_gender: data.partner_gender || 'other',
+      relationship_type: data.relationship_type || 'romantic',
       person1: JSON.stringify(data.person1, null, 2),
       person2: JSON.stringify(data.person2, null, 2)
     },
