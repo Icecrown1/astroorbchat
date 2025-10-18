@@ -19,6 +19,7 @@ import {
   Users,
   Settings as SettingsIcon,
   Receipt,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -231,6 +232,17 @@ export default function Dashboard() {
             <Receipt className="w-4 h-4 mr-2" />
             {t.nav.paymentHistory}
           </Button>
+          {user?.isAdmin && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate('/admin')}
+              data-testid="button-admin"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              {locale === 'ru' ? 'Админ панель' : 'Admin Panel'}
+            </Button>
+          )}
         </div>
       </div>
     </div>
