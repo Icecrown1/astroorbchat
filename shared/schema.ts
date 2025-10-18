@@ -227,7 +227,10 @@ export const compatibilityReadings = pgTable("compatibility_readings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   partnerName: text("partner_name").notNull(),
+  partnerGender: varchar("partner_gender", { length: 20 }).default('other'),
   partnerDate: timestamp("partner_date").notNull(),
+  relationshipType: varchar("relationship_type", { length: 20 }).notNull().default('romantic'),
+  guestChartId: varchar("guest_chart_id", { length: 255 }),
   analysis: text("analysis").notNull(),
   isProfessional: boolean("is_professional").notNull().default(false),
   professionalInterpretation: jsonb("professional_interpretation"),
@@ -235,6 +238,7 @@ export const compatibilityReadings = pgTable("compatibility_readings", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("compatibility_readings_user_id_idx").on(table.userId),
+  guestChartIdIdx: index("compatibility_readings_guest_chart_id_idx").on(table.guestChartId),
 }));
 
 export const compatibilityReadingsRelations = relations(compatibilityReadings, ({ one }) => ({
@@ -383,7 +387,10 @@ export const insertHoroscopeReadingSchema = createInsertSchema(horoscopeReadings
 export const insertCompatibilityReadingSchema = createInsertSchema(compatibilityReadings, {
   userId: z.string(),
   partnerName: z.string(),
+  partnerGender: z.enum(["male", "female", "other"]).default("other"),
   partnerDate: z.date().or(z.string()),
+  relationshipType: z.enum(["romantic", "friendship", "work", "family"]).default("romantic"),
+  guestChartId: z.string().optional().nullable(),
   analysis: z.string(),
   isProfessional: z.boolean().optional(),
   professionalInterpretation: z.any().optional(),

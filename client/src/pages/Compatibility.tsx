@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
 import { ArrowLeft, Heart, HeartCrack, UserPlus, Users } from 'lucide-react';
@@ -36,18 +37,22 @@ export default function Compatibility() {
 
   const compatibilitySchema = useMemo(() => z.object({
     partnerName: z.string().min(1, locale === 'ru' ? 'Имя партнера обязательно' : 'Partner name is required'),
+    partnerGender: z.enum(['male', 'female', 'other']),
     partnerDate: z.string().min(1, locale === 'ru' ? 'Дата рождения партнера обязательна' : 'Partner birth date is required'),
     partnerTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
     partnerPlace: z.string().optional(),
+    relationshipType: z.enum(['romantic', 'friendship', 'work', 'family']),
   }), [locale]);
 
   const form = useForm({
     resolver: zodResolver(compatibilitySchema),
     defaultValues: {
       partnerName: '',
+      partnerGender: 'other' as 'male' | 'female' | 'other',
       partnerDate: '',
       partnerTime: '',
       partnerPlace: '',
+      relationshipType: 'romantic' as 'romantic' | 'friendship' | 'work' | 'family',
     },
   });
 
@@ -56,10 +61,13 @@ export default function Compatibility() {
       const response = await apiRequest('POST', '/api/astrology/compatibility', {
         partner: {
           name: data.partnerName,
+          gender: data.partnerGender,
           date: data.partnerDate,
           time: data.partnerTime || null,
           place: data.partnerPlace || null,
         },
+        relationshipType: data.relationshipType,
+        guestChartId: selectedGuestId,
         locale,
       });
       return response.data;
@@ -129,6 +137,7 @@ export default function Compatibility() {
                       onClick={() => {
                         setSelectedGuestId(chart.id);
                         form.setValue('partnerName', chart.name);
+                        form.setValue('partnerGender', chart.gender as 'male' | 'female' | 'other');
                         const formattedDate = chart.birthdayDate ? chart.birthdayDate.split('T')[0] : '';
                         form.setValue('partnerDate', formattedDate);
                         form.setValue('partnerTime', chart.birthTime || '');
@@ -173,6 +182,28 @@ export default function Compatibility() {
               </div>
 
               <div>
+                <Label htmlFor="partnerGender">{t.compatibility.partnerGender}</Label>
+                <Select
+                  value={form.watch('partnerGender')}
+                  onValueChange={(value) => form.setValue('partnerGender', value as 'male' | 'female' | 'other')}
+                >
+                  <SelectTrigger data-testid="select-partner-gender">
+                    <SelectValue placeholder={t.compatibility.partnerGender} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{t.compatibility.male}</SelectItem>
+                    <SelectItem value="female">{t.compatibility.female}</SelectItem>
+                    <SelectItem value="other">{t.compatibility.other}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.partnerGender && (
+                  <p className="text-sm text-destructive mt-1">
+                    {form.formState.errors.partnerGender.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <Label htmlFor="partnerDate">{t.auth.birthDate}</Label>
                 <Input
                   id="partnerDate"
@@ -205,6 +236,29 @@ export default function Compatibility() {
                   placeholder={t.compatibility.placePlaceholder}
                   data-testid="input-partner-place"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="relationshipType">{t.compatibility.relationshipType}</Label>
+                <Select
+                  value={form.watch('relationshipType')}
+                  onValueChange={(value) => form.setValue('relationshipType', value as 'romantic' | 'friendship' | 'work' | 'family')}
+                >
+                  <SelectTrigger data-testid="select-relationship-type">
+                    <SelectValue placeholder={t.compatibility.relationshipType} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="romantic">{t.compatibility.romantic}</SelectItem>
+                    <SelectItem value="friendship">{t.compatibility.friendship}</SelectItem>
+                    <SelectItem value="work">{t.compatibility.work}</SelectItem>
+                    <SelectItem value="family">{t.compatibility.family}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.relationshipType && (
+                  <p className="text-sm text-destructive mt-1">
+                    {form.formState.errors.relationshipType.message}
+                  </p>
+                )}
               </div>
 
               <Button
