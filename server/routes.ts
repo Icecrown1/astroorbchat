@@ -15,7 +15,7 @@ import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged }
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
-import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment, signPayload, verifyPayload } from "./lib/telegramStars";
+import { createInvoiceLink, answerPreCheckoutQuery, refundStarPayment } from "./lib/telegramStars";
 import { z } from "zod";
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
@@ -2719,44 +2719,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[Stars] Payment config:', { title, priceStars, energyAmount, tier });
 
-      // Generate signed payload with HMAC for security
-      const payloadData = {
-        userId,
-        kind: validated.kind,
-        tier,
-        energyAmount,
-        amountStars: priceStars,
-        timestamp: Date.now(),
-      };
-      
-      let signedPayload: string;
-      try {
-        signedPayload = signPayload(payloadData);
-        console.log('[Stars] Generated signed payload (first 50 chars):', signedPayload.substring(0, 50));
-      } catch (error: any) {
-        console.error('[Stars] CRITICAL: Failed to sign payload -', error.message);
-        return res.status(500).json({ 
-          ok: false, 
-          error: "Payment system configuration error - please contact support" 
-        });
-      }
-
-      // Create payment record with signed payload
+      // Create payment record FIRST (we'll use its ID as the invoice payload)
       const starPayment = await storage.createStarPayment({
         userId,
         kind: validated.kind,
         tier,
         energyAmount,
         amountStars: priceStars,
-        invoicePayload: signedPayload,
+        invoicePayload: '', // Placeholder - will use payment.id as actual payload
       });
-      console.log('[Stars] Payment record created:', starPayment.id);
+      
+      // Use payment ID as payload (short, unique, and under 128 bytes limit)
+      const payload = starPayment.id;
+      
+      console.log('[Stars] Payment record created with ID:', starPayment.id);
+      console.log('[Stars] Using payment ID as invoice payload (length:', payload.length, 'bytes)');
 
-      // Create invoice link with signed payload
+      // Create invoice link with payment ID as payload
       const invoiceResult = await createInvoiceLink({
         title,
         description,
-        payload: signedPayload,
+        payload,
         prices: [{ label: title, amount: priceStars }],
       });
 
@@ -2811,35 +2794,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('[Telegram Webhook] Query ID:', queryId);
         console.log('[Telegram Webhook] From user:', from?.id, from?.username);
         console.log('[Telegram Webhook] Total amount:', total_amount);
-        console.log('[Telegram Webhook] Invoice payload (first 100 chars):', invoice_payload.substring(0, 100));
+        console.log('[Telegram Webhook] Invoice payload (payment ID):', invoice_payload);
 
-        // STEP 1: Verify HMAC signature of payload
-        console.log('[Telegram Webhook] Verifying HMAC signature...');
-        const verification = verifyPayload(invoice_payload);
-        
-        if (!verification.valid) {
-          console.error('[Telegram Webhook] SECURITY: Invalid HMAC signature - payload tampered or corrupted');
-          await answerPreCheckoutQuery({
-            preCheckoutQueryId: queryId,
-            ok: false,
-            errorMessage: "Order validation failed",
-          });
-          return res.json({ ok: true });
-        }
-        
-        console.log('[Telegram Webhook] HMAC signature valid ✓');
-        console.log('[Telegram Webhook] Decoded payload data:', verification.data);
-
-        // STEP 2: Check if payment exists in database
+        // STEP 1: Find payment by ID (payload is the payment ID)
         console.log('[Telegram Webhook] Looking up payment in database...');
         const payment = await storage.getStarPaymentByPayload(invoice_payload);
         
         if (!payment) {
-          console.error('[Telegram Webhook] Payment not found in database');
+          console.error('[Telegram Webhook] Payment not found in database for ID:', invoice_payload);
           await answerPreCheckoutQuery({
             preCheckoutQueryId: queryId,
             ok: false,
-            errorMessage: "Order validation failed",
+            errorMessage: "Order not found",
           });
           return res.json({ ok: true });
         }
@@ -2849,7 +2815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('[Telegram Webhook] Payment userId:', payment.userId);
         console.log('[Telegram Webhook] Payment amount:', payment.amountStars);
 
-        // STEP 3: Verify payment is pending
+        // STEP 2: Verify payment is pending
         if (payment.status !== 'pending') {
           console.error('[Telegram Webhook] Payment already processed, status:', payment.status);
           await answerPreCheckoutQuery({
@@ -2860,7 +2826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ ok: true });
         }
 
-        // STEP 4: Verify amount matches (security check)
+        // STEP 3: Verify amount matches (security check)
         if (payment.amountStars !== total_amount) {
           console.error('[Telegram Webhook] SECURITY: Amount mismatch!', {
             expected: payment.amountStars,
@@ -2893,7 +2859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('[Telegram Webhook] ===== SUCCESSFUL PAYMENT =====');
         console.log('[Telegram Webhook] Charge ID:', telegram_payment_charge_id);
-        console.log('[Telegram Webhook] Invoice payload (first 100 chars):', invoice_payload.substring(0, 100));
+        console.log('[Telegram Webhook] Invoice payload (payment ID):', invoice_payload);
         console.log('[Telegram Webhook] Total amount:', total_amount);
 
         // Atomic update to prevent race conditions
