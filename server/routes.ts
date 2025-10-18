@@ -1319,7 +1319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/compatibility", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { partner, professional = false } = req.body;
+      const { partner, professional = false, relationshipType = 'romantic', guestChartId } = req.body;
       const locale = req.body.locale || 'en';
 
       // Check energy first (without deducting)
@@ -1329,7 +1329,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      const cost = professional ? ENERGY_COSTS.compatibility_professional : ENERGY_COSTS.compatibility;
+      // Check if we need to create a new guest chart or use existing one
+      let finalGuestChartId = guestChartId;
+      let needsNewGuestChart = false;
+      
+      if (!guestChartId) {
+        // Check if a guest chart with the same birth data already exists
+        const existingGuestCharts = await storage.getExternalNatalsByOwnerId(userId);
+        const matchingChart = existingGuestCharts.find((chart: any) => {
+          const chartDate = typeof chart.birthdayDate === 'string' 
+            ? chart.birthdayDate.split('T')[0] 
+            : chart.birthdayDate.toISOString().split('T')[0];
+          const partnerDate = partner.date.split('T')[0];
+          return chartDate === partnerDate && 
+                 chart.birthTime === (partner.time || null) &&
+                 chart.name === partner.name;
+        });
+
+        if (matchingChart) {
+          finalGuestChartId = matchingChart.id;
+        } else {
+          needsNewGuestChart = true;
+        }
+      }
+
+      // Calculate cost based on whether we need to create a guest chart
+      const baseCost = professional ? ENERGY_COSTS.compatibility_professional : ENERGY_COSTS.compatibility;
+      const cost = needsNewGuestChart ? baseCost + 2 : baseCost;
+      
       if ((user.freeEnergy + user.purchasedEnergy) < cost) {
         return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
@@ -1397,6 +1424,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         house_system: 'Placidus',
       });
 
+      // Create guest chart if needed
+      if (needsNewGuestChart) {
+        const newGuestChart = await storage.createExternalNatal({
+          ownerId: userId,
+          name: partner.name,
+          gender: partner.gender || 'other',
+          birthdayDate: new Date(partner.date),
+          birthTime: partner.time || null,
+          birthPlace: partner.place || null,
+          timezone: partner.timezone || 'UTC',
+          data: person2ChartData as any,
+        });
+        finalGuestChartId = newGuestChart.id;
+      }
+
       // Transform for AI interpretation (convert to array format expected by AI)
       const person1Chart = {
         planets: Object.entries(person1ChartData.planets).map(([name, data]) => ({
@@ -1462,7 +1504,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Basic compatibility interpretation
         analysis = await getAstrologyInterpretation("compatibility", {
           host_name: user.name,
+          host_gender: user.gender,
           partner_name: partner.name,
+          partner_gender: partner.gender || 'other',
+          relationship_type: relationshipType,
           person1: person1Chart,
           person2: person2Chart,
         }, locale, user.gender);
@@ -1471,7 +1516,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createCompatibilityReading({
         userId,
         partnerName: partner.name,
+        partnerGender: partner.gender || 'other',
         partnerDate: new Date(partner.date),
+        relationshipType: relationshipType,
+        guestChartId: finalGuestChartId || null,
         analysis,
         isProfessional: professional,
         professionalInterpretation: professionalInterpretation as any,
