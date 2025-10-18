@@ -2675,7 +2675,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/payments/stars/create", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      console.log('[Stars] Creating payment for userId:', userId);
       const validated = createStarsInvoiceSchema.parse(req.body);
+      console.log('[Stars] Validated request:', validated);
 
       // Determine pricing based on kind and pack/tier
       let title: string;
@@ -2692,6 +2694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }[validated.pack.energy as 20 | 50 | 120];
 
         if (!packConfig) {
+          console.error('[Stars] Invalid pack:', validated.pack.energy);
           return res.status(400).json({ ok: false, error: "Invalid energy pack" });
         }
 
@@ -2710,34 +2713,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priceStars = tierConfig.stars;
         tier = validated.tier;
       } else {
+        console.error('[Stars] Invalid request - missing pack or tier');
         return res.status(400).json({ ok: false, error: "Invalid request: must specify pack or tier" });
       }
 
-      // Generate short unique payload (well within 128 byte limit)
-      const shortPayload = `star_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('[Stars] Payment config:', { title, priceStars, energyAmount, tier });
 
-      // Create payment record with short payload
+      // Generate signed payload with HMAC for security
+      const payloadData = {
+        userId,
+        kind: validated.kind,
+        tier,
+        energyAmount,
+        amountStars: priceStars,
+        timestamp: Date.now(),
+      };
+      const signedPayload = signPayload(payloadData);
+      console.log('[Stars] Generated signed payload (first 50 chars):', signedPayload.substring(0, 50));
+
+      // Create payment record with signed payload
       const starPayment = await storage.createStarPayment({
         userId,
         kind: validated.kind,
-        tier, // For subscriptions
+        tier,
         energyAmount,
         amountStars: priceStars,
-        invoicePayload: shortPayload,
+        invoicePayload: signedPayload,
       });
+      console.log('[Stars] Payment record created:', starPayment.id);
 
-      // Create invoice link with short payload
+      // Create invoice link with signed payload
       const invoiceResult = await createInvoiceLink({
         title,
         description,
-        payload: shortPayload,
+        payload: signedPayload,
         prices: [{ label: title, amount: priceStars }],
       });
 
       if (!invoiceResult.ok) {
+        console.error('[Stars] Failed to create invoice link:', invoiceResult.error);
         return res.status(500).json({ ok: false, error: invoiceResult.error || "Failed to create invoice" });
       }
 
+      console.log('[Stars] Invoice link created successfully');
       res.json({
         ok: true,
         data: {
@@ -2747,6 +2765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
+        console.error('[Stars] Validation error:', error.errors);
         return res.status(400).json({ ok: false, error: error.errors[0].message });
       }
       console.error('[Stars] Create invoice error:', error);
