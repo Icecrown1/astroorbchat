@@ -26,6 +26,7 @@ import Settings from '@/pages/Settings';
 import PaymentHistory from '@/pages/PaymentHistory';
 import Admin from '@/pages/Admin';
 import Archive from '@/pages/Archive';
+import Legal from '@/pages/Legal';
 
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
@@ -38,7 +39,7 @@ function Router() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated && location !== '/register' && location !== '/login') {
+    if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal') {
       navigate('/register');
     }
   }, [isAuthenticated, location, navigate]);
@@ -47,6 +48,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/legal" component={Legal} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/my-natal-chart" component={MyNatalChart} />
       <Route path="/natal-chart" component={NatalChart} />
