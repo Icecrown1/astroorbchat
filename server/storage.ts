@@ -12,6 +12,7 @@ import {
   externalNatals,
   importantDateUnlocks,
   starPayments,
+  yookassaPayments,
   referralRewards,
   type User, 
   type InsertUser,
@@ -37,6 +38,8 @@ import {
   type InsertImportantDateUnlock,
   type StarPayment,
   type InsertStarPayment,
+  type YookassaPayment,
+  type InsertYookassaPayment,
   type ReferralReward,
   type InsertReferralReward
 } from "@shared/schema";
@@ -109,6 +112,12 @@ export interface IStorage {
   getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined>;
   updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined>;
   atomicStartProcessing(invoicePayload: string, telegramChargeId: string): Promise<StarPayment | null>;
+  
+  // YooKassa payment operations
+  createYookassaPayment(payment: InsertYookassaPayment): Promise<YookassaPayment>;
+  getYookassaPaymentById(yookassaPaymentId: string): Promise<YookassaPayment | undefined>;
+  getYookassaPaymentsByUserId(userId: string): Promise<YookassaPayment[]>;
+  updateYookassaPayment(yookassaPaymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined>;
   
   // Referral reward operations
   createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
@@ -491,6 +500,40 @@ export class DatabaseStorage implements IStorage {
       )
       .returning();
     return payment || null;
+  }
+
+  // YooKassa payment operations
+  async createYookassaPayment(insertPayment: InsertYookassaPayment): Promise<YookassaPayment> {
+    const [payment] = await db
+      .insert(yookassaPayments)
+      .values(insertPayment)
+      .returning();
+    return payment;
+  }
+
+  async getYookassaPaymentById(yookassaPaymentId: string): Promise<YookassaPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(yookassaPayments)
+      .where(eq(yookassaPayments.yookassaPaymentId, yookassaPaymentId));
+    return payment || undefined;
+  }
+
+  async getYookassaPaymentsByUserId(userId: string): Promise<YookassaPayment[]> {
+    return await db
+      .select()
+      .from(yookassaPayments)
+      .where(eq(yookassaPayments.userId, userId))
+      .orderBy(desc(yookassaPayments.createdAt));
+  }
+
+  async updateYookassaPayment(yookassaPaymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined> {
+    const [payment] = await db
+      .update(yookassaPayments)
+      .set(data)
+      .where(eq(yookassaPayments.yookassaPaymentId, yookassaPaymentId))
+      .returning();
+    return payment || undefined;
   }
 
   // Admin operations

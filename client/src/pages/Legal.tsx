@@ -27,7 +27,10 @@ export default function Legal() {
                 <User className="w-5 h-5 mt-0.5 text-purple-300" />
                 <div>
                   <p className="font-medium text-white">Самозанятый</p>
-                  <p className="text-sm">Статус плательщика НПД (налог на профессиональный доход)</p>
+                  <p className="text-sm">Садаев Алексей Сергеевич</p>
+                  <p className="text-xs text-purple-300 mt-1">
+                    Статус плательщика НПД (налог на профессиональный доход)
+                  </p>
                 </div>
               </div>
 
@@ -35,10 +38,7 @@ export default function Legal() {
                 <FileText className="w-5 h-5 mt-0.5 text-purple-300" />
                 <div>
                   <p className="font-medium text-white">ИНН</p>
-                  <p className="text-sm font-mono">123456789012</p>
-                  <p className="text-xs text-purple-300 mt-1">
-                    * Укажите ваш реальный ИНН самозанятого
-                  </p>
+                  <p className="text-sm font-mono">026819831820</p>
                 </div>
               </div>
 
@@ -46,10 +46,7 @@ export default function Legal() {
                 <Mail className="w-5 h-5 mt-0.5 text-purple-300" />
                 <div>
                   <p className="font-medium text-white">Email поддержки</p>
-                  <p className="text-sm">support@astroorb.example</p>
-                  <p className="text-xs text-purple-300 mt-1">
-                    * Укажите ваш реальный email для связи
-                  </p>
+                  <p className="text-sm">alekseysadaev1@gmail.com</p>
                 </div>
               </div>
             </div>

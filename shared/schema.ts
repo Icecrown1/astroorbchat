@@ -57,6 +57,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   externalNatals: many(externalNatals),
   importantDateUnlocks: many(importantDateUnlocks),
+  yookassaPayments: many(yookassaPayments),
 }));
 
 export const natalCharts = pgTable("natal_charts", {
@@ -310,6 +311,29 @@ export const starPaymentsRelations = relations(starPayments, ({ one }) => ({
   }),
 }));
 
+export const yookassaPayments = pgTable("yookassa_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  kind: varchar("kind", { length: 50 }).notNull(), // "energy_pack" or "subscription"
+  tier: varchar("tier", { length: 20 }), // For subscriptions: "standard" or "pro"
+  energyAmount: integer("energy_amount"), // For energy packs
+  amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }).notNull(),
+  yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }).unique(), // YooKassa payment ID
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, succeeded, canceled
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  yookassaPaymentIdIdx: index("yookassa_payments_yookassa_payment_id_idx").on(table.yookassaPaymentId),
+  userIdIdx: index("yookassa_payments_user_id_idx").on(table.userId),
+}));
+
+export const yookassaPaymentsRelations = relations(yookassaPayments, ({ one }) => ({
+  user: one(users, {
+    fields: [yookassaPayments.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users, {
   tgId: z.string().min(1),
@@ -455,6 +479,20 @@ export const insertStarPaymentSchema = createInsertSchema(starPayments, {
   status: true,
 });
 
+export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, {
+  userId: z.string(),
+  kind: z.enum(["energy_pack", "subscription"]),
+  tier: z.string().optional(),
+  energyAmount: z.number().optional(),
+  amountRUB: z.string(), // Decimal as string
+  yookassaPaymentId: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+  status: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -491,6 +529,9 @@ export type InsertImportantDateUnlock = z.infer<typeof insertImportantDateUnlock
 
 export type StarPayment = typeof starPayments.$inferSelect;
 export type InsertStarPayment = z.infer<typeof insertStarPaymentSchema>;
+
+export type YookassaPayment = typeof yookassaPayments.$inferSelect;
+export type InsertYookassaPayment = z.infer<typeof insertYookassaPaymentSchema>;
 
 export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({ id: true, createdAt: true });
 export type ReferralReward = typeof referralRewards.$inferSelect;
