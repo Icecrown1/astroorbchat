@@ -13,9 +13,9 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 
 const ENERGY_PACKS = [
-  { amount: 20, usdPrice: 2.99, starsPrice: 190, popular: false },
-  { amount: 50, usdPrice: 5.99, starsPrice: 375, popular: true },
-  { amount: 120, usdPrice: 11.99, starsPrice: 750, popular: false },
+  { amount: 20, usdPrice: 2.99, starsPrice: 190, rubPrice: 150, popular: false },
+  { amount: 50, usdPrice: 5.99, starsPrice: 375, rubPrice: 300, popular: true },
+  { amount: 120, usdPrice: 11.99, starsPrice: 750, rubPrice: 600, popular: false },
 ];
 
 export default function BuyEnergy() {
@@ -284,6 +284,41 @@ export default function BuyEnergy() {
     },
   });
 
+  const yookassaMutation = useMutation({
+    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+      console.log('[YooKassa] Creating payment for pack:', pack);
+      const response = await apiRequest('POST', '/api/payments/yookassa/create', {
+        kind: 'energy_pack',
+        pack: { energy: pack.amount }
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      console.log('[YooKassa] Payment created, redirecting to:', data.confirmationUrl);
+      if (data.confirmationUrl) {
+        // Redirect to YooKassa payment page
+        window.location.href = data.confirmationUrl;
+      } else {
+        toast({
+          title: t.common.error,
+          description: locale === 'ru'
+            ? 'Не удалось получить ссылку на оплату'
+            : 'Failed to get payment link',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error('[YooKassa] Error:', error);
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     const data = pricesData as any;
     if (data?.ok && data.data?.tonRate) {
@@ -371,6 +406,9 @@ export default function BuyEnergy() {
                       <Star className="w-3 h-3 text-yellow-500" />
                       {pack.starsPrice} Stars
                     </p>
+                    <p className="text-sm text-muted-foreground">
+                      {pack.rubPrice} ₽
+                    </p>
                   </div>
                 </div>
 
@@ -445,6 +483,29 @@ export default function BuyEnergy() {
                       </>
                     )}
                   </Button>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPack(pack.amount);
+                      yookassaMutation.mutate(pack);
+                    }}
+                    disabled={yookassaMutation.isPending && selectedPack === pack.amount}
+                    data-testid={`button-buy-rubles-${pack.amount}`}
+                  >
+                    {yookassaMutation.isPending && selectedPack === pack.amount ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.buyEnergy.purchasing}
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? `Оплатить ${pack.rubPrice} ₽` : `Pay ${pack.rubPrice} ₽`}
+                      </>
+                    )}
+                  </Button>
                 </div>
               </Card>
             ))}
@@ -455,8 +516,8 @@ export default function BuyEnergy() {
         <Card className="mt-6 p-4 bg-muted/50">
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' ? 
-              'Оплата через Telegram Stars или TON блокчейн. Энергия зачисляется мгновенно после подтверждения.' :
-              'Pay with Telegram Stars or TON blockchain. Energy is added instantly after confirmation.'
+              'Оплата через Telegram Stars, TON блокчейн или банковской картой (рубли). Энергия зачисляется мгновенно после подтверждения.' :
+              'Pay with Telegram Stars, TON blockchain or bank card (Rubles). Energy is added instantly after confirmation.'
             }
           </p>
         </Card>

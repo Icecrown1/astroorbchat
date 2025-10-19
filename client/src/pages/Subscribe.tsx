@@ -34,6 +34,7 @@ const SUBSCRIPTION_TIERS = [
     name: 'Standard',
     price: 9,
     starsPrice: 565,
+    rubPrice: 450,
     dailyEnergy: 100,
     features: ['100 energy orbs daily', 'All astrology features', 'Daily horoscope', 'Basic support'],
   },
@@ -42,6 +43,7 @@ const SUBSCRIPTION_TIERS = [
     name: 'Pro',
     price: 15,
     starsPrice: 940,
+    rubPrice: 750,
     dailyEnergy: 250,
     features: ['250 energy orbs daily', 'All astrology features', 'Priority AI responses', 'Premium support', 'Advanced insights'],
     popular: true,
@@ -226,6 +228,41 @@ export default function Subscribe() {
     },
   });
 
+  const yookassaMutation = useMutation({
+    mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
+      console.log('[YooKassa] Creating subscription payment for tier:', tier.tier);
+      const response = await apiRequest('POST', '/api/payments/yookassa/create', {
+        kind: 'subscription',
+        tier: tier.tier
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      console.log('[YooKassa] Subscription payment created, redirecting to:', data.confirmationUrl);
+      if (data.confirmationUrl) {
+        // Redirect to YooKassa payment page
+        window.location.href = data.confirmationUrl;
+      } else {
+        toast({
+          title: t.common.error,
+          description: locale === 'ru'
+            ? 'Не удалось получить ссылку на оплату'
+            : 'Failed to get payment link',
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error('[YooKassa] Error:', error);
+      toast({
+        title: t.common.error,
+        description: error.message || t.errors.calculationFailed,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getTonPrice = (usdPrice: number) => {
     if (pricesData?.ok && pricesData.data?.tonRate) {
       return (usdPrice / pricesData.data.tonRate).toFixed(2);
@@ -386,6 +423,9 @@ export default function Subscribe() {
                     <Star className="w-3 h-3 text-yellow-500" />
                     {tier.starsPrice} Stars {t.subscribe.perMonth}
                   </p>
+                  <p className="text-sm text-muted-foreground">
+                    {tier.rubPrice} ₽ {t.subscribe.perMonth}
+                  </p>
                 </div>
 
                 <div className="space-y-3 mb-6">
@@ -464,6 +504,30 @@ export default function Subscribe() {
                       <>
                         <CreditCard className="w-4 h-4 mr-2" />
                         {t.subscribe.subscribeWith}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      yookassaMutation.mutate(tier);
+                    }}
+                    disabled={yookassaMutation.isPending || currentSubscription?.tier === tier.tier}
+                    data-testid={`button-subscribe-rubles-${tier.tier}`}
+                  >
+                    {yookassaMutation.isPending ? (
+                      <>
+                        <Loader className="mr-2" size="sm" />
+                        {t.subscribe.subscribing}
+                      </>
+                    ) : currentSubscription?.tier === tier.tier ? (
+                      t.subscribe.currentPlan
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        {locale === 'ru' ? `Оплатить ${tier.rubPrice} ₽` : `Pay ${tier.rubPrice} ₽`}
                       </>
                     )}
                   </Button>

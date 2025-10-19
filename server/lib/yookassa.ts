@@ -142,37 +142,31 @@ export async function createRefund(paymentId: string, amount: string, reason?: s
 /**
  * Verify webhook notification from YooKassa
  * YooKassa sends webhooks from specific IP addresses
+ * 
+ * SECURITY NOTE: In production, YooKassa recommends using their webhook
+ * IP whitelist. This implementation only allows exact IP matches.
+ * CIDR range checking is disabled for security reasons - use a proper
+ * CIDR library (like 'ip-address' or 'ipaddr.js') if needed.
  */
 export function verifyWebhookIP(ipAddress: string): boolean {
-  // YooKassa webhook IP addresses (as of 2025)
-  const allowedIPs = [
-    '185.71.76.0/27',
-    '185.71.77.0/27',
-    '77.75.153.0/25',
-    '77.75.156.11',
-    '77.75.156.35',
-    '77.75.154.128/25',
-    '2a02:5180::/32',
-  ];
-
-  // In test mode, allow all IPs
+  // In test mode, allow all IPs for local development
   if (process.env.YOOKASSA_TEST_MODE === 'true') {
     console.log('[YooKassa] Test mode - allowing all webhook IPs');
     return true;
   }
 
-  // Simple IP check (in production, use proper CIDR matching library)
-  const isAllowed = allowedIPs.some(allowedIP => {
-    if (allowedIP.includes('/')) {
-      // CIDR notation - just check prefix for simplicity
-      const prefix = allowedIP.split('/')[0].split('.').slice(0, 3).join('.');
-      return ipAddress.startsWith(prefix);
-    }
-    return ipAddress === allowedIP;
-  });
+  // YooKassa webhook IP addresses (exact IPs only for security)
+  // For CIDR ranges, you must install a proper CIDR matching library
+  const allowedIPs = [
+    '77.75.156.11',
+    '77.75.156.35',
+  ];
+
+  const isAllowed = allowedIPs.includes(ipAddress);
 
   if (!isAllowed) {
     console.warn('[YooKassa] Webhook from unauthorized IP:', ipAddress);
+    console.warn('[YooKassa] To allow CIDR ranges in production, install a CIDR library like "ipaddr.js"');
   }
 
   return isAllowed;
