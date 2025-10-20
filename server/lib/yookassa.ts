@@ -7,10 +7,11 @@ const getYooKassaClient = () => {
     throw new Error('YooKassa credentials not configured. Please set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY');
   }
 
-  // Use require for CommonJS module
-  const YooCheckout = require('@appigram/yookassa-node');
+  // Library exports factory function, not constructor directly
+  const yookassaFactory = require('@appigram/yookassa-node');
   
-  return new YooCheckout(shopId, secretKey);
+  // Call factory function with shopId and secretKey
+  return yookassaFactory(shopId, secretKey);
 };
 
 export interface CreatePaymentParams {
