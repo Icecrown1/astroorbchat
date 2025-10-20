@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -134,4 +135,35 @@ app.use((req, res, next) => {
     console.error(`[STARTUP] FATAL: Failed to start server on port ${port}:`, error.message);
     process.exit(1);
   }
+
+  // Graceful shutdown handling for production deployments
+  const gracefulShutdown = (signal: string) => {
+    console.log(`\n[SHUTDOWN] ${signal} received. Starting graceful shutdown...`);
+    
+    server.close(() => {
+      console.log('[SHUTDOWN] HTTP server closed');
+      
+      // Close database connections
+      if (pool) {
+        pool.end().then(() => {
+          console.log('[SHUTDOWN] Database pool closed');
+          process.exit(0);
+        }).catch((err) => {
+          console.error('[SHUTDOWN] Error closing database pool:', err);
+          process.exit(1);
+        });
+      } else {
+        process.exit(0);
+      }
+    });
+
+    // Force shutdown after 30 seconds
+    setTimeout(() => {
+      console.error('[SHUTDOWN] Forced shutdown after timeout');
+      process.exit(1);
+    }, 30000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 })();
