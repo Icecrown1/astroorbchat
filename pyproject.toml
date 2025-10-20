@@ -1,8 +1,5 @@
 [project]
-name = "repl-nix-workspace"
-version = "0.1.0"
-description = "Add your description here"
+name = "astro-orb"
+version = "1.0.0"
+description = "AI-Powered Astrology Telegram Mini App"
 requires-python = ">=3.11"
-dependencies = [
-    "pyswisseph>=2.10.3.2",
-]
