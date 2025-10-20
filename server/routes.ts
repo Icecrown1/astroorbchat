@@ -2112,13 +2112,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           tonRate,
           subscriptions: {
-            standard: { usd: 9, ton: (9 / tonRate).toFixed(2), stars: 565 },
-            pro: { usd: 15, ton: (15 / tonRate).toFixed(2), stars: 940 },
+            standard: { usd: 9, ton: (9 / tonRate).toFixed(2) },
+            pro: { usd: 15, ton: (15 / tonRate).toFixed(2) },
           },
           energyPacks: {
-            small: { amount: 20, usd: 2.99, ton: (2.99 / tonRate).toFixed(2), stars: 190 },
-            medium: { amount: 50, usd: 5.99, ton: (5.99 / tonRate).toFixed(2), stars: 375 },
-            large: { amount: 120, usd: 11.99, ton: (11.99 / tonRate).toFixed(2), stars: 750 },
+            small: { amount: 20, usd: 2.99, ton: (2.99 / tonRate).toFixed(2) },
+            medium: { amount: 50, usd: 5.99, ton: (5.99 / tonRate).toFixed(2) },
+            large: { amount: 120, usd: 11.99, ton: (11.99 / tonRate).toFixed(2) },
           },
         },
       });
