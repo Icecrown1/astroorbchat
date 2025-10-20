@@ -1,12 +1,18 @@
-import YooCheckout from '@appigram/yookassa-node';
+// Initialize YooKassa client (lazy loaded)
+let YooCheckout: any = null;
 
-// Initialize YooKassa client
-const getYooKassaClient = () => {
+const getYooKassaClient = async () => {
   const shopId = process.env.YOOKASSA_SHOP_ID;
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
   
   if (!shopId || !secretKey) {
     throw new Error('YooKassa credentials not configured. Please set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY');
+  }
+
+  // Lazy load the CommonJS module
+  if (!YooCheckout) {
+    const module = await import('@appigram/yookassa-node');
+    YooCheckout = module.default || module;
   }
 
   return new YooCheckout({
@@ -43,7 +49,7 @@ export interface YooKassaPayment {
  * Returns payment object with confirmation URL for redirect
  */
 export async function createPayment(params: CreatePaymentParams): Promise<YooKassaPayment> {
-  const yooKassa = getYooKassaClient();
+  const yooKassa = await getYooKassaClient();
   const isTestMode = process.env.YOOKASSA_TEST_MODE === 'true';
 
   console.log('[YooKassa] Creating payment:', {
@@ -85,7 +91,7 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
  * Check payment status by payment ID
  */
 export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPayment> {
-  const yooKassa = getYooKassaClient();
+  const yooKassa = await getYooKassaClient();
 
   console.log('[YooKassa] Checking payment status:', paymentId);
 
@@ -109,7 +115,7 @@ export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPay
  * Create a refund for a payment
  */
 export async function createRefund(paymentId: string, amount: string, reason?: string): Promise<any> {
-  const yooKassa = getYooKassaClient();
+  const yooKassa = await getYooKassaClient();
 
   console.log('[YooKassa] Creating refund:', {
     paymentId,
