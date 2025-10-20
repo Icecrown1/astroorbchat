@@ -44,4 +44,17 @@ Preferred communication style: Simple, everyday language.
 - **Blockchain/Payment**: TON Connect UI React (`@tonconnect/ui-react`), TON API, ЮKassa SDK (`@appigram/yookassa-node`)
 - **AI Services**: OpenAI API (GPT-5)
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM
+- **Python Packages**: `pyswisseph>=2.10.3.2` (managed via requirements.txt)
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
+
+## Deployment Configuration
+- **Platform**: Replit Autoscale
+- **Build Process**: Custom `build.sh` script handles:
+  1. Vite frontend build
+  2. esbuild backend bundling
+  3. Python scripts copying to dist/
+  4. AI prompt templates copying to dist/
+- **Python Dependencies**: Managed via `requirements.txt` for reliable Autoscale deployment
+- **Build Command** (in .replit): `build = ["sh", "-c", "./build.sh"]`
+- **Run Command**: `npm run start` (runs `NODE_ENV=production node dist/index.js`)
+- **Critical Files**: Python scripts and AI prompts must be copied to dist/ during build for production runtime
