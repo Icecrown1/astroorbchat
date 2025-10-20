@@ -198,8 +198,9 @@ export default function Login() {
     );
   }
 
-  // TEMPORARY: Check if registration without Telegram is allowed
-  const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+  // TEMPORARY HARDCODE: Allow registration without Telegram for moderation
+  // TODO: Remove this after moderation is complete
+  const allowWithoutTelegram = true; // import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">

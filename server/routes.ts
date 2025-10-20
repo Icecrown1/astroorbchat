@@ -35,8 +35,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { initData, name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
 
-      // TEMPORARY: Allow empty initData when test auth is enabled (for moderation)
-      const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
+      // TEMPORARY HARDCODE: Allow empty initData for moderation
+      // TODO: Remove this after moderation is complete
+      const allowTestAuth = true; // process.env.ALLOW_TEST_AUTH === 'true';
       const hasInitData = initData && initData.length > 0;
 
       if (!hasInitData && !allowTestAuth) {
