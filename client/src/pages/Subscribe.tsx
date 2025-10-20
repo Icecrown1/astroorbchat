@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
+import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
 import { ArrowLeft, CreditCard, Check, Sparkles, Wallet } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +55,8 @@ export default function Subscribe() {
   const { t, locale } = useTranslation();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [pendingYookassaTier, setPendingYookassaTier] = useState<typeof SUBSCRIPTION_TIERS[0] | null>(null);
 
 
   useEffect(() => {
@@ -163,11 +166,12 @@ export default function Subscribe() {
   });
 
   const yookassaMutation = useMutation({
-    mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
-      console.log('[YooKassa] Creating subscription payment for tier:', tier.tier);
+    mutationFn: async ({ tier, email }: { tier: typeof SUBSCRIPTION_TIERS[0], email: string | undefined }) => {
+      console.log('[YooKassa] Creating subscription payment for tier:', tier.tier, 'with email:', email);
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription',
-        tier: tier.tier
+        tier: tier.tier,
+        customerEmail: email || null
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
@@ -420,7 +424,8 @@ export default function Subscribe() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      yookassaMutation.mutate(tier);
+                      setPendingYookassaTier(tier);
+                      setShowEmailDialog(true);
                     }}
                     disabled={yookassaMutation.isPending || currentSubscription?.tier === tier.tier}
                     data-testid={`button-subscribe-rubles-${tier.tier}`}
@@ -480,6 +485,25 @@ export default function Subscribe() {
           </p>
         </Card>
       </div>
+
+      {/* Email Receipt Dialog */}
+      {pendingYookassaTier && (
+        <EmailReceiptDialog
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          onConfirm={(email) => {
+            if (pendingYookassaTier) {
+              yookassaMutation.mutate({ tier: pendingYookassaTier, email });
+              setPendingYookassaTier(null);
+            }
+          }}
+          amount={`${pendingYookassaTier.rubPrice} ₽`}
+          description={locale === 'ru' 
+            ? `Подписка ${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'}`
+            : `${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} Subscription`
+          }
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
+import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
 import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +28,8 @@ export default function BuyEnergy() {
   const wallet = useTonWallet();
   const walletConnected = !!wallet;
   const [pendingTonPurchase, setPendingTonPurchase] = useState<typeof ENERGY_PACKS[0] | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [pendingYookassaPack, setPendingYookassaPack] = useState<typeof ENERGY_PACKS[0] | null>(null);
 
 
   // Trigger TON purchase after wallet connects
@@ -219,11 +222,12 @@ export default function BuyEnergy() {
   });
 
   const yookassaMutation = useMutation({
-    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
-      console.log('[YooKassa] Creating payment for pack:', pack);
+    mutationFn: async ({ pack, email }: { pack: typeof ENERGY_PACKS[0], email: string | undefined }) => {
+      console.log('[YooKassa] Creating payment for pack:', pack, 'with email:', email);
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'energy_pack',
-        pack: { energy: pack.amount }
+        pack: { energy: pack.amount },
+        customerEmail: email || null
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
@@ -396,7 +400,8 @@ export default function BuyEnergy() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedPack(pack.amount);
-                      yookassaMutation.mutate(pack);
+                      setPendingYookassaPack(pack);
+                      setShowEmailDialog(true);
                     }}
                     disabled={yookassaMutation.isPending && selectedPack === pack.amount}
                     data-testid={`button-buy-rubles-${pack.amount}`}
@@ -429,6 +434,25 @@ export default function BuyEnergy() {
           </p>
         </Card>
       </div>
+
+      {/* Email Receipt Dialog */}
+      {pendingYookassaPack && (
+        <EmailReceiptDialog
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          onConfirm={(email) => {
+            if (pendingYookassaPack) {
+              yookassaMutation.mutate({ pack: pendingYookassaPack, email });
+              setPendingYookassaPack(null);
+            }
+          }}
+          amount={`${pendingYookassaPack.rubPrice} ₽`}
+          description={locale === 'ru' 
+            ? `Покупка ${pendingYookassaPack.amount} орбов энергии`
+            : `Purchase ${pendingYookassaPack.amount} energy orbs`
+          }
+        />
+      )}
     </div>
   );
 }

@@ -2507,6 +2507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       energy: z.number().refine(val => [20, 50, 120].includes(val))
     }).optional(),
     tier: z.enum(["standard", "pro"]).optional(),
+    customerEmail: z.string().email().optional().nullable(),
   });
 
   app.post("/api/payments/yookassa/create", requireAuth, async (req, res) => {
@@ -2572,7 +2573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get user for receipt (email required by YooKassa for самозанятый по 54-ФЗ)
       const user = await storage.getUser(userId);
-      const customerEmail = user?.telegramId ? `tg${user.telegramId}@astro-orb.app` : undefined;
+      // Use provided email from frontend, or fallback to synthetic email based on Telegram ID
+      const customerEmail = validated.customerEmail || (user?.tgId ? `tg${user.tgId}@astro-orb.app` : undefined);
+      console.log('[YooKassa] Customer email for receipt:', customerEmail);
 
       const ykPayment = await createYooKassaPayment({
         amount: amountRUB,
