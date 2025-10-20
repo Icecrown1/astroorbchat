@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 const app = express();
@@ -50,15 +51,38 @@ app.use((req, res, next) => {
   const missingSecrets = REQUIRED_SECRETS.filter(secret => !process.env[secret]);
   
   if (missingSecrets.length > 0) {
-    console.error(`[STARTUP] FATAL ERROR: Missing required environment variables: ${missingSecrets.join(', ')}`);
-    console.error('[STARTUP] Please configure these secrets in the Replit Secrets panel');
-    process.exit(1);
+    console.error(`[STARTUP] WARNING: Missing required environment variables: ${missingSecrets.join(', ')}`);
+    console.error('[STARTUP] Some features may not work correctly. Please configure secrets in the Replit Secrets panel');
+    // Don't exit - let the server start so /health endpoint can respond
+    // This helps with deployment provision diagnostics
+  } else {
+    console.log('[STARTUP] ✓ All required secrets configured');
   }
-  console.log('[STARTUP] ✓ All required secrets configured');
 
-  console.log('[STARTUP] Registering routes...');
-  const server = await registerRoutes(app);
-  console.log('[STARTUP] ✓ Routes registered successfully');
+  let server;
+  
+  try {
+    console.log('[STARTUP] Registering routes...');
+    server = await registerRoutes(app);
+    console.log('[STARTUP] ✓ Routes registered successfully');
+  } catch (error: any) {
+    console.error('[STARTUP] ERROR: Failed to register routes:', error.message);
+    console.error('[STARTUP] Error stack:', error.stack);
+    console.error('[STARTUP] Creating fallback HTTP server for diagnostics');
+    
+    // Add fallback route that returns 503 Service Unavailable for API requests only
+    // Don't add universal fallback - let static files/Vite handle non-API requests
+    app.all('/api/*', (_req, res) => {
+      res.status(503).json({
+        ok: false,
+        error: 'Service temporarily unavailable',
+        details: 'Server started but API routes failed to register. Check deployment logs.'
+      });
+    });
+    
+    // Create minimal server if routes fail - at least /health will work
+    server = createServer(app);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -75,12 +99,17 @@ app.use((req, res, next) => {
   console.log('app.get("env"):', appEnv);
   console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
   
-  if (appEnv === "development") {
-    console.log('Setting up Vite in development mode');
-    await setupVite(app, server);
-  } else {
-    console.log('Serving static files in production mode');
-    serveStatic(app);
+  try {
+    if (appEnv === "development") {
+      console.log('Setting up Vite in development mode');
+      await setupVite(app, server);
+    } else {
+      console.log('Serving static files in production mode');
+      serveStatic(app);
+    }
+  } catch (error: any) {
+    console.error('[STARTUP] ERROR: Failed to setup Vite/static files:', error.message);
+    console.error('[STARTUP] Server will start but file serving may not work');
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -91,13 +120,18 @@ app.use((req, res, next) => {
   
   console.log(`[STARTUP] Starting server on port ${port} (host: 0.0.0.0)...`);
   
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    console.log(`[STARTUP] ✅ SERVER READY - listening on port ${port}`);
-    console.log(`[STARTUP] Health check available at: /health`);
-    log(`serving on port ${port}`);
-  });
+  try {
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      console.log(`[STARTUP] ✅ SERVER READY - listening on port ${port}`);
+      console.log(`[STARTUP] Health check available at: /health`);
+      log(`serving on port ${port}`);
+    });
+  } catch (error: any) {
+    console.error(`[STARTUP] FATAL: Failed to start server on port ${port}:`, error.message);
+    process.exit(1);
+  }
 })();
