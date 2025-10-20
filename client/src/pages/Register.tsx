@@ -47,9 +47,8 @@ export default function Register() {
     let cleanupFn: (() => void) | null = null;
     
     const checkTelegramContext = async () => {
-      // TEMPORARY HARDCODE: Allow registration without Telegram for moderation
-      // TODO: Remove this after moderation is complete
-      const allowWithoutTelegram = true; // import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+      // Check if registration without Telegram is allowed
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
       if (!isMounted) return;
       
@@ -275,8 +274,8 @@ export default function Register() {
 
     try {
       const initData = getInitData();
-      // TEMPORARY HARDCODE: Allow registration without Telegram for moderation
-      const allowWithoutTelegram = true; // import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+      // Check if registration without Telegram is allowed
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
       // Must have valid Telegram initData to register through Mini App (unless override is enabled)
       if (!allowWithoutTelegram && (!initData || initData.length === 0)) {
