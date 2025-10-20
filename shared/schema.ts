@@ -286,31 +286,6 @@ export const importantDateUnlocksRelations = relations(importantDateUnlocks, ({ 
   }),
 }));
 
-export const starPayments = pgTable("star_payments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 255 }).notNull(),
-  kind: varchar("kind", { length: 50 }).notNull(),
-  tier: varchar("tier", { length: 20 }), // For subscriptions: "standard" or "pro"
-  energyAmount: integer("energy_amount"),
-  amountStars: integer("amount_stars").notNull(),
-  invoicePayload: varchar("invoice_payload", { length: 255 }).notNull().unique(),
-  telegramChargeId: varchar("telegram_charge_id", { length: 255 }).unique(),
-  status: varchar("status", { length: 20 }).notNull().default('pending'),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
-}, (table) => ({
-  invoicePayloadIdx: index("star_payments_invoice_payload_idx").on(table.invoicePayload),
-  userIdIdx: index("star_payments_user_id_idx").on(table.userId),
-  telegramChargeIdIdx: index("star_payments_telegram_charge_id_idx").on(table.telegramChargeId),
-}));
-
-export const starPaymentsRelations = relations(starPayments, ({ one }) => ({
-  user: one(users, {
-    fields: [starPayments.userId],
-    references: [users.id],
-  }),
-}));
-
 export const yookassaPayments = pgTable("yookassa_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
@@ -465,20 +440,6 @@ export const insertImportantDateUnlockSchema = createInsertSchema(importantDateU
   createdAt: true,
 });
 
-export const insertStarPaymentSchema = createInsertSchema(starPayments, {
-  userId: z.string(),
-  kind: z.enum(["energy_pack", "subscription"]),
-  energyAmount: z.number().optional(),
-  amountStars: z.number(),
-  invoicePayload: z.string(),
-}).omit({
-  id: true,
-  createdAt: true,
-  completedAt: true,
-  telegramChargeId: true,
-  status: true,
-});
-
 export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, {
   userId: z.string(),
   kind: z.enum(["energy_pack", "subscription"]),
@@ -526,9 +487,6 @@ export type InsertExternalNatal = z.infer<typeof insertExternalNatalSchema>;
 
 export type ImportantDateUnlock = typeof importantDateUnlocks.$inferSelect;
 export type InsertImportantDateUnlock = z.infer<typeof insertImportantDateUnlockSchema>;
-
-export type StarPayment = typeof starPayments.$inferSelect;
-export type InsertStarPayment = z.infer<typeof insertStarPaymentSchema>;
 
 export type YookassaPayment = typeof yookassaPayments.$inferSelect;
 export type InsertYookassaPayment = z.infer<typeof insertYookassaPaymentSchema>;

@@ -1,8 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { registerWebhookAtStartup } from "./lib/telegramStars";
-
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -49,9 +47,6 @@ app.use((req, res, next) => {
   console.log('[STARTUP] ✓ All required secrets configured');
 
   const server = await registerRoutes(app);
-
-  // Register Telegram webhook for Stars payments
-  await registerWebhookAtStartup();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
