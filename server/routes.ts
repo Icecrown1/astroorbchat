@@ -2570,10 +2570,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const baseUrl = process.env.SERVER_URL || `https://${req.headers.host}`;
       const returnUrl = `${baseUrl}/payment-success?paymentId=${yookassaPayment.id}`;
 
+      // Get user for receipt (email required by YooKassa for самозанятый по 54-ФЗ)
+      const user = await storage.getUser(userId);
+      const customerEmail = user?.telegramId ? `tg${user.telegramId}@astro-orb.app` : undefined;
+
       const ykPayment = await createYooKassaPayment({
         amount: amountRUB,
         description,
         returnUrl,
+        customerEmail,
         metadata: {
           internalPaymentId: yookassaPayment.id,
           userId,

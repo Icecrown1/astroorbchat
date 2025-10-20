@@ -49,6 +49,8 @@ export interface CreatePaymentParams {
   amount: string; // Amount in RUB (e.g., "100.00")
   description: string;
   returnUrl: string;
+  customerEmail?: string; // Email for receipt (required for самозанятый)
+  customerPhone?: string; // Phone for receipt (alternative to email)
   metadata?: Record<string, any>;
 }
 
@@ -85,7 +87,14 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
   console.log('[YooKassa] Client obtained, calling createPayment API');
 
   try {
-    const payment = await yooKassa.createPayment({
+    // Build receipt for 54-ФЗ (required for самозанятый)
+    const receiptCustomer = params.customerEmail 
+      ? { email: params.customerEmail }
+      : params.customerPhone 
+        ? { phone: params.customerPhone }
+        : { email: 'no-email@astro-orb.app' }; // Fallback email if neither provided
+
+    const paymentData: any = {
       amount: {
         value: params.amount,
         currency: 'RUB',
@@ -98,7 +107,25 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
       capture: true, // Auto-capture payment after authorization
       metadata: params.metadata || {},
       test: isTestMode,
-    });
+      receipt: {
+        customer: receiptCustomer,
+        items: [
+          {
+            description: params.description,
+            quantity: '1',
+            amount: {
+              value: params.amount,
+              currency: 'RUB',
+            },
+            vat_code: 1, // НДС не облагается (для самозанятых)
+          },
+        ],
+      },
+    };
+
+    console.log('[YooKassa] Payment data with receipt:', JSON.stringify(paymentData, null, 2));
+
+    const payment = await yooKassa.createPayment(paymentData);
 
     console.log('[YooKassa] Payment created:', {
       id: payment.id,
