@@ -51,21 +51,21 @@ export default function Register() {
       // TODO: Remove this after moderation is complete
       const allowWithoutTelegram = true; // import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
-      // Check if Telegram WebApp is available
-      const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
-      
       if (!isMounted) return;
       
-      if (!isTelegramWebApp && !allowWithoutTelegram) {
-        // Not in Telegram context at all - redirect to web login
-        navigate('/login');
+      // If allowing without Telegram, skip all Telegram checks and proceed directly
+      if (allowWithoutTelegram) {
+        console.log('[Register] Registration without Telegram allowed - skipping all Telegram checks');
+        setIsCheckingTelegram(false);
         return;
       }
       
-      // If allowing without Telegram, skip initData checks and proceed directly
-      if (allowWithoutTelegram && !isTelegramWebApp) {
-        console.log('[Register] Registration without Telegram allowed');
-        setIsCheckingTelegram(false);
+      // Check if Telegram WebApp is available
+      const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
+      
+      if (!isTelegramWebApp) {
+        // Not in Telegram context at all - redirect to web login
+        navigate('/login');
         return;
       }
       
