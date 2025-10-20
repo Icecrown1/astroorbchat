@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["sh", "start.sh"]
+run = ["node", "dist/index.js"]
 
 [[ports]]
 localPort = 5000
