@@ -1,4 +1,4 @@
-import YooKassa from '@appigram/yookassa-node';
+import YooCheckout from '@appigram/yookassa-node';
 
 // Initialize YooKassa client
 const getYooKassaClient = () => {
@@ -9,7 +9,7 @@ const getYooKassaClient = () => {
     throw new Error('YooKassa credentials not configured. Please set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY');
   }
 
-  return new YooKassa({
+  return new YooCheckout({
     shopId,
     secretKey,
   });
