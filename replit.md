@@ -48,13 +48,19 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Deployment Configuration
-- **Platform**: Replit Autoscale
+- **Platform**: Replit Autoscale (✅ Successfully deployed)
 - **Build Process**: Custom `build.sh` script handles:
-  1. Vite frontend build
+  1. Vite frontend build with `CI=true` (non-interactive mode)
   2. esbuild backend bundling
-  3. Python scripts copying to dist/
-  4. AI prompt templates copying to dist/
+  3. Python scripts copying to dist/server/
+  4. AI prompt templates copying to dist/server/lib/prompts/
 - **Python Dependencies**: Managed via `requirements.txt` for reliable Autoscale deployment
 - **Build Command** (in .replit): `build = ["sh", "-c", "./build.sh"]`
 - **Run Command**: `npm run start` (runs `NODE_ENV=production node dist/index.js`)
 - **Critical Files**: Python scripts and AI prompts must be copied to dist/ during build for production runtime
+- **Key Fix**: `CI=true` flag for Vite build prevents interactive prompts that would hang deployment
+
+## Recent Changes (October 2025)
+- **Fixed deployment issues**: Simplified build.sh, added CI=true for non-interactive Vite builds
+- **Cleaned pyproject.toml**: Removed conflicting dependencies, using requirements.txt for Python packages
+- **Verified production deployment**: Application successfully runs on Replit Autoscale with all features functional
