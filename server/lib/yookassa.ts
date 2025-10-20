@@ -1,56 +1,24 @@
+import YooKassa from '@appigram/yookassa-node';
+
 // Initialize YooKassa client
-const getYooKassaClient = async () => {
+const getYooKassaClient = () => {
   const shopId = process.env.YOOKASSA_SHOP_ID;
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
-  
-  console.log('[YooKassa] Initializing client with credentials:', {
-    shopId: shopId ? `${shopId.substring(0, 4)}...` : 'MISSING',
-    secretKeyPresent: !!secretKey,
-  });
   
   if (!shopId || !secretKey) {
     throw new Error('YooKassa credentials not configured. Please set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY');
   }
 
-  try {
-    // Dynamic import for CommonJS module in ESM environment
-    const yookassaModule = await import('@appigram/yookassa-node');
-    
-    console.log('[YooKassa] Module loaded, keys:', Object.keys(yookassaModule));
-    console.log('[YooKassa] Default export type:', typeof yookassaModule.default);
-    console.log('[YooKassa] YooKassa export type:', typeof (yookassaModule as any).YooKassa);
-    
-    // Try factory function first (based on docs)
-    const factory = yookassaModule.default || yookassaModule;
-    
-    let client;
-    try {
-      // Try calling as factory function
-      client = factory(shopId, secretKey);
-      console.log('[YooKassa] Client created via factory function');
-    } catch (factoryError: any) {
-      console.log('[YooKassa] Factory function failed, trying constructor:', factoryError.message);
-      // Try as constructor with new
-      client = new (factory as any)(shopId, secretKey);
-      console.log('[YooKassa] Client created via constructor');
-    }
-    
-    console.log('[YooKassa] Client type:', typeof client);
-    console.log('[YooKassa] Client methods:', Object.keys(client));
-    
-    return client;
-  } catch (error: any) {
-    console.error('[YooKassa] Failed to initialize client:', error);
-    throw new Error(`Failed to initialize YooKassa client: ${error.message}`);
-  }
+  return new YooKassa({
+    shopId,
+    secretKey,
+  });
 };
 
 export interface CreatePaymentParams {
   amount: string; // Amount in RUB (e.g., "100.00")
   description: string;
   returnUrl: string;
-  customerEmail?: string; // Email for receipt (required for самозанятый)
-  customerPhone?: string; // Phone for receipt (alternative to email)
   metadata?: Record<string, any>;
 }
 
@@ -75,6 +43,7 @@ export interface YooKassaPayment {
  * Returns payment object with confirmation URL for redirect
  */
 export async function createPayment(params: CreatePaymentParams): Promise<YooKassaPayment> {
+  const yooKassa = getYooKassaClient();
   const isTestMode = process.env.YOOKASSA_TEST_MODE === 'true';
 
   console.log('[YooKassa] Creating payment:', {
@@ -82,19 +51,9 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
     description: params.description,
     testMode: isTestMode,
   });
-  
-  const yooKassa = await getYooKassaClient();
-  console.log('[YooKassa] Client obtained, calling createPayment API');
 
   try {
-    // Build receipt for 54-ФЗ (required for самозанятый)
-    const receiptCustomer = params.customerEmail 
-      ? { email: params.customerEmail }
-      : params.customerPhone 
-        ? { phone: params.customerPhone }
-        : { email: 'no-email@astro-orb.app' }; // Fallback email if neither provided
-
-    const paymentData: any = {
+    const payment = await yooKassa.createPayment({
       amount: {
         value: params.amount,
         currency: 'RUB',
@@ -107,25 +66,7 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
       capture: true, // Auto-capture payment after authorization
       metadata: params.metadata || {},
       test: isTestMode,
-      receipt: {
-        customer: receiptCustomer,
-        items: [
-          {
-            description: params.description,
-            quantity: '1',
-            amount: {
-              value: params.amount,
-              currency: 'RUB',
-            },
-            vat_code: 1, // НДС не облагается (для самозанятых)
-          },
-        ],
-      },
-    };
-
-    console.log('[YooKassa] Payment data with receipt:', JSON.stringify(paymentData, null, 2));
-
-    const payment = await yooKassa.createPayment(paymentData);
+    });
 
     console.log('[YooKassa] Payment created:', {
       id: payment.id,
@@ -144,7 +85,7 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
  * Check payment status by payment ID
  */
 export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPayment> {
-  const yooKassa = await getYooKassaClient();
+  const yooKassa = getYooKassaClient();
 
   console.log('[YooKassa] Checking payment status:', paymentId);
 
@@ -168,7 +109,7 @@ export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPay
  * Create a refund for a payment
  */
 export async function createRefund(paymentId: string, amount: string, reason?: string): Promise<any> {
-  const yooKassa = await getYooKassaClient();
+  const yooKassa = getYooKassaClient();
 
   console.log('[YooKassa] Creating refund:', {
     paymentId,

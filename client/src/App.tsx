@@ -40,7 +40,7 @@ function Router() {
 
   useEffect(() => {
     if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal') {
-      navigate('/login');
+      navigate('/register');
     }
   }, [isAuthenticated, location, navigate]);
 
@@ -64,7 +64,7 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/settings" component={Settings} />
       <Route path="/archive" component={Archive} />
-      <Route path="/" component={isAuthenticated ? Dashboard : Login} />
+      <Route path="/" component={isAuthenticated ? Dashboard : Register} />
       <Route component={NotFound} />
     </Switch>
   );

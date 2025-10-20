@@ -11,6 +11,7 @@ import {
   natalCharts,
   externalNatals,
   importantDateUnlocks,
+  starPayments,
   yookassaPayments,
   referralRewards,
   type User, 
@@ -35,6 +36,8 @@ import {
   type InsertExternalNatal,
   type ImportantDateUnlock,
   type InsertImportantDateUnlock,
+  type StarPayment,
+  type InsertStarPayment,
   type YookassaPayment,
   type InsertYookassaPayment,
   type ReferralReward,
@@ -103,6 +106,12 @@ export interface IStorage {
   getImportantDateUnlocksByUserId(userId: string): Promise<ImportantDateUnlock[]>;
   createImportantDateUnlock(unlock: InsertImportantDateUnlock): Promise<ImportantDateUnlock>;
   updateImportantDateUnlock(id: string, data: Partial<ImportantDateUnlock>): Promise<ImportantDateUnlock | undefined>;
+  
+  // Star payment operations
+  createStarPayment(payment: InsertStarPayment): Promise<StarPayment>;
+  getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined>;
+  updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined>;
+  atomicStartProcessing(invoicePayload: string, telegramChargeId: string): Promise<StarPayment | null>;
   
   // YooKassa payment operations
   createYookassaPayment(payment: InsertYookassaPayment): Promise<YookassaPayment>;
@@ -445,6 +454,52 @@ export class DatabaseStorage implements IStorage {
       .where(eq(importantDateUnlocks.id, id))
       .returning();
     return unlock || undefined;
+  }
+
+  // Star payment operations
+  async createStarPayment(insertPayment: InsertStarPayment): Promise<StarPayment> {
+    const [payment] = await db
+      .insert(starPayments)
+      .values(insertPayment)
+      .returning();
+    return payment;
+  }
+
+  async getStarPaymentByPayload(invoicePayload: string): Promise<StarPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(starPayments)
+      .where(eq(starPayments.invoicePayload, invoicePayload));
+    return payment || undefined;
+  }
+
+  async updateStarPaymentStatus(invoicePayload: string, data: Partial<StarPayment>): Promise<StarPayment | undefined> {
+    const [payment] = await db
+      .update(starPayments)
+      .set(data)
+      .where(eq(starPayments.invoicePayload, invoicePayload))
+      .returning();
+    return payment || undefined;
+  }
+
+  async atomicStartProcessing(invoicePayload: string, telegramChargeId: string): Promise<StarPayment | null> {
+    // Atomic update: only set to processing if status is pending AND telegramChargeId is null
+    // This prevents race conditions where two webhooks try to process the same payment
+    const [payment] = await db
+      .update(starPayments)
+      .set({ 
+        status: 'processing',
+        telegramChargeId 
+      })
+      .where(
+        and(
+          eq(starPayments.invoicePayload, invoicePayload),
+          eq(starPayments.status, 'pending'),
+          isNull(starPayments.telegramChargeId) // Only update if no chargeId yet
+        )
+      )
+      .returning();
+    return payment || null;
   }
 
   // YooKassa payment operations
