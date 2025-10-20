@@ -35,11 +35,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { initData, name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
 
-      if (!validateTelegramInitData(initData)) {
-        return res.status(401).json({ ok: false, error: "Invalid Telegram data" });
+      // TEMPORARY: Allow empty initData when test auth is enabled (for moderation)
+      const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
+      const hasInitData = initData && initData.length > 0;
+
+      if (!hasInitData && !allowTestAuth) {
+        return res.status(401).json({ ok: false, error: "Invalid Telegram data: initData required" });
       }
 
-      const tgUser = parseTelegramInitData(initData);
+      if (hasInitData && !validateTelegramInitData(initData)) {
+        return res.status(401).json({ ok: false, error: "Invalid Telegram data: validation failed" });
+      }
+
+      // Parse Telegram user or create fake user for test mode
+      let tgUser = hasInitData ? parseTelegramInitData(initData) : null;
+      
+      // If no initData but test auth is allowed, create a fake telegram user
+      if (!tgUser && allowTestAuth) {
+        // Generate unique telegram ID for test user
+        const testId = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        tgUser = {
+          id: parseInt(testId.replace(/\D/g, '').slice(0, 9)) || 999999999,
+          first_name: name || "Test User",
+          username: `testuser_${Date.now()}`,
+        };
+        console.log('[Auth] Test mode: Created fake Telegram user', tgUser);
+      }
+
       if (!tgUser) {
         return res.status(401).json({ ok: false, error: "Invalid Telegram user" });
       }

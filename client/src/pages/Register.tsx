@@ -47,14 +47,25 @@ export default function Register() {
     let cleanupFn: (() => void) | null = null;
     
     const checkTelegramContext = async () => {
+      // TEMPORARY: Allow registration without Telegram for moderation/testing
+      // Set VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM=true to enable
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+      
       // Check if Telegram WebApp is available
       const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
       
       if (!isMounted) return;
       
-      if (!isTelegramWebApp) {
+      if (!isTelegramWebApp && !allowWithoutTelegram) {
         // Not in Telegram context at all - redirect to web login
         navigate('/login');
+        return;
+      }
+      
+      // If allowing without Telegram, skip initData checks and proceed directly
+      if (allowWithoutTelegram && !isTelegramWebApp) {
+        console.log('[Register] Registration without Telegram allowed');
+        setIsCheckingTelegram(false);
         return;
       }
       
@@ -264,9 +275,10 @@ export default function Register() {
 
     try {
       const initData = getInitData();
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
-      // Must have valid Telegram initData to register through Mini App
-      if (!initData || initData.length === 0) {
+      // Must have valid Telegram initData to register through Mini App (unless override is enabled)
+      if (!allowWithoutTelegram && (!initData || initData.length === 0)) {
         toast({
           title: t.common.error,
           description: locale === 'ru' 
@@ -281,7 +293,10 @@ export default function Register() {
       const response = await fetch('/api/auth/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, ...finalData }),
+        body: JSON.stringify({ 
+          initData: initData || '', // Allow empty initData if override is enabled
+          ...finalData 
+        }),
         credentials: 'include',
       });
 

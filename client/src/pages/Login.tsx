@@ -198,6 +198,9 @@ export default function Login() {
     );
   }
 
+  // TEMPORARY: Check if registration without Telegram is allowed
+  const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -219,19 +222,41 @@ export default function Login() {
 
         <div className="space-y-6 pt-8">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-            <p className="text-white mb-6">
-              Sign in with your Telegram account to access your personalized astrology dashboard
-            </p>
-            
-            <div 
-              ref={containerRef} 
-              className="flex justify-center"
-              data-testid="telegram-login-widget-container"
-            />
+            {allowWithoutTelegram ? (
+              // Show direct registration button for moderation/testing
+              <>
+                <p className="text-white mb-6">
+                  Создайте профиль для доступа к персональным астрологическим прогнозам
+                </p>
+                <Button 
+                  onClick={() => setLocation('/register')}
+                  className="w-full"
+                  size="lg"
+                  data-testid="button-create-profile"
+                >
+                  Создать профиль
+                </Button>
+              </>
+            ) : (
+              // Show Telegram Login Widget (default behavior)
+              <>
+                <p className="text-white mb-6">
+                  Sign in with your Telegram account to access your personalized astrology dashboard
+                </p>
+                
+                <div 
+                  ref={containerRef} 
+                  className="flex justify-center"
+                  data-testid="telegram-login-widget-container"
+                />
+              </>
+            )}
           </div>
 
           <p className="text-sm text-purple-300">
-            By signing in, you agree to use Telegram authentication for secure access
+            {allowWithoutTelegram 
+              ? "Для модерации: можно создать профиль без Telegram" 
+              : "By signing in, you agree to use Telegram authentication for secure access"}
           </p>
         </div>
       </div>
