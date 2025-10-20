@@ -47,10 +47,20 @@ export default function Register() {
     let cleanupFn: (() => void) | null = null;
     
     const checkTelegramContext = async () => {
-      // Check if Telegram WebApp is available
-      const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
+      // Check if registration without Telegram is allowed
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
       if (!isMounted) return;
+      
+      // If allowing without Telegram, skip all Telegram checks and proceed directly
+      if (allowWithoutTelegram) {
+        console.log('[Register] Registration without Telegram allowed - skipping all Telegram checks');
+        setIsCheckingTelegram(false);
+        return;
+      }
+      
+      // Check if Telegram WebApp is available
+      const isTelegramWebApp = window.Telegram?.WebApp !== undefined;
       
       if (!isTelegramWebApp) {
         // Not in Telegram context at all - redirect to web login
@@ -264,9 +274,11 @@ export default function Register() {
 
     try {
       const initData = getInitData();
+      // Check if registration without Telegram is allowed
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
       
-      // Must have valid Telegram initData to register through Mini App
-      if (!initData || initData.length === 0) {
+      // Must have valid Telegram initData to register through Mini App (unless override is enabled)
+      if (!allowWithoutTelegram && (!initData || initData.length === 0)) {
         toast({
           title: t.common.error,
           description: locale === 'ru' 
@@ -281,7 +293,10 @@ export default function Register() {
       const response = await fetch('/api/auth/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, ...finalData }),
+        body: JSON.stringify({ 
+          initData: initData || '', // Allow empty initData if override is enabled
+          ...finalData 
+        }),
         credentials: 'include',
       });
 
