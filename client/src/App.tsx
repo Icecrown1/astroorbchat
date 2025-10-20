@@ -9,7 +9,6 @@ import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import NotFound from '@/pages/not-found';
-import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import MyNatalChart from '@/pages/MyNatalChart';
@@ -39,14 +38,15 @@ function Router() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal') {
+    // TEMPORARY HARDCODE: Auto-redirect to registration for moderation
+    // TODO: Remove this after moderation is complete
+    if (!isAuthenticated && location !== '/register' && location !== '/legal') {
       navigate('/register');
     }
   }, [isAuthenticated, location, navigate]);
 
   return (
     <Switch>
-      <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/legal" component={Legal} />
       <Route path="/dashboard" component={Dashboard} />
