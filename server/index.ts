@@ -36,10 +36,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Add health check endpoint before any other setup
+  // Add health check endpoint FIRST - before any other setup
+  // This ensures Replit can check if the app is alive immediately
   app.get('/health', (_req, res) => {
+    console.log('[Health] Health check requested');
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  console.log('[STARTUP] Starting application initialization...');
 
   // SECURITY: Verify critical environment variables at startup
   const REQUIRED_SECRETS = ['SESSION_SECRET', 'JWT_SECRET', 'DATABASE_URL', 'TELEGRAM_BOT_TOKEN'];
@@ -52,7 +56,9 @@ app.use((req, res, next) => {
   }
   console.log('[STARTUP] ✓ All required secrets configured');
 
+  console.log('[STARTUP] Registering routes...');
   const server = await registerRoutes(app);
+  console.log('[STARTUP] ✓ Routes registered successfully');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -82,11 +88,16 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
+  console.log(`[STARTUP] Starting server on port ${port} (host: 0.0.0.0)...`);
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
+    console.log(`[STARTUP] ✅ SERVER READY - listening on port ${port}`);
+    console.log(`[STARTUP] Health check available at: /health`);
     log(`serving on port ${port}`);
   });
 })();
