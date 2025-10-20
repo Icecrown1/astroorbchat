@@ -1,17 +1,48 @@
 // Initialize YooKassa client
-const getYooKassaClient = () => {
+const getYooKassaClient = async () => {
   const shopId = process.env.YOOKASSA_SHOP_ID;
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
+  
+  console.log('[YooKassa] Initializing client with credentials:', {
+    shopId: shopId ? `${shopId.substring(0, 4)}...` : 'MISSING',
+    secretKeyPresent: !!secretKey,
+  });
   
   if (!shopId || !secretKey) {
     throw new Error('YooKassa credentials not configured. Please set YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY');
   }
 
-  // Library exports factory function, not constructor directly
-  const yookassaFactory = require('@appigram/yookassa-node');
-  
-  // Call factory function with shopId and secretKey
-  return yookassaFactory(shopId, secretKey);
+  try {
+    // Dynamic import for CommonJS module in ESM environment
+    const yookassaModule = await import('@appigram/yookassa-node');
+    
+    console.log('[YooKassa] Module loaded, keys:', Object.keys(yookassaModule));
+    console.log('[YooKassa] Default export type:', typeof yookassaModule.default);
+    console.log('[YooKassa] YooKassa export type:', typeof (yookassaModule as any).YooKassa);
+    
+    // Try factory function first (based on docs)
+    const factory = yookassaModule.default || yookassaModule;
+    
+    let client;
+    try {
+      // Try calling as factory function
+      client = factory(shopId, secretKey);
+      console.log('[YooKassa] Client created via factory function');
+    } catch (factoryError: any) {
+      console.log('[YooKassa] Factory function failed, trying constructor:', factoryError.message);
+      // Try as constructor with new
+      client = new (factory as any)(shopId, secretKey);
+      console.log('[YooKassa] Client created via constructor');
+    }
+    
+    console.log('[YooKassa] Client type:', typeof client);
+    console.log('[YooKassa] Client methods:', Object.keys(client));
+    
+    return client;
+  } catch (error: any) {
+    console.error('[YooKassa] Failed to initialize client:', error);
+    throw new Error(`Failed to initialize YooKassa client: ${error.message}`);
+  }
 };
 
 export interface CreatePaymentParams {
@@ -42,7 +73,6 @@ export interface YooKassaPayment {
  * Returns payment object with confirmation URL for redirect
  */
 export async function createPayment(params: CreatePaymentParams): Promise<YooKassaPayment> {
-  const yooKassa = getYooKassaClient();
   const isTestMode = process.env.YOOKASSA_TEST_MODE === 'true';
 
   console.log('[YooKassa] Creating payment:', {
@@ -50,6 +80,9 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
     description: params.description,
     testMode: isTestMode,
   });
+  
+  const yooKassa = await getYooKassaClient();
+  console.log('[YooKassa] Client obtained, calling createPayment API');
 
   try {
     const payment = await yooKassa.createPayment({
@@ -84,7 +117,7 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
  * Check payment status by payment ID
  */
 export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPayment> {
-  const yooKassa = getYooKassaClient();
+  const yooKassa = await getYooKassaClient();
 
   console.log('[YooKassa] Checking payment status:', paymentId);
 
@@ -108,7 +141,7 @@ export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPay
  * Create a refund for a payment
  */
 export async function createRefund(paymentId: string, amount: string, reason?: string): Promise<any> {
-  const yooKassa = getYooKassaClient();
+  const yooKassa = await getYooKassaClient();
 
   console.log('[YooKassa] Creating refund:', {
     paymentId,
