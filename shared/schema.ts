@@ -293,12 +293,11 @@ export const yookassaPayments = pgTable("yookassa_payments", {
   tier: varchar("tier", { length: 20 }), // For subscriptions: "standard" or "pro"
   energyAmount: integer("energy_amount"), // For energy packs
   amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }).notNull(),
-  yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }), // YooKassa payment ID
+  yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }).unique(), // YooKassa payment ID - unique constraint
   status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, succeeded, canceled
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 }, (table) => ({
-  yookassaPaymentIdIdx: index("yookassa_payments_yookassa_payment_id_idx").on(table.yookassaPaymentId),
   userIdIdx: index("yookassa_payments_user_id_idx").on(table.userId),
 }));
 
