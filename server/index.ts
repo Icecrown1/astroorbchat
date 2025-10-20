@@ -36,13 +36,19 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add health check endpoint before any other setup
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   // SECURITY: Verify critical environment variables at startup
   const REQUIRED_SECRETS = ['SESSION_SECRET', 'JWT_SECRET', 'DATABASE_URL', 'TELEGRAM_BOT_TOKEN'];
-  for (const secret of REQUIRED_SECRETS) {
-    if (!process.env[secret]) {
-      console.error(`[STARTUP] FATAL ERROR: Required environment variable ${secret} is not set`);
-      process.exit(1);
-    }
+  const missingSecrets = REQUIRED_SECRETS.filter(secret => !process.env[secret]);
+  
+  if (missingSecrets.length > 0) {
+    console.error(`[STARTUP] FATAL ERROR: Missing required environment variables: ${missingSecrets.join(', ')}`);
+    console.error('[STARTUP] Please configure these secrets in the Replit Secrets panel');
+    process.exit(1);
   }
   console.log('[STARTUP] ✓ All required secrets configured');
 
