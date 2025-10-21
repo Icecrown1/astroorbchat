@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { EnergyBadge } from '@/components/EnergyBadge';
+import { LowEnergyAlert } from '@/components/LowEnergyAlert';
 import { FeatureCard } from '@/components/FeatureCard';
 import { Loader } from '@/components/Loader';
 import { Coachmark } from '@/components/Coachmark';
@@ -158,6 +159,13 @@ export default function Dashboard() {
         <div className="flex justify-center mb-8">
           <EnergyBadge />
         </div>
+
+        {/* Low Energy Alert */}
+        {energy < 10 && (
+          <div className="mb-6">
+            <LowEnergyAlert />
+          </div>
+        )}
 
         {/* Onboarding Coachmark */}
         <Coachmark

@@ -72,16 +72,19 @@ export async function checkAndResetEnergy(storage: any, userId: string): Promise
       }
     }
     
-    let newFreeEnergy = 10;
-
-    // Both 'active' and 'canceled' get benefits until period ends
+    // Determine max free energy based on subscription
+    let maxFreeEnergy = 10;
     if (subscription?.status === 'active' || subscription?.status === 'canceled') {
-      newFreeEnergy = SUBSCRIPTION_DAILY_ENERGY[subscription.tier as 'standard' | 'pro'] || 10;
+      maxFreeEnergy = SUBSCRIPTION_DAILY_ENERGY[subscription.tier as 'standard' | 'pro'] || 10;
     }
+
+    // CRITICAL: Replenish to MAX, not replace
+    // If user has 2 orbs, restore to 10. If user has 12 orbs, keep 12.
+    const newFreeEnergy = Math.max(user.freeEnergy, maxFreeEnergy);
 
     const nextReset = getNextResetTime(user.timezone);
     
-    // Reset only free energy, keep purchased energy intact
+    // Reset only free energy to maximum, keep purchased energy intact
     await storage.updateUser(userId, {
       freeEnergy: newFreeEnergy,
       energyResetAt: nextReset,

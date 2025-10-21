@@ -405,6 +405,11 @@ export const translations = {
       subscriptionUpdatedSuccess: 'Subscription updated successfully',
       subscriptionUpdateFailed: 'Failed to update subscription',
     },
+    energy: {
+      lowEnergyMessage: 'Your orbs are running low! They replenish to 10 every day at midnight. You can also purchase more orbs or subscribe for unlimited energy.',
+      buyEnergy: 'Buy Energy',
+      subscribe: 'Subscribe',
+    },
     errors: {
       insufficientEnergy: 'Insufficient energy. Please purchase more orbs.',
       calculationFailed: 'Calculation failed. Please try again.',
@@ -815,6 +820,11 @@ export const translations = {
       energyUpdateFailed: 'Не удалось обновить энергию',
       subscriptionUpdatedSuccess: 'Подписка успешно обновлена',
       subscriptionUpdateFailed: 'Не удалось обновить подписку',
+    },
+    energy: {
+      lowEnergyMessage: 'Ваши орбы заканчиваются! Раз в сутки они восстанавливаются до 10. Также вы можете купить орбы или оформить подписку.',
+      buyEnergy: 'Купить энергию',
+      subscribe: 'Подписаться',
     },
     errors: {
       insufficientEnergy: 'Недостаточно энергии. Пожалуйста, купите больше сфер.',
