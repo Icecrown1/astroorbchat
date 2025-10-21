@@ -2689,6 +2689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update our payment record with YooKassa payment ID
       // Handle duplicate key error (if this yookassaPaymentId already exists from a previous payment)
+      let actualPaymentId = yookassaPayment.id;
       try {
         await storage.updateYookassaPayment(yookassaPayment.id, {
           yookassaPaymentId: ykPayment.id,
@@ -2698,6 +2699,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (updateError.code === '23505' && updateError.constraint === 'yookassa_payments_yookassa_payment_id_unique') {
           console.warn('[YooKassa] Duplicate yookassaPaymentId detected:', ykPayment.id);
           console.log('[YooKassa] This likely means idempotency worked - YooKassa returned an existing payment');
+          
+          // Find the original payment record with this yookassaPaymentId
+          const originalPayment = await storage.getYookassaPaymentById(ykPayment.id);
+          if (originalPayment) {
+            actualPaymentId = originalPayment.id;
+            console.log('[YooKassa] Found original payment record:', actualPaymentId);
+          }
           
           // Delete the current payment record we just created (it's a duplicate)
           try {
@@ -2725,7 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ok: true,
         data: {
           confirmationUrl,
-          paymentId: yookassaPayment.id,
+          paymentId: actualPaymentId,
           yookassaPaymentId: ykPayment.id,
         },
       });
