@@ -47,7 +47,12 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 21, 2025)
-- **YooKassa Idempotency System - PRODUCTION READY v2**: Enhanced idempotency implementation following YooKassa best practices:
+- **YooKassa Critical Bug Fix - RESOLVED**: Fixed duplicate payment error that was showing to users:
+  - **Root Cause**: `updateYookassaPayment` in storage.ts used wrong WHERE clause - searched by `yookassaPaymentId` (YooKassa ID) but received `internal ID` parameter
+  - **Result**: Updates failed silently, duplicate key errors showed to users on retry
+  - **Fix**: Changed WHERE clause to `eq(yookassaPayments.id, paymentId)` - now correctly uses internal primary key
+  - **Impact**: Duplicate payment handling now works correctly - errors caught by try/catch, users see seamless experience
+- **YooKassa Idempotency System - PRODUCTION READY v3**: Enhanced idempotency implementation following YooKassa best practices:
   - **SHA-256 Idempotency Key**: Frontend generates 64-char SHA-256 hash from `userId + kind + amount/tier + price + minuteTimestamp` (YooKassa recommendation)
   - **Database Schema**: `idempotencyKey` field (varchar 255, unique constraint, indexed) in yookassaPayments table
   - **Cross-User Protection**: Each user's hash includes their userId, preventing cross-user collisions

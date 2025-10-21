@@ -109,7 +109,7 @@ export interface IStorage {
   getYookassaPaymentById(yookassaPaymentId: string): Promise<YookassaPayment | undefined>;
   getYookassaPaymentByIdempotencyKey(idempotencyKey: string): Promise<YookassaPayment | undefined>;
   getYookassaPaymentsByUserId(userId: string): Promise<YookassaPayment[]>;
-  updateYookassaPayment(yookassaPaymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined>;
+  updateYookassaPayment(paymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined>;
   deleteYookassaPayment(yookassaPaymentId: string): Promise<void>;
   
   // Referral reward operations
@@ -482,11 +482,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(yookassaPayments.createdAt));
   }
 
-  async updateYookassaPayment(yookassaPaymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined> {
+  async updateYookassaPayment(paymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined> {
     const [payment] = await db
       .update(yookassaPayments)
       .set(data)
-      .where(eq(yookassaPayments.yookassaPaymentId, yookassaPaymentId))
+      .where(eq(yookassaPayments.id, paymentId))
       .returning();
     return payment || undefined;
   }
