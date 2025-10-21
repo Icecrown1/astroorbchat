@@ -2613,9 +2613,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Tell client to retry after a short delay
           console.log('[YooKassa] Recent payment being created, asking client to retry');
           return res.status(202).json({ 
-            ok: false, 
-            error: 'Payment is being created, please try again in a few seconds',
-            retryAfter: 3 // Suggest retry after 3 seconds
+            ok: true,
+            status: 'pending',
+            retryAfter: 3,
+            message: 'Payment is being created, will retry automatically'
           });
         }
       }
@@ -2658,17 +2659,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[YooKassa] Payment config:', { description, amountRUB, energyAmount, tier });
 
       // Create payment record first
-      yookassaPayment = await storage.createYookassaPayment({
-        userId,
-        kind: validated.kind,
-        tier,
-        energyAmount,
-        amountRUB,
-        yookassaPaymentId: '', // Will be updated after YooKassa creates payment
-        idempotencyKey: validated.idempotencyKey, // Store client's idempotency key
-      });
-      
-      console.log('[YooKassa] Payment record created with ID:', yookassaPayment.id);
+      // Wrap in try/catch to handle race condition where two requests with same idempotencyKey
+      // both pass the existingPayment check and both try to create a record
+      try {
+        yookassaPayment = await storage.createYookassaPayment({
+          userId,
+          kind: validated.kind,
+          tier,
+          energyAmount,
+          amountRUB,
+          yookassaPaymentId: '', // Will be updated after YooKassa creates payment
+          idempotencyKey: validated.idempotencyKey, // Store client's idempotency key
+        });
+        
+        console.log('[YooKassa] Payment record created with ID:', yookassaPayment.id);
+      } catch (createError: any) {
+        // If duplicate key error on idempotencyKey, another request beat us to creating the record
+        if (createError.code === '23505' && createError.constraint === 'yookassa_payments_idempotency_key_unique') {
+          console.warn('[YooKassa] ⚠️  Race condition detected - another request created payment with same idempotency key');
+          
+          // Fetch the existing payment that was just created
+          const existingPaymentByKey = await storage.getYookassaPaymentByIdempotencyKey(validated.idempotencyKey);
+          if (existingPaymentByKey) {
+            console.log('[YooKassa] Found existing payment:', existingPaymentByKey.id);
+            
+            // Use the existing payment instead
+            yookassaPayment = existingPaymentByKey;
+            
+            // If it already has a yookassaPaymentId and confirmation URL, return it immediately
+            if (existingPaymentByKey.yookassaPaymentId) {
+              try {
+                const ykPayment = await getYooKassaPayment(existingPaymentByKey.yookassaPaymentId);
+                const confirmationUrl = ykPayment.confirmation?.confirmation_url;
+                
+                if (confirmationUrl) {
+                  console.log('[YooKassa] Returning existing payment URL (race condition handled)');
+                  return res.json({
+                    ok: true,
+                    data: {
+                      confirmationUrl,
+                      paymentId: existingPaymentByKey.id,
+                      yookassaPaymentId: existingPaymentByKey.yookassaPaymentId,
+                    },
+                  });
+                }
+              } catch (fetchError) {
+                console.error('[YooKassa] Failed to fetch existing payment from YooKassa:', fetchError);
+                // Fall through to continue creating YooKassa payment
+              }
+            }
+            
+            // Payment exists but doesn't have yookassaPaymentId yet
+            // Wait a moment for the other request to finish, then tell client to retry
+            console.log('[YooKassa] Existing payment being processed by another request, asking client to retry');
+            return res.status(202).json({ 
+              ok: true,
+              status: 'pending',
+              retryAfter: 2,
+              message: 'Payment is being created, will retry automatically'
+            });
+          } else {
+            // This shouldn't happen - we got duplicate key error but can't find the existing payment
+            console.error('[YooKassa] Got duplicate key error but cannot find existing payment!');
+            return res.status(500).json({ ok: false, error: 'Payment creation failed, please try again' });
+          }
+        } else {
+          // Different error - re-throw it
+          throw createError;
+        }
+      }
 
       // Create YooKassa payment
       const baseUrl = process.env.SERVER_URL || `https://${req.headers.host}`;
@@ -2794,7 +2853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Missing payment ID" });
       }
 
-      const dbPayment = await storage.getYookassaPaymentById(internalPaymentId);
+      const dbPayment = await storage.getYookassaPaymentByInternalId(internalPaymentId);
       if (!dbPayment) {
         console.error('[YooKassa Webhook] Payment not found in database:', internalPaymentId);
         return res.status(404).json({ ok: false, error: "Payment not found" });

@@ -265,11 +265,13 @@ export default function BuyEnergy() {
         idempotencyKey
       });
       
-      // If server asks to retry (202 status returns retryAfter field), wait and retry once
-      // Note: apiRequest returns the JSON body directly, even for 202 status
-      if (response.retryAfter && !response.ok) {
+      // If server asks to retry (payment being created by another request), wait and retry
+      // Backend returns { ok: true, status: 'pending', retryAfter: N } for race conditions
+      // Allow up to 2 retries to handle edge cases
+      let retryCount = 0;
+      while (response.status === 'pending' && response.retryAfter && retryCount < 2) {
         const retryAfter = response.retryAfter || 3;
-        console.log('[YooKassa] Payment being created, retrying after', retryAfter, 'seconds...');
+        console.log('[YooKassa] Payment being created, retrying after', retryAfter, 'seconds... (attempt', retryCount + 1, ')');
         await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
         
         // Retry request
@@ -279,9 +281,16 @@ export default function BuyEnergy() {
           customerEmail: email || null,
           idempotencyKey
         });
+        retryCount++;
       }
       
+      // Check if we have valid response data
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      if (!response.data || !response.data.confirmationUrl) {
+        throw new Error(locale === 'ru' 
+          ? 'Платёж обрабатывается. Пожалуйста, повторите попытку через минуту.'
+          : 'Payment is being processed. Please try again in a minute.');
+      }
       return response.data;
     },
     onSuccess: (data) => {

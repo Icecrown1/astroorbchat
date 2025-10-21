@@ -107,6 +107,7 @@ export interface IStorage {
   // YooKassa payment operations
   createYookassaPayment(payment: InsertYookassaPayment): Promise<YookassaPayment>;
   getYookassaPaymentById(yookassaPaymentId: string): Promise<YookassaPayment | undefined>;
+  getYookassaPaymentByInternalId(id: string): Promise<YookassaPayment | undefined>;
   getYookassaPaymentByIdempotencyKey(idempotencyKey: string): Promise<YookassaPayment | undefined>;
   getYookassaPaymentsByUserId(userId: string): Promise<YookassaPayment[]>;
   updateYookassaPayment(paymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined>;
@@ -463,6 +464,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(yookassaPayments)
       .where(eq(yookassaPayments.yookassaPaymentId, yookassaPaymentId));
+    return payment || undefined;
+  }
+
+  async getYookassaPaymentByInternalId(id: string): Promise<YookassaPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(yookassaPayments)
+      .where(eq(yookassaPayments.id, id));
     return payment || undefined;
   }
 
