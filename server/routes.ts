@@ -2529,6 +2529,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/yookassa/create", requireAuth, async (req, res) => {
+    let yookassaPayment: any = null; // Declare here so it's accessible in catch block
+    
     try {
       const userId = (req as any).userId;
       console.log('[YooKassa] Creating payment for userId:', userId);
@@ -2655,6 +2657,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
+      // Clean up payment record if YooKassa API call failed
+      if (yookassaPayment?.id) {
+        try {
+          await storage.deleteYookassaPayment(yookassaPayment.id);
+          console.log('[YooKassa] Cleaned up failed payment record:', yookassaPayment.id);
+        } catch (cleanupError) {
+          console.error('[YooKassa] Failed to cleanup payment record:', cleanupError);
+        }
+      }
+      
       if (error instanceof z.ZodError) {
         console.error('[YooKassa] Validation error:', error.errors);
         return res.status(400).json({ ok: false, error: error.errors[0].message });
