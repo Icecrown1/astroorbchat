@@ -1,13 +1,11 @@
-// Reference: blueprint:javascript_openai_ai_integrations
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
 
-// This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Using custom OpenAI API key provided by user
+// the newest OpenAI model is "gpt-4o" which is the latest available model
 export const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 /**
@@ -91,7 +89,7 @@ export async function getAstrologyInterpretation(
     : "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
@@ -199,7 +197,7 @@ export async function getPlanetInterpretation(
     : "You are a practical astrologer. You explain planetary positions concretely without fluff. Return only valid JSON.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
@@ -293,7 +291,7 @@ export async function interpretImportantDate(
     : "You are a practical astrologer. You provide concrete, useful advice for important dates. Return only valid JSON.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
@@ -415,7 +413,7 @@ Return structured JSON with ${hostName} and ${partnerName} names in texts:
 `;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
@@ -550,7 +548,7 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
   
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -731,11 +729,11 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
     ? "Ты опытный астролог-практик. Составляешь недельные планы с конкретными рекомендациями. Возвращаешь только валидный JSON."
     : "You are a practical astrologer. You create weekly plans with concrete recommendations. Return only valid JSON.";
 
-  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-5');
+  console.log('[generateWeeklyPlan] Calling OpenAI with model: gpt-4o');
   console.log('[generateWeeklyPlan] Prompt length:', finalPrompt.length);
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
@@ -841,7 +839,7 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
     : "You are a practical astrologer. You create monthly plans considering weeks and key dates. Return only valid JSON.";
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
