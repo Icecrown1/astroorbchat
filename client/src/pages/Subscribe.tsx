@@ -167,25 +167,60 @@ export default function Subscribe() {
 
   const yookassaMutation = useMutation({
     mutationFn: async ({ tier, email }: { tier: typeof SUBSCRIPTION_TIERS[0], email: string | undefined }) => {
-      console.log('[YooKassa] Creating subscription payment for tier:', tier.tier, 'with email:', email);
+      console.log('[YooKassa] ============ FRONTEND: Creating subscription payment ============');
+      console.log('[YooKassa] Tier:', tier.tier);
+      console.log('[YooKassa] Email:', email);
+      console.log('[YooKassa] WebApp Platform:', WebApp.platform);
+      console.log('[YooKassa] WebApp Version:', WebApp.version);
+      console.log('[YooKassa] initDataUnsafe:', WebApp.initDataUnsafe);
       
       if (!userData?.ok || !userData.data?.id) {
         throw new Error(locale === 'ru' ? 'Пользователь не авторизован' : 'User not authenticated');
       }
       
-      // Generate stable idempotency key based on userId, tier, and current minute
+      // Generate stable idempotency key using SHA-256 hash (YooKassa recommendation)
+      // Based on userId, kind, tier, price, and current minute
       // This ensures clicks within the same minute use the same key for the same user
       const now = new Date();
       const minuteTimestamp = Math.floor(now.getTime() / 60000); // Round to minute
-      const idempotencyKey = `${userData.data.id}_subscription_${tier.tier}_${tier.rubPrice}_${minuteTimestamp}`;
-      console.log('[YooKassa] Using idempotency key:', idempotencyKey.substring(0, 20) + '...');
+      const keyData = `${userData.data.id}_subscription_${tier.tier}_${tier.rubPrice}_${minuteTimestamp}`;
       
-      const response = await apiRequest('POST', '/api/payments/yookassa/create', {
+      // Hash the key data using SHA-256
+      const encoder = new TextEncoder();
+      const data = encoder.encode(keyData);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const idempotencyKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 64);
+      
+      console.log('[YooKassa] User ID:', userData.data.id);
+      console.log('[YooKassa] Minute timestamp:', minuteTimestamp);
+      console.log('[YooKassa] Key data (before hash):', keyData);
+      console.log('[YooKassa] Idempotency Key (SHA-256, 64 chars):', idempotencyKey);
+      
+      // Make request with automatic retry for race conditions
+      let response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription',
         tier: tier.tier,
         customerEmail: email || null,
         idempotencyKey
       });
+      
+      // If server asks to retry (202 status returns retryAfter field), wait and retry once
+      // Note: apiRequest returns the JSON body directly, even for 202 status
+      if (response.retryAfter && !response.ok) {
+        const retryAfter = response.retryAfter || 3;
+        console.log('[YooKassa] Payment being created, retrying after', retryAfter, 'seconds...');
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        
+        // Retry request
+        response = await apiRequest('POST', '/api/payments/yookassa/create', {
+          kind: 'subscription',
+          tier: tier.tier,
+          customerEmail: email || null,
+          idempotencyKey
+        });
+      }
+      
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },

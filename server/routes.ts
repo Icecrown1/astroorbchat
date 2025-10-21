@@ -2534,15 +2534,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const userId = (req as any).userId;
-      console.log('[YooKassa] Creating payment for userId:', userId);
+      console.log('[YooKassa] ============ NEW PAYMENT REQUEST ============');
+      console.log('[YooKassa] User ID:', userId);
+      console.log('[YooKassa] Request body:', JSON.stringify(req.body, null, 2));
       
       const validated = createYooKassaPaymentSchema.parse(req.body);
-      console.log('[YooKassa] Validated request:', validated);
+      console.log('[YooKassa] Idempotency Key (FULL):', validated.idempotencyKey);
+      console.log('[YooKassa] Payment kind:', validated.kind);
+      console.log('[YooKassa] Pack/Tier:', validated.pack || validated.tier);
 
       // Check if payment with this idempotency key already exists
       const existingPayment = await storage.getYookassaPaymentByIdempotencyKey(validated.idempotencyKey);
       if (existingPayment) {
-        console.log('[YooKassa] Payment with this idempotency key already exists:', existingPayment.id);
+        console.log('[YooKassa] ⚠️  EXISTING PAYMENT FOUND:');
+        console.log('[YooKassa]   - Payment ID:', existingPayment.id);
+        console.log('[YooKassa]   - YooKassa ID:', existingPayment.yookassaPaymentId || 'NOT SET');
+        console.log('[YooKassa]   - Status:', existingPayment.status);
+        console.log('[YooKassa]   - User ID:', existingPayment.userId);
+        console.log('[YooKassa]   - Created At:', existingPayment.createdAt);
+        console.log('[YooKassa]   - Idempotency Key:', existingPayment.idempotencyKey);
         
         // Verify it belongs to this user (security check)
         if (existingPayment.userId !== userId) {

@@ -47,15 +47,19 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 21, 2025)
-- **YooKassa Idempotency System - COMPLETE REWRITE**: Implemented proper idempotency handling following YooKassa documentation:
-  - **Client-Side Idempotency Key**: Frontend generates stable key from `userId + kind + amount/tier + price + minuteTimestamp`
-  - **Database Schema**: Added `idempotencyKey` field (varchar 255, unique constraint, indexed) to yookassaPayments table
-  - **Cross-User Protection**: Each user's idempotency key includes their userId, preventing cross-user collisions
-  - **Race Condition Handling**: Fast double-clicks handled with 202 response (retry in 3 seconds) when payment is being created
+- **YooKassa Idempotency System - PRODUCTION READY v2**: Enhanced idempotency implementation following YooKassa best practices:
+  - **SHA-256 Idempotency Key**: Frontend generates 64-char SHA-256 hash from `userId + kind + amount/tier + price + minuteTimestamp` (YooKassa recommendation)
+  - **Database Schema**: `idempotencyKey` field (varchar 255, unique constraint, indexed) in yookassaPayments table
+  - **Cross-User Protection**: Each user's hash includes their userId, preventing cross-user collisions
+  - **Race Condition Handling**: 
+    - Backend returns 202 status with `retryAfter` field when payment creation in progress
+    - Frontend automatically retries after 3 seconds (no user action needed)
+    - Handles fast double-clicks and concurrent requests gracefully
   - **Stuck Payment Recovery**: Payments stuck >30 seconds without yookassaPaymentId are auto-deleted and retried
-  - **No Duplicate Inserts**: System prevents duplicate database records through multiple layers of protection
+  - **Duplicate Detection & Cleanup**: When YooKassa returns existing payment (idempotency worked), system finds original DB record, deletes duplicate, returns correct payment URL
   - **Error Resilience**: Failed YooKassa API calls leave payment record in place for retry, preventing loss of idempotency protection
-  - **Production Ready**: All edge cases covered including API failures, rapid clicks, concurrent users, and recovery scenarios
+  - **Comprehensive Logging**: Full diagnostic logging of userId, idempotency keys, WebApp platform, existing payments for troubleshooting
+  - **Production Ready**: All edge cases covered - API failures, rapid clicks, concurrent users, Menu Button vs Direct Link entry points, recovery scenarios
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.
