@@ -2767,14 +2767,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[YooKassa] YooKassa payment created:', ykPayment.id);
 
-      // Update our payment record with YooKassa payment ID
-      // Handle duplicate key error (if this yookassaPaymentId already exists from a previous payment)
+      // PROACTIVE CHECK: Check if this yookassaPaymentId already exists in database
+      // This handles case where YooKassa idempotency returned existing payment
       let actualPaymentId = yookassaPayment.id;
-      try {
-        await storage.updateYookassaPayment(yookassaPayment.id, {
-          yookassaPaymentId: ykPayment.id,
-        });
-      } catch (updateError: any) {
+      const existingPaymentWithSameYkId = await storage.getYookassaPaymentById(ykPayment.id);
+      
+      if (existingPaymentWithSameYkId && existingPaymentWithSameYkId.id !== yookassaPayment.id) {
+        console.warn('[YooKassa] ⚠️  YooKassa returned existing payment ID (idempotency worked):', ykPayment.id);
+        console.log('[YooKassa] Existing payment record:', existingPaymentWithSameYkId.id);
+        console.log('[YooKassa] New payment record (will clean up):', yookassaPayment.id);
+        
+        // YooKassa idempotency worked - it returned an existing payment
+        // Simply reuse the existing payment record and clean up the duplicate
+        try {
+          // Delete the new payment record we just created (it's a duplicate)
+          await storage.deleteYookassaPayment(yookassaPayment.id);
+          console.log('[YooKassa] ✅ Cleaned up duplicate payment record:', yookassaPayment.id);
+          
+          // Use the existing payment record AS IS (don't modify its metadata)
+          actualPaymentId = existingPaymentWithSameYkId.id;
+          console.log('[YooKassa] ✅ Using existing payment record:', actualPaymentId);
+        } catch (deleteError) {
+          console.error('[YooKassa] Failed to delete duplicate payment record:', deleteError);
+          throw deleteError;
+        }
+      } else {
+        // No existing payment with this yookassaPaymentId - safe to update
+        try {
+          await storage.updateYookassaPayment(yookassaPayment.id, {
+            yookassaPaymentId: ykPayment.id,
+          });
+          console.log('[YooKassa] ✅ Updated payment record with YooKassa ID');
+        } catch (updateError: any) {
         // If duplicate key error, this yookassaPaymentId already exists in the database
         // Check by error code and full error string (most robust approach)
         const errorString = JSON.stringify(updateError).toLowerCase();
@@ -2814,6 +2838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Continue with the existing payment - the confirmation URL is still valid
         } else {
           throw updateError; // Re-throw if it's a different error
+        }
         }
       }
 
