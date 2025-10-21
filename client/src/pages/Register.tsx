@@ -18,10 +18,12 @@ import { Progress } from '@/components/ui/progress';
 import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { Loader } from '@/components/Loader';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { getInitData, getReferralCode } from '@/lib/telegram';
+import { formatTimezoneWithOffset } from '@/lib/timezone';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
 import utc from 'dayjs/plugin/utc.js';
@@ -446,11 +448,11 @@ export default function Register() {
 
             <div>
               <Label htmlFor="birthPlace">{t.auth.birthPlace}</Label>
-              <Input
-                id="birthPlace"
-                {...step2Form.register('birthPlace')}
+              <CityAutocomplete
+                value={step2Form.watch('birthPlace') || ''}
+                onChange={(value) => step2Form.setValue('birthPlace', value)}
                 placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
-                data-testid="input-birthplace"
+                locale={locale}
               />
               {step2Form.formState.errors.birthPlace && (
                 <p className="text-sm text-destructive mt-1">
@@ -492,7 +494,7 @@ export default function Register() {
                 <SelectContent>
                   {TIMEZONES.map((tz) => (
                     <SelectItem key={tz} value={tz}>
-                      {tz}
+                      {formatTimezoneWithOffset(tz)}
                     </SelectItem>
                   ))}
                 </SelectContent>

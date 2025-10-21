@@ -14,6 +14,7 @@ import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNa
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
+import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createPayment as createYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
 import { nanoid } from "nanoid";
@@ -292,6 +293,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ ok: false, error: 'Invalid action' });
     } catch (error: any) {
       console.error('[DEV] Test referral error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get("/api/cities/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const limit = parseInt(req.query.limit as string || '10', 10);
+      
+      const cities = searchCities(query || '', Math.min(limit, 50));
+      
+      res.json({ ok: true, data: cities });
+    } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
   });

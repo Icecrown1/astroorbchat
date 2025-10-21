@@ -151,3 +151,29 @@ export function findCityCoordinates(cityName: string): CityCoordinates | null {
   
   return null;
 }
+
+/**
+ * Searches for cities matching a query string
+ * @param query - search string
+ * @param limit - maximum results to return
+ * @returns array of city names
+ */
+export function searchCities(query: string, limit: number = 10): string[] {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+  
+  const normalized = normalizeCityName(query);
+  const results: string[] = [];
+  
+  for (const city of Object.keys(CITIES_DATABASE)) {
+    if (normalizeCityName(city).includes(normalized)) {
+      results.push(city);
+      if (results.length >= limit) {
+        break;
+      }
+    }
+  }
+  
+  return results;
+}
