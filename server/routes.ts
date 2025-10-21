@@ -2675,7 +2675,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('[YooKassa] Payment record created with ID:', yookassaPayment.id);
       } catch (createError: any) {
         // If duplicate key error on idempotencyKey, another request beat us to creating the record
-        if (createError.code === '23505' && createError.constraint === 'yookassa_payments_idempotency_key_unique') {
+        console.log('[YooKassa] Create error caught:', {
+          code: createError.code,
+          constraint: createError.constraint,
+          message: createError.message
+        });
+        
+        const isDuplicateIdempotencyKey = 
+          createError.code === '23505' && 
+          (createError.constraint?.includes('idempotency_key') || 
+           createError.message?.includes('idempotency_key'));
+        
+        if (isDuplicateIdempotencyKey) {
           console.warn('[YooKassa] ⚠️  Race condition detected - another request created payment with same idempotency key');
           
           // Fetch the existing payment that was just created
