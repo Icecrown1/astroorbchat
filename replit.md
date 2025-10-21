@@ -47,9 +47,12 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 21, 2025)
-- **YooKassa Payment Error Handling**: Comprehensive fix for payment creation issues:
+- **YooKassa Payment Error Handling - CRITICAL BUGFIX**: Fixed variable scoping bug that prevented error cleanup:
+  - **Root Cause**: Used `const yookassaPayment` instead of `yookassaPayment =` on line 2582, creating shadowed variable that prevented catch block cleanup
+  - **Impact**: Failed payments accumulated as "zombie" records with empty yookassaPaymentId, causing duplicate key constraint violations
+  - **Fix Applied**: Changed to proper variable assignment so catch block can delete failed records
   - **Idempotency Protection**: Uses internal payment ID as idempotency key to prevent duplicate payment creation on repeated clicks
-  - **Automatic Cleanup**: If YooKassa API fails, the created payment record is automatically deleted from database
+  - **Automatic Cleanup**: If YooKassa API fails, the created payment record is now correctly deleted from database
   - **Duplicate Handling**: Gracefully handles duplicate yookassaPaymentId constraints when idempotency returns existing payment
   - **Database Cleanup**: Removed 20 orphaned payment records with empty yookassaPaymentId
   - **Schema Update**: Added unique constraint on `yookassaPaymentId` field matching production database

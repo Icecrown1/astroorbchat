@@ -2576,7 +2576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[YooKassa] Payment config:', { description, amountRUB, energyAmount, tier });
 
       // Create payment record first
-      const yookassaPayment = await storage.createYookassaPayment({
+      yookassaPayment = await storage.createYookassaPayment({
         userId,
         kind: validated.kind,
         tier,
