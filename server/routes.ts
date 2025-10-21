@@ -2600,6 +2600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         returnUrl,
         customerEmail,
+        idempotencyKey: yookassaPayment.id, // Use internal payment ID as idempotency key
         metadata: {
           internalPaymentId: yookassaPayment.id,
           userId,
@@ -2612,9 +2613,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[YooKassa] YooKassa payment created:', ykPayment.id);
 
       // Update our payment record with YooKassa payment ID
-      await storage.updateYookassaPayment(yookassaPayment.id, {
-        yookassaPaymentId: ykPayment.id,
-      });
+      // Handle duplicate key error (if payment was already updated by another request)
+      try {
+        await storage.updateYookassaPayment(yookassaPayment.id, {
+          yookassaPaymentId: ykPayment.id,
+        });
+      } catch (updateError: any) {
+        // If duplicate key error, check if another record already has this yookassaPaymentId
+        if (updateError.code === '23505' && updateError.constraint === 'yookassa_payments_yookassa_payment_id_unique') {
+          console.warn('[YooKassa] Duplicate yookassaPaymentId detected:', ykPayment.id);
+          // This is OK - means we already processed this payment (idempotency worked)
+          // Just continue and return the existing payment
+        } else {
+          throw updateError; // Re-throw if it's a different error
+        }
+      }
 
       // Return confirmation URL for redirect
       const confirmationUrl = ykPayment.confirmation?.confirmation_url;
