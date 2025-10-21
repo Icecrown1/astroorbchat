@@ -41,6 +41,10 @@ export default function BuyEnergy() {
     }
   }, [walletConnected, pendingTonPurchase]);
 
+  const { data: userData } = useQuery<{ ok: boolean; data: { id: string } }>({
+    queryKey: ['/api/user/me'],
+  });
+
   const { data: pricesData, isLoading: pricesLoading } = useQuery({
     queryKey: ['/api/payments/price'],
   });
@@ -224,10 +228,23 @@ export default function BuyEnergy() {
   const yookassaMutation = useMutation({
     mutationFn: async ({ pack, email }: { pack: typeof ENERGY_PACKS[0], email: string | undefined }) => {
       console.log('[YooKassa] Creating payment for pack:', pack, 'with email:', email);
+      
+      if (!userData?.ok || !userData.data?.id) {
+        throw new Error(locale === 'ru' ? 'Пользователь не авторизован' : 'User not authenticated');
+      }
+      
+      // Generate stable idempotency key based on userId, amount, and current minute
+      // This ensures clicks within the same minute use the same key for the same user
+      const now = new Date();
+      const minuteTimestamp = Math.floor(now.getTime() / 60000); // Round to minute
+      const idempotencyKey = `${userData.data.id}_energy_${pack.amount}_${pack.rubPrice}_${minuteTimestamp}`;
+      console.log('[YooKassa] Using idempotency key:', idempotencyKey.substring(0, 20) + '...');
+      
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'energy_pack',
         pack: { energy: pack.amount },
-        customerEmail: email || null
+        customerEmail: email || null,
+        idempotencyKey
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;

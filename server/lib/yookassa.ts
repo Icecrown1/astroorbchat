@@ -149,17 +149,17 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
 }
 
 /**
- * Check payment status by payment ID
+ * Get payment by ID (for fetching existing payment details)
  */
-export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPayment> {
+export async function getPayment(paymentId: string): Promise<YooKassaPayment> {
   const yooKassa = await getYooKassaClient();
 
-  console.log('[YooKassa] Checking payment status:', paymentId);
+  console.log('[YooKassa] Getting payment:', paymentId);
 
   try {
     const payment = await yooKassa.getPayment(paymentId);
     
-    console.log('[YooKassa] Payment status:', {
+    console.log('[YooKassa] Payment fetched:', {
       id: payment.id,
       status: payment.status,
       paid: payment.paid,
@@ -167,9 +167,16 @@ export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPay
 
     return payment;
   } catch (error: any) {
-    console.error('[YooKassa] Error checking payment status:', error);
-    throw new Error(`Failed to check YooKassa payment status: ${error.message}`);
+    console.error('[YooKassa] Error getting payment:', error);
+    throw new Error(`Failed to get YooKassa payment: ${error.message}`);
   }
+}
+
+/**
+ * Check payment status by payment ID
+ */
+export async function checkPaymentStatus(paymentId: string): Promise<YooKassaPayment> {
+  return getPayment(paymentId);
 }
 
 /**

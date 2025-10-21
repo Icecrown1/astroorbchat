@@ -294,11 +294,13 @@ export const yookassaPayments = pgTable("yookassa_payments", {
   energyAmount: integer("energy_amount"), // For energy packs
   amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }).notNull(),
   yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }).unique(), // YooKassa payment ID - must be unique
+  idempotencyKey: varchar("idempotency_key", { length: 255 }).unique(), // Client-provided idempotency key - must be unique
   status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, succeeded, canceled
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 }, (table) => ({
   userIdIdx: index("yookassa_payments_user_id_idx").on(table.userId),
+  idempotencyKeyIdx: index("yookassa_payments_idempotency_key_idx").on(table.idempotencyKey),
 }));
 
 export const yookassaPaymentsRelations = relations(yookassaPayments, ({ one }) => ({

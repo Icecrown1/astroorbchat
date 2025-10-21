@@ -16,7 +16,7 @@ import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
-import { createPayment as createYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
+import { createPayment as createYooKassaPayment, getPayment as getYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
@@ -2526,6 +2526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }).optional(),
     tier: z.enum(["standard", "pro"]).optional(),
     customerEmail: z.string().email().optional().nullable(),
+    idempotencyKey: z.string().min(1).max(64), // Client-generated idempotency key (required)
   });
 
   app.post("/api/payments/yookassa/create", requireAuth, async (req, res) => {
@@ -2537,6 +2538,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validated = createYooKassaPaymentSchema.parse(req.body);
       console.log('[YooKassa] Validated request:', validated);
+
+      // Check if payment with this idempotency key already exists
+      const existingPayment = await storage.getYookassaPaymentByIdempotencyKey(validated.idempotencyKey);
+      if (existingPayment) {
+        console.log('[YooKassa] Payment with this idempotency key already exists:', existingPayment.id);
+        
+        // Verify it belongs to this user (security check)
+        if (existingPayment.userId !== userId) {
+          console.error('[YooKassa] Idempotency key collision - different user!');
+          return res.status(409).json({ 
+            ok: false, 
+            error: 'Payment already in progress, please try again in a minute' 
+          });
+        }
+        
+        // If payment already succeeded or was canceled, don't allow reuse
+        if (existingPayment.status !== 'pending') {
+          return res.status(400).json({ 
+            ok: false, 
+            error: `Payment with this idempotency key already ${existingPayment.status}` 
+          });
+        }
+        
+        // Payment is pending for this user
+        // If it has yookassaPaymentId, fetch and return the confirmation URL
+        if (existingPayment.yookassaPaymentId) {
+          try {
+            const ykPayment = await getYooKassaPayment(existingPayment.yookassaPaymentId);
+            const confirmationUrl = ykPayment.confirmation?.confirmation_url;
+            
+            if (confirmationUrl) {
+              console.log('[YooKassa] Returning existing payment:', existingPayment.id);
+              return res.json({
+                ok: true,
+                data: {
+                  confirmationUrl,
+                  paymentId: existingPayment.id,
+                  yookassaPaymentId: existingPayment.yookassaPaymentId,
+                },
+              });
+            }
+          } catch (fetchError) {
+            console.error('[YooKassa] Failed to fetch existing payment from YooKassa:', fetchError);
+            // Fall through to check if we should retry creation
+          }
+        }
+        
+        // Payment exists but doesn't have yookassaPaymentId
+        // Check if it's been too long since creation (stuck payment from failed API call)
+        const createdAt = new Date(existingPayment.createdAt);
+        const now = new Date();
+        const secondsSinceCreation = (now.getTime() - createdAt.getTime()) / 1000;
+        
+        if (secondsSinceCreation > 30) {
+          // Payment has been pending for >30 seconds without yookassaPaymentId
+          // This likely means the original YooKassa API call failed
+          // Delete it and allow creation of a new one
+          console.log('[YooKassa] Stuck payment detected (>30s), deleting and will retry:', existingPayment.id);
+          await storage.deleteYookassaPayment(existingPayment.id);
+          // Fall through to create new payment
+        } else {
+          // Payment was created recently, likely still in progress (race condition)
+          // Tell client to retry after a short delay
+          console.log('[YooKassa] Recent payment being created, asking client to retry');
+          return res.status(202).json({ 
+            ok: false, 
+            error: 'Payment is being created, please try again in a few seconds',
+            retryAfter: 3 // Suggest retry after 3 seconds
+          });
+        }
+      }
 
       // Determine pricing based on kind and pack/tier (in RUB)
       let description: string;
@@ -2583,6 +2655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         energyAmount,
         amountRUB,
         yookassaPaymentId: '', // Will be updated after YooKassa creates payment
+        idempotencyKey: validated.idempotencyKey, // Store client's idempotency key
       });
       
       console.log('[YooKassa] Payment record created with ID:', yookassaPayment.id);
@@ -2602,7 +2675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         returnUrl,
         customerEmail,
-        idempotencyKey: yookassaPayment.id, // Use internal payment ID as idempotency key
+        idempotencyKey: validated.idempotencyKey, // Use client's idempotency key for YooKassa
         metadata: {
           internalPaymentId: yookassaPayment.id,
           userId,
@@ -2657,15 +2730,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
-      // Clean up payment record if YooKassa API call failed
-      if (yookassaPayment?.id) {
-        try {
-          await storage.deleteYookassaPayment(yookassaPayment.id);
-          console.log('[YooKassa] Cleaned up failed payment record:', yookassaPayment.id);
-        } catch (cleanupError) {
-          console.error('[YooKassa] Failed to cleanup payment record:', cleanupError);
-        }
-      }
+      // DO NOT delete the payment record on error!
+      // Keep it in pending state so client can retry with same idempotency key
+      // The next request will find this record and return 202 (retry)
+      console.log('[YooKassa] Payment creation failed but keeping record for retry:', yookassaPayment?.id);
       
       if (error instanceof z.ZodError) {
         console.error('[YooKassa] Validation error:', error.errors);

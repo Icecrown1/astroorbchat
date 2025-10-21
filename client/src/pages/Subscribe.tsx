@@ -168,10 +168,23 @@ export default function Subscribe() {
   const yookassaMutation = useMutation({
     mutationFn: async ({ tier, email }: { tier: typeof SUBSCRIPTION_TIERS[0], email: string | undefined }) => {
       console.log('[YooKassa] Creating subscription payment for tier:', tier.tier, 'with email:', email);
+      
+      if (!userData?.ok || !userData.data?.id) {
+        throw new Error(locale === 'ru' ? 'Пользователь не авторизован' : 'User not authenticated');
+      }
+      
+      // Generate stable idempotency key based on userId, tier, and current minute
+      // This ensures clicks within the same minute use the same key for the same user
+      const now = new Date();
+      const minuteTimestamp = Math.floor(now.getTime() / 60000); // Round to minute
+      const idempotencyKey = `${userData.data.id}_subscription_${tier.tier}_${tier.rubPrice}_${minuteTimestamp}`;
+      console.log('[YooKassa] Using idempotency key:', idempotencyKey.substring(0, 20) + '...');
+      
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription',
         tier: tier.tier,
-        customerEmail: email || null
+        customerEmail: email || null,
+        idempotencyKey
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
