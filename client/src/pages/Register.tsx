@@ -210,17 +210,14 @@ export default function Register() {
   const step1Schema = useMemo(() => z.object({
     name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),
     gender: z.enum(['male', 'female', 'other']),
-    age: z.string().transform((val) => parseInt(val, 10)).pipe(
-      z.number()
-        .min(1, locale === 'ru' ? 'Возраст должен быть не менее 1 года' : 'Age must be at least 1')
-        .max(150, locale === 'ru' ? 'Возраст должен быть не более 150 лет' : 'Age must be at most 150')
-    ),
   }), [locale]);
 
   const step2Schema = useMemo(() => z.object({
     birthdayDate: z.string().min(1, locale === 'ru' ? 'Дата рождения обязательна' : 'Birth date is required'),
-    birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
-    birthPlace: z.string().optional(),
+    birthTime: z.string()
+      .min(1, locale === 'ru' ? 'Время рождения обязательно' : 'Birth time is required')
+      .regex(/^\d{2}:\d{2}$/, locale === 'ru' ? 'Формат: ЧЧ:ММ' : 'Format: HH:MM'),
+    birthPlace: z.string().min(1, locale === 'ru' ? 'Место рождения обязательно' : 'Birth place is required'),
   }), [locale]);
 
   const step3Schema = useMemo(() => z.object({
@@ -232,7 +229,6 @@ export default function Register() {
     defaultValues: {
       name: '',
       gender: 'other' as const,
-      age: '',
     },
   });
 
@@ -266,9 +262,6 @@ export default function Register() {
     const finalData = {
       ...formData,
       ...data,
-      age: parseInt(formData.age, 10),
-      birthTime: formData.birthTime || null,
-      birthPlace: formData.birthPlace || null,
       ...(referralCode && { referralCode }), // Add referral code if present
     };
 
@@ -411,22 +404,6 @@ export default function Register() {
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="age">{locale === 'ru' ? 'Возраст' : 'Age'}</Label>
-              <Input
-                id="age"
-                type="number"
-                {...step1Form.register('age')}
-                placeholder={locale === 'ru' ? 'Введите возраст' : 'Enter your age'}
-                data-testid="input-age"
-              />
-              {step1Form.formState.errors.age && (
-                <p className="text-sm text-destructive mt-1">
-                  {step1Form.formState.errors.age.message}
-                </p>
-              )}
-            </div>
-
             <Button type="submit" className="w-full" data-testid="button-next-step1">
               {t.common.next}
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -460,6 +437,11 @@ export default function Register() {
                 placeholder="HH:mm"
                 data-testid="input-birthtime"
               />
+              {step2Form.formState.errors.birthTime && (
+                <p className="text-sm text-destructive mt-1">
+                  {step2Form.formState.errors.birthTime.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -470,6 +452,11 @@ export default function Register() {
                 placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
                 data-testid="input-birthplace"
               />
+              {step2Form.formState.errors.birthPlace && (
+                <p className="text-sm text-destructive mt-1">
+                  {step2Form.formState.errors.birthPlace.message}
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2">

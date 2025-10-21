@@ -32,7 +32,7 @@ interface StoredNatalChart extends NatalChartResult {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/telegram", async (req, res) => {
     try {
-      const { initData, name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
+      const { initData, name, gender, birthdayDate, birthTime, birthPlace, timezone } = req.body;
 
       // Check if test auth is allowed
       const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
@@ -68,14 +68,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let user = await storage.getUserByTgId(tgUser.id.toString());
 
       if (!user) {
+        // Calculate age from birthday date
+        const birthday = new Date(birthdayDate || new Date());
+        const age = Math.floor((Date.now() - birthday.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+        
         const referralCode = generateReferralCode();
         user = await storage.createUser({
           tgId: tgUser.id.toString(),
           username: tgUser.username || null,
           name: name || tgUser.first_name || "User",
           gender: gender || "other",
-          age: age || 25,
-          birthdayDate: new Date(birthdayDate || new Date()),
+          age: Math.max(1, age),
+          birthdayDate: birthday,
           birthTime: birthTime || null,
           birthPlace: birthPlace || null,
           timezone: timezone || "Europe/Moscow",
