@@ -2776,19 +2776,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (updateError: any) {
         // If duplicate key error, this yookassaPaymentId already exists in the database
-        // Check by error code and message content (more robust than constraint name)
-        console.log('[YooKassa] Update error caught:', {
-          code: updateError.code,
-          constraint: updateError.constraint,
-          message: updateError.message,
-          detail: updateError.detail
-        });
+        // Check by error code and full error string (most robust approach)
+        const errorString = JSON.stringify(updateError).toLowerCase();
+        console.log('[YooKassa] ============ UPDATE ERROR DETAILS ============');
+        console.log('[YooKassa] Error code:', updateError.code);
+        console.log('[YooKassa] Error constraint:', updateError.constraint);
+        console.log('[YooKassa] Error message:', updateError.message);
+        console.log('[YooKassa] Error detail:', updateError.detail);
+        console.log('[YooKassa] Full error string:', errorString);
+        console.log('[YooKassa] ================================================');
         
+        // Check if this is a duplicate yookassa_payment_id error by searching the full error
+        // This works even if constraint name is truncated by Postgres
         const isDuplicateYookassaId = 
           updateError.code === '23505' && 
-          (updateError.constraint?.includes('yookassa_payment_id') || 
-           updateError.message?.includes('yookassa_payment_id') ||
-           updateError.detail?.includes('yookassa_payment_id'));
+          errorString.includes('yookassa_payment_id');
         
         if (isDuplicateYookassaId) {
           console.warn('[YooKassa] ✅ Duplicate yookassaPaymentId detected - handling gracefully:', ykPayment.id);
