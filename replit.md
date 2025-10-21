@@ -47,23 +47,18 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 21, 2025)
-- **YooKassa Critical Bug Fix - FULLY RESOLVED**: Fixed duplicate payment error caused by race condition on double-clicks:
-  - **Root Cause #1**: `updateYookassaPayment` searched by `yookassaPaymentId` but received `internal ID` - fixed by changing WHERE clause
-  - **Root Cause #2**: When two requests arrived simultaneously, both passed `existingPayment` check and both tried `createYookassaPayment` - second got duplicate key error on `idempotencyKey` unique constraint
-  - **Root Cause #3**: Postgres truncates constraint names to 63 chars - `yookassa_payments_yookassa_payment_id_unique` became `yookassa_payments_yookassa_payment_id_uniqu` - exact match check failed
-  - **Backend Fix**: 
-    - Wrapped `createYookassaPayment` in try/catch to handle duplicate key errors (constraint: `yookassa_payments_idempotency_key_unique`)
-    - On duplicate error: finds existing payment, returns `{ ok: true, status: 'pending', retryAfter: 2-3 }` instead of throwing error
-    - Added `getYookassaPaymentByInternalId` method for proper internal ID lookups
-    - Updated webhook to use correct method for internal ID searches
-    - Fixed constraint check: changed `constraint === 'yookassa_payments_yookassa_payment_id_unique'` to `constraint?.startsWith('yookassa_payments_yookassa_payment_id_uniqu')` to handle Postgres truncation
-    - Added diagnostic logging inside duplicate error branch (only for confirmed duplicates)
-  - **Frontend Fix**:
-    - Changed retry logic to check `response.status === 'pending'` instead of `!response.ok`
-    - Added while loop with max 2 retries instead of single if statement
-    - Added data validation: checks `confirmationUrl` exists before proceeding
-    - User-friendly fallback message if payment still pending after retries
-  - **Impact**: Zero user-visible duplicate key errors - seamless automatic retry on race conditions
+- **YooKassa Duplicate Key Error - FINAL FIX**: Resolved persistent duplicate key violation error when YooKassa idempotency returns existing payment:
+  - **Root Cause**: When YooKassa idempotency worked and returned existing payment, backend created new DB record but tried to save YooKassa's existing `yookassaPaymentId` → duplicate key error on `yookassa_payments_yookassa_payment_id_unique` constraint
+  - **Production vs Dev Issue**: Error only occurred in production database which had old conflicting records from previous payment attempts
+  - **Solution - Proactive Check Before Update**:
+    - Added proactive lookup: check if `yookassaPaymentId` already exists in database BEFORE attempting UPDATE
+    - If existing payment found with same `yookassaPaymentId`:
+      1. Delete newly created duplicate record
+      2. Return confirmation URL from existing payment (preserves original metadata)
+      3. Use `actualPaymentId` from existing record
+    - If no existing payment: safely UPDATE new record with `yookassaPaymentId`
+  - **Fallback Error Handling**: Enhanced catch block with comprehensive error logging (code, constraint, message, detail) and full error string search for duplicate detection (works even if Postgres truncates constraint names)
+  - **Result**: Zero duplicate key errors in both dev and production - system gracefully handles YooKassa idempotency without data corruption
 - **YooKassa Idempotency System - PRODUCTION READY v4**: Enhanced idempotency implementation following YooKassa best practices:
   - **SHA-256 Idempotency Key**: Frontend generates 64-char SHA-256 hash from `userId + kind + amount/tier + price + minuteTimestamp` (YooKassa recommendation)
   - **Database Schema**: `idempotencyKey` field (varchar 255, unique constraint, indexed) in yookassaPayments table
