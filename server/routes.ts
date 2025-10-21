@@ -2781,7 +2781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Simply reuse the existing payment record and clean up the duplicate
         try {
           // Delete the new payment record we just created (it's a duplicate)
-          await storage.deleteYookassaPayment(yookassaPayment.id);
+          await storage.deleteYookassaPaymentByInternalId(yookassaPayment.id);
           console.log('[YooKassa] ✅ Cleaned up duplicate payment record:', yookassaPayment.id);
           
           // Use the existing payment record AS IS (don't modify its metadata)
@@ -2829,7 +2829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Delete the current payment record we just created (it's a duplicate)
           try {
-            await storage.deleteYookassaPayment(yookassaPayment.id);
+            await storage.deleteYookassaPaymentByInternalId(yookassaPayment.id);
             console.log('[YooKassa] Cleaned up duplicate payment record:', yookassaPayment.id);
           } catch (deleteError) {
             console.error('[YooKassa] Failed to delete duplicate payment record:', deleteError);
