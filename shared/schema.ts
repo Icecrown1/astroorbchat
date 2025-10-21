@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -293,14 +293,13 @@ export const yookassaPayments = pgTable("yookassa_payments", {
   tier: varchar("tier", { length: 20 }), // For subscriptions: "standard" or "pro"
   energyAmount: integer("energy_amount"), // For energy packs
   amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }).notNull(),
-  yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }), // YooKassa payment ID - unique via constraint
+  yookassaPaymentId: varchar("yookassa_payment_id", { length: 255 }), // YooKassa payment ID
   status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, succeeded, canceled
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 }, (table) => ({
+  yookassaPaymentIdIdx: index("yookassa_payments_yookassa_payment_id_idx").on(table.yookassaPaymentId),
   userIdIdx: index("yookassa_payments_user_id_idx").on(table.userId),
-  // Legacy unique constraint with production name (matches existing production DB)
-  yookassaPaymentIdUnique: uniqueIndex("production_payments_yookassa_payment_id_unique").on(table.yookassaPaymentId),
 }));
 
 export const yookassaPaymentsRelations = relations(yookassaPayments, ({ one }) => ({
