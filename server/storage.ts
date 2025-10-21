@@ -109,6 +109,7 @@ export interface IStorage {
   getYookassaPaymentById(yookassaPaymentId: string): Promise<YookassaPayment | undefined>;
   getYookassaPaymentsByUserId(userId: string): Promise<YookassaPayment[]>;
   updateYookassaPayment(yookassaPaymentId: string, data: Partial<YookassaPayment>): Promise<YookassaPayment | undefined>;
+  deleteYookassaPayment(yookassaPaymentId: string): Promise<void>;
   
   // Referral reward operations
   createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
@@ -479,6 +480,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(yookassaPayments.yookassaPaymentId, yookassaPaymentId))
       .returning();
     return payment || undefined;
+  }
+
+  async deleteYookassaPayment(yookassaPaymentId: string): Promise<void> {
+    await db
+      .delete(yookassaPayments)
+      .where(eq(yookassaPayments.id, yookassaPaymentId));
   }
 
   // Admin operations

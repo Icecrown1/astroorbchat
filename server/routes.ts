@@ -2613,17 +2613,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[YooKassa] YooKassa payment created:', ykPayment.id);
 
       // Update our payment record with YooKassa payment ID
-      // Handle duplicate key error (if payment was already updated by another request)
+      // Handle duplicate key error (if this yookassaPaymentId already exists from a previous payment)
       try {
         await storage.updateYookassaPayment(yookassaPayment.id, {
           yookassaPaymentId: ykPayment.id,
         });
       } catch (updateError: any) {
-        // If duplicate key error, check if another record already has this yookassaPaymentId
+        // If duplicate key error, this yookassaPaymentId already exists in the database
         if (updateError.code === '23505' && updateError.constraint === 'yookassa_payments_yookassa_payment_id_unique') {
           console.warn('[YooKassa] Duplicate yookassaPaymentId detected:', ykPayment.id);
-          // This is OK - means we already processed this payment (idempotency worked)
-          // Just continue and return the existing payment
+          console.log('[YooKassa] This likely means idempotency worked - YooKassa returned an existing payment');
+          
+          // Delete the current payment record we just created (it's a duplicate)
+          try {
+            await storage.deleteYookassaPayment(yookassaPayment.id);
+            console.log('[YooKassa] Cleaned up duplicate payment record:', yookassaPayment.id);
+          } catch (deleteError) {
+            console.error('[YooKassa] Failed to delete duplicate payment record:', deleteError);
+          }
+          
+          // Continue with the existing payment - the confirmation URL is still valid
         } else {
           throw updateError; // Re-throw if it's a different error
         }
