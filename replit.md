@@ -47,7 +47,12 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 21, 2025)
-- **YooKassa Idempotency Fix**: Implemented idempotency key protection using internal payment ID to prevent duplicate payment creation errors on repeated button clicks. Added unique constraint on `yookassaPaymentId` field in schema matching production database.
+- **YooKassa Payment Error Handling**: Comprehensive fix for payment creation issues:
+  - **Idempotency Protection**: Uses internal payment ID as idempotency key to prevent duplicate payment creation on repeated clicks
+  - **Automatic Cleanup**: If YooKassa API fails, the created payment record is automatically deleted from database
+  - **Duplicate Handling**: Gracefully handles duplicate yookassaPaymentId constraints when idempotency returns existing payment
+  - **Database Cleanup**: Removed 20 orphaned payment records with empty yookassaPaymentId
+  - **Schema Update**: Added unique constraint on `yookassaPaymentId` field matching production database
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.
