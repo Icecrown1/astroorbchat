@@ -32,7 +32,7 @@ Preferred communication style: Simple, everyday language.
 - **Payment Systems**: 
   - **TON Blockchain**: Via TON Connect with server-side verification
   - **Telegram Stars**: With webhook security and idempotency checks
-  - **ЮKassa (YooKassa)**: Russian ruble payments via bank cards, with webhook IP verification and payment status tracking. Legal entity info published at `/legal` endpoint for compliance.
+  - **ЮKassa (YooKassa)**: Russian ruble payments via bank cards, with webhook IP verification, payment status tracking, and idempotency key protection using internal payment ID to prevent duplicate charges from race conditions. Legal entity info published at `/legal` endpoint for compliance. Receipt email mandatory for самозанятый compliance with 54-ФЗ.
 - **Subscription System**: Standard and Pro tiers offering varying daily orb allowances, free weekly/monthly plans, and immediate energy boosts. Subscriptions have `active`, `canceled`, and `expired` statuses.
 - **Geocoding**: Accurate Ascendant calculations using a two-tier geocoding system: local cities database fallback to Nominatim API for precise birth location coordinates.
 - **Referral System**: Referral rewards credited to `purchasedEnergy`, tracked in a `referralRewards` table, with notifications for new referrals and detailed history/statistics in the UI.
@@ -45,3 +45,9 @@ Preferred communication style: Simple, everyday language.
 - **AI Services**: OpenAI API (GPT-5)
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
+
+## Recent Updates (October 21, 2025)
+- **YooKassa Idempotency Fix**: Implemented idempotency key protection using internal payment ID to prevent duplicate payment creation errors on repeated button clicks. Added unique constraint on `yookassaPaymentId` field in schema matching production database.
+- **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
+- **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
+- **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.
