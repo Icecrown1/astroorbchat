@@ -50,11 +50,14 @@ Preferred communication style: Simple, everyday language.
 - **YooKassa Critical Bug Fix - FULLY RESOLVED**: Fixed duplicate payment error caused by race condition on double-clicks:
   - **Root Cause #1**: `updateYookassaPayment` searched by `yookassaPaymentId` but received `internal ID` - fixed by changing WHERE clause
   - **Root Cause #2**: When two requests arrived simultaneously, both passed `existingPayment` check and both tried `createYookassaPayment` - second got duplicate key error on `idempotencyKey` unique constraint
+  - **Root Cause #3**: Postgres truncates constraint names to 63 chars - `yookassa_payments_yookassa_payment_id_unique` became `yookassa_payments_yookassa_payment_id_uniqu` - exact match check failed
   - **Backend Fix**: 
     - Wrapped `createYookassaPayment` in try/catch to handle duplicate key errors (constraint: `yookassa_payments_idempotency_key_unique`)
     - On duplicate error: finds existing payment, returns `{ ok: true, status: 'pending', retryAfter: 2-3 }` instead of throwing error
     - Added `getYookassaPaymentByInternalId` method for proper internal ID lookups
     - Updated webhook to use correct method for internal ID searches
+    - Fixed constraint check: changed `constraint === 'yookassa_payments_yookassa_payment_id_unique'` to `constraint?.startsWith('yookassa_payments_yookassa_payment_id_uniqu')` to handle Postgres truncation
+    - Added diagnostic logging inside duplicate error branch (only for confirmed duplicates)
   - **Frontend Fix**:
     - Changed retry logic to check `response.status === 'pending'` instead of `!response.ok`
     - Added while loop with max 2 retries instead of single if statement
