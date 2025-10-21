@@ -2765,10 +2765,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (updateError: any) {
         // If duplicate key error, this yookassaPaymentId already exists in the database
-        // Note: Postgres truncates long constraint names to 63 chars, so we use startsWith
-        if (updateError.code === '23505' && updateError.constraint?.startsWith('yookassa_payments_yookassa_payment_id_uniqu')) {
-          console.warn('[YooKassa] Duplicate yookassaPaymentId detected:', ykPayment.id);
-          console.log('[YooKassa] Update error details:', { code: updateError.code, constraint: updateError.constraint });
+        // Check by error code and message content (more robust than constraint name)
+        console.log('[YooKassa] Update error caught:', {
+          code: updateError.code,
+          constraint: updateError.constraint,
+          message: updateError.message,
+          detail: updateError.detail
+        });
+        
+        const isDuplicateYookassaId = 
+          updateError.code === '23505' && 
+          (updateError.constraint?.includes('yookassa_payment_id') || 
+           updateError.message?.includes('yookassa_payment_id') ||
+           updateError.detail?.includes('yookassa_payment_id'));
+        
+        if (isDuplicateYookassaId) {
+          console.warn('[YooKassa] ✅ Duplicate yookassaPaymentId detected - handling gracefully:', ykPayment.id);
           console.log('[YooKassa] This likely means idempotency worked - YooKassa returned an existing payment');
           
           // Find the original payment record with this yookassaPaymentId
