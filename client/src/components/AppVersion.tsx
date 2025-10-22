@@ -17,7 +17,7 @@ export function AppVersion() {
 
   return (
     <div 
-      className="fixed bottom-2 right-2 text-xs text-muted-foreground/50 font-mono z-50 pointer-events-none select-none"
+      className="fixed bottom-4 right-4 text-sm text-foreground/70 font-mono z-50 pointer-events-none select-none bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-lg border border-border/50"
       data-testid="text-app-version"
       title={`Build date: ${new Date(data.buildDate).toLocaleString()}`}
     >
