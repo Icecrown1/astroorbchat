@@ -11,7 +11,7 @@ import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransacti
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
-import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged } from "./lib/natalService";
+import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
@@ -556,8 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/natal/init", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const locale = req.body.locale || 'ru';
-      const chart = await ensureUserNatalChart(userId, locale);
+      const chart = await ensureUserNatalChart(userId);
       res.json({ ok: true, data: chart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
@@ -568,10 +567,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/natal/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const locale = (req.query.locale as string) || 'ru';
       
       // Auto-recalculate if profile changed
-      await recomputeIfProfileChanged(userId, locale);
+      await recomputeIfProfileChanged(userId);
       
       const chart = await storage.getNatalChart(userId);
       
@@ -589,16 +587,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/natal/recalculate", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const locale = req.body.locale || 'ru';
       const user = await storage.getUser(userId);
       
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
       
-      // Force recalculation with interpretation
-      const newData = await computeNatalFromUser(user, locale);
-      await storage.updateNatalChart(userId, { data: newData });
+      // Force recalculation (clears cached interpretations)
+      const newData = await computeNatalFromUser(user);
+      await storage.updateNatalChart(userId, { 
+        data: newData,
+        professionalInterpretation: null, // Clear cached interpretations
+      });
       
       const updatedChart = await storage.getNatalChart(userId);
       res.json({ ok: true, data: updatedChart });
@@ -784,8 +784,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const natalChart = await ensureUserNatalChart(userId);
       const savedChart = natalChart.data as NatalChartResult;
       
-      // Generate AI interpretation
-      const interpretation = await getAstrologyInterpretation("natal", savedChart, locale, user.gender);
+      // Get cached interpretation or generate new one
+      const interpretation = await ensureNatalInterpretation(userId, locale);
       
       // Transform planets from object to array for frontend
       const planetsArray = Object.entries(savedChart.planets).map(([name, data]) => ({
