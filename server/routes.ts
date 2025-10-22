@@ -3108,12 +3108,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 tier: dbPayment.tier,
               },
             });
-          } else if (ykPayment.status === 'pending' || ykPayment.status === 'waiting_for_capture') {
+          } else if (ykPayment.status === 'waiting_for_capture') {
+            // Payment is being processed by bank
             return res.json({
               ok: true,
               data: {
-                status: 'pending',
-                message: 'Payment is being processed',
+                status: 'processing',
+                message: 'Payment is being processed by bank',
+              },
+            });
+          } else if (ykPayment.status === 'pending') {
+            // Payment created but not completed (user exited without paying)
+            return res.json({
+              ok: true,
+              data: {
+                status: 'abandoned',
+                message: 'Payment was not completed',
               },
             });
           } else {

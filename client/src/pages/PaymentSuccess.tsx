@@ -14,7 +14,7 @@ export default function PaymentSuccess() {
   const params = new URLSearchParams(search);
   const paymentId = params.get('paymentId');
   
-  const [status, setStatus] = useState<'checking' | 'success' | 'pending' | 'failed'>('checking');
+  const [status, setStatus] = useState<'checking' | 'success' | 'processing' | 'abandoned' | 'failed'>('checking');
   const [message, setMessage] = useState('');
   const [energyAmount, setEnergyAmount] = useState(0);
 
@@ -36,13 +36,14 @@ export default function PaymentSuccess() {
         navigate('/dashboard');
       }, 2000);
       return () => clearTimeout(timer);
-    } else if (status === 'failed') {
-      // Redirect to buy-energy page after failed/canceled payment (3 seconds to show message)
+    } else if (status === 'failed' || status === 'abandoned') {
+      // Redirect to buy-energy page after failed/abandoned payment (5 seconds to show message)
       const timer = setTimeout(() => {
         navigate('/buy-energy');
-      }, 3000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
+    // Note: 'processing' status does NOT redirect - user can check again
   }, [status, navigate]);
 
   const checkPaymentStatus = async () => {
@@ -61,11 +62,17 @@ export default function PaymentSuccess() {
             ? `Платёж успешно обработан! Начислено ${amount} орбов энергии.`
             : `Payment successful! Credited ${amount} energy orbs.`
           );
-        } else if (paymentStatus === 'pending') {
-          setStatus('pending');
+        } else if (paymentStatus === 'processing') {
+          setStatus('processing');
           setMessage(locale === 'ru'
-            ? 'Платёж обрабатывается. Энергия будет зачислена в течение нескольких минут.'
-            : 'Payment is being processed. Energy will be credited within a few minutes.'
+            ? 'Платёж обрабатывается банком. Нажмите "Проверить снова" через несколько секунд.'
+            : 'Payment is being processed by bank. Click "Check Again" in a few seconds.'
+          );
+        } else if (paymentStatus === 'abandoned') {
+          setStatus('abandoned');
+          setMessage(locale === 'ru'
+            ? 'Платёж не был завершён. Возвращаемся на страницу покупки...'
+            : 'Payment was not completed. Returning to purchase page...'
           );
         } else {
           setStatus('failed');
@@ -89,8 +96,10 @@ export default function PaymentSuccess() {
     switch (status) {
       case 'success':
         return <CheckCircle className="w-16 h-16 text-green-500" />;
-      case 'pending':
+      case 'processing':
         return <AlertCircle className="w-16 h-16 text-yellow-500" />;
+      case 'abandoned':
+        return <XCircle className="w-16 h-16 text-orange-500" />;
       case 'failed':
         return <XCircle className="w-16 h-16 text-red-500" />;
       default:
@@ -102,10 +111,12 @@ export default function PaymentSuccess() {
     switch (status) {
       case 'success':
         return locale === 'ru' ? 'Оплата успешна!' : 'Payment Successful!';
-      case 'pending':
+      case 'processing':
         return locale === 'ru' ? 'Платёж обрабатывается' : 'Payment Processing';
+      case 'abandoned':
+        return locale === 'ru' ? 'Платёж не завершён' : 'Payment Not Completed';
       case 'failed':
-        return locale === 'ru' ? 'Платёж не завершён' : 'Payment Failed';
+        return locale === 'ru' ? 'Платёж не удался' : 'Payment Failed';
       default:
         return locale === 'ru' ? 'Проверяем платёж...' : 'Checking payment...';
     }
@@ -145,7 +156,7 @@ export default function PaymentSuccess() {
             )}
 
             <div className="flex gap-3 w-full pt-4">
-              {status === 'pending' && (
+              {status === 'processing' && (
                 <Button
                   variant="outline"
                   onClick={checkPaymentStatus}
