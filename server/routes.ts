@@ -2163,7 +2163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { eventType, date, sign, planet, to_sign, house_for_sun_sign, locale = 'ru' } = req.body;
       
+      console.log('[Important Date Interpretation] Request body:', req.body);
+      console.log('[Important Date Interpretation] Parsed fields:', { eventType, date, sign, planet, to_sign, house_for_sun_sign, locale });
+      
       if (!eventType || !date || !sign) {
+        console.error('[Important Date Interpretation] Missing required fields:', { eventType, date, sign });
         return res.status(400).json({ ok: false, error: "Missing required event data" });
       }
       
