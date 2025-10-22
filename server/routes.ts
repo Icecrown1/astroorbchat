@@ -413,6 +413,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset user profile to registration state
+  app.post("/api/user/reset-profile", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+
+      // Delete natal chart if exists
+      await storage.deleteNatalChart(userId);
+
+      // Reset profile data to registration state
+      const user = await storage.updateUser(userId, {
+        birthPlace: null,
+        birthTime: null,
+        natalChart: null,
+        lastProfileUpdate: null,
+      });
+
+      res.json({ 
+        ok: true, 
+        data: user,
+        message: "Profile reset successfully. Please complete registration again."
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Cancel subscription
   app.post("/api/user/subscription/cancel", requireAuth, async (req, res) => {
     try {

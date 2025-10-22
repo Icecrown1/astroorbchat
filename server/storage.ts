@@ -91,6 +91,7 @@ export interface IStorage {
   getNatalChart(userId: string): Promise<NatalChart | undefined>;
   createNatalChart(chart: InsertNatalChart): Promise<NatalChart>;
   updateNatalChart(userId: string, data: Partial<NatalChart>): Promise<NatalChart | undefined>;
+  deleteNatalChart(userId: string): Promise<void>;
   
   // External natal operations
   getExternalNatal(id: string): Promise<ExternalNatal | undefined>;
@@ -375,6 +376,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(natalCharts.userId, userId))
       .returning();
     return chart || undefined;
+  }
+
+  async deleteNatalChart(userId: string): Promise<void> {
+    await db
+      .delete(natalCharts)
+      .where(eq(natalCharts.userId, userId));
   }
 
   // External natal operations
