@@ -38,6 +38,124 @@ function loadPrompt(promptName: string, replacements: Record<string, string> = {
   return content;
 }
 
+export async function getImportantDateInterpretation(
+  eventType: 'new_moon' | 'full_moon' | 'planet_transit',
+  eventData: {
+    date: string;
+    sign: string;
+    planet?: string;
+    from_sign?: string;
+    to_sign?: string;
+    house_for_sun_sign?: number;
+  },
+  userData: {
+    sunSign: string;
+    ascendantSign?: string;
+    gender?: string;
+  },
+  locale: string = 'ru'
+): Promise<string> {
+  const languageInstruction = locale === 'ru' 
+    ? 'ВАЖНО: Ответь полностью на русском языке.' 
+    : 'Respond in English.';
+  
+  const toneInstruction = personalizeTone(userData.gender || 'other');
+  
+  const eventTypeText = locale === 'ru' 
+    ? (eventType === 'new_moon' ? 'Новолуние' : eventType === 'full_moon' ? 'Полнолуние' : 'Транзит планеты')
+    : (eventType === 'new_moon' ? 'New Moon' : eventType === 'full_moon' ? 'Full Moon' : 'Planet Transit');
+  
+  let eventDescription = '';
+  if (eventType === 'new_moon' || eventType === 'full_moon') {
+    const signName = translateSign(eventData.sign, locale);
+    eventDescription = locale === 'ru'
+      ? `${eventTypeText} в знаке ${signName}`
+      : `${eventTypeText} in ${signName}`;
+    
+    if (eventData.house_for_sun_sign) {
+      eventDescription += locale === 'ru'
+        ? ` (${eventData.house_for_sun_sign}-й дом)`
+        : ` (${eventData.house_for_sun_sign}${getOrdinalSuffix(eventData.house_for_sun_sign)} house)`;
+    }
+  } else if (eventType === 'planet_transit' && eventData.planet) {
+    const planetName = translatePlanet(eventData.planet, locale);
+    const toSignName = eventData.to_sign ? translateSign(eventData.to_sign, locale) : '';
+    eventDescription = locale === 'ru'
+      ? `${planetName} входит в ${toSignName}`
+      : `${planetName} enters ${toSignName}`;
+    
+    if (eventData.house_for_sun_sign) {
+      eventDescription += locale === 'ru'
+        ? ` (${eventData.house_for_sun_sign}-й дом)`
+        : ` (${eventData.house_for_sun_sign}${getOrdinalSuffix(eventData.house_for_sun_sign)} house)`;
+    }
+  }
+  
+  const userContext = locale === 'ru'
+    ? `Солнце пользователя в знаке ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Асцендент в ${translateSign(userData.ascendantSign, locale)}` : ''}.`
+    : `User's Sun in ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Ascendant in ${translateSign(userData.ascendantSign, locale)}` : ''}.`;
+  
+  const promptText = locale === 'ru'
+    ? `Событие: ${eventDescription}
+Дата: ${new Date(eventData.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+${userContext}
+
+Напиши персонализированную астрологическую интерпретацию этого события (${eventTypeText}) для этого человека:
+
+1. Что означает это событие лично для него/неё (с учетом положения его Солнца${userData.ascendantSign ? ' и Асцендента' : ''})
+2. Какие сферы жизни будут активированы (основываясь на доме, в который попадает событие)
+3. Практические рекомендации: что делать, на что обратить внимание
+4. Возможности и вызовы этого периода
+
+Пиши конкретно, практично и с теплотой. Избегай общих фраз и абстракций. Дай реальные советы.
+
+Объём: 200-300 слов.`
+    : `Event: ${eventDescription}
+Date: ${new Date(eventData.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+${userContext}
+
+Write a personalized astrological interpretation of this event (${eventTypeText}) for this person:
+
+1. What this event means personally for them (considering their Sun${userData.ascendantSign ? ' and Ascendant' : ''} positions)
+2. Which life areas will be activated (based on the house the event falls in)
+3. Practical recommendations: what to do, what to pay attention to
+4. Opportunities and challenges of this period
+
+Write specifically, practically, and warmly. Avoid general phrases and abstractions. Give real advice.
+
+Length: 200-300 words.`;
+  
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог, который предоставляет четкие, практичные и проницательные чтения без эзотерического жаргона. Твои советы конкретны, действенны и основаны на астрологических принципах. Всегда отвечай на русском языке."
+    : "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles.";
+  
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}`
+      }
+    ],
+    max_completion_tokens: 1024
+  });
+  
+  return completion.choices[0]?.message?.content || "";
+}
+
+function getOrdinalSuffix(num: number): string {
+  if (num === 1) return 'st';
+  if (num === 2) return 'nd';
+  if (num === 3) return 'rd';
+  return 'th';
+}
+
 export async function getAstrologyInterpretation(
   type: 'natal' | 'solar' | 'horoscope' | 'compatibility' | 'ask',
   data: any,

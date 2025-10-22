@@ -29,11 +29,18 @@ export async function getImportantDates(): Promise<ImportantEvent[]> {
   return response.data;
 }
 
-export async function unlockImportantDate(eventKey: string): Promise<void> {
-  await apiRequest('POST', '/api/astrology/important-dates/unlock', { eventKey });
-}
-
-export async function getImportantDateDetail(eventKey: string, locale: string = 'ru'): Promise<ImportantDateInterpretation> {
-  const response = await apiRequest('POST', '/api/astrology/important-dates/detail', { eventKey, locale });
-  return response.data;
+export async function getImportantDateInterpretation(
+  event: ImportantEvent,
+  locale: string = 'ru'
+): Promise<string> {
+  const response = await apiRequest('POST', '/api/astrology/important-dates/interpret', {
+    eventType: event.type,
+    date: event.date,
+    sign: event.sign,
+    planet: event.planet,
+    to_sign: event.to_sign,
+    house_for_sun_sign: event.house_for_sun_sign,
+    locale,
+  });
+  return response.data.interpretation;
 }

@@ -9,7 +9,7 @@ import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBon
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
-import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
+import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, getImportantDateInterpretation, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets, getImportantDatesWithLunarPhases } from "./lib/transits";
@@ -2138,132 +2138,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/astrology/important-dates/unlock", requireAuth, async (req, res) => {
+  app.post("/api/astrology/important-dates/interpret", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { eventKey } = req.body;
+      const { eventType, date, sign, planet, to_sign, house_for_sun_sign, locale = 'ru' } = req.body;
       
-      if (!eventKey) {
-        return res.status(400).json({ ok: false, error: "Event key is required" });
+      if (!eventType || !date || !sign) {
+        return res.status(400).json({ ok: false, error: "Missing required event data" });
       }
       
-      // Check if already unlocked
-      const existing = await storage.getImportantDateUnlockByUserAndKey(userId, eventKey);
-      if (existing) {
-        return res.json({ ok: true, data: existing });
-      }
-      
-      // Create unlock record (no energy cost for unlock itself)
-      const unlock = await storage.createImportantDateUnlock({
-        userId,
-        eventKey,
-      });
-      
-      res.json({ ok: true, data: unlock });
-    } catch (error: any) {
-      res.status(500).json({ ok: false, error: error.message });
-    }
-  });
-
-  app.post("/api/astrology/important-dates/detail", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const { eventKey, locale = 'ru' } = req.body;
-      
-      if (!eventKey) {
-        return res.status(400).json({ ok: false, error: "Event key is required" });
-      }
-      
-      // Check energy first
-      await checkAndResetEnergy(storage, userId);
+      // Get user data
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
       
-      const cost = ENERGY_COSTS.important_date_detail;
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
-      }
-      
-      // Get natal chart
+      // Get natal chart to extract Sun sign and Ascendant
       const natalChart = await storage.getNatalChart(userId);
       if (!natalChart) {
-        return res.status(400).json({ ok: false, error: "Natal chart required" });
+        return res.status(400).json({ ok: false, error: "Natal chart required. Please create your natal chart first." });
       }
       
       const chartData = natalChart.data as NatalChartResult;
+      const sunSign = chartData.planets?.Sun?.sign;
+      const ascendantSign = chartData.angles?.Ascendant?.sign;
       
-      // Extract natal planets for transit calculation
-      const natalPlanets = extractNatalPlanets(chartData);
-      
-      // Find all events and locate the requested one
-      const now = new Date();
-      const futureDate = new Date();
-      futureDate.setDate(now.getDate() + 90);
-      
-      const events = await findImportantEvents(natalPlanets, {
-        from: now,
-        to: futureDate,
-        limit: 20
-      });
-      
-      const event = events.find(e => e.key === eventKey);
-      
-      if (!event) {
-        return res.status(404).json({ ok: false, error: "Event not found" });
+      if (!sunSign) {
+        return res.status(400).json({ ok: false, error: "Could not determine Sun sign from natal chart" });
       }
       
-      // Prepare natal summary for interpretation
-      const natalSummary = {
-        planets: Object.entries(chartData.planets).map(([name, data]) => ({
-          name,
-          sign: data.sign,
-          house: 1 // Houses not calculated in current version
-        })),
-        ascendant: chartData.angles?.ascendant
-      };
-      
-      // Build interpretation input
-      const interpretationInput: ImportantDateInterpretationInput = {
-        profile: {
-          name: user.name,
-          age: new Date().getFullYear() - new Date(user.birthdayDate).getFullYear(),
-          gender: user.gender,
-          timezone: user.timezone
-        },
-        event: {
-          kind: event.kind,
-          planet: event.planet,
-          date: event.date,
-          sign: event.sign,
-          natalTarget: event.natalTarget,
-          brief: event.brief
-        },
-        natalSummary
-      };
-      
-      // Generate interpretation
-      const interpretation = await interpretImportantDate(interpretationInput, locale);
-      
-      // Deduct energy and log usage
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: "important_date_detail", cost });
-      
-      // Update unlock record with interpretation
-      const unlock = await storage.getImportantDateUnlockByUserAndKey(userId, eventKey);
-      if (unlock) {
-        await storage.updateImportantDateUnlock(unlock.id, {
-          interpretation: interpretation as any
-        });
+      // Check energy cost (2 orbs for interpretation)
+      await checkAndResetEnergy(storage, userId);
+      const userAfterReset = await storage.getUser(userId);
+      if (!userAfterReset) {
+        return res.status(404).json({ ok: false, error: "User not found" });
       }
       
-      res.json({ ok: true, data: interpretation });
+      const cost = 2;  // 2 orbs for important date interpretation
+      if ((userAfterReset.freeEnergy + userAfterReset.purchasedEnergy) < cost) {
+        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      }
+      
+      // Generate AI interpretation
+      const interpretation = await getImportantDateInterpretation(
+        eventType,
+        {
+          date,
+          sign,
+          planet,
+          to_sign,
+          house_for_sun_sign
+        },
+        {
+          sunSign,
+          ascendantSign,
+          gender: user.gender
+        },
+        locale
+      );
+      
+      // Deduct energy (using solar as placeholder - important dates don't have dedicated enum yet)
+      await deductEnergy(storage, userId, 'solar');
+      
+      res.json({ ok: true, data: { interpretation } });
     } catch (error: any) {
+      console.error('[Important Date Interpretation] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
-
 
   app.get("/api/payments/history", requireAuth, async (req, res) => {
     try {
