@@ -28,6 +28,7 @@ import PaymentHistory from '@/pages/PaymentHistory';
 import Admin from '@/pages/Admin';
 import Archive from '@/pages/Archive';
 import Legal from '@/pages/Legal';
+import PaymentSuccess from '@/pages/PaymentSuccess';
 
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
@@ -40,7 +41,7 @@ function Router() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal') {
+    if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal' && !location.startsWith('/payment-success')) {
       navigate('/login');
     }
   }, [isAuthenticated, location, navigate]);
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/settings" component={Settings} />
       <Route path="/archive" component={Archive} />
+      <Route path="/payment-success" component={PaymentSuccess} />
       <Route path="/" component={isAuthenticated ? Dashboard : Login} />
       <Route component={NotFound} />
     </Switch>

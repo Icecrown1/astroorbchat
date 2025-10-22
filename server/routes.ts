@@ -2961,6 +2961,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // YooKassa check payment status endpoint
+  const checkStatusSchema = z.object({
+    paymentId: z.string(),
+  });
+
+  app.post("/api/payments/yookassa/check-status", async (req, res) => {
+    try {
+      const validated = checkStatusSchema.parse(req.body);
+      console.log('[YooKassa Check] Checking payment status:', validated.paymentId);
+
+      // Get internal payment record
+      const dbPayment = await storage.getYookassaPaymentByInternalId(validated.paymentId);
+      if (!dbPayment) {
+        console.error('[YooKassa Check] Payment not found:', validated.paymentId);
+        return res.status(404).json({ ok: false, error: "Payment not found" });
+      }
+
+      console.log('[YooKassa Check] Payment found:', {
+        id: dbPayment.id,
+        status: dbPayment.status,
+        yookassaId: dbPayment.yookassaPaymentId,
+      });
+
+      // If payment already completed, return success
+      if (dbPayment.status === 'completed') {
+        return res.json({
+          ok: true,
+          data: {
+            status: 'succeeded',
+            energyAmount: dbPayment.energyAmount,
+            tier: dbPayment.tier,
+          },
+        });
+      }
+
+      // If payment has yookassaPaymentId, check status with YooKassa API
+      if (dbPayment.yookassaPaymentId) {
+        try {
+          const ykPayment = await getYooKassaPayment(dbPayment.yookassaPaymentId);
+          console.log('[YooKassa Check] YooKassa payment status:', ykPayment.status);
+
+          // If succeeded on YooKassa side, credit energy/subscription
+          if (ykPayment.status === 'succeeded' && ykPayment.paid) {
+            console.log('[YooKassa Check] Payment succeeded, crediting...');
+
+            // Credit energy or activate subscription
+            if (dbPayment.kind === "energy_pack" && dbPayment.energyAmount) {
+              const user = await storage.getUser(dbPayment.userId);
+              if (user) {
+                const newEnergy = (user.purchasedEnergy || 0) + dbPayment.energyAmount;
+                await storage.updateUser(dbPayment.userId, {
+                  purchasedEnergy: newEnergy,
+                });
+                console.log(`[YooKassa Check] Credited ${dbPayment.energyAmount} energy orbs`);
+              }
+            } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
+              const tier = dbPayment.tier as "standard" | "pro";
+              const startedAt = new Date();
+              const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+
+              const existingSub = await storage.getSubscription(dbPayment.userId);
+              if (existingSub) {
+                await storage.updateSubscription(existingSub.id, {
+                  tier,
+                  status: "active",
+                  currentPeriodEnd,
+                });
+              } else {
+                await storage.createSubscription({
+                  userId: dbPayment.userId,
+                  tier,
+                  status: "active",
+                  startedAt,
+                  currentPeriodEnd,
+                });
+              }
+
+              const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+              const user = await storage.getUser(dbPayment.userId);
+              if (user) {
+                await storage.updateUser(dbPayment.userId, {
+                  purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
+                });
+              }
+
+              await handleSubscriptionReferralBonus(storage, dbPayment.userId);
+            }
+
+            // Mark as completed
+            await storage.updateYookassaPayment(dbPayment.id, {
+              status: 'completed',
+              completedAt: new Date(),
+            });
+
+            return res.json({
+              ok: true,
+              data: {
+                status: 'succeeded',
+                energyAmount: dbPayment.energyAmount,
+                tier: dbPayment.tier,
+              },
+            });
+          } else if (ykPayment.status === 'pending' || ykPayment.status === 'waiting_for_capture') {
+            return res.json({
+              ok: true,
+              data: {
+                status: 'pending',
+                message: 'Payment is being processed',
+              },
+            });
+          } else {
+            // canceled, failed, etc
+            await storage.updateYookassaPayment(dbPayment.id, {
+              status: 'failed',
+            });
+            return res.json({
+              ok: true,
+              data: {
+                status: 'failed',
+                message: 'Payment was not completed',
+              },
+            });
+          }
+        } catch (error: any) {
+          console.error('[YooKassa Check] Error fetching YooKassa payment:', error);
+          return res.status(500).json({ ok: false, error: "Failed to check payment status" });
+        }
+      } else {
+        // Payment doesn't have yookassaPaymentId yet (still being created)
+        return res.json({
+          ok: true,
+          data: {
+            status: 'pending',
+            message: 'Payment is being created',
+          },
+        });
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ ok: false, error: error.errors[0].message });
+      }
+      console.error('[YooKassa Check] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // YooKassa webhook endpoint
   app.post("/webhooks/yookassa", async (req, res) => {
     try {
