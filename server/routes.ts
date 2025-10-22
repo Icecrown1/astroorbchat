@@ -2161,9 +2161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/important-dates/interpret", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { eventType, date, sign, planet, to_sign, house_for_sun_sign, locale = 'ru' } = req.body;
+      const { eventType, date, sign: providedSign, planet, to_sign, house_for_sun_sign, locale = 'ru' } = req.body;
       
       console.log('[Important Date Interpretation] Request body:', req.body);
+      
+      // For planet transits, use to_sign as the sign (the sign the planet is entering)
+      const sign = eventType === 'planet_transit' ? to_sign : providedSign;
+      
       console.log('[Important Date Interpretation] Parsed fields:', { eventType, date, sign, planet, to_sign, house_for_sun_sign, locale });
       
       if (!eventType || !date || !sign) {
