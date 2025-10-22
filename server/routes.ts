@@ -2250,7 +2250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Deduct energy ONLY after successful generation
-      await deductEnergy(storage, userId, 'solar');
+      await deductEnergy(storage, userId, 'important_date');
       
       // Save to cache for 7 days
       await storage.saveImportantDateInterpretation(

@@ -12,6 +12,7 @@ export const ENERGY_COSTS = {
   ask: 1,
   natal_external: 2,
   important_date_detail: 1,
+  important_date: 2,  // Интерпретация важной даты
   compatibility_professional: 4,  // Профессиональная синастрия
   weekly_plan: 1,  // План на неделю
   monthly_plan: 1,  // План на месяц
