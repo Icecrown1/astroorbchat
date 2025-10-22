@@ -57,6 +57,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   externalNatals: many(externalNatals),
   importantDateUnlocks: many(importantDateUnlocks),
+  importantDateInterpretations: many(importantDateInterpretations),
   yookassaPayments: many(yookassaPayments),
 }));
 
@@ -287,6 +288,27 @@ export const importantDateUnlocksRelations = relations(importantDateUnlocks, ({ 
   }),
 }));
 
+export const importantDateInterpretations = pgTable("important_date_interpretations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // "new_moon", "full_moon", "planet_transit"
+  date: varchar("date", { length: 50 }).notNull(), // ISO date string
+  sign: varchar("sign", { length: 50 }).notNull(), // Zodiac sign
+  locale: varchar("locale", { length: 10 }).notNull().default('ru'), // "ru" or "en"
+  interpretation: text("interpretation").notNull(), // AI-generated text
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("important_date_interpretations_user_id_idx").on(table.userId),
+  cacheKeyIdx: index("important_date_interpretations_cache_key_idx").on(table.userId, table.eventType, table.date, table.sign, table.locale),
+}));
+
+export const importantDateInterpretationsRelations = relations(importantDateInterpretations, ({ one }) => ({
+  user: one(users, {
+    fields: [importantDateInterpretations.userId],
+    references: [users.id],
+  }),
+}));
+
 export const yookassaPayments = pgTable("yookassa_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
@@ -442,6 +464,18 @@ export const insertImportantDateUnlockSchema = createInsertSchema(importantDateU
   createdAt: true,
 });
 
+export const insertImportantDateInterpretationSchema = createInsertSchema(importantDateInterpretations, {
+  userId: z.string(),
+  eventType: z.enum(["new_moon", "full_moon", "planet_transit"]),
+  date: z.string(),
+  sign: z.string(),
+  locale: z.string().default('ru'),
+  interpretation: z.string(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, {
   userId: z.string(),
   kind: z.enum(["energy_pack", "subscription"]),
@@ -490,6 +524,9 @@ export type InsertExternalNatal = z.infer<typeof insertExternalNatalSchema>;
 
 export type ImportantDateUnlock = typeof importantDateUnlocks.$inferSelect;
 export type InsertImportantDateUnlock = z.infer<typeof insertImportantDateUnlockSchema>;
+
+export type ImportantDateInterpretation = typeof importantDateInterpretations.$inferSelect;
+export type InsertImportantDateInterpretation = z.infer<typeof insertImportantDateInterpretationSchema>;
 
 export type YookassaPayment = typeof yookassaPayments.$inferSelect;
 export type InsertYookassaPayment = z.infer<typeof insertYookassaPaymentSchema>;
