@@ -227,6 +227,15 @@ export function ImportantDatesList() {
                       {event.importance_reason === 'in_ascendant' && (locale === 'ru'
                         ? 'В вашем асценденте'
                         : 'In your Ascendant')}
+                      {event.importance_reason === 'in_1st_house' && (locale === 'ru'
+                        ? 'В вашем 1-м доме (личность)'
+                        : 'In your 1st house (self)')}
+                      {event.importance_reason === 'in_7th_house' && (locale === 'ru'
+                        ? 'В вашем 7-м доме (отношения)'
+                        : 'In your 7th house (relationships)')}
+                      {event.importance_reason === 'in_10th_house' && (locale === 'ru'
+                        ? 'В вашем 10-м доме (карьера)'
+                        : 'In your 10th house (career)')}
                     </p>
                   </div>
                 )}

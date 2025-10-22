@@ -11,7 +11,7 @@ export interface ImportantEvent {
   to_sign?: string;  // Для транзитов: в какой знак
   house_for_sun_sign?: number;  // Дом для солнечного знака пользователя
   importance?: 'high';  // Особо важное событие
-  importance_reason?: 'in_sun_sign' | 'in_ascendant';  // Причина важности
+  importance_reason?: 'in_sun_sign' | 'in_ascendant' | 'in_1st_house' | 'in_7th_house' | 'in_10th_house';  // Причина важности
 }
 
 export interface ImportantDateInterpretation {

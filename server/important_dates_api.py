@@ -323,20 +323,59 @@ def calculate_important_dates(params):
             # Для транзитов берём знак в который входит планета
             event_sign = event.get('to_sign')
         
-        # Рассчитываем дом для солнечного знака
+        # Рассчитываем дом для солнечного знака (для отображения)
         if sun_sign and event_sign:
             event['house_for_sun_sign'] = calculate_house_for_sun_sign(event_sign, sun_sign)
         
-        # Проверяем особые события (новолуние/транзит в знак асцендента или солнца)
+        # Рассчитываем дом относительно Асцендента (для определения важности)
+        house_for_ascendant = None
+        if ascendant_sign and event_sign:
+            house_for_ascendant = calculate_house_for_sun_sign(event_sign, ascendant_sign)
+        
+        # Проверяем особые события с расширенными критериями важности
         is_important = False
+        importance_reasons = []
+        
+        # 1. Событие в знаке Солнца (самый сильный показатель личной активации)
         if sun_sign and event_sign == sun_sign:
             is_important = True
-            event['importance'] = 'high'
-            event['importance_reason'] = 'in_sun_sign'
-        elif ascendant_sign and event_sign == ascendant_sign:
+            importance_reasons.append('in_sun_sign')
+        
+        # 2. Событие в знаке Асцендента (влияет на личность и жизненный путь)
+        if ascendant_sign and event_sign == ascendant_sign:
             is_important = True
+            importance_reasons.append('in_ascendant')
+        
+        # 3. Событие в 1-м доме относительно Асцендента (дом личности)
+        if house_for_ascendant == 1:
+            is_important = True
+            if 'in_ascendant' not in importance_reasons:  # Избегаем дублирования
+                importance_reasons.append('in_1st_house')
+        
+        # 4. Событие в 7-м доме относительно Асцендента (отношения и партнёрство)
+        if house_for_ascendant == 7:
+            is_important = True
+            importance_reasons.append('in_7th_house')
+        
+        # 5. Событие в 10-м доме относительно Асцендента (карьера и социальный статус)
+        if house_for_ascendant == 10:
+            is_important = True
+            importance_reasons.append('in_10th_house')
+        
+        # Устанавливаем важность события
+        if is_important:
             event['importance'] = 'high'
-            event['importance_reason'] = 'in_ascendant'
+            # Выбираем наиболее важную причину для отображения (по приоритету)
+            if 'in_sun_sign' in importance_reasons:
+                event['importance_reason'] = 'in_sun_sign'
+            elif 'in_ascendant' in importance_reasons:
+                event['importance_reason'] = 'in_ascendant'
+            elif 'in_1st_house' in importance_reasons:
+                event['importance_reason'] = 'in_1st_house'
+            elif 'in_10th_house' in importance_reasons:
+                event['importance_reason'] = 'in_10th_house'
+            else:
+                event['importance_reason'] = 'in_7th_house'
         
         # Убираем служебное поле jd
         del event['jd']
