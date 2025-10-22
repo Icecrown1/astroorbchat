@@ -1036,7 +1036,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Роут для интерпретации влияния дома на планету (ПЛАТНАЯ - 2 орба)
+  // Роут для проверки статуса купленных интерпретаций (бесплатно)
+  app.get("/api/astrology/house-influence-status", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { chartType = 'own', chartId } = req.query;
+      
+      // Для гостевых карт - всегда платно (нет кэша)
+      if (chartType === 'guest') {
+        return res.json({
+          ok: true,
+          data: {} // Пустой объект - ничего не куплено
+        });
+      }
+      
+      // Для своей карты - проверяем кэш
+      const ownChart = await storage.getNatalChart(userId);
+      if (!ownChart) {
+        return res.json({
+          ok: true,
+          data: {} // Нет карты - ничего не куплено
+        });
+      }
+      
+      const houseInfluences = (ownChart.houseInfluences as any) || {};
+      
+      res.json({
+        ok: true,
+        data: houseInfluences // Возвращаем структуру { "ru": { "Sun": true, "Moon": true }, "en": {...} }
+      });
+    } catch (error: any) {
+      console.error('House influence status check error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Роут для интерпретации влияния дома на планету
+  // ДЛЯ СВОЕЙ КАРТЫ: Первый раз платно (2 орба), потом бесплатно из кэша
+  // ДЛЯ ГОСТЕВЫХ КАРТ: Всегда платно (2 орба), не сохраняется
   app.post("/api/astrology/house-influence", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
@@ -1051,30 +1088,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Проверяем энергию перед списанием
-      await checkAndResetEnergy(storage, userId);
-      const userBefore = await storage.getUser(userId);
-      if (!userBefore) {
-        return res.status(404).json({ ok: false, error: "User not found" });
-      }
-
-      const cost = ENERGY_COSTS.house_influence;
-      const totalEnergy = userBefore.freeEnergy + userBefore.purchasedEnergy;
-      if (totalEnergy < cost) {
-        return res.status(402).json({ 
-          ok: false, 
-          error: "Insufficient energy",
-          required: cost,
-          available: totalEnergy
-        });
-      }
-
-      // Списываем энергию СРАЗУ
-      const deductResult = await deductEnergy(storage, userId, "house_influence");
-      if (!deductResult.ok) {
-        return res.status(402).json({ ok: false, error: deductResult.error });
-      }
-      
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
@@ -1082,10 +1095,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let savedChart: NatalChartResult;
       let chartOwner = user;
+      let chartRecord: any = null;
 
       // Получаем данные карты в зависимости от типа
       if (chartType === 'guest' && chartId) {
-        // Загружаем гостевую карту
+        // Загружаем гостевую карту (ВСЕГДА ПЛАТНО)
         const guestChart = await storage.getExternalNatal(chartId);
         
         if (!guestChart) {
@@ -1111,8 +1125,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gender: guestChart.gender,
           birthdayDate: guestChart.birthdayDate
         } as any;
+        // chartRecord остается null для гостевых карт
       } else {
-        // Получаем сохраненную натальную карту пользователя
+        // Получаем СВОЮ натальную карту (может быть кэш)
         const ownChart = await storage.getNatalChart(userId);
         
         if (!ownChart || !ownChart.data || typeof ownChart.data !== 'object' || !('planets' in ownChart.data)) {
@@ -1123,6 +1138,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         savedChart = ownChart.data as NatalChartResult;
+        chartRecord = ownChart;
+        
+        // КРИТИЧНО: Проверяем кэш для СВОЕЙ карты
+        const houseInfluences = (ownChart.houseInfluences as any) || {};
+        const localeCache = houseInfluences[locale] || {};
+        
+        if (localeCache[planet]) {
+          console.log(`[House Influence] Cache HIT for own chart: ${planet} (${locale})`);
+          // ВОЗВРАЩАЕМ БЕСПЛАТНО ИЗ КЭША
+          return res.json({
+            ok: true,
+            data: localeCache[planet],
+            cached: true
+          });
+        }
+        
+        console.log(`[House Influence] Cache MISS for own chart: ${planet} (${locale})`);
       }
 
       const planetData = savedChart.planets[planet];
@@ -1161,6 +1193,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const house = findHouse(planetData.longitude);
 
+      // ПЛАТНО: Проверяем и списываем энергию (для обеих типов карт)
+      await checkAndResetEnergy(storage, userId);
+      const userForEnergy = await storage.getUser(userId);
+      if (!userForEnergy) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const cost = ENERGY_COSTS.house_influence;
+      const totalEnergy = userForEnergy.freeEnergy + userForEnergy.purchasedEnergy;
+      if (totalEnergy < cost) {
+        return res.status(402).json({ 
+          ok: false, 
+          error: "Insufficient energy",
+          required: cost,
+          available: totalEnergy
+        });
+      }
+
+      // Списываем энергию
+      const deductResult = await deductEnergy(storage, userId, "house_influence");
+      if (!deductResult.ok) {
+        return res.status(402).json({ ok: false, error: deductResult.error });
+      }
+
       // Формируем данные для интерпретации влияния дома
       const houseInfluenceData: HouseInfluenceData = {
         planet: {
@@ -1178,9 +1234,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Получаем интерпретацию влияния дома от AI
       const interpretation = await getHouseInfluence(houseInfluenceData, locale);
 
+      // СОХРАНЯЕМ В КЭШ (только для своей карты)
+      if (chartRecord) {
+        const currentInfluences = (chartRecord.houseInfluences as any) || {};
+        const localeInfluences = currentInfluences[locale] || {};
+        
+        // Добавляем новую интерпретацию
+        localeInfluences[planet] = interpretation;
+        currentInfluences[locale] = localeInfluences;
+        
+        // Сохраняем в базу
+        await storage.updateNatalChart(userId, {
+          houseInfluences: currentInfluences
+        });
+        
+        console.log(`[House Influence] Saved to cache: ${planet} (${locale})`);
+      }
+
       res.json({
         ok: true,
-        data: interpretation
+        data: interpretation,
+        cached: false
       });
     } catch (error: any) {
       console.error('House influence interpretation error:', error);

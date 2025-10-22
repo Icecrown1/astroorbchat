@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/Loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap } from 'lucide-react';
+import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap, Eye } from 'lucide-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -70,13 +70,37 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
     retry: 1
   });
 
+  // Проверяем статус купленных интерпретаций влияния домов
+  const { data: purchasedStatus } = useQuery<Record<string, Record<string, any>>>({
+    queryKey: ['/api/astrology/house-influence-status', chartType, chartId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (chartType) params.append('chartType', chartType);
+      if (chartId) params.append('chartId', chartId);
+      const response = await fetch(`/api/astrology/house-influence-status?${params}`, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      const result = await response.json();
+      return result.data || {};
+    },
+    retry: 1
+  });
+
+  // Проверяем куплена ли интерпретация для текущей планеты и локали
+  const isPurchased = planet && purchasedStatus?.[locale]?.[planet];
+
   const handleClose = () => {
     setIsOpen(false);
     setHouseInfluence(null); // Сброс при закрытии
     setTimeout(onClose, 200); // Даем время на анимацию закрытия
   };
 
-  // Мутация для получения платной интерпретации влияния дома (2 орба)
+  // Мутация для получения интерпретации влияния дома
+  // Для своей карты: первый раз платно (2 орба), потом бесплатно из кэша
+  // Для гостевых карт: всегда платно (2 орба)
   const houseInfluenceMutation = useMutation({
     mutationFn: async (requestedPlanet: string) => {
       const response = await apiRequest('POST', '/api/astrology/house-influence', {
@@ -85,9 +109,9 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
         chartType,
         chartId
       });
-      return { data: response.data, requestedPlanet };
+      return { data: response.data, requestedPlanet, cached: response.cached };
     },
-    onSuccess: (result: { data: HouseInfluenceResult; requestedPlanet: string }) => {
+    onSuccess: (result: { data: HouseInfluenceResult; requestedPlanet: string; cached?: boolean }) => {
       // КРИТИЧНО: Проверяем, что пользователь все еще смотрит ту же планету
       // Иначе race condition покажет старые данные для новой планеты
       if (result.requestedPlanet !== planet) {
@@ -96,13 +120,16 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
       }
       
       setHouseInfluence(result.data);
-      // Обновляем энергию пользователя
+      
+      // Обновляем кэш статуса и энергию пользователя
+      queryClient.invalidateQueries({ queryKey: ['/api/astrology/house-influence-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      
       toast({
         title: locale === 'ru' ? '✨ Интерпретация получена' : '✨ Interpretation received',
         description: locale === 'ru' 
-          ? 'Глубокая интерпретация влияния дома загружена'
-          : 'Deep house influence interpretation loaded',
+          ? (result.cached ? 'Загружено из сохраненных' : 'Глубокая интерпретация влияния дома загружена')
+          : (result.cached ? 'Loaded from saved' : 'Deep house influence interpretation loaded'),
       });
     },
     onError: (error: any) => {
@@ -265,11 +292,17 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       size="sm"
                       onClick={() => planet && houseInfluenceMutation.mutate(planet)}
                       disabled={houseInfluenceMutation.isPending}
+                      variant={isPurchased ? 'secondary' : 'default'}
                       className="flex items-center gap-1.5 flex-shrink-0"
                       data-testid="button-house-influence"
                     >
                       {houseInfluenceMutation.isPending ? (
                         <Loader size="sm" />
+                      ) : isPurchased ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="text-xs">{locale === 'ru' ? 'Просмотр' : 'View'}</span>
+                        </>
                       ) : (
                         <>
                           <Zap className="w-3.5 h-3.5" />
