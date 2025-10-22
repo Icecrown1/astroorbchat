@@ -2756,7 +2756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tier,
           energyAmount,
           amountRUB,
-          yookassaPaymentId: '', // Will be updated after YooKassa creates payment
+          yookassaPaymentId: null, // Will be updated after YooKassa creates payment
           idempotencyKey: validated.idempotencyKey, // Store client's idempotency key
         });
         
