@@ -1,17 +1,17 @@
 import { apiRequest } from './queryClient';
 
+// Новый формат событий с лунными фазами и транзитами
 export interface ImportantEvent {
-  key: string;
+  type: 'new_moon' | 'full_moon' | 'planet_transit';
   date: string;
-  kind: string;
-  planet: string;
-  sign?: string;
-  natalTarget?: {
-    planet: string;
-    aspect?: string;
-  };
-  brief: string;
-  unlocked: boolean;
+  sign: string;
+  degree?: number;
+  planet?: string;  // Для транзитов планет
+  from_sign?: string;  // Для транзитов: из какого знака
+  to_sign?: string;  // Для транзитов: в какой знак
+  house_for_sun_sign?: number;  // Дом для солнечного знака пользователя
+  importance?: 'high';  // Особо важное событие
+  importance_reason?: 'in_sun_sign' | 'in_ascendant';  // Причина важности
 }
 
 export interface ImportantDateInterpretation {

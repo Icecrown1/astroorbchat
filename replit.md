@@ -44,6 +44,12 @@ Preferred communication style: Simple, everyday language.
 - **Global Error Handling**: Automatic cleanup of stale authentication tokens on 401 errors.
 - **Profile Management**: Feature to reset profile data while preserving energy and subscriptions.
 - **Payment Flow Fixes**: Enhanced YooKassa idempotency with UUIDs, robust backend duplicate key handling, and improved payment cancellation/abandonment redirects. Fixed TON Mini App URL handling for continuous blockchain polling.
+- **Important Dates System** (October 22, 2025):
+  - **Lunar Phases**: Automatic calculation of new moons and full moons with exact dates and zodiac signs
+  - **Planet Transits**: Tracking when planets change zodiac signs with precision timing
+  - **Personalized Houses**: Events mapped to user's houses based on Sun sign (Whole Sign Houses system)
+  - **Special Highlighting**: Events in user's Sun sign or Ascendant marked as high importance
+  - **Python Swiss Ephemeris Integration**: `important_dates_api.py` calculates astronomical events with high accuracy
 
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk`

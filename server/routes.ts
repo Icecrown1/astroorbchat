@@ -12,7 +12,7 @@ import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/
 import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
-import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
+import { findImportantEvents, extractNatalPlanets, getImportantDatesWithLunarPhases } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
@@ -2104,6 +2104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/astrology/important-dates", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const daysForward = parseInt(req.query.days as string) || 60;
       
       // Get user's natal chart
       const natalChart = await storage.getNatalChart(userId);
@@ -2113,32 +2114,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const chartData = natalChart.data as NatalChartResult;
       
-      // Extract natal planets for transit calculation
-      const natalPlanets = extractNatalPlanets(chartData);
+      // Извлекаем солнечный знак и асцендент из натальной карты
+      const sunSign = chartData.planets?.Sun?.sign;
+      const ascendantSign = chartData.angles?.Ascendant?.sign;
       
-      // Find important events (next 90 days)
-      const now = new Date();
-      const futureDate = new Date();
-      futureDate.setDate(now.getDate() + 90);
+      console.log(`[Important Dates] User sun sign: ${sunSign}, ascendant: ${ascendantSign}`);
       
-      const events = await findImportantEvents(natalPlanets, {
-        from: now,
-        to: futureDate,
-        limit: 20
-      });
+      // Получаем важные даты с лунными фазами и транзитами планет
+      const result = await getImportantDatesWithLunarPhases(
+        {
+          start_date: new Date().toISOString().split('T')[0],  // Сегодня
+          days_forward: daysForward
+        },
+        sunSign,
+        ascendantSign
+      );
       
-      // Get user's unlocked events
-      const unlocked = await storage.getImportantDateUnlocksByUserId(userId);
-      const unlockedKeys = new Set(unlocked.map((u: any) => u.eventKey));
-      
-      // Mark which events are unlocked
-      const eventsWithStatus = events.map(event => ({
-        ...event,
-        unlocked: unlockedKeys.has(event.key)
-      }));
-      
-      res.json({ ok: true, data: eventsWithStatus });
+      // Возвращаем только массив событий для совместимости с frontend
+      res.json({ ok: true, data: result.events });
     } catch (error: any) {
+      console.error('[Important Dates] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

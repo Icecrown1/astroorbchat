@@ -40,6 +40,33 @@ def get_sign_index(sign_name):
     """Возвращает индекс знака (0-11)"""
     return ZODIAC_SIGNS.index(sign_name)
 
+def calculate_house_for_sun_sign(event_sign, sun_sign):
+    """
+    Вычисляет в каком доме происходит событие для данного солнечного знака.
+    Использует систему Whole Sign Houses от солнечного знака.
+    
+    Args:
+        event_sign: Знак, в котором происходит событие
+        sun_sign: Солнечный знак пользователя
+    
+    Returns:
+        Номер дома (1-12)
+    
+    Пример:
+        Для Водолея (Aquarius):
+        - Событие в Водолее = 1-й дом
+        - Событие в Рыбах = 2-й дом
+        - Событие в Весах = 9-й дом
+    """
+    event_idx = get_sign_index(event_sign)
+    sun_idx = get_sign_index(sun_sign)
+    
+    # Разница между знаками (от 0 до 11)
+    house = (event_idx - sun_idx + 12) % 12
+    
+    # Дома нумеруются от 1 до 12
+    return house + 1
+
 def jd_to_datetime(jd):
     """Конвертирует юлианский день в datetime"""
     # Эпоха Unix в юлианских днях
@@ -234,12 +261,16 @@ def calculate_important_dates(params):
         params: dict с полями:
             - start_date: ISO формат (YYYY-MM-DD)
             - days_forward: количество дней вперёд (по умолчанию 60)
+            - sun_sign: солнечный знак пользователя (опционально)
+            - ascendant_sign: асцендент пользователя (опционально)
     
     Returns:
         dict с событиями
     """
     start_date_str = params.get('start_date')
     days_forward = params.get('days_forward', 60)
+    sun_sign = params.get('sun_sign')
+    ascendant_sign = params.get('ascendant_sign')
     
     # Парсим дату
     if start_date_str:
@@ -267,6 +298,10 @@ def calculate_important_dates(params):
     
     print(f"[IMPORTANT DATES] Calculating from {start_date.date()} to {end_date.date()}", file=sys.stderr)
     print(f"[IMPORTANT DATES] JD range: {start_jd} to {end_jd}", file=sys.stderr)
+    if sun_sign:
+        print(f"[IMPORTANT DATES] Sun sign: {sun_sign}", file=sys.stderr)
+    if ascendant_sign:
+        print(f"[IMPORTANT DATES] Ascendant: {ascendant_sign}", file=sys.stderr)
     
     # Ищем лунные фазы
     lunar_phases = find_lunar_phases(start_jd, end_jd)
@@ -280,8 +315,30 @@ def calculate_important_dates(params):
     all_events = lunar_phases + planet_transits
     all_events.sort(key=lambda x: x['jd'])
     
-    # Убираем служебное поле jd из результата
+    # Добавляем персонализацию: дома для знака пользователя
     for event in all_events:
+        # Определяем знак события
+        event_sign = event.get('sign')
+        if not event_sign:
+            # Для транзитов берём знак в который входит планета
+            event_sign = event.get('to_sign')
+        
+        # Рассчитываем дом для солнечного знака
+        if sun_sign and event_sign:
+            event['house_for_sun_sign'] = calculate_house_for_sun_sign(event_sign, sun_sign)
+        
+        # Проверяем особые события (новолуние/транзит в знак асцендента или солнца)
+        is_important = False
+        if sun_sign and event_sign == sun_sign:
+            is_important = True
+            event['importance'] = 'high'
+            event['importance_reason'] = 'in_sun_sign'
+        elif ascendant_sign and event_sign == ascendant_sign:
+            is_important = True
+            event['importance'] = 'high'
+            event['importance_reason'] = 'in_ascendant'
+        
+        # Убираем служебное поле jd
         del event['jd']
     
     return {
@@ -290,7 +347,11 @@ def calculate_important_dates(params):
             'start': start_date.isoformat(),
             'end': end_date.isoformat(),
             'days': days_forward
-        }
+        },
+        'personalization': {
+            'sun_sign': sun_sign,
+            'ascendant_sign': ascendant_sign
+        } if sun_sign or ascendant_sign else None
     }
 
 def main():

@@ -147,3 +147,110 @@ export function extractNatalPlanets(natalChartData: any): NatalPlanetData[] {
   
   return planets;
 }
+
+/**
+ * Новый интерфейс для важных дат с лунными фазами и транзитами
+ */
+export interface ImportantDateEvent {
+  type: 'new_moon' | 'full_moon' | 'planet_transit';
+  date: string;
+  sign: string;
+  degree?: number;
+  planet?: string;  // Для транзитов планет
+  from_sign?: string;  // Для транзитов: из какого знака
+  to_sign?: string;  // Для транзитов: в какой знак
+  house_for_sun_sign?: number;  // Дом для солнечного знака пользователя
+  importance?: 'high';  // Особо важное событие
+  importance_reason?: 'in_sun_sign' | 'in_ascendant';  // Причина важности
+}
+
+export interface ImportantDatesResult {
+  events: ImportantDateEvent[];
+  period: {
+    start: string;
+    end: string;
+    days: number;
+  };
+  personalization?: {
+    sun_sign?: string;
+    ascendant_sign?: string;
+  };
+}
+
+/**
+ * Получает важные астрологические даты: лунные фазы и транзиты планет
+ * 
+ * @param options Опции поиска
+ * @param sun_sign Солнечный знак пользователя (опционально)
+ * @param ascendant_sign Асцендент пользователя (опционально)
+ * @returns Список событий с лунными фазами и транзитами
+ */
+export async function getImportantDatesWithLunarPhases(
+  options: {
+    start_date?: string;  // ISO format YYYY-MM-DD
+    days_forward?: number;  // Default 60
+  },
+  sun_sign?: string,
+  ascendant_sign?: string
+): Promise<ImportantDatesResult> {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), 'server', 'important_dates_api.py');
+    
+    // Формируем входные данные для Python скрипта
+    const inputData = {
+      start_date: options.start_date,
+      days_forward: options.days_forward || 60,
+      sun_sign,
+      ascendant_sign
+    };
+    
+    // Запускаем Python-скрипт
+    const pythonProcess = spawn('python3', [scriptPath]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    // Собираем данные из stdout
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    // Собираем ошибки из stderr
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    // Обработка завершения процесса
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const result = JSON.parse(stdout);
+          if (result.error) {
+            reject(new Error(`Important dates calculation failed: ${result.error}`));
+          } else {
+            resolve(result as ImportantDatesResult);
+          }
+        } catch (err) {
+          reject(new Error(`Failed to parse Python output: ${err}`));
+        }
+      } else {
+        console.error('[Important Dates] Python stderr:', stderr);
+        try {
+          const errorObj = JSON.parse(stdout);
+          reject(new Error(`Python error: ${errorObj.error || stderr}`));
+        } catch {
+          reject(new Error(`Python script failed with code ${code}: ${stderr}`));
+        }
+      }
+    });
+    
+    // Обработка ошибок запуска
+    pythonProcess.on('error', (err) => {
+      reject(new Error(`Failed to start Python process: ${err.message}`));
+    });
+    
+    // Отправляем входные данные в stdin
+    pythonProcess.stdin.write(JSON.stringify(inputData));
+    pythonProcess.stdin.end();
+  });
+}

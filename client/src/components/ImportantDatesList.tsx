@@ -2,17 +2,15 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Calendar, TrendingUp } from 'lucide-react';
+import { Moon, Sparkles, ArrowRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getImportantDates, ImportantEvent } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { translatePlanet, translateSign } from '@/lib/astroTranslations';
-import { ImportantDateModal } from './ImportantDateModal';
 import { Loader } from './Loader';
 
 export function ImportantDatesList() {
   const { locale } = useTranslation();
-  const [selectedEvent, setSelectedEvent] = useState<ImportantEvent | null>(null);
 
   const { data: events, isLoading } = useQuery<ImportantEvent[]>({
     queryKey: ['/api/astrology/important-dates'],
@@ -28,8 +26,8 @@ export function ImportantDatesList() {
       <Card className="p-6">
         <p className="text-center text-muted-foreground">
           {locale === 'ru' 
-            ? 'Важных дат не найдено в ближайшие 3 месяца' 
-            : 'No important dates found in the next 3 months'}
+            ? 'Важных дат не найдено в ближайшие 2 месяца' 
+            : 'No important dates found in the next 2 months'}
         </p>
       </Card>
     );
@@ -44,137 +42,159 @@ export function ImportantDatesList() {
     });
   };
 
-  const getEventTypeLabel = (kind: string) => {
-    const labels: Record<string, { en: string; ru: string }> = {
-      'retrograde-start': { en: 'Retrograde Start', ru: 'Начало ретрограда' },
-      'retrograde-end': { en: 'Direct Motion', ru: 'Директное движение' },
-      ingress: { en: 'Sign Change', ru: 'Смена знака' },
-      'major-transit': { en: 'Major Transit', ru: 'Важный транзит' },
-      conjunction: { en: 'Conjunction', ru: 'Соединение' },
-      opposition: { en: 'Opposition', ru: 'Оппозиция' },
-      trine: { en: 'Trine', ru: 'Трин' },
-      square: { en: 'Square', ru: 'Квадрат' },
-      sextile: { en: 'Sextile', ru: 'Секстиль' },
-    };
-    return labels[kind]?.[locale] || kind;
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'new_moon':
+        return <Moon className="w-4 h-4 text-primary" />;
+      case 'full_moon':
+        return <Moon className="w-4 h-4 text-primary fill-current" />;
+      case 'planet_transit':
+        return <ArrowRight className="w-4 h-4 text-primary" />;
+      default:
+        return <Calendar className="w-4 h-4 text-primary" />;
+    }
   };
 
-  const getLocalizedBrief = (event: ImportantEvent) => {
-    const planet = translatePlanet(event.planet, locale);
-    const sign = event.sign ? translateSign(event.sign, locale) : '';
-
-    if (event.kind === 'retrograde-start') {
+  const getEventTitle = (event: ImportantEvent) => {
+    if (event.type === 'new_moon') {
       return locale === 'ru' 
-        ? `${planet} в ${sign} начинает ретроградное движение — пересмотрите планы в соответствующей сфере`
-        : `${planet} in ${sign} begins retrograde motion — review plans in this area`;
+        ? `Новолуние в ${translateSign(event.sign, locale)}`
+        : `New Moon in ${translateSign(event.sign, locale)}`;
     }
-    if (event.kind === 'retrograde-end') {
+    if (event.type === 'full_moon') {
       return locale === 'ru'
-        ? `${planet} в ${sign} возвращается к директному движению — путь вперёд открыт`
-        : `${planet} in ${sign} returns to direct motion — the way forward is clear`;
+        ? `Полнолуние в ${translateSign(event.sign, locale)}`
+        : `Full Moon in ${translateSign(event.sign, locale)}`;
     }
-    if (event.kind === 'ingress') {
+    if (event.type === 'planet_transit' && event.planet) {
+      const planet = translatePlanet(event.planet, locale);
+      const toSign = event.to_sign ? translateSign(event.to_sign, locale) : '';
       return locale === 'ru'
-        ? `${planet} входит в ${sign} — новая энергия в этой области жизни`
-        : `${planet} enters ${sign} — new energy in this life area`;
+        ? `${planet} входит в ${toSign}`
+        : `${planet} enters ${toSign}`;
     }
-    if (event.kind === 'major-transit' && event.natalTarget) {
-      const natalPlanet = translatePlanet(event.natalTarget.planet, locale);
-      const aspect = event.natalTarget.aspect ? getEventTypeLabel(event.natalTarget.aspect) : '';
+    return '';
+  };
+
+  const getEventDescription = (event: ImportantEvent) => {
+    const house = event.house_for_sun_sign;
+    
+    if (event.type === 'new_moon' || event.type === 'full_moon') {
+      const phaseType = event.type === 'new_moon' 
+        ? (locale === 'ru' ? 'Новолуние' : 'New Moon')
+        : (locale === 'ru' ? 'Полнолуние' : 'Full Moon');
+      
+      if (house) {
+        return locale === 'ru'
+          ? `${phaseType} в ${house}-м доме — время обновления в этой сфере жизни`
+          : `${phaseType} in ${house}${getOrdinalSuffix(house)} house — time for renewal in this life area`;
+      }
+      
       return locale === 'ru'
-        ? `Транзитный ${planet} формирует ${aspect} к натальному ${natalPlanet} — важное влияние`
-        : `Transiting ${planet} forms ${aspect} to natal ${natalPlanet} — significant influence`;
+        ? `${phaseType} — важный момент для новых начинаний`
+        : `${phaseType} — significant moment for new beginnings`;
     }
-    return event.brief;
+    
+    if (event.type === 'planet_transit' && event.planet) {
+      const planet = translatePlanet(event.planet, locale);
+      const toSign = event.to_sign ? translateSign(event.to_sign, locale) : '';
+      
+      if (house) {
+        return locale === 'ru'
+          ? `${planet} переходит в ${toSign} (${house}-й дом) — новая энергия в этой области`
+          : `${planet} transits into ${toSign} (${house}${getOrdinalSuffix(house)} house) — new energy in this area`;
+      }
+      
+      return locale === 'ru'
+        ? `${planet} входит в ${toSign} — смена энергии`
+        : `${planet} enters ${toSign} — energy shift`;
+    }
+    
+    return '';
+  };
+
+  const getOrdinalSuffix = (num: number) => {
+    if (num === 1) return 'st';
+    if (num === 2) return 'nd';
+    if (num === 3) return 'rd';
+    return 'th';
   };
 
   return (
-    <>
-      <div className="space-y-3">
-        {events.map((event) => {
-          const eventDate = new Date(event.date);
-          const day = eventDate.getDate();
-          const month = eventDate.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'short' });
-          
-          return (
-            <Card
-              key={event.key}
-              className={cn(
-                'relative p-4 cursor-pointer transition-all',
-                'hover-elevate active-elevate-2',
-                !event.unlocked && 'opacity-80'
-              )}
-              onClick={() => setSelectedEvent(event)}
-              data-testid={`card-important-date-${event.key}`}
-            >
-              {!event.unlocked && (
-                <div className="absolute top-3 left-3">
-                  <Lock className="w-4 h-4 text-muted-foreground" />
+    <div className="space-y-3">
+      {events.map((event, index) => {
+        const eventDate = new Date(event.date);
+        const day = eventDate.getDate();
+        const month = eventDate.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'short' });
+        const isHighImportance = event.importance === 'high';
+        
+        return (
+          <Card
+            key={`${event.type}-${event.date}-${index}`}
+            className={cn(
+              'relative p-4 transition-all',
+              isHighImportance && 'border-primary border-2'
+            )}
+            data-testid={`card-important-date-${index}`}
+          >
+            {isHighImportance && (
+              <div className="absolute top-2 right-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+            )}
+
+            <div className="flex items-start gap-4">
+              {/* Date Block */}
+              <div className="flex flex-col items-center shrink-0 w-16">
+                <div className={cn(
+                  'text-3xl font-bold leading-none',
+                  isHighImportance ? 'text-primary' : 'text-foreground'
+                )}>
+                  {day}
                 </div>
-              )}
-
-              <div className="flex items-start gap-4">
-                {/* Date Block - Main Focus */}
-                <div className="flex flex-col items-center shrink-0 w-16">
-                  <div className={cn(
-                    'text-3xl font-bold leading-none',
-                    event.kind === 'retrograde-start' ? 'text-destructive' : 'text-primary'
-                  )}>
-                    {day}
-                  </div>
-                  <div className="text-xs text-muted-foreground uppercase mt-1">
-                    {month}
-                  </div>
-                  <div className="mt-2">
-                    {event.kind === 'retrograde-start' || event.kind === 'retrograde-end' ? (
-                      <TrendingUp className={cn(
-                        'w-4 h-4',
-                        event.kind === 'retrograde-start' ? 'text-destructive rotate-180' : 'text-primary'
-                      )} />
-                    ) : (
-                      <Calendar className="w-4 h-4 text-primary" />
-                    )}
-                  </div>
+                <div className="text-xs text-muted-foreground uppercase mt-1">
+                  {month}
                 </div>
-
-                {/* Event Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-semibold text-card-foreground">
-                      {translatePlanet(event.planet, locale)} {getEventTypeLabel(event.kind)}
-                      {event.sign && ` ${locale === 'ru' ? 'в' : 'in'} ${translateSign(event.sign, locale)}`}
-                    </h4>
-                    {!event.unlocked && (
-                      <Badge variant="secondary" className="shrink-0 text-xs">
-                        1 {locale === 'ru' ? 'орб' : 'orb'}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <p className="text-sm text-muted-foreground">
-                    {getLocalizedBrief(event)}
-                  </p>
-
-                  {event.natalTarget && (
-                    <p className="text-xs text-primary mt-2">
-                      {locale === 'ru' ? 'Влияет на' : 'Affects'}: {translatePlanet(event.natalTarget.planet, locale)}
-                      {event.natalTarget.aspect && ` (${getEventTypeLabel(event.natalTarget.aspect)})`}
-                    </p>
-                  )}
+                <div className="mt-2">
+                  {getEventIcon(event.type)}
                 </div>
               </div>
-            </Card>
-          );
-        })}
-      </div>
 
-      {selectedEvent && (
-        <ImportantDateModal
-          event={selectedEvent}
-          open={!!selectedEvent}
-          onClose={() => setSelectedEvent(null)}
-        />
-      )}
-    </>
+              {/* Event Details */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h4 className="font-semibold text-card-foreground">
+                    {getEventTitle(event)}
+                  </h4>
+                  {event.house_for_sun_sign && (
+                    <Badge variant="secondary" className="shrink-0 text-xs">
+                      {event.house_for_sun_sign}-{locale === 'ru' ? 'й дом' : 'H'}
+                    </Badge>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  {getEventDescription(event)}
+                </p>
+
+                {isHighImportance && event.importance_reason && (
+                  <div className="mt-2 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-primary" />
+                    <p className="text-xs text-primary font-medium">
+                      {event.importance_reason === 'in_sun_sign' && (locale === 'ru' 
+                        ? 'В вашем солнечном знаке' 
+                        : 'In your Sun sign')}
+                      {event.importance_reason === 'in_ascendant' && (locale === 'ru'
+                        ? 'В вашем асценденте'
+                        : 'In your Ascendant')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
