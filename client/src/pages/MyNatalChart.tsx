@@ -328,7 +328,7 @@ export default function MyNatalChart() {
             </div>
           </Card>
 
-          {chartData.interpretation && (
+          {rawChartData?.professionalInterpretation?.[locale] && typeof rawChartData.professionalInterpretation[locale] === 'string' && (
             <Accordion type="single" collapsible defaultValue="interpretation">
               <AccordionItem value="interpretation">
                 <AccordionTrigger className="text-lg font-semibold">
@@ -338,7 +338,7 @@ export default function MyNatalChart() {
                   <div 
                     className="prose prose-sm dark:prose-invert max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: chartData.interpretation.replace(/\n/g, '<br />') 
+                      __html: rawChartData.professionalInterpretation[locale].replace(/\n/g, '<br />') 
                     }}
                   />
                 </AccordionContent>
@@ -346,67 +346,6 @@ export default function MyNatalChart() {
             </Accordion>
           )}
 
-          {rawChartData?.professionalInterpretation?.[locale] && (
-            <Card className="p-6 border-primary/20 bg-gradient-to-br from-primary/5 to-chart-1/5">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold">
-                  {locale === 'ru' ? 'Профессиональная интерпретация' : 'Professional Interpretation'}
-                </h2>
-              </div>
-              <div className="space-y-4">
-                <p className="text-sm leading-relaxed">
-                  {rawChartData.professionalInterpretation[locale].summary}
-                </p>
-                {rawChartData.professionalInterpretation[locale].house_framework?.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">
-                      {locale === 'ru' ? 'Анализ домов:' : 'House Framework:'}
-                    </h3>
-                    <div className="space-y-2">
-                      {rawChartData.professionalInterpretation[locale].house_framework.map((item: any, i: number) => (
-                        <div key={i} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
-                          <div className="font-medium text-foreground">
-                            {locale === 'ru' ? `Дом ${item.house}` : `House ${item.house}`}: {item.sign_on_cusp}
-                          </div>
-                          <div className="text-muted-foreground mt-1">
-                            {locale === 'ru' ? 'Управитель' : 'Ruler'}: {item.ruler} ({item.ruler_position})
-                          </div>
-                          {item.key_aspects_to_ruler && (
-                            <div className="text-muted-foreground text-xs mt-0.5">
-                              {item.key_aspects_to_ruler}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {rawChartData.professionalInterpretation[locale].planet_synthesis?.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">
-                      {locale === 'ru' ? 'Синтез планет:' : 'Planet Synthesis:'}
-                    </h3>
-                    <ul className="space-y-1">
-                      {rawChartData.professionalInterpretation[locale].planet_synthesis.map((item: string, i: number) => (
-                        <li key={i} className="text-sm text-muted-foreground ml-4">• {item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {rawChartData.professionalInterpretation[locale].angles_focus && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">
-                      {locale === 'ru' ? 'Аспекты к углам (ASC/MC/DSC/IC):' : 'Angles Focus (ASC/MC/DSC/IC):'}
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {rawChartData.professionalInterpretation[locale].angles_focus}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </Card>
-          )}
 
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">{t.natalChart.planetaryPositions}</h2>
