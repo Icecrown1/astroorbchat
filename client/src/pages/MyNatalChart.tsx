@@ -346,7 +346,7 @@ export default function MyNatalChart() {
             </Accordion>
           )}
 
-          {false && rawChartData?.professionalInterpretation?.[locale] && (
+          {rawChartData?.professionalInterpretation?.[locale] && (
             <Card className="p-6 border-primary/20 bg-gradient-to-br from-primary/5 to-chart-1/5">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-5 h-5 text-primary" />
