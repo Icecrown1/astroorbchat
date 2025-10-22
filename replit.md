@@ -96,3 +96,15 @@ Preferred communication style: Simple, everyday language.
   - **Solution**: Added logic to update user data if `birthPlace` is null and full profile data provided
   - **Flow**: Reset → `birthPlace = null` → Re-register → Profile data updates correctly
   - **Impact**: Users can now successfully update birth data after profile reset
+- **Payment Cancellation Auto-Redirect (October 22, 2025)**: Fixed YooKassa payment cancellation flow:
+  - **Problem**: Canceled payments showed "pending" status indefinitely on PaymentSuccess page
+  - **Solution**: Added automatic 3-second redirect to `/buy-energy` page when payment is canceled or failed
+  - **User Experience**: Success → dashboard (2s delay), Failed/Canceled → /buy-energy (3s delay) with proper status messages
+  - **Implementation**: Auto-redirect logic in PaymentSuccess component with status-based countdown timers
+- **Unified Payment History (October 22, 2025)**: Merged TON and YooKassa payment records into single history view:
+  - **Backend**: `/api/payments/history` endpoint transforms both payment types into unified format with `paymentMethod` discriminator
+  - **Display Logic**: Shows method-specific amounts (RUB for YooKassa, TON for blockchain)
+  - **Blockchain Link**: "View on Blockchain" link only appears for TON transactions
+  - **Payment Method Badges**: Each transaction shows "TON" or "Bank Card" badge with proper styling
+  - **Translations**: Added `paymentMethod` and `bankCard` strings to both English and Russian locales
+  - **Bug Fix**: Corrected typo in routes.ts (`amountRub` → `amountRUB`) for YooKassa payment data transformation
