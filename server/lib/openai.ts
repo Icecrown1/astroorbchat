@@ -131,8 +131,8 @@ IMPORTANT: Do NOT start with formal greetings like "Dear [Name]" or similar. Sta
 Length: 200-300 words.`;
   
   const systemMessage = locale === 'ru'
-    ? "Ты опытный астролог, который предоставляет четкие, практичные и проницательные чтения без эзотерического жаргона. Твои советы конкретны, действенны и основаны на астрологических принципах. Всегда отвечай на русском языке."
-    : "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles.";
+    ? "Ты опытный астролог, который предоставляет четкие, практичные и проницательные чтения без эзотерического жаргона. Твои советы конкретны, действенны и основаны на астрологических принципах. Всегда отвечай на русском языке. НИКОГДА не начинай ответ с формальных обращений типа 'Уважаемый(ая)', 'Дорогой(ая)' или подобных - сразу переходи к содержанию."
+    : "You are an expert astrologer who provides clear, practical, and insightful readings without esoteric jargon. Your advice is specific, actionable, and based on astrological principles. NEVER start your response with formal greetings like 'Dear' or similar - go straight to the content.";
   
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
