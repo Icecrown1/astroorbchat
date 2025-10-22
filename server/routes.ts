@@ -1051,10 +1051,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Проверяем энергию перед списанием
+      await checkAndResetEnergy(storage, userId);
+      const userBefore = await storage.getUser(userId);
+      if (!userBefore) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const cost = ENERGY_COSTS.house_influence;
+      const totalEnergy = userBefore.freeEnergy + userBefore.purchasedEnergy;
+      if (totalEnergy < cost) {
+        return res.status(402).json({ 
+          ok: false, 
+          error: "Insufficient energy",
+          required: cost,
+          available: totalEnergy
+        });
+      }
+
       // Списываем энергию СРАЗУ
       const deductResult = await deductEnergy(storage, userId, "house_influence");
       if (!deductResult.ok) {
-        return res.status(400).json({ ok: false, error: deductResult.error });
+        return res.status(402).json({ ok: false, error: deductResult.error });
       }
       
       const user = await storage.getUser(userId);
