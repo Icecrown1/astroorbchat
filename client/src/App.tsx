@@ -8,7 +8,6 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
-import { AppVersion } from '@/components/AppVersion';
 import NotFound from '@/pages/not-found';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -81,7 +80,6 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
-            <AppVersion />
           </TooltipProvider>
         </TonConnectUIProvider>
       </LocaleProvider>
