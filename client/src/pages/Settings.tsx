@@ -15,7 +15,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Save, LogOut, Trash2, Languages } from 'lucide-react';
+import { ArrowLeft, Save, LogOut, Trash2, Languages, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
@@ -141,6 +152,30 @@ export default function Settings() {
     onError: (error: any) => {
       toast({
         title: t.settings.updateError,
+        description: error.message || t.errors.invalidInput,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/user/reset-profile', {});
+      if (!response.ok) throw new Error(response.error || 'Failed to reset profile');
+      return response.data;
+    },
+    onSuccess: () => {
+      clearAuth();
+      queryClient.clear();
+      toast({
+        title: t.settings.resetSuccess,
+        description: locale === 'ru' ? 'Перенаправляем на регистрацию...' : 'Redirecting to registration...',
+      });
+      setTimeout(() => navigate('/register'), 1000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: t.settings.resetError,
         description: error.message || t.errors.invalidInput,
         variant: 'destructive',
       });
@@ -321,6 +356,53 @@ export default function Settings() {
               )}
             </Button>
           </form>
+        </Card>
+
+        <Card className="p-6 mt-6 border-destructive/50">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              {t.settings.dangerZone}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t.settings.resetProfileDesc}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  data-testid="button-reset-profile"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {t.settings.resetProfile}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t.settings.resetProfile}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t.settings.resetProfileConfirm}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-reset">
+                    {t.common.cancel}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => resetMutation.mutate()}
+                    disabled={resetMutation.isPending}
+                    data-testid="button-confirm-reset"
+                  >
+                    {resetMutation.isPending ? t.settings.resetting : t.common.confirm}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </Card>
 
         {!import.meta.env.PROD && (
