@@ -20,7 +20,7 @@ function getTimezoneOffset(tz: string, year: number, month: number, day: number)
   return tzDate.utcOffset();
 }
 
-export async function computeNatalFromUser(user: User, locale: string = 'ru'): Promise<NatalChartResult & { interpretation: string }> {
+export async function computeNatalFromUser(user: User): Promise<NatalChartResult> {
   // Parse birthday date safely (extract year/month/day from string directly to avoid timezone issues)
   const birthdayStr = typeof user.birthdayDate === 'string' ? user.birthdayDate : user.birthdayDate.toISOString();
   const [datePart] = birthdayStr.split('T');
@@ -71,21 +71,10 @@ export async function computeNatalFromUser(user: User, locale: string = 'ru'): P
   
   const pythonChart = await calculateNatalChartPython(pythonInput);
   
-  // Generate AI interpretation
-  const interpretation = await getAstrologyInterpretation(
-    "natal",
-    pythonChart,
-    locale,
-    user.gender || 'other'
-  );
-  
-  return {
-    ...pythonChart,
-    interpretation,
-  };
+  return pythonChart;
 }
 
-export async function ensureUserNatalChart(userId: string, locale: string = 'ru'): Promise<NatalChart> {
+export async function ensureUserNatalChart(userId: string): Promise<NatalChart> {
   const existingChart = await storage.getNatalChart(userId);
   
   if (existingChart) {
@@ -97,7 +86,7 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
     throw new Error("User not found");
   }
   
-  const natalData = await computeNatalFromUser(user, locale);
+  const natalData = await computeNatalFromUser(user);
   
   const chart = await storage.createNatalChart({
     userId,
@@ -105,6 +94,52 @@ export async function ensureUserNatalChart(userId: string, locale: string = 'ru'
   });
   
   return chart;
+}
+
+/**
+ * Ensures natal chart interpretation is cached for the given locale
+ * Returns interpretation from cache if exists, generates and saves if not
+ */
+export async function ensureNatalInterpretation(userId: string, locale: string = 'ru'): Promise<string> {
+  const chart = await storage.getNatalChart(userId);
+  
+  if (!chart) {
+    throw new Error("Natal chart not found");
+  }
+  
+  // Check if interpretation already exists for this locale
+  const interpretations = chart.professionalInterpretation as Record<string, string> | null;
+  if (interpretations && interpretations[locale]) {
+    console.log(`[NATAL SERVICE] Using cached interpretation for locale: ${locale}`);
+    return interpretations[locale];
+  }
+  
+  // Generate new interpretation
+  console.log(`[NATAL SERVICE] Generating new interpretation for locale: ${locale}`);
+  const user = await storage.getUser(userId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+  
+  const chartData = chart.data as NatalChartResult;
+  const interpretation = await getAstrologyInterpretation(
+    "natal",
+    chartData,
+    locale,
+    user.gender || 'other'
+  );
+  
+  // Save interpretation to database
+  const updatedInterpretations = {
+    ...(interpretations || {}),
+    [locale]: interpretation,
+  };
+  
+  await storage.updateNatalChart(userId, {
+    professionalInterpretation: updatedInterpretations,
+  });
+  
+  return interpretation;
 }
 
 /**
@@ -174,7 +209,7 @@ function determineHouse(longitude: number, cusps: number[]): number {
   return 1; // Default to 1st house
 }
 
-export async function recomputeIfProfileChanged(userId: string, locale: string = 'ru'): Promise<void> {
+export async function recomputeIfProfileChanged(userId: string): Promise<void> {
   const user = await storage.getUser(userId);
   const chart = await storage.getNatalChart(userId);
   
@@ -186,10 +221,11 @@ export async function recomputeIfProfileChanged(userId: string, locale: string =
   const userUpdatedAt = new Date(user.updatedAt);
   
   if (userUpdatedAt > chartCreatedAt) {
-    const newData = await computeNatalFromUser(user, locale);
+    const newData = await computeNatalFromUser(user);
     
     await storage.updateNatalChart(userId, { 
       data: newData,
+      professionalInterpretation: null, // Clear cached interpretations when profile changes
     });
   }
 }
