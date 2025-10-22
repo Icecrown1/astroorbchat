@@ -47,6 +47,9 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
 ## Recent Updates (October 22, 2025)
+- **City Database Expansion**: Added 60+ Russian cities including Стерлитамак, Набережные Челны, and all regional capitals
+- **Manual City Input**: Users can now input any city manually if not found in database - shows "Use [city name]" button when search returns no results
+- **Gender Field Label Fix**: Corrected gender field label from "Личная информация" to "Пол" in registration form
 - **YooKassa Idempotency System v5 - UUID with State Management**: Complete redesign of idempotency key generation for YooKassa payments:
   - **UUID v4 Idempotency Keys**: Replaced SHA-256 hash-based keys with standard `crypto.randomUUID()` generation
   - **Component State Persistence**: Each payment attempt generates UUID once and stores in React component state
