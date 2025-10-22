@@ -198,6 +198,10 @@ export function ImportantDatesList() {
                 <div className="mt-2">
                   {getEventIcon(event.type)}
                 </div>
+                <Badge variant="secondary" className="mt-2 text-xs shrink-0">
+                  <Zap className="w-3 h-3 mr-1" />
+                  2
+                </Badge>
               </div>
 
               {/* Event Details */}
