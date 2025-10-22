@@ -253,6 +253,12 @@ export default function BuyEnergy() {
       console.log('[YooKassa] User ID:', userData.data.id);
       console.log('[YooKassa] Idempotency Key (UUID v4):', idempotencyKey);
       console.log('[YooKassa] Is retry:', !!yookassaIdempotencyKey);
+      console.log('[YooKassa] Request payload:', {
+        kind: 'energy_pack',
+        pack: { energy: pack.amount },
+        customerEmail: email || null,
+        idempotencyKey
+      });
       
       // Make request with automatic retry for race conditions
       let response = await apiRequest('POST', '/api/payments/yookassa/create', {
@@ -261,6 +267,11 @@ export default function BuyEnergy() {
         customerEmail: email || null,
         idempotencyKey
       });
+      
+      console.log('[YooKassa] Response received:', response);
+      console.log('[YooKassa] Response.ok:', response.ok);
+      console.log('[YooKassa] Response.error:', response.error);
+      console.log('[YooKassa] Response.data:', response.data);
       
       // If server asks to retry (payment being created by another request), wait and retry
       // Backend returns { ok: true, status: 'pending', retryAfter: N } for race conditions
