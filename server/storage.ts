@@ -11,6 +11,7 @@ import {
   natalCharts,
   externalNatals,
   importantDateUnlocks,
+  importantDateInterpretations,
   yookassaPayments,
   referralRewards,
   type User, 
@@ -35,6 +36,8 @@ import {
   type InsertExternalNatal,
   type ImportantDateUnlock,
   type InsertImportantDateUnlock,
+  type ImportantDateInterpretation,
+  type InsertImportantDateInterpretation,
   type YookassaPayment,
   type InsertYookassaPayment,
   type ReferralReward,
@@ -104,6 +107,10 @@ export interface IStorage {
   getImportantDateUnlocksByUserId(userId: string): Promise<ImportantDateUnlock[]>;
   createImportantDateUnlock(unlock: InsertImportantDateUnlock): Promise<ImportantDateUnlock>;
   updateImportantDateUnlock(id: string, data: Partial<ImportantDateUnlock>): Promise<ImportantDateUnlock | undefined>;
+  
+  // Important Date Interpretation cache operations
+  getImportantDateInterpretation(userId: string, eventType: string, date: string, sign: string, locale: string): Promise<ImportantDateInterpretation | undefined>;
+  saveImportantDateInterpretation(userId: string, eventType: string, date: string, sign: string, locale: string, interpretation: string): Promise<ImportantDateInterpretation>;
   
   // YooKassa payment operations
   createYookassaPayment(payment: InsertYookassaPayment): Promise<YookassaPayment>;
@@ -456,6 +463,67 @@ export class DatabaseStorage implements IStorage {
       .where(eq(importantDateUnlocks.id, id))
       .returning();
     return unlock || undefined;
+  }
+
+  // Important Date Interpretation cache operations
+  async getImportantDateInterpretation(
+    userId: string,
+    eventType: string,
+    date: string,
+    sign: string,
+    locale: string
+  ): Promise<ImportantDateInterpretation | undefined> {
+    const [interpretation] = await db
+      .select()
+      .from(importantDateInterpretations)
+      .where(
+        and(
+          eq(importantDateInterpretations.userId, userId),
+          eq(importantDateInterpretations.eventType, eventType),
+          eq(importantDateInterpretations.date, date),
+          eq(importantDateInterpretations.sign, sign),
+          eq(importantDateInterpretations.locale, locale)
+        )
+      );
+    
+    // Check if interpretation is still valid (within 7 days TTL)
+    if (interpretation) {
+      const now = new Date();
+      const createdAt = new Date(interpretation.createdAt);
+      const daysDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysDiff > 7) {
+        // Cache expired, delete it
+        await db
+          .delete(importantDateInterpretations)
+          .where(eq(importantDateInterpretations.id, interpretation.id));
+        return undefined;
+      }
+    }
+    
+    return interpretation || undefined;
+  }
+
+  async saveImportantDateInterpretation(
+    userId: string,
+    eventType: string,
+    date: string,
+    sign: string,
+    locale: string,
+    interpretation: string
+  ): Promise<ImportantDateInterpretation> {
+    const [saved] = await db
+      .insert(importantDateInterpretations)
+      .values({
+        userId,
+        eventType,
+        date,
+        sign,
+        locale,
+        interpretation,
+      })
+      .returning();
+    return saved;
   }
 
   // YooKassa payment operations
