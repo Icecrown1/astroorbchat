@@ -9,7 +9,7 @@ import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBon
 import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
-import { getAstrologyInterpretation, getPlanetInterpretation, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type ImportantDateInterpretationInput } from "./lib/openai";
+import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
 import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets } from "./lib/transits";
@@ -1032,6 +1032,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('Planet interpretation error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Роут для интерпретации влияния дома на планету (ПЛАТНАЯ - 2 орба)
+  app.post("/api/astrology/house-influence", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { planet, locale = 'ru', chartType = 'own', chartId } = req.body;
+      
+      // Валидация планеты
+      const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'North Node', 'South Node'];
+      if (!planet || !validPlanets.includes(planet)) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: 'Invalid planet. Must be one of: ' + validPlanets.join(', ') 
+        });
+      }
+      
+      // Списываем энергию СРАЗУ
+      const deductResult = await deductEnergy(storage, userId, "house_influence");
+      if (!deductResult.ok) {
+        return res.status(400).json({ ok: false, error: deductResult.error });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      let savedChart: NatalChartResult;
+      let chartOwner = user;
+
+      // Получаем данные карты в зависимости от типа
+      if (chartType === 'guest' && chartId) {
+        // Загружаем гостевую карту
+        const guestChart = await storage.getExternalNatal(chartId);
+        
+        if (!guestChart) {
+          return res.status(404).json({ ok: false, error: "Guest chart not found" });
+        }
+        
+        // Проверяем владельца
+        if (guestChart.ownerId !== userId) {
+          return res.status(403).json({ ok: false, error: "Access denied" });
+        }
+        
+        if (!guestChart.data || typeof guestChart.data !== 'object' || !('planets' in guestChart.data)) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: 'Guest chart data is invalid' 
+          });
+        }
+        
+        savedChart = guestChart.data as NatalChartResult;
+        chartOwner = {
+          ...user,
+          name: guestChart.name,
+          gender: guestChart.gender,
+          birthdayDate: guestChart.birthdayDate
+        } as any;
+      } else {
+        // Получаем сохраненную натальную карту пользователя
+        const ownChart = await storage.getNatalChart(userId);
+        
+        if (!ownChart || !ownChart.data || typeof ownChart.data !== 'object' || !('planets' in ownChart.data)) {
+          return res.status(400).json({ 
+            ok: false, 
+            error: 'Natal chart not found. Please generate your natal chart first.' 
+          });
+        }
+        
+        savedChart = ownChart.data as NatalChartResult;
+      }
+
+      const planetData = savedChart.planets[planet];
+      
+      if (!planetData) {
+        return res.status(404).json({ 
+          ok: false, 
+          error: locale === 'ru' 
+            ? `${planet} не найден в вашей натальной карте. Попробуйте перегенерировать карту.`
+            : `${planet} not found in your natal chart. Try regenerating your chart.`
+        });
+      }
+
+      // Определяем дом, в котором находится планета
+      const findHouse = (longitude: number): number => {
+        if (!savedChart.houses || !Array.isArray(savedChart.houses.cusps)) return 1;
+        
+        const cusps = savedChart.houses.cusps;
+        
+        for (let i = 0; i < 12; i++) {
+          const houseStart = cusps[i];
+          const nextHouseStart = cusps[(i + 1) % 12];
+          
+          if (houseStart > nextHouseStart) {
+            if (longitude >= houseStart || longitude < nextHouseStart) {
+              return i + 1;
+            }
+          } else {
+            if (longitude >= houseStart && longitude < nextHouseStart) {
+              return i + 1;
+            }
+          }
+        }
+        return 1;
+      };
+
+      const house = findHouse(planetData.longitude);
+
+      // Формируем данные для интерпретации влияния дома
+      const houseInfluenceData: HouseInfluenceData = {
+        planet: {
+          name: planet,
+          sign: planetData.sign,
+          house
+        },
+        profile: {
+          name: chartOwner.name,
+          age: chartOwner.birthdayDate ? new Date().getFullYear() - new Date(chartOwner.birthdayDate).getFullYear() : undefined,
+          gender: chartOwner.gender || undefined
+        }
+      };
+
+      // Получаем интерпретацию влияния дома от AI
+      const interpretation = await getHouseInfluence(houseInfluenceData, locale);
+
+      res.json({
+        ok: true,
+        data: interpretation
+      });
+    } catch (error: any) {
+      console.error('House influence interpretation error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

@@ -15,6 +15,7 @@ export const ENERGY_COSTS = {
   compatibility_professional: 4,  // Профессиональная синастрия
   weekly_plan: 1,  // План на неделю
   monthly_plan: 1,  // План на месяц
+  house_influence: 2,  // Влияние дома на планету
 } as const;
 
 export const SUBSCRIPTION_DAILY_ENERGY = {

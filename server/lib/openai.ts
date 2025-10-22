@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
+import { translatePlanet, translateSign } from './astroTranslations';
 
 // Using custom OpenAI API key provided by user
 // the newest OpenAI model is "gpt-4o" which is the latest available model
@@ -180,9 +181,13 @@ export async function getPlanetInterpretation(
   const profileAge = data.profile.age ? `, ${data.profile.age} лет` : '';
   const profileGender = data.profile.gender ? `, ${data.profile.gender}` : '';
 
+  // Локализуем названия планет и знаков перед отправкой в GPT
+  const localizedPlanetName = translatePlanet(data.planet.name, locale);
+  const localizedSign = translateSign(data.planet.sign, locale);
+
   const promptText = loadPrompt('planet', {
-    planet_name: data.planet.name,
-    planet_sign: data.planet.sign,
+    planet_name: localizedPlanetName,
+    planet_sign: localizedSign,
     planet_house: String(data.planet.house),
     planet_aspects: aspectsText,
     profile_name: data.profile.name,
@@ -219,8 +224,15 @@ export async function getPlanetInterpretation(
 
   try {
     const result = JSON.parse(content);
+    // Локализуем фоллбэк заголовок
+    const localizedPlanetName = translatePlanet(data.planet.name, locale);
+    const localizedSign = translateSign(data.planet.sign, locale);
+    const fallbackTitle = locale === 'ru' 
+      ? `${localizedPlanetName} в ${localizedSign}`
+      : `${localizedPlanetName} in ${localizedSign}`;
+    
     return {
-      title: result.title || `${data.planet.name} в ${data.planet.sign}`,
+      title: result.title || fallbackTitle,
       summary: result.summary || '',
       strengths: Array.isArray(result.strengths) ? result.strengths : [],
       risks: Array.isArray(result.risks) ? result.risks : [],
@@ -229,6 +241,105 @@ export async function getPlanetInterpretation(
     };
   } catch (e) {
     throw new Error('Failed to parse planet interpretation response');
+  }
+}
+
+export interface HouseInfluenceData {
+  planet: {
+    name: string;
+    sign: string;
+    house: number;
+  };
+  profile: {
+    name: string;
+    age?: number;
+    gender?: string;
+  };
+}
+
+export interface HouseInfluenceResult {
+  title: string;
+  life_sphere: string;
+  manifestation: string;
+  key_themes: string[];
+  opportunities: string[];
+  challenges: string[];
+  practical_work: string[];
+}
+
+export async function getHouseInfluence(
+  data: HouseInfluenceData,
+  locale: string = 'ru'
+): Promise<HouseInfluenceResult> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const toneInstruction = personalizeTone(data.profile.gender || 'other');
+
+  // Локализуем названия планет и знаков перед отправкой в GPT
+  const localizedPlanetName = translatePlanet(data.planet.name, locale);
+  const localizedSign = translateSign(data.planet.sign, locale);
+
+  const shortTheme = locale === 'ru' ? 'сфера проявления' : 'area of manifestation';
+
+  const profileAge = data.profile.age ? `, ${data.profile.age} ${locale === 'ru' ? 'лет' : 'years old'}` : '';
+  const profileGender = data.profile.gender ? `, ${data.profile.gender}` : '';
+
+  const promptText = loadPrompt('house_influence', {
+    planet_name: localizedPlanetName,
+    planet_sign: localizedSign,
+    planet_house: String(data.planet.house),
+    short_theme: shortTheme,
+    profile_name: data.profile.name,
+    profile_age: profileAge,
+    profile_gender: profileGender
+  });
+
+  const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты опытный астролог-практик, специализирующийся на домах. Объясняешь влияние домов конкретно и без воды. Возвращаешь только валидный JSON."
+    : "You are a practical astrologer specializing in houses. You explain house influences concretely without fluff. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: systemMessage
+      },
+      {
+        role: "user",
+        content: finalPrompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 2500
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate house influence interpretation');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    const fallbackTitle = locale === 'ru'
+      ? `${localizedPlanetName} в ${data.planet.house}-м доме`
+      : `${localizedPlanetName} in House ${data.planet.house}`;
+
+    return {
+      title: result.title || fallbackTitle,
+      life_sphere: result.life_sphere || '',
+      manifestation: result.manifestation || '',
+      key_themes: Array.isArray(result.key_themes) ? result.key_themes : [],
+      opportunities: Array.isArray(result.opportunities) ? result.opportunities : [],
+      challenges: Array.isArray(result.challenges) ? result.challenges : [],
+      practical_work: Array.isArray(result.practical_work) ? result.practical_work : []
+    };
+  } catch (e) {
+    throw new Error('Failed to parse house influence response');
   }
 }
 
