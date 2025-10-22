@@ -567,6 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/natal/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
+      const locale = (req.query.locale as string) || 'ru';
       
       // Auto-recalculate if profile changed
       await recomputeIfProfileChanged(userId);
@@ -577,7 +578,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
       
-      res.json({ ok: true, data: chart });
+      // Ensure professional interpretation is generated for current locale
+      await ensureNatalInterpretation(userId, locale);
+      
+      // Refetch chart with updated interpretation
+      const updatedChart = await storage.getNatalChart(userId);
+      
+      res.json({ ok: true, data: updatedChart });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
