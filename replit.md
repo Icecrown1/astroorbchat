@@ -87,3 +87,12 @@ Preferred communication style: Simple, everyday language.
   - **UI Implementation**: AlertDialog confirmation with localized warnings in both English and Russian
   - **Flow**: After reset → clears auth → redirects to `/register` for fresh profile setup
   - **Use Case**: Allows users to restart registration process without losing purchased energy or subscriptions
+- **Dev Mode Auth Fix - Persistent User ID**: Fixed `/api/auth/test` to use consistent `telegramId` from request instead of generating new one each time:
+  - **Problem**: Each dev login created new user with timestamp-based ID, preventing profile updates
+  - **Solution**: Uses `telegramId` from request body (default '999999999') to find/create user
+  - **Benefit**: Dev user persists across sessions, allowing profile reset and re-registration testing
+- **Registration Update Logic - Existing Users**: Fixed `/api/auth/telegram` to update profile data for existing users after reset:
+  - **Problem**: Existing users with empty `birthPlace` (after reset) weren't updated during re-registration
+  - **Solution**: Added logic to update user data if `birthPlace` is null and full profile data provided
+  - **Flow**: Reset → `birthPlace = null` → Re-register → Profile data updates correctly
+  - **Impact**: Users can now successfully update birth data after profile reset

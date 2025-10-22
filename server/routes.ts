@@ -82,10 +82,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let user = await storage.getUserByTgId(tgUser.id.toString());
+      const hasFullProfile = birthdayDate && birthPlace;
 
       if (!user) {
+        // Create new user
         const referralCode = generateReferralCode();
-        const hasFullProfile = birthdayDate && birthPlace;
         
         if (hasFullProfile) {
           // Full registration - user provided all data
@@ -133,6 +134,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Refetch user with energy fields
         user = await storage.getUser(user.id) || user;
+      } else if (hasFullProfile && (!user.birthPlace || user.birthPlace === null)) {
+        // User exists but is completing registration (after reset or minimal signup)
+        const birthday = new Date(birthdayDate);
+        const age = Math.floor((Date.now() - birthday.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+        
+        await storage.updateUser(user.id, {
+          name: name || user.name,
+          gender: gender || user.gender,
+          age: Math.max(1, age),
+          birthdayDate: birthday,
+          birthTime: birthTime || null,
+          birthPlace: birthPlace,
+          timezone: timezone || user.timezone,
+        });
+        
+        // Refetch updated user
+        user = await storage.getUser(user.id) || user;
       }
 
       const token = generateToken(user.id);
@@ -167,28 +185,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Request body:', req.body);
     
     try {
-
-      const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone, referralCode: inputReferralCode } = req.body;
-      const testUsername = `test_user_${Date.now()}`;
-      const testTgId = `test_${Date.now()}`;
+      const { telegramId, firstName, lastName, username, name, gender, age, birthdayDate, birthTime, birthPlace, timezone, referralCode: inputReferralCode } = req.body;
+      
+      // Use provided telegramId or default to '999999999' for dev mode
+      const testTgId = telegramId || '999999999';
+      const testUsername = username || `devuser`;
 
       let user = await storage.getUserByTgId(testTgId);
 
       if (!user) {
+        // Create new user only if doesn't exist
         const referralCode = generateReferralCode();
+        const displayName = firstName || name || "Dev User";
+        
         const newUser = {
           tgId: testTgId,
           username: testUsername,
-          name: name || "Test User",
+          name: displayName,
           gender: gender || "other",
           age: age || 25,
           birthdayDate: new Date(birthdayDate || new Date()),
           birthTime: birthTime || null,
           birthPlace: birthPlace || null,
-          timezone: timezone || "America/New_York",
+          timezone: timezone || "Europe/Moscow",
           referralCode,
           freeEnergy: 10,
-          energyResetAt: getNextResetTime(timezone || "America/New_York"),
+          energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
         };
 
         user = await storage.createUser(newUser);
@@ -199,8 +221,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const token = generateToken(user.id);
+      
+      // Check if natal chart exists
+      const natalChart = await storage.getNatalChart(user.id);
 
-      res.json({ ok: true, data: { user, token } });
+      res.json({ ok: true, data: { user: { ...user, natalInitialized: !!natalChart }, token } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
