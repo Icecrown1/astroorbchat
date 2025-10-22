@@ -127,13 +127,12 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
     console.log('[YooKassa] Payment data with receipt:', JSON.stringify(paymentData, null, 2));
 
     // Add idempotency key if provided to prevent duplicate payments
-    const requestOptions = params.idempotencyKey 
-      ? { idempotenceKey: params.idempotencyKey }
-      : undefined;
+    // Pass as string directly (not as object) - SDK expects string value
+    const idempotencyKey = params.idempotencyKey || undefined;
 
     console.log('[YooKassa] Creating payment with idempotency key:', params.idempotencyKey?.substring(0, 8) + '...');
 
-    const payment = await yooKassa.createPayment(paymentData, requestOptions);
+    const payment = await yooKassa.createPayment(paymentData, idempotencyKey);
 
     console.log('[YooKassa] Payment created:', {
       id: payment.id,
