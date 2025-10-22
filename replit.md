@@ -108,3 +108,12 @@ Preferred communication style: Simple, everyday language.
   - **Payment Method Badges**: Each transaction shows "TON" or "Bank Card" badge with proper styling
   - **Translations**: Added `paymentMethod` and `bankCard` strings to both English and Russian locales
   - **Bug Fix**: Corrected typo in routes.ts (`amountRub` → `amountRUB`) for YooKassa payment data transformation
+- **Payment Status Handling Fix (October 22, 2025)**: Separated abandoned payments from legitimate processing:
+  - **Problem**: Users who clicked "Exit payment" on YooKassa were stuck on PaymentSuccess page with no redirect, AND legitimate in-flight payments would be incorrectly redirected away
+  - **Backend Solution**: Distinguished YooKassa statuses - `waiting_for_capture` → return 'processing', `pending` → return 'abandoned'
+  - **Frontend Implementation**: 
+    - `processing` status: Shows "Payment is being processed by bank" + "Check Again" button, NO auto-redirect (preserves polling)
+    - `abandoned` status: Shows "Payment was not completed" + auto-redirect to /buy-energy after 5 seconds
+    - `failed` status: Auto-redirect to /buy-energy after 5 seconds
+    - `success` status: Auto-redirect to /dashboard after 2 seconds
+  - **User Experience**: Abandoned payments redirect automatically, real processing payments allow user to poll status manually
