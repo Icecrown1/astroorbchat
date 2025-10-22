@@ -85,9 +85,26 @@ export function CityAutocomplete({
               </div>
             )}
             {!isLoading && searchQuery.length >= 2 && cities.length === 0 && (
-              <CommandEmpty>
-                {locale === 'ru' ? 'Город не найден' : 'No city found'}
-              </CommandEmpty>
+              <div className="py-2 px-2">
+                <CommandEmpty>
+                  <div className="text-center py-2 text-sm text-muted-foreground">
+                    {locale === 'ru' ? 'Город не найден в базе' : 'City not found in database'}
+                  </div>
+                </CommandEmpty>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => {
+                    onChange(searchQuery);
+                    setOpen(false);
+                    setSearchQuery("");
+                  }}
+                  data-testid="button-use-manual-city"
+                >
+                  {locale === 'ru' ? `Использовать "${searchQuery}"` : `Use "${searchQuery}"`}
+                </Button>
+              </div>
             )}
             {!isLoading && cities.length > 0 && (
               <CommandGroup>
