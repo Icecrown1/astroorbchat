@@ -66,7 +66,10 @@ export default function Settings() {
         .max(150, locale === 'ru' ? 'Возраст должен быть не более 150 лет' : 'Age must be at most 150')
     ),
     birthdayDate: z.string().min(1, locale === 'ru' ? 'Дата рождения обязательна' : 'Birth date is required'),
-    birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
+    birthTime: z.string()
+      .refine((val) => val === '' || /^\d{2}:\d{2}$/.test(val), {
+        message: locale === 'ru' ? 'Формат: ЧЧ:ММ (например, 14:30)' : 'Format: HH:MM (e.g., 14:30)'
+      }),
     birthPlace: z.string().optional(),
     timezone: z.string(),
   }), [locale]);

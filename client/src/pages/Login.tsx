@@ -63,9 +63,19 @@ export default function Login() {
       
       if (response?.ok && response?.data) {
         const { user: userData, token } = response.data;
-        console.log('[Mini App Auth] Login successful, redirecting to dashboard');
+        console.log('[Mini App Auth] Login successful');
         setAuth(userData, token);
-        setLocation("/dashboard");
+        
+        // Check if user needs to complete registration
+        // Profile is complete if birthPlace is set (not null from minimal registration)
+        const profileComplete = userData.birthPlace !== null && userData.birthPlace !== '';
+        if (!profileComplete) {
+          console.log('[Mini App Auth] User needs to complete registration');
+          setLocation("/register");
+        } else {
+          console.log('[Mini App Auth] Redirecting to dashboard');
+          setLocation("/dashboard");
+        }
       } else {
         console.error('[Mini App Auth] Login failed:', response);
         // Fallback to widget on failure
@@ -93,7 +103,15 @@ export default function Login() {
       if (response?.ok && response?.data) {
         const { user: userData, token } = response.data;
         setAuth(userData, token);
-        setLocation("/dashboard");
+        
+        // Check if user needs to complete registration
+        // Profile is complete if birthPlace is set (not null from minimal registration)
+        const profileComplete = userData.birthPlace !== null && userData.birthPlace !== '';
+        if (!profileComplete) {
+          setLocation("/register");
+        } else {
+          setLocation("/dashboard");
+        }
       }
     } catch (error: any) {
       console.error("Dev login error:", error);
@@ -128,12 +146,20 @@ export default function Login() {
         if (response?.ok && response?.data) {
           const { user: userData, token } = response.data;
           
-          console.log('[Telegram Widget] Login successful, redirecting to dashboard');
+          console.log('[Telegram Widget] Login successful');
           // Save auth data to store (will persist to localStorage)
           setAuth(userData, token);
           
-          // Redirect to dashboard
-          setLocation("/dashboard");
+          // Check if user needs to complete registration
+          // Profile is complete if birthPlace is set (not null from minimal registration)
+          const profileComplete = userData.birthPlace !== null && userData.birthPlace !== '';
+          if (!profileComplete) {
+            console.log('[Telegram Widget] User needs to complete registration');
+            setLocation("/register");
+          } else {
+            console.log('[Telegram Widget] Redirecting to dashboard');
+            setLocation("/dashboard");
+          }
         } else {
           console.error('[Telegram Widget] Login failed:', response);
           alert(`Login error: ${response?.error || "Unknown error"}\n\nDetails: ${JSON.stringify(response?.details || {})}`);

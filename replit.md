@@ -60,6 +60,16 @@ Preferred communication style: Simple, everyday language.
   - **Duplicate Detection**: If existing payment found, delete new duplicate record and return original confirmation URL
   - **Fallback Error Handling**: Comprehensive error logging (code, constraint, message, detail) with full string search for duplicate detection
   - **Database Schema**: `idempotencyKey` field (varchar 255, unique constraint, indexed) in yookassaPayments table
+- **Login Flow Fix - Profile Completion Check**: Fixed redirect loop after registration by changing check from `natalInitialized` to `birthPlace !== null`:
+  - **Minimal Profile Creation**: First login creates minimal profile with `birthPlace = null` → redirects to `/register`
+  - **Complete Profile Check**: All three auth paths (Mini App, Dev, Widget) check `birthPlace !== null && birthPlace !== ''`
+  - **No Redirect Loop**: After registration with real `birthPlace`, users access `/dashboard` directly
+  - **Dashboard Coachmark**: Dashboard shows "Create Chart" coachmark if `!natalInitialized`
+  - **Backend Response**: `/api/auth/telegram` now includes `natalInitialized: !!natalChart` in response
+- **Settings Validation Fix - Optional Birth Time**: Fixed birthTime validation to accept empty values:
+  - **Refine Pattern**: Changed from `.regex().optional().or(z.literal(''))` to `.refine()` with conditional logic
+  - **User-Friendly Error**: Shows "Format: HH:MM (e.g., 14:30)" only when value is non-empty and invalid
+  - **No False Errors**: Empty birthTime field passes validation without issues
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.

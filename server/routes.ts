@@ -84,23 +84,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let user = await storage.getUserByTgId(tgUser.id.toString());
 
       if (!user) {
-        // Calculate age from birthday date
-        const birthday = new Date(birthdayDate || new Date());
-        const age = Math.floor((Date.now() - birthday.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-        
         const referralCode = generateReferralCode();
-        user = await storage.createUser({
-          tgId: tgUser.id.toString(),
-          username: tgUser.username || null,
-          name: name || tgUser.first_name || "User",
-          gender: gender || "other",
-          age: Math.max(1, age),
-          birthdayDate: birthday,
-          birthTime: birthTime || null,
-          birthPlace: birthPlace || null,
-          timezone: timezone || "Europe/Moscow",
-          referralCode,
-        });
+        const hasFullProfile = birthdayDate && birthPlace;
+        
+        if (hasFullProfile) {
+          // Full registration - user provided all data
+          const birthday = new Date(birthdayDate);
+          const age = Math.floor((Date.now() - birthday.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+          
+          user = await storage.createUser({
+            tgId: tgUser.id.toString(),
+            username: tgUser.username || null,
+            name: name || tgUser.first_name || "User",
+            gender: gender || "other",
+            age: Math.max(1, age),
+            birthdayDate: birthday,
+            birthTime: birthTime || null,
+            birthPlace: birthPlace || null,
+            timezone: timezone || "Europe/Moscow",
+            referralCode,
+          });
+        } else {
+          // Minimal registration - just create user profile
+          // User will complete registration later
+          user = await storage.createUser({
+            tgId: tgUser.id.toString(),
+            username: tgUser.username || null,
+            name: name || tgUser.first_name || "User",
+            gender: "other",
+            age: 25, // Default age
+            birthdayDate: new Date(), // Placeholder
+            birthTime: null,
+            birthPlace: null,
+            timezone: "Europe/Moscow",
+            referralCode,
+          });
+        }
 
         // Set initial energy and reset time
         await storage.updateUser(user.id, {
@@ -117,8 +136,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const token = generateToken(user.id);
+      
+      // Check if natal chart exists
+      const natalChart = await storage.getNatalChart(user.id);
 
-      res.json({ ok: true, data: { user, token } });
+      res.json({ ok: true, data: { user: { ...user, natalInitialized: !!natalChart }, token } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
