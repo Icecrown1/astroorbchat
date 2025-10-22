@@ -30,7 +30,22 @@ interface StoredNatalChart extends NatalChartResult {
   interpretation?: string;
 }
 
+// Server start time for build date tracking
+const SERVER_START_TIME = new Date().toISOString();
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Version endpoint (public - no auth required)
+  app.get("/api/version", (req, res) => {
+    res.json({
+      ok: true,
+      data: {
+        version: "1.0.0",
+        gitCommit: "e2b66b8",
+        buildDate: SERVER_START_TIME,
+      }
+    });
+  });
+
   app.post("/api/auth/telegram", async (req, res) => {
     try {
       const { initData, name, gender, birthdayDate, birthTime, birthPlace, timezone } = req.body;
