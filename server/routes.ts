@@ -569,6 +569,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const locale = (req.query.locale as string) || 'ru';
       
+      console.log(`[GET /api/natal/me] User: ${userId}, Locale: ${locale}`);
+      
       // Auto-recalculate if profile changed
       await recomputeIfProfileChanged(userId);
       
@@ -578,14 +580,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
       
+      console.log(`[GET /api/natal/me] Chart found, professionalInterpretation exists: ${!!chart.professionalInterpretation}`);
+      if (chart.professionalInterpretation) {
+        console.log(`[GET /api/natal/me] Available locales: ${Object.keys(chart.professionalInterpretation as any)}`);
+      }
+      
       // Ensure professional interpretation is generated for current locale
       await ensureNatalInterpretation(userId, locale);
       
       // Refetch chart with updated interpretation
       const updatedChart = await storage.getNatalChart(userId);
       
+      console.log(`[GET /api/natal/me] After ensureNatalInterpretation, professionalInterpretation exists: ${!!updatedChart?.professionalInterpretation}`);
+      if (updatedChart?.professionalInterpretation) {
+        console.log(`[GET /api/natal/me] Available locales after: ${Object.keys(updatedChart.professionalInterpretation as any)}`);
+      }
+      
       res.json({ ok: true, data: updatedChart });
     } catch (error: any) {
+      console.error('[GET /api/natal/me] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
