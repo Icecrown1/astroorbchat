@@ -2175,6 +2175,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Missing required event data" });
       }
       
+      // Check cache first (with 7-day TTL)
+      const cachedInterpretation = await storage.getImportantDateInterpretation(
+        userId,
+        eventType,
+        date,
+        sign,
+        locale
+      );
+      
+      if (cachedInterpretation) {
+        console.log('[Important Date Interpretation] Found in cache, returning free');
+        return res.json({ 
+          ok: true, 
+          data: { 
+            interpretation: cachedInterpretation.interpretation,
+            cost: 0,
+            cached: true
+          } 
+        });
+      }
+      
+      // Not in cache, need to generate new interpretation
+      console.log('[Important Date Interpretation] Not in cache, generating new');
+      
       // Get user data
       const user = await storage.getUser(userId);
       if (!user) {
@@ -2195,7 +2219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "Could not determine Sun sign from natal chart" });
       }
       
-      // Check energy cost (2 orbs for interpretation)
+      // Check energy cost (2 orbs for new interpretation)
       await checkAndResetEnergy(storage, userId);
       const userAfterReset = await storage.getUser(userId);
       if (!userAfterReset) {
@@ -2225,10 +2249,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         locale
       );
       
-      // Deduct energy (using solar as placeholder - important dates don't have dedicated enum yet)
+      // Deduct energy ONLY after successful generation
       await deductEnergy(storage, userId, 'solar');
       
-      res.json({ ok: true, data: { interpretation } });
+      // Save to cache for 7 days
+      await storage.saveImportantDateInterpretation(
+        userId,
+        eventType,
+        date,
+        sign,
+        locale,
+        interpretation
+      );
+      
+      console.log('[Important Date Interpretation] Generated and cached new interpretation');
+      
+      res.json({ 
+        ok: true, 
+        data: { 
+          interpretation,
+          cost: 2,
+          cached: false
+        } 
+      });
     } catch (error: any) {
       console.error('[Important Date Interpretation] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
