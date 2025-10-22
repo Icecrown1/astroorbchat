@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Loader } from '@/components/Loader';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 export default function PaymentSuccess() {
   const [, navigate] = useLocation();
@@ -13,10 +13,12 @@ export default function PaymentSuccess() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const paymentId = params.get('paymentId');
+  const paymentType = params.get('type') || 'yookassa'; // 'ton' or 'yookassa'
   
   const [status, setStatus] = useState<'checking' | 'success' | 'processing' | 'abandoned' | 'failed'>('checking');
   const [message, setMessage] = useState('');
   const [energyAmount, setEnergyAmount] = useState(0);
+  const [pollingAttempt, setPollingAttempt] = useState(0);
 
   useEffect(() => {
     if (!paymentId) {
@@ -25,7 +27,11 @@ export default function PaymentSuccess() {
       return;
     }
 
-    checkPaymentStatus();
+    if (paymentType === 'ton') {
+      startTonPolling();
+    } else {
+      checkYooKassaPayment();
+    }
   }, [paymentId]);
 
   // Auto-redirect after payment check
@@ -46,7 +52,7 @@ export default function PaymentSuccess() {
     // Note: 'processing' status does NOT redirect - user can check again
   }, [status, navigate]);
 
-  const checkPaymentStatus = async () => {
+  const checkYooKassaPayment = async () => {
     try {
       const response = await apiRequest('POST', '/api/payments/yookassa/check-status', {
         paymentId,
@@ -90,6 +96,85 @@ export default function PaymentSuccess() {
       setStatus('failed');
       setMessage(locale === 'ru' ? 'Ошибка проверки платежа' : 'Failed to check payment');
     }
+  };
+
+  const checkTonPayment = async () => {
+    try {
+      console.log(`[TON] Checking blockchain for payment ${paymentId}...`);
+      
+      const response = await apiRequest('POST', '/api/payments/ton/confirm', {
+        paymentId,
+      });
+
+      if (response.ok && response.data) {
+        const { status: paymentStatus, energyAmount: amount } = response.data;
+        
+        if (paymentStatus === 'succeeded') {
+          console.log('[TON] ✅ Transaction found and confirmed!');
+          queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+          setStatus('success');
+          setEnergyAmount(amount || 0);
+          setMessage(locale === 'ru' 
+            ? `Транзакция найдена! Начислено ${amount} орбов энергии.`
+            : `Transaction found! Credited ${amount} energy orbs.`
+          );
+          return true;
+        } else if (paymentStatus === 'processing') {
+          console.log('[TON] Transaction still processing...');
+          return false; // Continue polling
+        } else {
+          console.log('[TON] Transaction failed or unknown status:', paymentStatus);
+          return false;
+        }
+      }
+
+      console.log('[TON] Invalid response from server');
+      return false;
+    } catch (error: any) {
+      console.error('[TON] Check error:', error);
+      return false;
+    }
+  };
+
+  const startTonPolling = async () => {
+    setStatus('processing');
+    setMessage(locale === 'ru' 
+      ? 'Ищем вашу транзакцию на блокчейне. Это может занять до минуты...'
+      : 'Searching for your transaction on blockchain. This may take up to a minute...'
+    );
+
+    const maxRetries = 15; // 15 attempts = 45 seconds of searching
+    const retryDelay = 3000; // 3 seconds between attempts
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      setPollingAttempt(attempt);
+      console.log(`[TON] Polling attempt ${attempt}/${maxRetries}...`);
+
+      const found = await checkTonPayment();
+      if (found) {
+        return;
+      }
+
+      // Update message every 5 attempts
+      if (attempt === 5 || attempt === 10) {
+        setMessage(locale === 'ru'
+          ? `Проверка ${attempt}/${maxRetries}. Транзакции на блокчейне могут занять время...`
+          : `Check ${attempt}/${maxRetries}. Blockchain transactions can take time...`
+        );
+      }
+
+      // If not last attempt, wait before retry
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+
+    // All retries failed
+    setStatus('failed');
+    setMessage(locale === 'ru' 
+      ? 'Транзакция не найдена на блокчейне. Проверьте баланс через несколько минут или нажмите "Проверить снова".'
+      : 'Transaction not found on blockchain. Check your balance in a few minutes or click "Check Again".'
+    );
   };
 
   const getIcon = () => {
@@ -144,6 +229,12 @@ export default function PaymentSuccess() {
               </p>
             )}
 
+            {status === 'processing' && paymentType === 'ton' && pollingAttempt > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {locale === 'ru' ? 'Попытка' : 'Attempt'} {pollingAttempt}/15
+              </p>
+            )}
+
             {status === 'success' && energyAmount > 0 && (
               <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
                 <p className="text-sm text-muted-foreground">
@@ -156,10 +247,10 @@ export default function PaymentSuccess() {
             )}
 
             <div className="flex gap-3 w-full pt-4">
-              {status === 'processing' && (
+              {(status === 'processing' || status === 'failed') && (
                 <Button
                   variant="outline"
-                  onClick={checkPaymentStatus}
+                  onClick={() => paymentType === 'ton' ? startTonPolling() : checkYooKassaPayment()}
                   className="flex-1"
                   data-testid="button-retry-check"
                 >

@@ -2373,7 +2373,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment.status === "completed") {
         // Already processed (idempotency)
         console.log('[TON_CONFIRM] Payment already completed:', validated.paymentId);
-        return res.json({ ok: true, message: "Already processed" });
+        return res.json({ 
+          ok: true, 
+          data: {
+            status: 'succeeded',
+            energyAmount: payment.energyAmount || 0
+          }
+        });
       }
 
       // Get wallet address from env
@@ -2416,10 +2422,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!matchedTx) {
-        console.error('[TON_CONFIRM] No matching unused transaction found on blockchain');
-        return res.status(400).json({ 
-          ok: false, 
-          error: "Transaction not found on blockchain. Please wait a few seconds and try again." 
+        console.log('[TON_CONFIRM] Transaction not found yet - still processing');
+        return res.json({ 
+          ok: true,
+          data: {
+            status: 'processing',
+            energyAmount: 0
+          }
         });
       }
 
@@ -2448,8 +2457,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         ok: true, 
-        message: "Payment confirmed",
-        txHash: matchedTx.hash 
+        data: {
+          status: 'succeeded',
+          energyAmount: payment.energyAmount || 0,
+          txHash: matchedTx.hash
+        }
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {

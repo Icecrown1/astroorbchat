@@ -109,71 +109,13 @@ export default function BuyEnergy() {
         toast({
           title: locale === 'ru' ? 'Подтвердите транзакцию' : 'Confirm transaction',
           description: locale === 'ru' 
-            ? 'Подпишите транзакцию в кошельке, затем подождите проверки'
-            : 'Sign the transaction in your wallet, then wait for verification',
+            ? 'Подпишите транзакцию в кошельке'
+            : 'Sign the transaction in your wallet',
         });
 
-        // Wait for user to sign in wallet (realistic time: 10-15 seconds)
-        await new Promise(resolve => setTimeout(resolve, 12000)); // 12 seconds
-
-        // Show that we're starting to check
-        toast({
-          title: locale === 'ru' ? 'Проверяем блокчейн...' : 'Checking blockchain...',
-          description: locale === 'ru' 
-            ? 'Ищем вашу транзакцию, это может занять до минуты'
-            : 'Searching for your transaction, this may take up to a minute',
-        });
-
-        // Start polling blockchain for transaction
-        const maxRetries = 15; // 15 attempts = 45 seconds of searching
-        const retryDelay = 3000; // 3 seconds between attempts
-        let lastError = '';
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          console.log(`[TON] Blockchain check ${attempt}/${maxRetries}...`);
-          
-          const confirmResponse = await apiRequest('POST', '/api/payments/ton/confirm', {
-            paymentId: data.paymentId,
-          });
-
-          if (confirmResponse.ok) {
-            console.log('[TON] ✅ Transaction found and confirmed!');
-            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-            toast({
-              title: t.common.success,
-              description: `${pack.amount} ${t.common.orbs} ${t.common.energy.toLowerCase()}`,
-            });
-            navigate('/dashboard');
-            return;
-          }
-
-          lastError = confirmResponse.error || 'Transaction not found';
-          
-          // If not found on blockchain, wait and retry
-          if (lastError.includes('not found on blockchain') && attempt < maxRetries) {
-            // Show progress to user every 5 attempts
-            if (attempt === 5 || attempt === 10) {
-              toast({
-                title: locale === 'ru' ? 'Все еще ищем...' : 'Still searching...',
-                description: locale === 'ru' 
-                  ? `Проверка ${attempt}/${maxRetries}. Транзакции на блокчейне могут занять время`
-                  : `Check ${attempt}/${maxRetries}. Blockchain transactions can take time`,
-              });
-            }
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          }
-          
-          // Other errors - don't retry
-          break;
-        }
-
-        // All retries failed
-        throw new Error(
-          locale === 'ru' 
-            ? 'Транзакция не найдена на блокчейне. Проверьте баланс через несколько минут или обратитесь в поддержку'
-            : 'Transaction not found on blockchain. Check your balance in a few minutes or contact support'
-        );
+        // Redirect to payment success page where polling will happen
+        // This prevents state loss when wallet redirects back in Mini App
+        navigate(`/payment-success?paymentId=${data.paymentId}&type=ton`);
       } catch (error: any) {
         console.error('[TON] Error:', error);
         toast({
