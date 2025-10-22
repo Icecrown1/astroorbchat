@@ -24,7 +24,14 @@ Preferred communication style: Simple, everyday language.
 - **Energy System Architecture**: Dual-field energy system with `freeEnergy` (daily reset) and `purchasedEnergy` (persists).
 
 ### System Design Choices
-- **Data Caching**: Multi-locale caching for natal charts.
+- **Data Caching**: 
+  - **Natal Chart Interpretations**: AI-generated interpretations cached by locale in `professionalInterpretation` field (October 22, 2025)
+    - Structure: `{ "ru": "...", "en": "..." }` for multi-locale support
+    - First request per locale generates via OpenAI and saves to database
+    - Subsequent requests retrieve from cache instantly (0 OpenAI calls)
+    - Cache automatically invalidated when user profile changes (birth data/time/place)
+    - Significantly improves performance and reduces OpenAI API costs
+  - **Astronomical Calculations**: Natal chart positions (planets, houses, aspects) cached in database
 - **Payment Systems**:
   - **TON Blockchain**: Via TON Connect with server-side verification.
   - **Telegram Stars**: With webhook security and idempotency checks.
