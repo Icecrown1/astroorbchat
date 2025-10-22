@@ -48,7 +48,13 @@ Preferred communication style: Simple, everyday language.
   - **Lunar Phases**: Automatic calculation of new moons and full moons with exact dates and zodiac signs
   - **Planet Transits**: Tracking when planets change zodiac signs with precision timing
   - **Personalized Houses**: Events mapped to user's houses based on Sun sign (Whole Sign Houses system)
-  - **Special Highlighting**: Events in user's Sun sign or Ascendant marked as high importance
+  - **Expanded Importance Criteria**: Events marked as high importance based on multiple factors:
+    - Events in user's Sun sign (personal activation)
+    - Events in user's Ascendant sign (identity/life path)
+    - Events in 1st house from Ascendant (self/personality)
+    - Events in 7th house from Ascendant (relationships/partnerships)
+    - Events in 10th house from Ascendant (career/public status)
+  - **Clickable Events**: Each event opens modal with AI-generated personalized interpretation (costs 2 orbs)
   - **Python Swiss Ephemeris Integration**: `important_dates_api.py` calculates astronomical events with high accuracy
 
 ## External Dependencies
