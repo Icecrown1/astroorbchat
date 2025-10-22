@@ -49,6 +49,7 @@ export async function getImportantDateInterpretation(
     house_for_sun_sign?: number;
   },
   userData: {
+    name?: string;
     sunSign: string;
     ascendantSign?: string;
     gender?: string;
@@ -91,9 +92,11 @@ export async function getImportantDateInterpretation(
     }
   }
   
+  const userName = userData.name || (locale === 'ru' ? 'пользователя' : 'the user');
+  
   const userContext = locale === 'ru'
-    ? `Солнце пользователя в знаке ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Асцендент в ${translateSign(userData.ascendantSign, locale)}` : ''}.`
-    : `User's Sun in ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Ascendant in ${translateSign(userData.ascendantSign, locale)}` : ''}.`;
+    ? `${userData.name ? `Имя: ${userData.name}\n` : ''}Солнце в знаке ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Асцендент в ${translateSign(userData.ascendantSign, locale)}` : ''}.`
+    : `${userData.name ? `Name: ${userData.name}\n` : ''}Sun in ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Ascendant in ${translateSign(userData.ascendantSign, locale)}` : ''}.`;
   
   const promptText = locale === 'ru'
     ? `Событие: ${eventDescription}
@@ -101,14 +104,14 @@ export async function getImportantDateInterpretation(
 
 ${userContext}
 
-Напиши персонализированную астрологическую интерпретацию этого события (${eventTypeText}) для этого человека:
+Напиши персонализированную астрологическую интерпретацию этого события (${eventTypeText})${userData.name ? ` для ${userData.name}` : ' для этого человека'}:
 
-1. Что означает это событие лично для него/неё (с учетом положения его Солнца${userData.ascendantSign ? ' и Асцендента' : ''})
+1. Что означает это событие лично${userData.name ? ` для ${userData.name}` : ' для него/неё'} (с учетом положения Солнца${userData.ascendantSign ? ' и Асцендента' : ''})
 2. Какие сферы жизни будут активированы (основываясь на доме, в который попадает событие)
 3. Практические рекомендации: что делать, на что обратить внимание
 4. Возможности и вызовы этого периода
 
-Пиши конкретно, практично и с теплотой. Избегай общих фраз и абстракций. Дай реальные советы.
+ВАЖНО: НЕ начинай с формального обращения типа "Уважаемый(ая)" или подобных. Начни сразу с содержательной части интерпретации${userData.name ? `, используя имя ${userData.name} естественно по тексту, где это уместно` : ''}. Пиши конкретно, практично и с теплотой. Избегай общих фраз и абстракций. Дай реальные советы.
 
 Объём: 200-300 слов.`
     : `Event: ${eventDescription}
@@ -116,14 +119,14 @@ Date: ${new Date(eventData.date).toLocaleDateString('en-US', { day: 'numeric', m
 
 ${userContext}
 
-Write a personalized astrological interpretation of this event (${eventTypeText}) for this person:
+Write a personalized astrological interpretation of this event (${eventTypeText})${userData.name ? ` for ${userData.name}` : ' for this person'}:
 
-1. What this event means personally for them (considering their Sun${userData.ascendantSign ? ' and Ascendant' : ''} positions)
+1. What this event means personally${userData.name ? ` for ${userData.name}` : ' for them'} (considering their Sun${userData.ascendantSign ? ' and Ascendant' : ''} positions)
 2. Which life areas will be activated (based on the house the event falls in)
 3. Practical recommendations: what to do, what to pay attention to
 4. Opportunities and challenges of this period
 
-Write specifically, practically, and warmly. Avoid general phrases and abstractions. Give real advice.
+IMPORTANT: Do NOT start with formal greetings like "Dear [Name]" or similar. Start directly with the substantive interpretation${userData.name ? `, using the name ${userData.name} naturally in the text where appropriate` : ''}. Write specifically, practically, and warmly. Avoid general phrases and abstractions. Give real advice.
 
 Length: 200-300 words.`;
   

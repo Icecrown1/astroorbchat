@@ -2242,6 +2242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           house_for_sun_sign
         },
         {
+          name: user.name || undefined,
           sunSign,
           ascendantSign,
           gender: user.gender
