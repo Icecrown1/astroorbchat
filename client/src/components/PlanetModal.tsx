@@ -71,26 +71,18 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
   });
 
   // Проверяем статус купленных интерпретаций влияния домов
+  const statusParams = new URLSearchParams();
+  if (chartType) statusParams.append('chartType', chartType);
+  if (chartId) statusParams.append('chartId', chartId);
+  
   const { data: purchasedStatus } = useQuery<Record<string, Record<string, any>>>({
-    queryKey: ['/api/astrology/house-influence-status', chartType, chartId],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (chartType) params.append('chartType', chartType);
-      if (chartId) params.append('chartId', chartId);
-      const response = await fetch(`/api/astrology/house-influence-status?${params}`, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      const result = await response.json();
-      return result.data || {};
-    },
+    queryKey: [`/api/astrology/house-influence-status?${statusParams.toString()}`],
+    enabled: !!planet,
     retry: 1
   });
 
   // Проверяем куплена ли интерпретация для текущей планеты и локали
-  const isPurchased = planet && purchasedStatus?.[locale]?.[planet];
+  const isPurchased = planet && purchasedStatus?.data?.[locale]?.[planet];
 
   const handleClose = () => {
     setIsOpen(false);
