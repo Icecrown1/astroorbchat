@@ -390,7 +390,7 @@ export default function Register() {
             </div>
 
             <div>
-              <Label htmlFor="gender">{t.settings.personalInfo}</Label>
+              <Label htmlFor="gender">{t.auth.gender}</Label>
               <Select
                 onValueChange={(value) => step1Form.setValue('gender', value as any)}
                 defaultValue="other"
