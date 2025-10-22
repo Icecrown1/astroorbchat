@@ -28,6 +28,16 @@ export default function PaymentSuccess() {
     checkPaymentStatus();
   }, [paymentId]);
 
+  // Auto-redirect to dashboard after successful payment (2 seconds delay to show message)
+  useEffect(() => {
+    if (status === 'success') {
+      const timer = setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, navigate]);
+
   const checkPaymentStatus = async () => {
     try {
       const response = await apiRequest('POST', '/api/payments/yookassa/check-status', {
