@@ -217,10 +217,12 @@ export async function recomputeIfProfileChanged(userId: string): Promise<void> {
     return;
   }
   
-  const chartCreatedAt = new Date(chart.createdAt);
+  const chartUpdatedAt = new Date(chart.updatedAt);
   const userUpdatedAt = new Date(user.updatedAt);
   
-  if (userUpdatedAt > chartCreatedAt) {
+  // Only recompute if user profile was updated after the chart
+  if (userUpdatedAt > chartUpdatedAt) {
+    console.log('[NATAL SERVICE] Profile changed, recomputing chart and clearing interpretations');
     const newData = await computeNatalFromUser(user);
     
     await storage.updateNatalChart(userId, { 
