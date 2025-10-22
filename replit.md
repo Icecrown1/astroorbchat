@@ -70,6 +70,11 @@ Preferred communication style: Simple, everyday language.
   - **Refine Pattern**: Changed from `.regex().optional().or(z.literal(''))` to `.refine()` with conditional logic
   - **User-Friendly Error**: Shows "Format: HH:MM (e.g., 14:30)" only when value is non-empty and invalid
   - **No False Errors**: Empty birthTime field passes validation without issues
+- **Global 401 Handler - Stale Token Cleanup**: Added automatic auth cleanup for 401 errors:
+  - **Problem**: After database recreation, old JWT tokens remain in localStorage but users don't exist in new database
+  - **Solution**: Global 401 handler in `queryClient.ts` that clears localStorage and redirects to `/login`
+  - **User Experience**: Shows "Session expired" message instead of confusing "User not found" errors
+  - **Coverage**: Works for all API requests (queries and mutations) automatically
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.
