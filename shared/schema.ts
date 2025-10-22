@@ -65,6 +65,7 @@ export const natalCharts = pgTable("natal_charts", {
   userId: varchar("user_id", { length: 255 }).notNull().unique(),
   data: jsonb("data").notNull(),
   professionalInterpretation: jsonb("professional_interpretation"),
+  houseInfluences: jsonb("house_influences"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
