@@ -103,13 +103,17 @@ export async function deductEnergy(
 
   const user = await storage.getUser(userId);
   if (!user) {
+    console.error('[ENERGY] User not found:', userId);
     return { ok: false, error: 'User not found' };
   }
 
   const cost = ENERGY_COSTS[feature];
   const totalEnergy = user.freeEnergy + user.purchasedEnergy;
 
+  console.log('[ENERGY] Deducting:', { feature, cost, freeEnergy: user.freeEnergy, purchasedEnergy: user.purchasedEnergy, totalEnergy });
+
   if (totalEnergy < cost) {
+    console.error('[ENERGY] Insufficient energy:', { totalEnergy, cost });
     return { ok: false, error: 'Insufficient energy' };
   }
 
@@ -127,11 +131,15 @@ export async function deductEnergy(
     newPurchasedEnergy = user.purchasedEnergy - remainingCost;
   }
 
+  console.log('[ENERGY] New values:', { newFreeEnergy, newPurchasedEnergy });
+
   await storage.updateUser(userId, { 
     freeEnergy: newFreeEnergy,
     purchasedEnergy: newPurchasedEnergy 
   });
   await storage.createUsageLog({ userId, feature, cost });
+
+  console.log('[ENERGY] Successfully deducted', cost, 'orbs for', feature);
 
   return { ok: true };
 }
