@@ -46,32 +46,20 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL via Neon serverless with Drizzle ORM
 - **Environment Variables**: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `SESSION_SECRET`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, `TON_PRICE_FALLBACK_USD_PER_TON`, `TON_WALLET_ADDRESS`, `VITE_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `ALLOW_TEST_AUTH`, `LOGIN_ALLOWED_SKEW_SECONDS`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`
 
-## Recent Updates (October 21, 2025)
-- **YooKassa Duplicate Key Error - FINAL FIX**: Resolved persistent duplicate key violation error when YooKassa idempotency returns existing payment:
-  - **Root Cause**: When YooKassa idempotency worked and returned existing payment, backend created new DB record but tried to save YooKassa's existing `yookassaPaymentId` → duplicate key error on `yookassa_payments_yookassa_payment_id_unique` constraint
-  - **Production vs Dev Issue**: Error only occurred in production database which had old conflicting records from previous payment attempts
-  - **Solution - Proactive Check Before Update**:
-    - Added proactive lookup: check if `yookassaPaymentId` already exists in database BEFORE attempting UPDATE
-    - If existing payment found with same `yookassaPaymentId`:
-      1. Delete newly created duplicate record
-      2. Return confirmation URL from existing payment (preserves original metadata)
-      3. Use `actualPaymentId` from existing record
-    - If no existing payment: safely UPDATE new record with `yookassaPaymentId`
-  - **Fallback Error Handling**: Enhanced catch block with comprehensive error logging (code, constraint, message, detail) and full error string search for duplicate detection (works even if Postgres truncates constraint names)
-  - **Result**: Zero duplicate key errors in both dev and production - system gracefully handles YooKassa idempotency without data corruption
-- **YooKassa Idempotency System - PRODUCTION READY v4**: Enhanced idempotency implementation following YooKassa best practices:
-  - **SHA-256 Idempotency Key**: Frontend generates 64-char SHA-256 hash from `userId + kind + amount/tier + price + minuteTimestamp` (YooKassa recommendation)
+## Recent Updates (October 22, 2025)
+- **YooKassa Idempotency System v5 - UUID with State Management**: Complete redesign of idempotency key generation for YooKassa payments:
+  - **UUID v4 Idempotency Keys**: Replaced SHA-256 hash-based keys with standard `crypto.randomUUID()` generation
+  - **Component State Persistence**: Each payment attempt generates UUID once and stores in React component state
+  - **Retry Safety**: Saved UUID is reused for all retries (network timeouts, user re-clicks) to prevent duplicate charges
+  - **Clean Slate After Completion**: UUID cleared on success/error, ensuring next payment gets fresh key
+  - **Problem Solved**: Old approach (SHA-256 with minuteTimestamp) changed every minute, preventing multiple purchases per day and risking duplicates if response lost
+  - **Implementation**: Both `BuyEnergy.tsx` and `Subscribe.tsx` use `useState` for `yookassaIdempotencyKey` with lazy generation inside mutation handler
+  - **Standard Practice**: One UUID per transaction attempt - standard approach used by major payment processors
+- **YooKassa Duplicate Key Error - Backend Handling**: Robust backend error handling for YooKassa idempotency:
+  - **Proactive Lookup**: Check if `yookassaPaymentId` exists in database BEFORE attempting UPDATE
+  - **Duplicate Detection**: If existing payment found, delete new duplicate record and return original confirmation URL
+  - **Fallback Error Handling**: Comprehensive error logging (code, constraint, message, detail) with full string search for duplicate detection
   - **Database Schema**: `idempotencyKey` field (varchar 255, unique constraint, indexed) in yookassaPayments table
-  - **Cross-User Protection**: Each user's hash includes their userId, preventing cross-user collisions
-  - **Race Condition Handling**: 
-    - Backend returns 202 status with `retryAfter` field when payment creation in progress
-    - Frontend automatically retries after 3 seconds (no user action needed)
-    - Handles fast double-clicks and concurrent requests gracefully
-  - **Stuck Payment Recovery**: Payments stuck >30 seconds without yookassaPaymentId are auto-deleted and retried
-  - **Duplicate Detection & Cleanup**: When YooKassa returns existing payment (idempotency worked), system finds original DB record, deletes duplicate, returns correct payment URL
-  - **Error Resilience**: Failed YooKassa API calls leave payment record in place for retry, preventing loss of idempotency protection
-  - **Comprehensive Logging**: Full diagnostic logging of userId, idempotency keys, WebApp platform, existing payments for troubleshooting
-  - **Production Ready**: All edge cases covered - API failures, rapid clicks, concurrent users, Menu Button vs Direct Link entry points, recovery scenarios
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.

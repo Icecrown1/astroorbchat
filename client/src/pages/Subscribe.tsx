@@ -57,6 +57,7 @@ export default function Subscribe() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<typeof SUBSCRIPTION_TIERS[0] | null>(null);
+  const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -178,24 +179,20 @@ export default function Subscribe() {
         throw new Error(locale === 'ru' ? 'Пользователь не авторизован' : 'User not authenticated');
       }
       
-      // Generate stable idempotency key using SHA-256 hash (YooKassa recommendation)
-      // Based on userId, kind, tier, price, and current minute
-      // This ensures clicks within the same minute use the same key for the same user
-      const now = new Date();
-      const minuteTimestamp = Math.floor(now.getTime() / 60000); // Round to minute
-      const keyData = `${userData.data.id}_subscription_${tier.tier}_${tier.rubPrice}_${minuteTimestamp}`;
-      
-      // Hash the key data using SHA-256
-      const encoder = new TextEncoder();
-      const data = encoder.encode(keyData);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const idempotencyKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 64);
+      // Generate unique idempotency key using UUID v4 (if not already generated)
+      // The key is persisted in state to handle retries correctly:
+      // - First click: generate new UUID and save to state
+      // - Retries: reuse the same UUID to prevent duplicate payments
+      // - Success/Error: clear the key for next payment attempt
+      let idempotencyKey = yookassaIdempotencyKey;
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID();
+        setYookassaIdempotencyKey(idempotencyKey);
+      }
       
       console.log('[YooKassa] User ID:', userData.data.id);
-      console.log('[YooKassa] Minute timestamp:', minuteTimestamp);
-      console.log('[YooKassa] Key data (before hash):', keyData);
-      console.log('[YooKassa] Idempotency Key (SHA-256, 64 chars):', idempotencyKey);
+      console.log('[YooKassa] Idempotency Key (UUID v4):', idempotencyKey);
+      console.log('[YooKassa] Is retry:', !!yookassaIdempotencyKey);
       
       // Make request with automatic retry for race conditions
       let response = await apiRequest('POST', '/api/payments/yookassa/create', {
@@ -235,6 +232,9 @@ export default function Subscribe() {
     },
     onSuccess: (data) => {
       console.log('[YooKassa] Subscription payment created, redirecting to:', data.confirmationUrl);
+      // Clear idempotency key on success (ready for next payment)
+      setYookassaIdempotencyKey(null);
+      
       if (data.confirmationUrl) {
         // Redirect to YooKassa payment page
         window.location.href = data.confirmationUrl;
@@ -250,6 +250,9 @@ export default function Subscribe() {
     },
     onError: (error: any) => {
       console.error('[YooKassa] Error:', error);
+      // Clear idempotency key on error (ready for next payment attempt)
+      setYookassaIdempotencyKey(null);
+      
       toast({
         title: t.common.error,
         description: error.message || t.errors.calculationFailed,
