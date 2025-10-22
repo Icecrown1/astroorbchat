@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Moon, Sparkles, ArrowRight, Calendar, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getImportantDates, getImportantDateInterpretation, ImportantEvent } from '@/lib/importantDatesApi';
+import { getImportantDates, getImportantDateInterpretation, ImportantEvent, InterpretationResponse } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { translatePlanet, translateSign } from '@/lib/astroTranslations';
 import { Loader } from './Loader';
@@ -22,7 +22,7 @@ export function ImportantDatesList() {
   const { locale } = useTranslation();
   const { toast } = useToast();
   const [selectedEvent, setSelectedEvent] = useState<ImportantEvent | null>(null);
-  const [interpretation, setInterpretation] = useState<string>('');
+  const [interpretationResponse, setInterpretationResponse] = useState<InterpretationResponse | null>(null);
 
   const { data: events, isLoading } = useQuery<ImportantEvent[]>({
     queryKey: ['/api/astrology/important-dates'],
@@ -32,7 +32,7 @@ export function ImportantDatesList() {
   const interpretationMutation = useMutation({
     mutationFn: (event: ImportantEvent) => getImportantDateInterpretation(event, locale),
     onSuccess: (data) => {
-      setInterpretation(data);
+      setInterpretationResponse(data);
     },
     onError: (error: Error) => {
       toast({
@@ -46,13 +46,13 @@ export function ImportantDatesList() {
 
   const handleEventClick = (event: ImportantEvent) => {
     setSelectedEvent(event);
-    setInterpretation('');
+    setInterpretationResponse(null);
     interpretationMutation.mutate(event);
   };
 
   const closeModal = () => {
     setSelectedEvent(null);
-    setInterpretation('');
+    setInterpretationResponse(null);
   };
 
   if (isLoading) {
@@ -284,15 +284,37 @@ export function ImportantDatesList() {
               <Loader />
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <Zap className="w-4 h-4 text-primary" />
-                {locale === 'ru' ? '2 орба • Генерация интерпретации...' : '2 orbs • Generating interpretation...'}
+                {locale === 'ru' ? 'Проверка кэша и генерация...' : 'Checking cache and generating...'}
               </p>
             </div>
           )}
 
-          {interpretation && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap">{interpretation}</p>
-            </div>
+          {interpretationResponse && (
+            <>
+              {interpretationResponse.cached && (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {locale === 'ru' 
+                      ? '✓ Бесплатно (из кэша, действует 7 дней)' 
+                      : '✓ Free (from cache, valid for 7 days)'}
+                  </span>
+                </div>
+              )}
+              {!interpretationResponse.cached && interpretationResponse.cost > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-md">
+                  <Zap className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground">
+                    {locale === 'ru' 
+                      ? `✓ Списано ${interpretationResponse.cost} орба (новая интерпретация, в кэше на 7 дней)` 
+                      : `✓ ${interpretationResponse.cost} orbs deducted (new interpretation, cached for 7 days)`}
+                  </span>
+                </div>
+              )}
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <p className="whitespace-pre-wrap">{interpretationResponse.interpretation}</p>
+              </div>
+            </>
           )}
         </div>
       </DialogContent>

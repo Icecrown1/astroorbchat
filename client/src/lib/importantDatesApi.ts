@@ -24,6 +24,12 @@ export interface ImportantDateInterpretation {
   timingTips: string[];
 }
 
+export interface InterpretationResponse {
+  interpretation: string;
+  cost: number;
+  cached: boolean;
+}
+
 export async function getImportantDates(): Promise<ImportantEvent[]> {
   const response = await apiRequest('GET', '/api/astrology/important-dates');
   return response.data;
@@ -32,7 +38,7 @@ export async function getImportantDates(): Promise<ImportantEvent[]> {
 export async function getImportantDateInterpretation(
   event: ImportantEvent,
   locale: string = 'ru'
-): Promise<string> {
+): Promise<InterpretationResponse> {
   const response = await apiRequest('POST', '/api/astrology/important-dates/interpret', {
     eventType: event.type,
     date: event.date,
@@ -42,5 +48,5 @@ export async function getImportantDateInterpretation(
     house_for_sun_sign: event.house_for_sun_sign,
     locale,
   });
-  return response.data.interpretation;
+  return response.data;
 }
