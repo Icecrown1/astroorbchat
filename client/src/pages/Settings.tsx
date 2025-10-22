@@ -53,9 +53,25 @@ export default function Settings() {
     navigate('/register');
   };
 
-  const { data, isLoading } = useQuery<UserMeResponse>({
+  const { data, isLoading, error } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
+
+  // Handle 401 errors - user not found in database (e.g. after database recreation)
+  useEffect(() => {
+    if (error) {
+      console.error('[Settings] Query error:', error);
+      // Clear auth and redirect to login
+      clearAuth();
+      queryClient.clear();
+      toast({
+        title: locale === 'ru' ? 'Сессия истекла' : 'Session expired',
+        description: locale === 'ru' ? 'Пожалуйста, войдите снова' : 'Please log in again',
+        variant: 'destructive',
+      });
+      navigate('/login');
+    }
+  }, [error, clearAuth, navigate, toast, locale]);
 
   const settingsSchema = useMemo(() => z.object({
     name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),

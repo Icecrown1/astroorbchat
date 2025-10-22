@@ -2,6 +2,16 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 errors globally - clear auth and redirect to login
+    if (res.status === 401) {
+      console.log('[Auth] 401 Unauthorized - clearing auth and redirecting to login');
+      // Clear auth from localStorage
+      localStorage.removeItem('astro-orb-auth');
+      // Redirect to login page
+      window.location.href = '/login';
+      throw new Error('Session expired. Please log in again.');
+    }
+    
     try {
       const json = await res.json();
       throw new Error(json.error || json.message || res.statusText);
