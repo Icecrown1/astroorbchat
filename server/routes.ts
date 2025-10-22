@@ -2047,8 +2047,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payments/history", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const payments = await storage.getPaymentsByUserId(userId);
-      res.json({ ok: true, data: payments });
+      
+      // Get TON payments
+      const tonPayments = await storage.getPaymentsByUserId(userId);
+      
+      // Get YooKassa payments
+      const yookassaPayments = await storage.getYookassaPaymentsByUserId(userId);
+      
+      // Transform YooKassa payments to unified format
+      const yookassaFormatted = yookassaPayments.map(p => ({
+        id: p.id,
+        userId: p.userId,
+        kind: p.kind,
+        energyAmount: p.energyAmount,
+        tier: p.tier,
+        amountRUB: p.amountRub,
+        amountTON: null,
+        userWalletAddress: null,
+        status: p.status,
+        txHash: null,
+        yookassaPaymentId: p.yookassaPaymentId,
+        paymentMethod: 'yookassa' as const,
+        createdAt: p.createdAt,
+      }));
+      
+      // Transform TON payments to unified format
+      const tonFormatted = tonPayments.map(p => ({
+        id: p.id,
+        userId: p.userId,
+        kind: p.kind,
+        energyAmount: p.energyAmount,
+        tier: p.tier,
+        amountRUB: null,
+        amountTON: p.amountTON,
+        userWalletAddress: p.userWalletAddress,
+        status: p.status,
+        txHash: p.txHash,
+        yookassaPaymentId: null,
+        paymentMethod: 'ton' as const,
+        createdAt: p.createdAt,
+      }));
+      
+      // Combine and sort by createdAt (newest first)
+      const allPayments = [...tonFormatted, ...yookassaFormatted].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      res.json({ ok: true, data: allPayments });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }

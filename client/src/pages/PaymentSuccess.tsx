@@ -28,12 +28,19 @@ export default function PaymentSuccess() {
     checkPaymentStatus();
   }, [paymentId]);
 
-  // Auto-redirect to dashboard after successful payment (2 seconds delay to show message)
+  // Auto-redirect after payment check
   useEffect(() => {
     if (status === 'success') {
+      // Redirect to dashboard after successful payment (2 seconds to show success message)
       const timer = setTimeout(() => {
         navigate('/dashboard');
       }, 2000);
+      return () => clearTimeout(timer);
+    } else if (status === 'failed') {
+      // Redirect to buy-energy page after failed/canceled payment (3 seconds to show message)
+      const timer = setTimeout(() => {
+        navigate('/buy-energy');
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [status, navigate]);
