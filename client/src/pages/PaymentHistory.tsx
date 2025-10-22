@@ -10,11 +10,13 @@ import { useTranslation } from "@/contexts/LocaleContext";
 interface Payment {
   id: string;
   kind: string;
-  tier?: string;
-  energyAmount?: number;
-  amountUSD: string;
-  amountTON: string;
-  txHash: string;
+  tier?: string | null;
+  energyAmount?: number | null;
+  amountRUB: number | null;
+  amountTON: string | null;
+  txHash: string | null;
+  yookassaPaymentId: string | null;
+  paymentMethod: 'ton' | 'yookassa';
   status: string;
   createdAt: string;
 }
@@ -177,21 +179,32 @@ export default function PaymentHistory() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{t.paymentHistory.amount}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-medium" data-testid={`text-amount-usd-${payment.id}`}>
-                        ${payment.amountUSD}
-                      </span>
-                      <span className="text-muted-foreground" data-testid={`text-amount-ton-${payment.id}`}>
-                        {parseFloat(payment.amountTON).toFixed(2)} TON
-                      </span>
+                      {payment.paymentMethod === 'yookassa' && payment.amountRUB && (
+                        <span className="font-medium" data-testid={`text-amount-rub-${payment.id}`}>
+                          {payment.amountRUB} ₽
+                        </span>
+                      )}
+                      {payment.paymentMethod === 'ton' && payment.amountTON && (
+                        <span className="font-medium" data-testid={`text-amount-ton-${payment.id}`}>
+                          {parseFloat(payment.amountTON).toFixed(2)} TON
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t.paymentHistory.paymentMethod || 'Payment Method'}</span>
+                    <Badge variant="outline" data-testid={`badge-method-${payment.id}`}>
+                      {payment.paymentMethod === 'ton' ? 'TON' : t.paymentHistory.bankCard || 'Bank Card'}
+                    </Badge>
+                  </div>
                   
-                  {isCompleted(payment.status) && !payment.txHash.startsWith("pending_") && (
+                  {isCompleted(payment.status) && payment.paymentMethod === 'ton' && payment.txHash && !payment.txHash.startsWith("pending_") && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="w-full justify-between"
-                      onClick={() => openTxExplorer(payment.txHash)}
+                      onClick={() => openTxExplorer(payment.txHash!)}
                       data-testid={`button-view-tx-${payment.id}`}
                     >
                       <span>{t.paymentHistory.viewOnBlockchain}</span>

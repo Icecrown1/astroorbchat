@@ -2061,7 +2061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kind: p.kind,
         energyAmount: p.energyAmount,
         tier: p.tier,
-        amountRUB: p.amountRub,
+        amountRUB: p.amountRUB,
         amountTON: null,
         userWalletAddress: null,
         status: p.status,
