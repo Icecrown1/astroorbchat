@@ -81,3 +81,9 @@ Preferred communication style: Simple, everyday language.
 - **Energy Restoration System**: Fixed daily energy restoration to use `Math.max()` logic - now correctly replenishes to 10 orbs daily (or 100/250 for subscriptions) instead of replacing values.
 - **Low Energy Alert**: Added notification banner on Dashboard when user has < 10 orbs, explaining daily restoration and linking to purchase/subscription options.
 - **OpenAI Prompts**: All 8 prompt files converted to plain text format (no markdown formatting: **, ###, -, *) for cleaner AI interpretations.
+- **Profile Reset Feature**: New "Danger Zone" section in Settings with profile reset functionality:
+  - **Backend Endpoint**: `/api/user/reset-profile` clears `birthPlace`, `birthTime`, deletes natal chart, and resets `lastProfileUpdate`
+  - **Data Preservation**: Energy balances (`freeEnergy`, `purchasedEnergy`), subscriptions, and payment history remain intact
+  - **UI Implementation**: AlertDialog confirmation with localized warnings in both English and Russian
+  - **Flow**: After reset → clears auth → redirects to `/register` for fresh profile setup
+  - **Use Case**: Allows users to restart registration process without losing purchased energy or subscriptions
