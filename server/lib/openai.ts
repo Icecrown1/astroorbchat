@@ -161,7 +161,6 @@ export interface PlanetInterpretationResult {
   strengths: string[];
   risks: string[];
   advice: string[];
-  house_note: string;
 }
 
 export async function getPlanetInterpretation(
@@ -236,8 +235,7 @@ export async function getPlanetInterpretation(
       summary: result.summary || '',
       strengths: Array.isArray(result.strengths) ? result.strengths : [],
       risks: Array.isArray(result.risks) ? result.risks : [],
-      advice: Array.isArray(result.advice) ? result.advice : [],
-      house_note: result.house_note || ''
+      advice: Array.isArray(result.advice) ? result.advice : []
     };
   } catch (e) {
     throw new Error('Failed to parse planet interpretation response');
