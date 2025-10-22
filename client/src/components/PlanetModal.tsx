@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/Loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react';
+import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap } from 'lucide-react';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 interface PlanetInterpretation {
   title: string;
@@ -18,7 +20,16 @@ interface PlanetInterpretation {
   strengths: string[];
   risks: string[];
   advice: string[];
-  house_note: string;
+}
+
+interface HouseInfluenceResult {
+  title: string;
+  life_sphere: string;
+  manifestation: string;
+  key_themes: string[];
+  opportunities: string[];
+  challenges: string[];
+  practical_work: string[];
 }
 
 interface PlanetModalProps {
@@ -30,10 +41,17 @@ interface PlanetModalProps {
 
 export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: PlanetModalProps) {
   const { locale } = useTranslation();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [houseInfluence, setHouseInfluence] = useState<HouseInfluenceResult | null>(null);
 
   useEffect(() => {
     setIsOpen(!!planet);
+    // КРИТИЧНО: Сбрасываем платную интерпретацию при смене планеты
+    // Это гарантирует, что для каждой планеты нужна новая покупка
+    setHouseInfluence(null);
+    // Сбрасываем мутацию чтобы избежать race condition
+    houseInfluenceMutation.reset();
   }, [planet]);
 
   const { data, isLoading, error } = useQuery<PlanetInterpretation>({
@@ -54,8 +72,60 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
 
   const handleClose = () => {
     setIsOpen(false);
+    setHouseInfluence(null); // Сброс при закрытии
     setTimeout(onClose, 200); // Даем время на анимацию закрытия
   };
+
+  // Мутация для получения платной интерпретации влияния дома (2 орба)
+  const houseInfluenceMutation = useMutation({
+    mutationFn: async (requestedPlanet: string) => {
+      const response = await apiRequest('POST', '/api/astrology/house-influence', {
+        planet: requestedPlanet,
+        locale,
+        chartType,
+        chartId
+      });
+      return { data: response.data, requestedPlanet };
+    },
+    onSuccess: (result: { data: HouseInfluenceResult; requestedPlanet: string }) => {
+      // КРИТИЧНО: Проверяем, что пользователь все еще смотрит ту же планету
+      // Иначе race condition покажет старые данные для новой планеты
+      if (result.requestedPlanet !== planet) {
+        console.log('[House Influence] Race condition prevented: planet changed during request');
+        return;
+      }
+      
+      setHouseInfluence(result.data);
+      // Обновляем энергию пользователя
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      toast({
+        title: locale === 'ru' ? '✨ Интерпретация получена' : '✨ Interpretation received',
+        description: locale === 'ru' 
+          ? 'Глубокая интерпретация влияния дома загружена'
+          : 'Deep house influence interpretation loaded',
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error || error.message;
+      
+      // Проверяем, это ошибка недостатка энергии?
+      if (error.response?.status === 402) {
+        toast({
+          title: locale === 'ru' ? '⚡ Недостаточно орбов' : '⚡ Insufficient orbs',
+          description: locale === 'ru' 
+            ? `Нужно ${error.response?.data?.required || 2} орбов. Доступно: ${error.response?.data?.available || 0}`
+            : `Required: ${error.response?.data?.required || 2} orbs. Available: ${error.response?.data?.available || 0}`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: locale === 'ru' ? 'Ошибка' : 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        });
+      }
+    }
+  });
 
   const PLANET_SYMBOLS: Record<string, string> = {
     'Sun': '☉',
@@ -174,17 +244,150 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                 </ul>
               </div>
 
-              {/* Примечание по дому */}
-              {data.house_note && (
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      {locale === 'ru' ? 'Влияние дома: ' : 'House influence: '}
-                    </span>
-                    {data.house_note}
-                  </p>
-                </div>
-              )}
+              {/* Платная интерпретация влияния дома */}
+              <div className="p-4 bg-accent/10 rounded-lg border border-accent/30">
+                {!houseInfluence ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <Home className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-sm mb-1">
+                          {locale === 'ru' ? 'Влияние дома на планету' : 'House influence on planet'}
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {locale === 'ru' 
+                            ? 'Глубокая интерпретация того, как дом модифицирует планету'
+                            : 'Deep interpretation of how the house modifies the planet'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => planet && houseInfluenceMutation.mutate(planet)}
+                      disabled={houseInfluenceMutation.isPending}
+                      className="flex items-center gap-1.5 flex-shrink-0"
+                      data-testid="button-house-influence"
+                    >
+                      {houseInfluenceMutation.isPending ? (
+                        <Loader size="sm" />
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>2</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="flex items-center gap-2 text-lg font-semibold">
+                        <Home className="w-5 h-5 text-accent" />
+                        {houseInfluence.title}
+                      </h3>
+                    </div>
+
+                    {/* Сфера жизни */}
+                    <div className="p-3 bg-primary/5 rounded-lg">
+                      <p className="text-sm">
+                        <span className="font-medium text-foreground">
+                          {locale === 'ru' ? 'Сфера жизни: ' : 'Life sphere: '}
+                        </span>
+                        <span className="text-muted-foreground">{houseInfluence.life_sphere}</span>
+                      </p>
+                    </div>
+
+                    {/* Как проявляется */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">
+                        {locale === 'ru' ? 'Как проявляется' : 'How it manifests'}
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {houseInfluence.manifestation}
+                      </p>
+                    </div>
+
+                    {/* Ключевые темы */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">
+                        {locale === 'ru' ? 'Ключевые темы' : 'Key themes'}
+                      </h4>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {houseInfluence.key_themes.map((theme, index) => (
+                          <li 
+                            key={index} 
+                            className="flex items-start gap-2 text-xs"
+                            data-testid={`theme-${index}`}
+                          >
+                            <span className="text-accent mt-0.5">•</span>
+                            <span className="text-muted-foreground">{theme}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Возможности */}
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                        {locale === 'ru' ? 'Возможности' : 'Opportunities'}
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {houseInfluence.opportunities.map((opp, index) => (
+                          <li 
+                            key={index} 
+                            className="flex items-start gap-2 text-sm"
+                            data-testid={`opportunity-${index}`}
+                          >
+                            <span className="text-green-600 mt-0.5">✓</span>
+                            <span className="text-muted-foreground">{opp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Вызовы */}
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        {locale === 'ru' ? 'Вызовы' : 'Challenges'}
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {houseInfluence.challenges.map((challenge, index) => (
+                          <li 
+                            key={index} 
+                            className="flex items-start gap-2 text-sm"
+                            data-testid={`challenge-${index}`}
+                          >
+                            <span className="text-amber-600 mt-0.5">!</span>
+                            <span className="text-muted-foreground">{challenge}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Практические шаги */}
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <Lightbulb className="w-4 h-4 text-primary" />
+                        {locale === 'ru' ? 'Практическая работа' : 'Practical work'}
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {houseInfluence.practical_work.map((work, index) => (
+                          <li 
+                            key={index} 
+                            className="flex items-start gap-2 text-sm"
+                            data-testid={`work-${index}`}
+                          >
+                            <span className="text-primary mt-0.5">→</span>
+                            <span className="text-muted-foreground">{work}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
