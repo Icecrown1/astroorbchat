@@ -143,7 +143,14 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
 
     return payment;
   } catch (error: any) {
-    console.error('[YooKassa] Error creating payment:', error);
+    console.error('[YooKassa] ========== ERROR CREATING PAYMENT ==========');
+    console.error('[YooKassa] Error message:', error.message);
+    console.error('[YooKassa] Error code:', error.code);
+    console.error('[YooKassa] Error type:', error.type);
+    console.error('[YooKassa] Full error:', JSON.stringify(error, null, 2));
+    console.error('[YooKassa] Response data:', error.response?.data);
+    console.error('[YooKassa] Response status:', error.response?.status);
+    console.error('[YooKassa] ===============================================');
     throw new Error(`Failed to create YooKassa payment: ${error.message}`);
   }
 }
