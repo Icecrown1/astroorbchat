@@ -61,7 +61,7 @@ export default function Dashboard() {
       icon: Sun,
       title: t.dashboard.solarReturn,
       description: t.dashboard.solarReturnDesc,
-      energyCost: 11,
+      energyCost: 15,
       path: '/solar-today',
     },
     {
