@@ -1628,6 +1628,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[WEEKLY_PLAN] Week range:', weekStart, 'to', weekEnd);
 
+      // Calculate transits for the start of the week
+      const weekStartDate = dayjs(weekStart).tz(user.timezone);
+      const transitData = {
+        year: weekStartDate.year(),
+        month: weekStartDate.month() + 1,
+        day: weekStartDate.date(),
+        hour: 12, // Noon on Monday
+        minute: 0,
+      };
+
+      console.log('[WEEKLY_PLAN] Calculating transits for:', transitData);
+      const transits = await calculateTransits(transitData);
+      console.log('[WEEKLY_PLAN] Transits calculated:', Object.keys(transits.planets).length, 'planets');
+
+      // Map transits to natal houses
+      const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart.data);
+      console.log('[WEEKLY_PLAN] Transits mapped to natal houses');
+
       // Generate weekly plan
       console.log('[WEEKLY_PLAN] Calling generateWeeklyPlan...');
       const result = await generateWeeklyPlan({
@@ -1638,7 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         natal: natalChart.data,
         week_start_iso: weekStart,
-        transits: []
+        transits: transitsInNatalHouses
       }, locale);
 
       console.log('[WEEKLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
@@ -1727,6 +1745,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[MONTHLY_PLAN] Month range:', monthStart, 'to', monthEnd);
 
+      // Calculate transits for the start of the month
+      const monthStartDate = dayjs(monthStart).tz(user.timezone);
+      const transitData = {
+        year: monthStartDate.year(),
+        month: monthStartDate.month() + 1,
+        day: monthStartDate.date(),
+        hour: 12, // Noon on first day
+        minute: 0,
+      };
+
+      console.log('[MONTHLY_PLAN] Calculating transits for:', transitData);
+      const transits = await calculateTransits(transitData);
+      console.log('[MONTHLY_PLAN] Transits calculated:', Object.keys(transits.planets).length, 'planets');
+
+      // Map transits to natal houses
+      const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart.data);
+      console.log('[MONTHLY_PLAN] Transits mapped to natal houses');
+
       // Generate monthly plan
       console.log('[MONTHLY_PLAN] Calling generateMonthlyPlan...');
       const result = await generateMonthlyPlan({
@@ -1737,7 +1773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         natal: natalChart.data,
         month_iso: monthStart,
-        transits: []
+        transits: transitsInNatalHouses
       }, locale);
 
       console.log('[MONTHLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));

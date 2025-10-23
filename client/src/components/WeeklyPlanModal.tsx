@@ -8,13 +8,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Loader } from '@/components/Loader';
 import { Calendar, Lock } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useQuery } from '@tanstack/react-query';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 interface DayPlan {
   date: string;
@@ -153,51 +158,64 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
         )}
 
         {planData && (
-          <div className="space-y-4 py-4">
-            {planData.days.map((day, index) => (
-              <Card 
-                key={day.date} 
-                className="p-4" 
-                data-testid={`card-day-${index}`}
-              >
-                <div className="flex items-start gap-4 mb-3">
-                  <div className="text-center min-w-[60px]">
-                    <div className="text-2xl font-bold text-primary">
-                      {new Date(day.date).getDate()}
+          <div className="py-4">
+            <Accordion type="single" collapsible className="w-full">
+              {planData.days.map((day, index) => (
+                <AccordionItem 
+                  key={day.date} 
+                  value={`day-${index}`}
+                  data-testid={`accordion-day-${index}`}
+                >
+                  <AccordionTrigger 
+                    className="hover:no-underline"
+                    data-testid={`accordion-trigger-day-${index}`}
+                  >
+                    <div className="flex items-center gap-3 w-full pr-4">
+                      <div className="text-center min-w-[50px]">
+                        <div className="text-xl font-bold text-primary">
+                          {new Date(day.date).getDate()}
+                        </div>
+                        <div className="text-xs text-muted-foreground uppercase">
+                          {day.day_of_week.substring(0, 2)}
+                        </div>
+                      </div>
+                      <div className="text-left flex-1">
+                        <div className="font-medium">{day.day_of_week}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(day.date)}</div>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground uppercase">
-                      {day.day_of_week}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-2 space-y-3 pl-16">
+                      <div className="text-sm">
+                        <span className="font-semibold text-primary">💰 {t.horoscope.money}:</span>
+                        <p className="text-muted-foreground mt-1">{day.money}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold text-primary">💼 {t.horoscope.work}:</span>
+                        <p className="text-muted-foreground mt-1">{day.work}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold text-primary">📚 {t.horoscope.study}:</span>
+                        <p className="text-muted-foreground mt-1">{day.study}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold text-primary">💕 {t.horoscope.love}:</span>
+                        <p className="text-muted-foreground mt-1">{day.love}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold text-primary">🏥 {t.horoscope.health}:</span>
+                        <p className="text-muted-foreground mt-1">{day.health}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">💰 {t.horoscope.money}:</span>
-                      <p className="text-muted-foreground mt-1">{day.money}</p>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">💼 {t.horoscope.work}:</span>
-                      <p className="text-muted-foreground mt-1">{day.work}</p>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">📚 {t.horoscope.study}:</span>
-                      <p className="text-muted-foreground mt-1">{day.study}</p>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">💕 {t.horoscope.love}:</span>
-                      <p className="text-muted-foreground mt-1">{day.love}</p>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">🏥 {t.horoscope.health}:</span>
-                      <p className="text-muted-foreground mt-1">{day.health}</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
 
             <Button
               variant="outline"
-              className="w-full mt-4"
+              className="w-full mt-6"
               onClick={handleClose}
               data-testid="button-close"
             >
