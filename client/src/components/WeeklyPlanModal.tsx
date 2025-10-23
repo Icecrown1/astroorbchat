@@ -63,6 +63,7 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
     onSuccess: (data) => {
       setPlanData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/astrology/horoscope/archive'] });
       toast({
         title: t.horoscope.generated,
         description: t.horoscope.forecastReady,

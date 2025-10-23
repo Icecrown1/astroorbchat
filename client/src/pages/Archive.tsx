@@ -8,6 +8,13 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { useTranslation } from "@/contexts/LocaleContext";
 
 interface ArchiveReading {
   id: string;
@@ -21,7 +28,21 @@ interface ArchiveReading {
 export default function Archive() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { locale } = useTranslation();
   const [selectedReading, setSelectedReading] = useState<ArchiveReading | null>(null);
+
+  const getDayAbbreviation = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+    
+    if (locale === 'ru') {
+      const ruAbbreviations = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+      return ruAbbreviations[dayOfWeek];
+    } else {
+      const enAbbreviations = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      return enAbbreviations[dayOfWeek];
+    }
+  };
 
   const { data: archive, isLoading } = useQuery<{ ok: boolean; data: ArchiveReading[] }>({
     queryKey: ['/api/astrology/horoscope/archive'],
@@ -144,61 +165,107 @@ export default function Archive() {
           
           <div className="space-y-4" data-testid="archive-view-dialog-content">
             {selectedReading?.period === 'week' && selectedReading.data?.days && (
-              <div className="space-y-4">
+              <Accordion type="single" collapsible className="w-full">
                 {selectedReading.data.days.map((day: any, index: number) => (
-                  <Card key={index} data-testid={`archive-day-${index}`}>
-                    <CardHeader>
-                      <CardTitle className="text-lg" data-testid={`archive-day-title-${index}`}>
-                        {day.day_of_week} — {day.date}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div data-testid={`archive-day-money-${index}`}>
-                        <strong>💰 Деньги:</strong> {day.money}
+                  <AccordionItem 
+                    key={day.date} 
+                    value={`day-${index}`}
+                    data-testid={`archive-accordion-day-${index}`}
+                  >
+                    <AccordionTrigger 
+                      className="hover:no-underline"
+                      data-testid={`archive-accordion-trigger-day-${index}`}
+                    >
+                      <div className="flex items-center gap-3 w-full pr-4">
+                        <div className="text-center min-w-[50px]">
+                          <div className="text-xl font-bold text-primary">
+                            {new Date(day.date).getDate()}
+                          </div>
+                          <div className="text-xs text-muted-foreground uppercase">
+                            {getDayAbbreviation(day.date)}
+                          </div>
+                        </div>
+                        <div className="text-left flex-1">
+                          <div className="font-medium">{day.day_of_week}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(day.date).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </div>
+                        </div>
                       </div>
-                      <div data-testid={`archive-day-work-${index}`}>
-                        <strong>💼 Работа:</strong> {day.work}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pt-2 space-y-3 pl-16">
+                        <div className="text-sm">
+                          <span className="font-semibold text-primary">💰 Деньги:</span>
+                          <p className="text-muted-foreground mt-1">{day.money}</p>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-primary">💼 Работа:</span>
+                          <p className="text-muted-foreground mt-1">{day.work}</p>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-primary">📚 Учеба:</span>
+                          <p className="text-muted-foreground mt-1">{day.study}</p>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-primary">💕 Любовь:</span>
+                          <p className="text-muted-foreground mt-1">{day.love}</p>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-primary">🏥 Здоровье:</span>
+                          <p className="text-muted-foreground mt-1">{day.health}</p>
+                        </div>
                       </div>
-                      <div data-testid={`archive-day-study-${index}`}>
-                        <strong>📚 Учеба:</strong> {day.study}
-                      </div>
-                      <div data-testid={`archive-day-love-${index}`}>
-                        <strong>❤️ Любовь:</strong> {day.love}
-                      </div>
-                      <div data-testid={`archive-day-health-${index}`}>
-                        <strong>🏥 Здоровье:</strong> {day.health}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </AccordionContent>
+                  </AccordionItem>
                 ))}
-              </div>
+              </Accordion>
             )}
 
-            {selectedReading?.period === 'month' && selectedReading.data?.weeks && (
-              <div className="space-y-4">
-                {selectedReading.data.weeks.map((week: any, index: number) => (
-                  <Card key={index} data-testid={`archive-week-${index}`}>
-                    <CardHeader>
-                      <CardTitle className="text-lg" data-testid={`archive-week-title-${index}`}>
-                        Неделя {index + 1}
-                      </CardTitle>
+            {selectedReading?.period === 'month' && selectedReading.data && (
+              <div className="space-y-6">
+                {selectedReading.data.overview && (
+                  <div className="p-4 bg-muted/50 rounded-lg" data-testid="archive-month-overview">
+                    <h3 className="font-semibold mb-2 text-primary">Обзор месяца</h3>
+                    <p className="text-sm text-muted-foreground">{selectedReading.data.overview}</p>
+                  </div>
+                )}
+
+                {selectedReading.data.weeks && selectedReading.data.weeks.map((week: any, index: number) => (
+                  <Card key={index} className="overflow-hidden" data-testid={`archive-week-${index}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg flex items-center gap-2" data-testid={`archive-week-title-${index}`}>
+                            <span className="text-primary">{week.week_number}</span>
+                            <span className="text-muted-foreground font-normal">НЕДЕЛЯ</span>
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">{week.dates}</p>
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div data-testid={`archive-week-money-${index}`}>
-                        <strong>💰 Деньги:</strong> {week.money}
+                    <CardContent className="space-y-3">
+                      <div className="text-sm">
+                        <p className="text-muted-foreground">{week.summary}</p>
                       </div>
-                      <div data-testid={`archive-week-work-${index}`}>
-                        <strong>💼 Работа:</strong> {week.work}
-                      </div>
-                      <div data-testid={`archive-week-study-${index}`}>
-                        <strong>📚 Учеба:</strong> {week.study}
-                      </div>
-                      <div data-testid={`archive-week-love-${index}`}>
-                        <strong>❤️ Любовь:</strong> {week.love}
-                      </div>
-                      <div data-testid={`archive-week-health-${index}`}>
-                        <strong>🏥 Здоровье:</strong> {week.health}
-                      </div>
+                      
+                      {week.key_themes && week.key_themes.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {week.key_themes.map((theme: string, themeIndex: number) => (
+                            <Badge 
+                              key={themeIndex} 
+                              variant="secondary" 
+                              className="text-xs"
+                              data-testid={`archive-week-theme-${index}-${themeIndex}`}
+                            >
+                              {theme}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

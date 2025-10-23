@@ -63,6 +63,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
   const { t, locale } = useTranslation();
   const [planData, setPlanData] = useState<MonthlyPlanData | null>(null);
   const [weeklyDetails, setWeeklyDetails] = useState<{ [key: number]: WeeklyPlanData }>({});
+  const [loadingWeeks, setLoadingWeeks] = useState<Set<number>>(new Set());
 
   const { data: user } = useQuery({
     queryKey: ['/api/user/me'],
@@ -80,6 +81,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
     onSuccess: (data) => {
       setPlanData(data);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/astrology/horoscope/archive'] });
       toast({
         title: t.horoscope.generated,
         description: t.horoscope.forecastReady,
@@ -104,6 +106,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
 
   const weeklyMutation = useMutation({
     mutationFn: async ({ weekNumber, weekStart, weekEnd }: { weekNumber: number; weekStart: string; weekEnd: string }) => {
+      setLoadingWeeks(prev => new Set(prev).add(weekNumber));
       const response = await apiRequest('POST', '/api/astrology/horoscope/weekly-plan', { 
         week_start_iso: weekStart,
         week_end_iso: weekEnd,
@@ -113,13 +116,23 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
     },
     onSuccess: ({ weekNumber, data }) => {
       setWeeklyDetails(prev => ({ ...prev, [weekNumber]: data }));
+      setLoadingWeeks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(weekNumber);
+        return newSet;
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: t.horoscope.generated,
         description: locale === 'ru' ? 'Детальный прогноз недели готов' : 'Detailed week forecast ready',
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, { weekNumber }) => {
+      setLoadingWeeks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(weekNumber);
+        return newSet;
+      });
       if (error.message?.includes('Insufficient energy')) {
         toast({
           title: t.common.error,
@@ -140,6 +153,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
     onOpenChange(false);
     setPlanData(null);
     setWeeklyDetails({});
+    setLoadingWeeks(new Set());
   };
 
   const formatDate = (dateStr: string) => {
@@ -277,11 +291,11 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
                               weekStart: week.week_start_iso,
                               weekEnd: week.week_end_iso
                             })}
-                            disabled={weeklyMutation.isPending}
+                            disabled={loadingWeeks.has(week.week_number)}
                             className="mt-2"
                             data-testid={`button-calculate-week-${index}`}
                           >
-                            {weeklyMutation.isPending ? (
+                            {loadingWeeks.has(week.week_number) ? (
                               <>
                                 <Loader className="mr-2" size="sm" />
                                 {locale === 'ru' ? 'Расчёт...' : 'Calculating...'}
