@@ -1572,11 +1572,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/astrology/horoscope/weekly-plan", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { week_start_iso } = req.body;
+      const { week_start_iso, week_end_iso } = req.body;
       const locale = req.body.locale || 'ru';
 
       console.log('[WEEKLY_PLAN] User ID:', userId);
-      console.log('[WEEKLY_PLAN] Request body:', { week_start_iso, locale });
+      console.log('[WEEKLY_PLAN] Request body:', { week_start_iso, week_end_iso, locale });
 
       // Check energy first (without deducting)
       await checkAndResetEnergy(storage, userId);
@@ -1612,7 +1612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Calculate week start (always Monday of current week)
+      // Calculate week start (always Monday of current week if not provided)
       let weekStart = week_start_iso;
       if (!weekStart) {
         const now = dayjs().tz(user.timezone);
@@ -1623,8 +1623,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weekStart = monday.format('YYYY-MM-DD');
       }
 
-      // Calculate week end (Sunday)
-      const weekEnd = dayjs(weekStart).add(6, 'day').format('YYYY-MM-DD');
+      // Use provided week end or calculate as start + 6 days
+      let weekEnd = week_end_iso;
+      if (!weekEnd) {
+        weekEnd = dayjs(weekStart).add(6, 'day').format('YYYY-MM-DD');
+      }
 
       console.log('[WEEKLY_PLAN] Week range:', weekStart, 'to', weekEnd);
 
@@ -1777,6 +1780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, locale);
 
       console.log('[MONTHLY_PLAN] Result received:', JSON.stringify(result).substring(0, 200));
+
+      // AI now generates week_start_iso and week_end_iso for each week directly
+      // No need to calculate dates here - they come from the prompt response
 
       // Save monthly plan to database with date range
       await storage.createHoroscopeReading({

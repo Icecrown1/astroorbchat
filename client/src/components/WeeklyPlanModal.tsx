@@ -98,6 +98,19 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
     });
   };
 
+  const getDayAbbreviation = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+    
+    if (locale === 'ru') {
+      const ruAbbreviations = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+      return ruAbbreviations[dayOfWeek];
+    } else {
+      const enAbbreviations = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      return enAbbreviations[dayOfWeek];
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-weekly-plan">
@@ -176,7 +189,7 @@ export function WeeklyPlanModal({ open, onOpenChange }: WeeklyPlanModalProps) {
                           {new Date(day.date).getDate()}
                         </div>
                         <div className="text-xs text-muted-foreground uppercase">
-                          {day.day_of_week.substring(0, 2)}
+                          {getDayAbbreviation(day.date)}
                         </div>
                       </div>
                       <div className="text-left flex-1">

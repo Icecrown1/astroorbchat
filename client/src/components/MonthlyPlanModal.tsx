@@ -10,17 +10,41 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader } from '@/components/Loader';
-import { CalendarRange, Lock } from 'lucide-react';
+import { CalendarRange, Lock, Calendar } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useQuery } from '@tanstack/react-query';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+
+interface DayPlan {
+  date: string;
+  day_of_week: string;
+  money: string;
+  work: string;
+  study: string;
+  love: string;
+  health: string;
+}
+
+interface WeeklyPlanData {
+  week_start: string;
+  week_end: string;
+  days: DayPlan[];
+}
 
 interface WeekPlan {
   week_number: number;
   dates: string;
   summary: string;
   key_themes: string[];
+  week_start_iso: string;
+  week_end_iso: string;
 }
 
 interface MonthlyPlanData {
@@ -38,6 +62,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [planData, setPlanData] = useState<MonthlyPlanData | null>(null);
+  const [weeklyDetails, setWeeklyDetails] = useState<{ [key: number]: WeeklyPlanData }>({});
 
   const { data: user } = useQuery({
     queryKey: ['/api/user/me'],
@@ -77,9 +102,65 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
     },
   });
 
+  const weeklyMutation = useMutation({
+    mutationFn: async ({ weekNumber, weekStart, weekEnd }: { weekNumber: number; weekStart: string; weekEnd: string }) => {
+      const response = await apiRequest('POST', '/api/astrology/horoscope/weekly-plan', { 
+        week_start_iso: weekStart,
+        week_end_iso: weekEnd,
+        locale 
+      });
+      return { weekNumber, data: response.data };
+    },
+    onSuccess: ({ weekNumber, data }) => {
+      setWeeklyDetails(prev => ({ ...prev, [weekNumber]: data }));
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      toast({
+        title: t.horoscope.generated,
+        description: locale === 'ru' ? 'Детальный прогноз недели готов' : 'Detailed week forecast ready',
+      });
+    },
+    onError: (error: any) => {
+      if (error.message?.includes('Insufficient energy')) {
+        toast({
+          title: t.common.error,
+          description: t.dashboard.needMoreEnergy,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: t.horoscope.generationFailed,
+          description: error.message || t.compatibility.tryAgain,
+          variant: 'destructive',
+        });
+      }
+    },
+  });
+
   const handleClose = () => {
     onOpenChange(false);
     setPlanData(null);
+    setWeeklyDetails({});
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getDayAbbreviation = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay();
+    
+    if (locale === 'ru') {
+      const ruAbbreviations = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+      return ruAbbreviations[dayOfWeek];
+    } else {
+      const enAbbreviations = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      return enAbbreviations[dayOfWeek];
+    }
   };
 
   return (
@@ -153,40 +234,132 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
             </Card>
 
             <div className="space-y-4">
-              {planData.weeks.map((week, index) => (
-                <Card 
-                  key={week.week_number} 
-                  className="p-4 hover-elevate" 
-                  data-testid={`card-week-${index}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="text-center min-w-[60px]">
-                      <div className="text-2xl font-bold text-primary">
-                        {week.week_number}
-                      </div>
-                      <div className="text-xs text-muted-foreground uppercase">
-                        {locale === 'ru' ? 'Неделя' : 'Week'}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-muted-foreground mb-2">{week.dates}</div>
-                      <h4 className="text-sm font-semibold mb-2">{week.summary}</h4>
-                      {week.key_themes && week.key_themes.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {week.key_themes.map((theme, idx) => (
-                            <span 
-                              key={idx} 
-                              className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground"
-                            >
-                              {theme}
-                            </span>
-                          ))}
+              {planData.weeks.map((week, index) => {
+                const weekDetails = weeklyDetails[week.week_number];
+                
+                return (
+                  <Card 
+                    key={week.week_number} 
+                    className="p-4" 
+                    data-testid={`card-week-${index}`}
+                  >
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="text-center min-w-[60px]">
+                        <div className="text-2xl font-bold text-primary">
+                          {week.week_number}
                         </div>
-                      )}
+                        <div className="text-xs text-muted-foreground uppercase">
+                          {locale === 'ru' ? 'Неделя' : 'Week'}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-muted-foreground mb-2">{week.dates}</div>
+                        <h4 className="text-sm font-semibold mb-2">{week.summary}</h4>
+                        {week.key_themes && week.key_themes.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                            {week.key_themes.map((theme, idx) => (
+                              <span 
+                                key={idx} 
+                                className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground"
+                              >
+                                {theme}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {!weekDetails && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => weeklyMutation.mutate({ 
+                              weekNumber: week.week_number, 
+                              weekStart: week.week_start_iso,
+                              weekEnd: week.week_end_iso
+                            })}
+                            disabled={weeklyMutation.isPending}
+                            className="mt-2"
+                            data-testid={`button-calculate-week-${index}`}
+                          >
+                            {weeklyMutation.isPending ? (
+                              <>
+                                <Loader className="mr-2" size="sm" />
+                                {locale === 'ru' ? 'Расчёт...' : 'Calculating...'}
+                              </>
+                            ) : (
+                              <>
+                                <Calendar className="w-3 h-3 mr-2" />
+                                {locale === 'ru' ? `Рассчитать ${week.week_number} неделю` : `Calculate week ${week.week_number}`}
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+
+                    {weekDetails && (
+                      <div className="mt-4 pt-4 border-t">
+                        <h5 className="text-sm font-semibold mb-3 text-primary">
+                          {locale === 'ru' ? 'Детальный прогноз:' : 'Detailed Forecast:'}
+                        </h5>
+                        <Accordion type="single" collapsible className="w-full">
+                          {weekDetails.days.map((day, dayIndex) => (
+                            <AccordionItem 
+                              key={day.date} 
+                              value={`day-${dayIndex}`}
+                              data-testid={`accordion-day-${week.week_number}-${dayIndex}`}
+                            >
+                              <AccordionTrigger 
+                                className="hover:no-underline"
+                                data-testid={`accordion-trigger-day-${week.week_number}-${dayIndex}`}
+                              >
+                                <div className="flex items-center gap-3 w-full pr-4">
+                                  <div className="text-center min-w-[50px]">
+                                    <div className="text-xl font-bold text-primary">
+                                      {new Date(day.date).getDate()}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground uppercase">
+                                      {getDayAbbreviation(day.date)}
+                                    </div>
+                                  </div>
+                                  <div className="text-left flex-1">
+                                    <div className="font-medium">{day.day_of_week}</div>
+                                    <div className="text-xs text-muted-foreground">{formatDate(day.date)}</div>
+                                  </div>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="pt-2 space-y-3 pl-16">
+                                  <div className="text-sm">
+                                    <span className="font-semibold text-primary">💰 {t.horoscope.money}:</span>
+                                    <p className="text-muted-foreground mt-1">{day.money}</p>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="font-semibold text-primary">💼 {t.horoscope.work}:</span>
+                                    <p className="text-muted-foreground mt-1">{day.work}</p>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="font-semibold text-primary">📚 {t.horoscope.study}:</span>
+                                    <p className="text-muted-foreground mt-1">{day.study}</p>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="font-semibold text-primary">💕 {t.horoscope.love}:</span>
+                                    <p className="text-muted-foreground mt-1">{day.love}</p>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="font-semibold text-primary">🏥 {t.horoscope.health}:</span>
+                                    <p className="text-muted-foreground mt-1">{day.health}</p>
+                                  </div>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
 
             <Button
