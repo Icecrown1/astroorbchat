@@ -754,9 +754,17 @@ export async function interpretHoroscope(
   };
   
   // Include transits if available (compact summary without data loss)
-  const transitsInfo = input.transits && input.transits.length > 0 
-    ? `\n${labels.transits}: ${summarizeTransits(input.transits, locale)}` 
-    : '';
+  // Support both formats: array (old) and object (new transits in natal houses)
+  let transitsInfo = '';
+  if (input.transits) {
+    if (Array.isArray(input.transits) && input.transits.length > 0) {
+      // Old format: array of transits
+      transitsInfo = `\n${labels.transits}: ${summarizeTransits(input.transits, locale)}`;
+    } else if (typeof input.transits === 'object' && Object.keys(input.transits).length > 0) {
+      // New format: transits mapped to natal houses
+      transitsInfo = `\n${labels.transits}: ${formatTransitsInNatalHouses(input.transits as any, locale)}`;
+    }
+  }
 
   const promptData = `
 ${labels.period}: day
@@ -862,6 +870,30 @@ function findHouseForPlanet(longitude: number, cusps: number[]): number {
     }
   }
   return 1;
+}
+
+// Format transits mapped to natal houses for horoscope interpretation
+function formatTransitsInNatalHouses(
+  transitsInHouses: Record<string, { sign: string; natalHouse: number; longitude: number }>,
+  locale: string = 'ru'
+): string {
+  if (!transitsInHouses || Object.keys(transitsInHouses).length === 0) return '';
+  
+  const planetTranslations: Record<string, string> = {
+    'Sun': 'Солнце', 'Moon': 'Луна', 'Mercury': 'Меркурий', 'Venus': 'Венера',
+    'Mars': 'Марс', 'Jupiter': 'Юпитер', 'Saturn': 'Сатурн', 'Uranus': 'Уран',
+    'Neptune': 'Нептун', 'Pluto': 'Плутон', 'North Node': 'Северный Узел', 'South Node': 'Южный Узел'
+  };
+  
+  const houseLabel = locale === 'ru' ? 'дом' : 'house';
+  const inLabel = locale === 'ru' ? 'в' : 'in';
+  
+  const transitLines = Object.entries(transitsInHouses).map(([planetName, data]) => {
+    const planet = locale === 'ru' ? (planetTranslations[planetName] || planetName) : planetName;
+    return `${planet} ${inLabel} ${data.sign} (${data.natalHouse}-й ${houseLabel})`;
+  });
+  
+  return transitLines.join(', ');
 }
 
 // Summarize transits compactly without losing data

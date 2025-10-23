@@ -51,6 +51,25 @@ export interface SolarReturnTimeResult {
   minute: number;
 }
 
+export interface TransitData {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+export interface TransitsResult {
+  planets: Record<string, {
+    longitude: number;
+    latitude: number;
+    sign: string;
+    degree_in_sign: number;
+  }>;
+  date: string;
+  time: string;
+}
+
 /**
  * Находит точное время Solar Return - момент возвращения Солнца в натальную позицию
  */
@@ -100,6 +119,115 @@ export async function calculateSolarReturnTime(input: SolarReturnTimeInput): Pro
     pythonProcess.stdin.write(JSON.stringify(requestData));
     pythonProcess.stdin.end();
   });
+}
+
+/**
+ * Рассчитывает транзиты (позиции планет на указанную дату)
+ */
+export async function calculateTransits(transitData: TransitData): Promise<TransitsResult> {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), 'server', 'natal_chart_api.py');
+    const pythonProcess = spawn('python3', [scriptPath]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const result = JSON.parse(stdout);
+          resolve(result);
+        } catch (err) {
+          reject(new Error(`Failed to parse Python output: ${err}`));
+        }
+      } else {
+        try {
+          const errorObj = JSON.parse(stderr);
+          reject(new Error(`Python error: ${errorObj.error || stderr}`));
+        } catch {
+          reject(new Error(`Python script failed with code ${code}: ${stderr}`));
+        }
+      }
+    });
+    
+    pythonProcess.on('error', (err) => {
+      reject(new Error(`Failed to start Python process: ${err.message}`));
+    });
+    
+    // Отправляем входные данные с типом запроса 'transits'
+    const requestData = {
+      type: 'transits',
+      ...transitData
+    };
+    pythonProcess.stdin.write(JSON.stringify(requestData));
+    pythonProcess.stdin.end();
+  });
+}
+
+/**
+ * Определяет в какой натальный дом попадает транзитная планета
+ * Используется для персонализированного гороскопа
+ */
+export function getTransitHousePosition(
+  transitLongitude: number,
+  natalHouseCusps: number[]
+): number {
+  // Нормализуем долготу в диапазон 0-360
+  const normalizedLongitude = ((transitLongitude % 360) + 360) % 360;
+  
+  // Находим дом, в который попадает планета
+  for (let i = 0; i < 12; i++) {
+    const currentCusp = natalHouseCusps[i];
+    const nextCusp = natalHouseCusps[(i + 1) % 12];
+    
+    // Обработка случая, когда дом пересекает 0° Овна
+    if (currentCusp > nextCusp) {
+      if (normalizedLongitude >= currentCusp || normalizedLongitude < nextCusp) {
+        return i + 1; // Дома нумеруются с 1
+      }
+    } else {
+      if (normalizedLongitude >= currentCusp && normalizedLongitude < nextCusp) {
+        return i + 1;
+      }
+    }
+  }
+  
+  // Если не нашли (не должно происходить), возвращаем 1-й дом
+  return 1;
+}
+
+/**
+ * Сопоставляет транзиты с натальной картой
+ * Определяет в какие натальные дома попадают транзитные планеты
+ */
+export function mapTransitsToNatalHouses(
+  transits: TransitsResult,
+  natalChart: NatalChartResult
+): Record<string, { sign: string; natalHouse: number; longitude: number }> {
+  const result: Record<string, { sign: string; natalHouse: number; longitude: number }> = {};
+  
+  for (const [planetName, planetData] of Object.entries(transits.planets)) {
+    const natalHouse = getTransitHousePosition(
+      planetData.longitude,
+      natalChart.houses.cusps
+    );
+    
+    result[planetName] = {
+      sign: planetData.sign,
+      natalHouse,
+      longitude: planetData.longitude
+    };
+  }
+  
+  return result;
 }
 
 /**

@@ -169,6 +169,81 @@ def calculate_natal_chart(birth_data):
     }
 
 
+def calculate_transits(transit_data):
+    """
+    Рассчитывает позиции планет на указанную дату (транзиты)
+    
+    Args:
+        transit_data: dict с полями:
+            - year, month, day, hour, minute (обязательные)
+    
+    Returns:
+        dict с позициями планет
+    """
+    year = transit_data['year']
+    month = transit_data['month']
+    day = transit_data['day']
+    hour = transit_data['hour']
+    minute = transit_data['minute']
+    
+    print(f"[TRANSITS] Calculating for {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}", file=sys.stderr)
+    
+    # Преобразуем в десятичные часы
+    decimal_hour = hour + minute / 60.0
+    
+    # Юлианский день
+    jd_ut = swe.julday(year, month, day, decimal_hour, swe.GREG_CAL)
+    delta_t = swe.deltat(jd_ut)
+    jd_tt = jd_ut + delta_t / 86400.0
+    
+    # Рассчитываем позиции планет
+    planets_data = {}
+    north_node_lon = None
+    
+    for planet_name, planet_id in PLANETS.items():
+        try:
+            # Специальная обработка для South Node
+            if planet_name == 'South Node':
+                if north_node_lon is None:
+                    # Если North Node еще не рассчитан, рассчитываем его
+                    nn_position, _ = swe.calc(jd_tt, swe.TRUE_NODE, swe.FLG_SWIEPH)
+                    north_node_lon = nn_position[0]
+                
+                # South Node = North Node + 180°
+                lon = (north_node_lon + 180) % 360
+                planets_data[planet_name] = {
+                    'longitude': round(lon, 4),
+                    'latitude': 0,  # South Node всегда на эклиптике
+                    'sign': get_zodiac_sign(lon),
+                    'degree_in_sign': round(lon % 30, 4)
+                }
+            else:
+                position, _ = swe.calc(jd_tt, planet_id, swe.FLG_SWIEPH)
+                lon = position[0]
+                
+                # Сохраняем долготу North Node для расчета South Node
+                if planet_name == 'North Node':
+                    north_node_lon = lon
+                
+                planets_data[planet_name] = {
+                    'longitude': round(lon, 4),
+                    'latitude': round(position[1], 4),
+                    'sign': get_zodiac_sign(lon),
+                    'degree_in_sign': round(lon % 30, 4)
+                }
+        except Exception as e:
+            print(f"[TRANSITS] Warning: couldn't calculate {planet_name}: {e}", file=sys.stderr)
+            continue
+    
+    print(f"[TRANSITS] Calculated {len(planets_data)} planets", file=sys.stderr)
+    
+    return {
+        'planets': planets_data,
+        'date': f"{year}-{month:02d}-{day:02d}",
+        'time': f"{hour:02d}:{minute:02d}"
+    }
+
+
 def calculate_solar_return_time(natal_sun_longitude, birth_month, birth_day, target_year):
     """
     Находит точное время Solar Return - момент, когда Солнце возвращается в натальную позицию
@@ -302,6 +377,9 @@ if __name__ == '__main__':
                 birth_day,
                 target_year
             )
+        elif request_type == 'transits':
+            # Рассчитываем транзиты
+            result = calculate_transits(input_data)
         else:
             # Рассчитываем натальную карту
             result = calculate_natal_chart(input_data)

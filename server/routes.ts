@@ -10,7 +10,7 @@ import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextRese
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, getImportantDateInterpretation, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
-import { calculateNatalChartPython, calculateSolarReturnTime, type NatalChartResult } from "./lib/pythonNatal";
+import { calculateNatalChartPython, calculateSolarReturnTime, calculateTransits, mapTransitsToNatalHouses, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets, getImportantDatesWithLunarPhases } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
@@ -1508,7 +1508,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[HOROSCOPE] Calling interpretHoroscope...');
 
-      // Generate daily horoscope only
+      // Calculate today's transits
+      const nowTime = dayjs().tz(user.timezone);
+      const transitData = {
+        year: nowTime.year(),
+        month: nowTime.month() + 1, // dayjs months are 0-indexed
+        day: nowTime.date(),
+        hour: nowTime.hour(),
+        minute: nowTime.minute(),
+      };
+
+      console.log('[HOROSCOPE] Calculating transits for:', transitData);
+      const transits = await calculateTransits(transitData);
+      console.log('[HOROSCOPE] Transits calculated:', Object.keys(transits.planets).length, 'planets');
+
+      // Map transits to natal houses
+      const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart.data);
+      console.log('[HOROSCOPE] Transits mapped to natal houses');
+
+      // Generate daily horoscope with transits
       const result = await interpretHoroscope({
         profile: {
           name: user.name,
@@ -1516,14 +1534,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timezone: user.timezone
         },
         natal: natalChart.data,
-        transits: []
+        transits: transitsInNatalHouses
       }, locale);
 
       console.log('[HOROSCOPE] interpretHoroscope returned successfully');
 
       // Save to database with today's date
-      const now = dayjs().tz(user.timezone);
-      const today = now.format('YYYY-MM-DD');
+      const today = nowTime.format('YYYY-MM-DD');
 
       await storage.createHoroscopeReading({
         userId,
