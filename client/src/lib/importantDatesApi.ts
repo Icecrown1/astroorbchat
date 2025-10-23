@@ -30,8 +30,11 @@ export interface InterpretationResponse {
   cached: boolean;
 }
 
-export async function getImportantDates(): Promise<ImportantEvent[]> {
-  const response = await apiRequest('GET', '/api/astrology/important-dates');
+export async function getImportantDates(externalChartId?: string): Promise<ImportantEvent[]> {
+  const url = externalChartId 
+    ? `/api/astrology/important-dates?externalChartId=${externalChartId}`
+    : '/api/astrology/important-dates';
+  const response = await apiRequest('GET', url);
   return response.data;
 }
 

@@ -2131,7 +2131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If externalChartId is provided, use guest chart; otherwise use user's chart
       if (externalChartId) {
-        natalChart = await storage.getExternalNatalChart(externalChartId);
+        natalChart = await storage.getExternalNatal(externalChartId);
         if (!natalChart) {
           return res.status(404).json({ ok: false, error: "External natal chart not found" });
         }

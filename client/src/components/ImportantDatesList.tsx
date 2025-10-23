@@ -18,15 +18,21 @@ import { translatePlanet, translateSign } from '@/lib/astroTranslations';
 import { Loader } from './Loader';
 import { useToast } from '@/hooks/use-toast';
 
-export function ImportantDatesList() {
+interface ImportantDatesListProps {
+  externalChartId?: string;
+}
+
+export function ImportantDatesList({ externalChartId }: ImportantDatesListProps = {}) {
   const { locale } = useTranslation();
   const { toast } = useToast();
   const [selectedEvent, setSelectedEvent] = useState<ImportantEvent | null>(null);
   const [interpretationResponse, setInterpretationResponse] = useState<InterpretationResponse | null>(null);
 
   const { data: events, isLoading } = useQuery<ImportantEvent[]>({
-    queryKey: ['/api/astrology/important-dates'],
-    queryFn: getImportantDates,
+    queryKey: externalChartId 
+      ? ['/api/astrology/important-dates', externalChartId]
+      : ['/api/astrology/important-dates'],
+    queryFn: () => getImportantDates(externalChartId),
   });
 
   const interpretationMutation = useMutation({
