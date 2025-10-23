@@ -88,9 +88,13 @@ export async function ensureUserNatalChart(userId: string): Promise<NatalChart> 
   
   const natalData = await computeNatalFromUser(user);
   
+  // Extract Sun longitude for Solar Return calculations
+  const sunLongitude = natalData.planets?.Sun?.longitude;
+  
   const chart = await storage.createNatalChart({
     userId,
     data: natalData,
+    natalSunLongitude: sunLongitude ? sunLongitude.toString() : null,
   });
   
   return chart;
@@ -225,8 +229,12 @@ export async function recomputeIfProfileChanged(userId: string): Promise<void> {
     console.log('[NATAL SERVICE] Profile changed, recomputing chart and clearing interpretations');
     const newData = await computeNatalFromUser(user);
     
+    // Extract Sun longitude for Solar Return calculations
+    const sunLongitude = newData.planets?.Sun?.longitude;
+    
     await storage.updateNatalChart(userId, { 
       data: newData,
+      natalSunLongitude: sunLongitude ? sunLongitude.toString() : null,
       professionalInterpretation: null, // Clear cached interpretations when profile changes
     });
   }

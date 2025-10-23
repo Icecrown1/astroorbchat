@@ -10,7 +10,7 @@ import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextRese
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, getImportantDateInterpretation, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
-import { calculateNatalChartPython, type NatalChartResult } from "./lib/pythonNatal";
+import { calculateNatalChartPython, calculateSolarReturnTime, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets, getImportantDatesWithLunarPhases } from "./lib/transits";
 import { geocodeCityWithFallback } from "./lib/geocoding";
@@ -1363,21 +1363,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Execute the reading using Swiss Ephemeris
-      const birthDate = new Date(user.birthdayDate);
-      const solarDate = new Date(targetYear, birthDate.getMonth(), birthDate.getDate());
+      // Get natal Sun longitude for accurate Solar Return calculation
+      let natalSunLongitude = natalChart.natalSunLongitude;
       
-      const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
+      // If natalSunLongitude is missing (legacy charts), extract from chart data
+      if (!natalSunLongitude) {
+        const chartData = natalChart.data as NatalChartResult;
+        const sunLongitude = chartData?.planets?.Sun?.longitude;
+        
+        if (!sunLongitude) {
+          return res.status(500).json({ 
+            ok: false, 
+            error: "Natal Sun longitude not found. Please recalculate your natal chart." 
+          });
+        }
+        
+        // Save it for future use
+        natalSunLongitude = sunLongitude.toString();
+        await storage.updateNatalChart(userId, { 
+          natalSunLongitude 
+        });
+        console.log(`[SOLAR] Extracted and saved natal Sun longitude: ${natalSunLongitude}°`);
+      } else {
+        console.log(`[SOLAR] Using cached natal Sun longitude: ${natalSunLongitude}°`);
+      }
+      
+      // Calculate exact Solar Return time (when Sun returns to natal position)
+      const birthDate = new Date(user.birthdayDate);
+      const birthMonth = birthDate.getMonth() + 1; // 1-12
+      const birthDay = birthDate.getDate();
+      
+      const solarReturnTime = await calculateSolarReturnTime({
+        natal_sun_longitude: parseFloat(natalSunLongitude),
+        birth_month: birthMonth,
+        birth_day: birthDay,
+        target_year: targetYear,
+      });
+      
+      console.log(`[SOLAR] Exact Solar Return time:`, solarReturnTime);
       
       // Geocode location (where user will be on birthday) to get coordinates
       const coords = await geocodeCityWithFallback(location.trim());
       
       const solarChartData = await calculateNatalChartPython({
-        year: solarDate.getFullYear(),
-        month: solarDate.getMonth() + 1,
-        day: solarDate.getDate(),
-        hour: hours,
-        minute: minutes,
+        year: solarReturnTime.year,
+        month: solarReturnTime.month,
+        day: solarReturnTime.day,
+        hour: solarReturnTime.hour,
+        minute: solarReturnTime.minute,
         latitude: coords.lat,
         longitude: coords.lon,
         house_system: 'Placidus',
@@ -1385,10 +1418,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Extract Sun position from chart
       const sunData = solarChartData.planets['Sun'];
+      
+      // Create exact Solar Return date from calculated time
+      const exactSolarDate = new Date(
+        solarReturnTime.year,
+        solarReturnTime.month - 1, // JS months are 0-indexed
+        solarReturnTime.day,
+        solarReturnTime.hour,
+        solarReturnTime.minute
+      );
+      
       const solar = {
         position: sunData.longitude,
         sign: sunData.sign,
-        date: solarDate,
+        date: exactSolarDate,
       };
       
       const interpretation = await getAstrologyInterpretation("solar", solar, locale, user.gender);

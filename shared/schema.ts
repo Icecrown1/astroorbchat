@@ -79,6 +79,7 @@ export const natalCharts = pgTable("natal_charts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull().unique(),
   data: jsonb("data").notNull(),
+  natalSunLongitude: decimal("natal_sun_longitude", { precision: 10, scale: 6 }),
   professionalInterpretation: jsonb("professional_interpretation"),
   houseInfluences: jsonb("house_influences"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

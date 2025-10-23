@@ -33,6 +33,10 @@ Preferred communication style: Simple, everyday language.
     - Significantly improves performance and reduces OpenAI API costs
   - **Astronomical Calculations**: Natal chart positions (planets, houses, aspects) cached in database
   - **Solar Return Caching** (October 23, 2025):
+    - **Astronomically Accurate Calculation**: Uses Swiss Ephemeris to find exact moment when Sun returns to natal position
+    - **Algorithm**: Finds precise time (year, month, day, hour, minute) when transiting Sun longitude equals natal Sun longitude
+    - Solar Return can occur 1-2 days before/after birthday due to astronomical variations
+    - **natal_sun_longitude**: Stored in natalCharts table upon first natal chart calculation for reuse
     - **Location-Aware Caching**: Cached by (userId, targetYear, location) to support different cities for same year
     - Location is normalized (trim + toLowerCase) for consistent cache matching
     - Cost: 15 orbs (increased from 11 orbs)

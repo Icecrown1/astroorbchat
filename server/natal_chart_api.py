@@ -169,13 +169,142 @@ def calculate_natal_chart(birth_data):
     }
 
 
+def calculate_solar_return_time(natal_sun_longitude, birth_month, birth_day, target_year):
+    """
+    Находит точное время Solar Return - момент, когда Солнце возвращается в натальную позицию
+    
+    Args:
+        natal_sun_longitude: Долгота Солнца при рождении (0-360°)
+        birth_month: Месяц рождения (1-12)
+        birth_day: День рождения (1-31)
+        target_year: Целевой год для расчета Solar Return
+    
+    Returns:
+        dict с полями: year, month, day, hour, minute - точное время Solar Return
+    """
+    print(f"[SOLAR RETURN] Calculating for target year {target_year}", file=sys.stderr)
+    print(f"[SOLAR RETURN] Natal Sun longitude: {natal_sun_longitude}°", file=sys.stderr)
+    
+    # Начинаем с предполагаемой даты (день рождения в целевом году)
+    # Солнце может вернуться на день раньше или позже из-за високосных годов
+    search_year = target_year
+    search_month = birth_month
+    search_day = birth_day
+    
+    # Проверяем возможные дни вокруг дня рождения
+    for day_offset in range(-2, 3):  # Проверяем от -2 до +2 дней
+        try:
+            test_day = birth_day + day_offset
+            test_month = birth_month
+            test_year = target_year
+            
+            # Корректируем месяц/год если day выходит за границы
+            if test_day < 1:
+                test_month -= 1
+                if test_month < 1:
+                    test_month = 12
+                    test_year -= 1
+                # Получаем последний день предыдущего месяца
+                import calendar
+                test_day = calendar.monthrange(test_year, test_month)[1] + test_day
+            else:
+                # Проверяем максимальный день для текущего месяца
+                import calendar
+                max_day = calendar.monthrange(test_year, test_month)[1]
+                if test_day > max_day:
+                    test_day -= max_day
+                    test_month += 1
+                    if test_month > 12:
+                        test_month = 1
+                        test_year += 1
+            
+            # Ищем точное время в этом дне
+            for hour_offset in range(0, 24):
+                jd_ut = swe.julday(test_year, test_month, test_day, hour_offset, swe.GREG_CAL)
+                delta_t = swe.deltat(jd_ut)
+                jd_tt = jd_ut + delta_t / 86400.0
+                
+                # Получаем позицию Солнца
+                sun_position, _ = swe.calc(jd_tt, swe.SUN, swe.FLG_SWIEPH)
+                current_sun_lon = sun_position[0]
+                
+                # Нормализуем углы для сравнения (учитываем переход через 0°)
+                diff = abs(current_sun_lon - natal_sun_longitude)
+                if diff > 180:
+                    diff = 360 - diff
+                
+                # Если разница меньше 1°, уточняем с помощью минут
+                if diff < 1.0:
+                    # Ищем точное время с шагом в 1 минуту
+                    best_minute = 0
+                    min_diff = diff
+                    
+                    for minute_offset in range(0, 60):
+                        decimal_hour = hour_offset + minute_offset / 60.0
+                        jd_ut = swe.julday(test_year, test_month, test_day, decimal_hour, swe.GREG_CAL)
+                        delta_t = swe.deltat(jd_ut)
+                        jd_tt = jd_ut + delta_t / 86400.0
+                        
+                        sun_position, _ = swe.calc(jd_tt, swe.SUN, swe.FLG_SWIEPH)
+                        current_sun_lon = sun_position[0]
+                        
+                        diff = abs(current_sun_lon - natal_sun_longitude)
+                        if diff > 180:
+                            diff = 360 - diff
+                        
+                        if diff < min_diff:
+                            min_diff = diff
+                            best_minute = minute_offset
+                    
+                    print(f"[SOLAR RETURN] Found at {test_year}-{test_month:02d}-{test_day:02d} {hour_offset:02d}:{best_minute:02d}", file=sys.stderr)
+                    print(f"[SOLAR RETURN] Sun longitude difference: {min_diff:.4f}°", file=sys.stderr)
+                    
+                    return {
+                        'year': test_year,
+                        'month': test_month,
+                        'day': test_day,
+                        'hour': hour_offset,
+                        'minute': best_minute
+                    }
+        except Exception as e:
+            print(f"[SOLAR RETURN] Error checking day offset {day_offset}: {e}", file=sys.stderr)
+            continue
+    
+    # Если не нашли точное время, возвращаем день рождения в полдень
+    print(f"[SOLAR RETURN] WARNING: Could not find exact time, using birthday noon", file=sys.stderr)
+    return {
+        'year': target_year,
+        'month': birth_month,
+        'day': birth_day,
+        'hour': 12,
+        'minute': 0
+    }
+
+
 if __name__ == '__main__':
     try:
         # Читаем входные данные из stdin
         input_data = json.load(sys.stdin)
         
-        # Рассчитываем натальную карту
-        result = calculate_natal_chart(input_data)
+        # Определяем тип запроса
+        request_type = input_data.get('type', 'natal_chart')
+        
+        if request_type == 'solar_return_time':
+            # Рассчитываем точное время Solar Return
+            natal_sun_longitude = input_data['natal_sun_longitude']
+            birth_month = input_data['birth_month']
+            birth_day = input_data['birth_day']
+            target_year = input_data['target_year']
+            
+            result = calculate_solar_return_time(
+                natal_sun_longitude,
+                birth_month,
+                birth_day,
+                target_year
+            )
+        else:
+            # Рассчитываем натальную карту
+            result = calculate_natal_chart(input_data)
         
         # Выводим результат в stdout
         print(json.dumps(result, ensure_ascii=False))

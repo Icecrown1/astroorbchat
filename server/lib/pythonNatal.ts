@@ -36,6 +36,72 @@ export interface NatalChartResult {
   julian_day: number;
 }
 
+export interface SolarReturnTimeInput {
+  natal_sun_longitude: number;
+  birth_month: number;
+  birth_day: number;
+  target_year: number;
+}
+
+export interface SolarReturnTimeResult {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+/**
+ * Находит точное время Solar Return - момент возвращения Солнца в натальную позицию
+ */
+export async function calculateSolarReturnTime(input: SolarReturnTimeInput): Promise<SolarReturnTimeResult> {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), 'server', 'natal_chart_api.py');
+    const pythonProcess = spawn('python3', [scriptPath]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const result = JSON.parse(stdout);
+          resolve(result);
+        } catch (err) {
+          reject(new Error(`Failed to parse Python output: ${err}`));
+        }
+      } else {
+        try {
+          const errorObj = JSON.parse(stderr);
+          reject(new Error(`Python error: ${errorObj.error || stderr}`));
+        } catch {
+          reject(new Error(`Python script failed with code ${code}: ${stderr}`));
+        }
+      }
+    });
+    
+    pythonProcess.on('error', (err) => {
+      reject(new Error(`Failed to start Python process: ${err.message}`));
+    });
+    
+    // Отправляем входные данные с типом запроса 'solar_return_time'
+    const requestData = {
+      type: 'solar_return_time',
+      ...input
+    };
+    pythonProcess.stdin.write(JSON.stringify(requestData));
+    pythonProcess.stdin.end();
+  });
+}
+
 /**
  * Вызывает Python-скрипт для расчёта натальной карты через Swiss Ephemeris
  * 
