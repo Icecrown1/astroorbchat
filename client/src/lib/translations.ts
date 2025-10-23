@@ -124,6 +124,11 @@ export const translations = {
       insight1: "This year's cosmic energy supports new beginnings",
       insight2: 'Focus on personal growth and self-expression',
       insight3: 'Trust your intuition in decision-making',
+      selectYear: 'Select Year',
+      location: 'Location on your birthday',
+      locationPlaceholder: 'City where you will be',
+      forYear: 'For year',
+      viewCached: 'View (free)',
     },
     horoscope: {
       title: 'Daily Horoscope',
@@ -550,6 +555,11 @@ export const translations = {
       insight1: 'Космическая энергия этого года поддерживает новые начинания',
       insight2: 'Сосредоточьтесь на личностном росте и самовыражении',
       insight3: 'Доверяйте своей интуиции в принятии решений',
+      selectYear: 'Выберите год',
+      location: 'Город в день рождения',
+      locationPlaceholder: 'Город, где вы будете',
+      forYear: 'На год',
+      viewCached: 'Посмотреть (бесплатно)',
     },
     horoscope: {
       title: 'Ежедневный гороскоп',

@@ -1282,10 +1282,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if solar return is cached for a specific year and location
+  app.post("/api/astrology/solar/check", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { targetYear, location } = req.body;
+
+      if (!targetYear) {
+        return res.status(400).json({ ok: false, error: "targetYear is required" });
+      }
+      if (!location || !location.trim()) {
+        return res.status(400).json({ ok: false, error: "location is required" });
+      }
+
+      const cachedSolar = await storage.getSolarReturn(userId, targetYear, location.trim().toLowerCase());
+      
+      res.json({
+        ok: true,
+        cached: !!cachedSolar,
+      });
+    } catch (error: any) {
+      console.error('[SOLAR CHECK] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/astrology/solar", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
       const locale = req.body.locale || 'en';
+      const { targetYear, location } = req.body;
+      
+      // Validate inputs
+      if (!targetYear) {
+        return res.status(400).json({ ok: false, error: "targetYear is required" });
+      }
+      if (!location || !location.trim()) {
+        return res.status(400).json({ ok: false, error: "location is required" });
+      }
       
       // Get user
       const user = await storage.getUser(userId);
@@ -1304,14 +1338,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ ok: false, error: "NATAL_INCOMPLETE" });
       }
 
-      // Calculate target year (current year)
-      const today = new Date();
-      const targetYear = today.getFullYear();
-
       // CHECK CACHE FIRST (per TZ requirement - no energy deduction for cached)
-      const cachedSolar = await storage.getSolarReturn(userId, targetYear);
+      const normalizedLocation = location.trim().toLowerCase();
+      const cachedSolar = await storage.getSolarReturn(userId, targetYear, normalizedLocation);
       if (cachedSolar) {
-        console.log(`[SOLAR] Using cached solar return for year ${targetYear}`);
+        console.log(`[SOLAR] Using cached solar return for year ${targetYear}, location: ${location}`);
         return res.json({
           ok: true,
           data: cachedSolar.data,
@@ -1338,8 +1369,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
       
-      // Geocode birth city to get coordinates
-      const coords = await geocodeCityWithFallback(user.birthPlace);
+      // Geocode location (where user will be on birthday) to get coordinates
+      const coords = await geocodeCityWithFallback(location.trim());
       
       const solarChartData = await calculateNatalChartPython({
         year: solarDate.getFullYear(),
@@ -1364,11 +1395,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Localized insights
       const insights = locale === 'ru' ? [
-        'Сегодняшняя космическая энергия поддерживает новые начинания',
+        'Космическая энергия этого года поддерживает новые начинания',
         'Сосредоточьтесь на личностном росте и самовыражении',
         'Доверяйте своей интуиции в принятии решений',
       ] : [
-        "Today's cosmic energy supports new beginnings",
+        "This year's cosmic energy supports new beginnings",
         'Focus on personal growth and self-expression',
         'Trust your intuition in decision-making',
       ];
@@ -1384,6 +1415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createSolarReturn({
         userId,
         targetYear,
+        location: normalizedLocation,
         data: responseData,
       });
 

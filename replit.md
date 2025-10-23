@@ -33,12 +33,14 @@ Preferred communication style: Simple, everyday language.
     - Significantly improves performance and reduces OpenAI API costs
   - **Astronomical Calculations**: Natal chart positions (planets, houses, aspects) cached in database
   - **Solar Return Caching** (October 23, 2025):
-    - Cached by userId + targetYear in `solarReturns` table to prevent duplicate charges
+    - **Location-Aware Caching**: Cached by (userId, targetYear, location) to support different cities for same year
+    - Location is normalized (trim + toLowerCase) for consistent cache matching
     - Cost: 15 orbs (increased from 11 orbs)
     - Subscribers get solar returns free; cached results don't deduct energy on subsequent views
     - Requires complete natal chart (with birth time and place); returns 409 if missing
     - Energy deducted AFTER successful calculation to prevent charging for failed requests
     - Frontend shows subscription-aware messaging and cached result indicators
+    - User can select target year (current + 3 future years) and specify where they'll be on birthday
 - **Payment Systems**:
   - **TON Blockchain**: Via TON Connect with server-side verification.
   - **Telegram Stars**: With webhook security and idempotency checks.

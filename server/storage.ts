@@ -130,7 +130,7 @@ export interface IStorage {
   getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]>;
   
   // Solar return operations
-  getSolarReturn(userId: string, targetYear: number): Promise<SolarReturn | undefined>;
+  getSolarReturn(userId: string, targetYear: number, location: string): Promise<SolarReturn | undefined>;
   createSolarReturn(solarReturn: InsertSolarReturn): Promise<SolarReturn>;
   
   // Admin operations
@@ -647,11 +647,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Solar return operations
-  async getSolarReturn(userId: string, targetYear: number): Promise<SolarReturn | undefined> {
+  // NOTE: location parameter must be pre-normalized (trim + toLowerCase) by caller
+  async getSolarReturn(userId: string, targetYear: number, location: string): Promise<SolarReturn | undefined> {
     const [solarReturn] = await db
       .select()
       .from(solarReturns)
-      .where(and(eq(solarReturns.userId, userId), eq(solarReturns.targetYear, targetYear)));
+      .where(and(
+        eq(solarReturns.userId, userId), 
+        eq(solarReturns.targetYear, targetYear),
+        eq(solarReturns.location, location)
+      ));
     return solarReturn || undefined;
   }
 

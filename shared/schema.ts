@@ -9,11 +9,12 @@ export const solarReturns = pgTable("solar_returns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   targetYear: integer("target_year").notNull(),
+  location: text("location").notNull(),
   data: jsonb("data").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("solar_returns_user_id_idx").on(table.userId),
-  userYearIdx: index("solar_returns_user_year_idx").on(table.userId, table.targetYear),
+  userYearLocationIdx: index("solar_returns_user_year_location_idx").on(table.userId, table.targetYear, table.location),
 }));
 
 export const users = pgTable("users", {
