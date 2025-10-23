@@ -14,28 +14,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 
 interface HoroscopeData {
-  morning?: {
-    money: string;
-    work: string;
-    study: string;
-    love: string;
-    health: string;
-  };
-  day?: {
-    money: string;
-    work: string;
-    study: string;
-    love: string;
-    health: string;
-  };
-  evening?: {
-    money: string;
-    work: string;
-    study: string;
-    love: string;
-    health: string;
-    self_care?: string;
-  };
+  money: string;
+  work: string;
+  study: string;
+  love: string;
+  health: string;
+  self_care?: string;
 }
 
 export default function Horoscope() {
@@ -233,11 +217,7 @@ export default function Horoscope() {
                     </p>
                   </div>
 
-                  <HoroscopeThemes 
-                    morning={horoscopeData.morning}
-                    day={horoscopeData.day}
-                    evening={horoscopeData.evening}
-                  />
+                  <HoroscopeThemes themes={horoscopeData} />
                 </Card>
 
                 <Button
