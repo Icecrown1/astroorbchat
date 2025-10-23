@@ -1343,9 +1343,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cachedSolar = await storage.getSolarReturn(userId, targetYear, normalizedLocation);
       if (cachedSolar) {
         console.log(`[SOLAR] Using cached solar return for year ${targetYear}, location: ${location}`);
+        
+        // Remove insights field from cached data (backward compatibility)
+        const cleanedData = { ...cachedSolar.data };
+        delete cleanedData.insights;
+        
         return res.json({
           ok: true,
-          data: cachedSolar.data,
+          data: cleanedData,
           cached: true,
         });
       }
@@ -1435,17 +1440,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const interpretation = await getAstrologyInterpretation("solar", solarData, locale, user.gender);
 
-      // Localized insights
-      const insights = locale === 'ru' ? [
-        'Космическая энергия этого года поддерживает новые начинания',
-        'Сосредоточьтесь на личностном росте и самовыражении',
-        'Доверяйте своей интуиции в принятии решений',
-      ] : [
-        "This year's cosmic energy supports new beginnings",
-        'Focus on personal growth and self-expression',
-        'Trust your intuition in decision-making',
-      ];
-
       // Prepare full response data
       const responseData = {
         solar: {
@@ -1454,7 +1448,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: exactSolarDate,
         },
         interpretation,
-        insights,
       };
 
       // SAVE TO CACHE (per TZ requirement)

@@ -305,23 +305,6 @@ export default function SolarToday() {
               </div>
             </Card>
 
-            {solarData.insights && solarData.insights.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">{t.solarToday.keyInsights}</h2>
-                <div className="space-y-3">
-                  {solarData.insights.map((insight: string, index: number) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10"
-                    >
-                      <Sun className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <p className="text-sm text-foreground">{insight}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
             <Button
               variant="outline"
               className="w-full"
