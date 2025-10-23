@@ -393,7 +393,7 @@ export default function GuestNatalChartView() {
                 ? 'Персональные астрологические события на ближайшие 3 месяца на основе транзитов к этой натальной карте' 
                 : 'Personalized astrological events for the next 3 months based on transits to this natal chart'}
             </p>
-            <ImportantDatesList />
+            <ImportantDatesList externalChartId={chartId} />
           </Card>
         </div>
       </div>
