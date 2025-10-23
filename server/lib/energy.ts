@@ -6,7 +6,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 export const ENERGY_COSTS = {
-  solar: 11,
+  solar: 15,
   horoscope: 2,
   compatibility: 2,
   ask: 1,

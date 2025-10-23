@@ -1287,23 +1287,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const locale = req.body.locale || 'en';
       
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
+      // Get user
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
       }
 
-      const cost = ENERGY_COSTS.solar;
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
+      // STRICT NATAL CHART CHECK (from TZ requirement)
+      const natalChart = await storage.getNatalChart(userId);
+      if (!natalChart || !natalChart.data) {
+        return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
       }
 
-      // Execute the reading using Swiss Ephemeris (calculate solar return chart for today)
+      // Check if natal chart has precise time and place
+      if (!user.birthTime || !user.birthPlace) {
+        return res.status(409).json({ ok: false, error: "NATAL_INCOMPLETE" });
+      }
+
+      // Calculate target year (current year)
       const today = new Date();
-      const solarYear = today.getFullYear();
+      const targetYear = today.getFullYear();
+
+      // CHECK CACHE FIRST (per TZ requirement - no energy deduction for cached)
+      const cachedSolar = await storage.getSolarReturn(userId, targetYear);
+      if (cachedSolar) {
+        console.log(`[SOLAR] Using cached solar return for year ${targetYear}`);
+        return res.json({
+          ok: true,
+          data: cachedSolar.data,
+          cached: true,
+        });
+      }
+
+      // Not in cache - check subscription and energy
+      await checkAndResetEnergy(storage, userId);
+      const subscription = await checkSubscriptionExpiry(storage, userId);
+      const hasActiveSubscription = subscription && (subscription.status === 'active' || subscription.status === 'canceled');
+
+      // CHECK energy availability (but don't deduct yet)
+      if (!hasActiveSubscription) {
+        const updatedUser = await storage.getUser(userId);
+        if (!updatedUser || (updatedUser.freeEnergy + updatedUser.purchasedEnergy) < ENERGY_COSTS.solar) {
+          return res.status(402).json({ ok: false, error: "Insufficient energy" });
+        }
+      }
+
+      // Execute the reading using Swiss Ephemeris
       const birthDate = new Date(user.birthdayDate);
-      const solarDate = new Date(solarYear, birthDate.getMonth(), birthDate.getDate());
+      const solarDate = new Date(targetYear, birthDate.getMonth(), birthDate.getDate());
       
       const [hours = 12, minutes = 0] = (user.birthTime || '12:00').split(':').map(Number);
       
@@ -1342,19 +1373,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Trust your intuition in decision-making',
       ];
 
-      // Only deduct energy after successful execution
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: "solar", cost });
+      // Prepare full response data
+      const responseData = {
+        solar,
+        interpretation,
+        insights,
+      };
+
+      // SAVE TO CACHE (per TZ requirement)
+      await storage.createSolarReturn({
+        userId,
+        targetYear,
+        data: responseData,
+      });
+
+      // DEDUCT ENERGY AFTER SUCCESSFUL CALCULATION (per architect feedback)
+      if (!hasActiveSubscription) {
+        const deductResult = await deductEnergy(storage, userId, 'solar');
+        if (!deductResult.ok) {
+          console.error('[SOLAR] Failed to deduct energy after calculation:', deductResult.error);
+        }
+      }
+
+      console.log(`[SOLAR] Calculated and cached solar return for year ${targetYear}`);
 
       res.json({
         ok: true,
-        data: {
-          solar,
-          interpretation,
-          insights,
-        },
+        data: responseData,
+        cached: false,
       });
     } catch (error: any) {
+      console.error('[SOLAR] Error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });

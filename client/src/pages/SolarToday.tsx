@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Sun } from 'lucide-react';
+import { ArrowLeft, Sun, Info } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -14,21 +15,75 @@ export default function SolarToday() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [solarData, setSolarData] = useState<any>(null);
+  const [isCached, setIsCached] = useState(false);
+
+  // Get current user to check subscription
+  const { data: me } = useQuery({
+    queryKey: ['/api/user/me'],
+  });
+
+  const hasActiveSubscription = me?.subscription?.status === 'active' || me?.subscription?.status === 'canceled';
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/astrology/solar', { locale });
-      return response.data;
+      return response;
     },
-    onSuccess: (data) => {
-      setSolarData(data);
+    onSuccess: (response) => {
+      setSolarData(response.data);
+      setIsCached(response.cached || false);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      toast({
-        title: t.solarToday.generated,
-        description: t.solarToday.solarReady,
-      });
+      
+      if (response.cached) {
+        toast({
+          title: locale === 'ru' ? 'Соляр загружен' : 'Solar Loaded',
+          description: locale === 'ru' ? 'Показан сохраненный расчет' : 'Showing cached calculation',
+        });
+      } else {
+        toast({
+          title: t.solarToday.generated,
+          description: t.solarToday.solarReady,
+        });
+      }
     },
     onError: (error: any) => {
+      // Handle 409 errors (NATAL_NOT_INITIALIZED, NATAL_INCOMPLETE)
+      if (error.response?.status === 409) {
+        const errorCode = error.response?.data?.error;
+        if (errorCode === 'NATAL_NOT_INITIALIZED') {
+          toast({
+            title: locale === 'ru' ? 'Натальная карта не создана' : 'Natal chart not created',
+            description: locale === 'ru' 
+              ? 'Сначала создайте натальную карту с точным временем и местом рождения' 
+              : 'First create your natal chart with precise birth time and place',
+            variant: 'destructive',
+          });
+          navigate('/natal-chart');
+          return;
+        }
+        if (errorCode === 'NATAL_INCOMPLETE') {
+          toast({
+            title: locale === 'ru' ? 'Неполные данные' : 'Incomplete data',
+            description: locale === 'ru' 
+              ? 'Для соляра нужны точное время и место рождения' 
+              : 'Solar return requires precise birth time and place',
+            variant: 'destructive',
+          });
+          navigate('/settings');
+          return;
+        }
+      }
+
+      // Handle insufficient energy (402)
+      if (error.response?.status === 402) {
+        toast({
+          title: locale === 'ru' ? 'Недостаточно орбов' : 'Insufficient orbs',
+          description: locale === 'ru' ? 'Пополните баланс орбов' : 'Please top up your orbs',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
         title: t.solarToday.generationFailed,
         description: error.message || t.compatibility.tryAgain,
@@ -65,10 +120,31 @@ export default function SolarToday() {
               <p className="text-muted-foreground mb-4">
                 {t.solarToday.generateDescription}
               </p>
-              <p className="text-sm text-primary font-medium">
-                {t.solarToday.costOne}
-              </p>
+              
+              {/* Cost badge */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                {hasActiveSubscription ? (
+                  <Badge variant="secondary" className="text-sm">
+                    {locale === 'ru' ? '✨ Бесплатно по подписке' : '✨ Free with subscription'}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-sm">
+                    {locale === 'ru' ? '💫 15 орбов' : '💫 15 orbs'}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Hint about caching */}
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-left mb-4">
+                <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  {locale === 'ru' 
+                    ? 'Новый расчет соляра стоит 15 орбов. Повторный просмотр этого же года — бесплатно.' 
+                    : 'New solar return calculation costs 15 orbs. Viewing the same year again is free.'}
+                </p>
+              </div>
             </div>
+
             <Button
               onClick={() => mutation.mutate()}
               disabled={mutation.isPending}
@@ -83,7 +159,9 @@ export default function SolarToday() {
               ) : (
                 <>
                   <Sun className="w-4 h-4 mr-2" />
-                  {t.solarToday.generate}
+                  {hasActiveSubscription 
+                    ? (locale === 'ru' ? 'Рассчитать (бесплатно)' : 'Calculate (free)')
+                    : (locale === 'ru' ? 'Рассчитать (−15 орбов)' : 'Calculate (−15 orbs)')}
                 </>
               )}
             </Button>
@@ -92,6 +170,18 @@ export default function SolarToday() {
 
         {solarData && (
           <div className="space-y-6">
+            {/* Cached indicator */}
+            {isCached && (
+              <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <Info className="w-4 h-4 text-primary" />
+                <p className="text-sm text-primary">
+                  {locale === 'ru' 
+                    ? '📅 Сохраненный расчет — орбы не списаны' 
+                    : '📅 Cached calculation — no orbs deducted'}
+                </p>
+              </div>
+            )}
+
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">{t.solarToday.todaysInfluence}</h2>
               <div className="prose prose-sm dark:prose-invert max-w-none">

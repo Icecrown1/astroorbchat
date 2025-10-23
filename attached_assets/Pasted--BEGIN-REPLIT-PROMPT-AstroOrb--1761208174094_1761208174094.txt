@@ -1,0 +1,293 @@
+[BEGIN REPLIT PROMPT]
+
+Цель: Реализовать модуль «Соляр» в AstroOrb:
+- Пользователь выбирает год (напр. 2025/2026) и город, где будет в момент соляра.
+- Бэкенд вычисляет момент соляра (точный return по долготе Солнца, с учётом таймзоны выбранной локации) и строит солярную карту.
+- Альтернатива: «снимок на ту же дату» (локальная полночь или время рождения) — по выбору.
+- Итог: отдаём данные карты и интерпретацию. За разные годы — списываем сферы (или бесплатно по подписке).
+- Кэшируем результаты в БД, повторный запрос года не списывает повторно.
+
+## 0) Контекст проекта
+- Frontend: apps/web (React + TS), экраны NatalChart/Solar.
+- Backend: apps/api (Express + TS), Prisma + Postgres, модуль астрологии `src/astrology/*`, OpenAI-промпты в `src/astrology/prompts/*`.
+- Энергия: есть механизм списаний (features).
+
+## 1) БД (Prisma) — таблица кэша соляров
+Файл: `prisma/schema.prisma` — ДОБАВИТЬ:
+
+```prisma
+model SolarReturn {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  targetYear   Int
+  method       String   // "exact_return" | "same_date"
+  tzOffsetMin  Int
+  latitude     Float
+  longitude    Float
+  placeLabel   String
+  exactMoment  DateTime // UTC момент для метода exact_return; для same_date — момент выбранного снимка
+  data         Json     // полный расчёт солярной карты (планеты, дома, углы, аспекты)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, targetYear, method, tzOffsetMin, latitude, longitude])
+  @@index([userId, targetYear])
+}
+Сгенерировать миграцию. В prisma/seed.ts — не требуется сид.
+
+2) Энергия/подписка
+Файл: apps/api/src/routes/energy.ts — ДОБАВИТЬ фичу:
+
+ts
+Копировать код
+solar_return: 1
+Правило: подписчики (любой платный план) — бесплатно. Иначе списываем 1 сферу за каждый новый (не закэшированный) расчёт года.
+
+3) Бэкенд — расчёт соляра
+3.1 Новый модуль эфемерид и соляра
+Файл: apps/api/src/astrology/solar.ts — ПОЛНЫЙ.
+
+Функции:
+
+ts
+Копировать код
+export type SolarMethod = "exact_return" | "same_date";
+
+export type SolarInput = {
+  userId: string;
+  targetYear: number;                 // напр. 2026
+  method: SolarMethod;                // "exact_return" (по умолчанию) | "same_date"
+  // место, где будет человек в момент соляра/снимка
+  lat: number; lon: number; tzOffsetMinutes: number;
+  placeLabel: string;                 // подпись места для UI
+};
+
+export type SolarResult = {
+  exactMomentUTC: string;             // ISO (UTC)
+  localMomentISO: string;             // ISO с учётом tzOffsetMinutes
+  houseSystem: string;                // берём глобальное значение (например, Placidus)
+  angles: { ASC_deg: number; MC_deg: number; DSC_deg: number; IC_deg: number; };
+  house_cusps: number[];              // 12 значений (0..360)
+  planets: { name:string; lon_deg:number; house_index:number; speed_deg_per_day:number }[];
+  aspects: { a:string; b:string; type:"conj"|"opp"|"sq"|"tri"|"sex"; orb_deg:number }[];
+  meta: {
+    method: SolarMethod;
+    targetYear: number;
+    lat: number; lon: number; tzOffsetMinutes: number; placeLabel: string;
+    zodiac_type: "tropical";
+  }
+};
+Реализация:
+
+Натальная долгота Солнца берётся из сохранённой NatalChart.data пользователя (λ_sun_natal).
+
+Метод exact_return (по умолчанию):
+
+Стартовое окно поиска: от targetYear-01-01 до targetYear-12-31.
+
+Использовать итерационный поиск (Ньютон-Рафсон) по времени T (UTC) для решения wrapAngle(λ_sun(T) - λ_sun_natal) = 0 (в градусах).
+
+λ_sun(T) — аппаратная геоцентрическая эклиптическая долгота Солнца (можно через astronomia или существующий модуль проекта; взять «истинное» Солнце, допуска достаточна до минут дуги).
+
+Производную по времени аппроксимировать разностью (±30 мин).
+
+Конверсия в локальное время для выбранного tzOffsetMinutes, но (!) расчёт всегда в UTC.
+
+На найденный момент cast-карту: вычислить наклон эклиптики, LST, углы/дома (тот же код, что в натале), планеты/аспекты — на указанной локации пользователя (relocated solar).
+
+Метод same_date:
+
+Построить карту на ту же календарную дату и время рождения пользователя (или локальную полночь — использовать время рождения как базовый вариант), но с годом targetYear и локацией + timezone, которые задал пользователь.
+
+Этот режим пометить в meta.method.
+
+Перед возвратом:
+
+Сохранить/прочитать кэш SolarReturn по (userId, targetYear, method, tzOffsetMin, lat, lon).
+
+Если найден — вернуть кэш без списаний; если нет — посчитать, записать, потом списать сферы (если нет подписки).
+
+Важное UX-поведение: если у пользователя не заполнены точные время и место рождения, вернуть 409 с кодом "NATAL_INCOMPLETE" и сообщением «Для соляра нужно точное время и место рождения».
+
+3.2 Промпт интерпретации соляра
+Файл: apps/api/src/astrology/prompts/solar_interpretation.md — ПОЛНЫЙ:
+
+css
+Копировать код
+Ты — астролог уровня ISAR/NCGR. Дай интерпретацию соляра кратко и по делу.
+
+Вход: 
+- natal_summary: выдержка из натальной карты (ключевые управители, углы).
+- solar: данные солярной карты (планеты/углы/дома/аспекты, метод exact_return|same_date).
+- профиль: { name, gender }.
+
+Правила:
+1) Сначала укажи, какой метод использован: exact_return (точный) или same_date (упрощённый).
+2) Приоритет структуры:
+   (A) Главная тема года — по дому и аспектам Солнца.
+   (B) Луна — эмоциональный фон и быт.
+   (C) Планеты в угловых домах 1/4/7/10 — ключевые события.
+   (D) Соединения/мажорные аспекты солярных планет с натальными — личные изменения.
+3) Пиши короткими абзацами, без воды, без фатализма.
+4) Стиль: для женщин — мягче и поддерживающе; для мужчин — конкретней, но человечно.
+5) Выводи JSON:
+
+{
+  "headline": "О чём год в целом",
+  "sun_focus": ["..."],
+  "moon_mood": ["..."],
+  "angular_events": ["..."],
+  "natal_overlaps": ["..."],
+  "practical_tips": ["3–5 практичных совета"]
+}
+3.3 Обёртка OpenAI
+Файл: apps/api/src/astrology/openai.ts — ДОБАВИТЬ:
+
+ts
+Копировать код
+export async function interpretSolar(input: {
+  profile: { name:string; gender:string };
+  natalSummary: any;
+  solar: SolarResult;
+}): Promise<{
+  headline: string;
+  sun_focus: string[];
+  moon_mood: string[];
+  angular_events: string[];
+  natal_overlaps: string[];
+  practical_tips: string[];
+}> { /* читать prompts/solar_interpretation.md, response_format:"json_object" */ }
+3.4 Роуты API
+Файл: apps/api/src/routes/astrology.ts — ДОПОЛНИТЬ:
+
+POST /astrology/solar/compute
+Вход (Zod):
+
+ts
+Копировать код
+{
+  targetYear: number.min(1900).max(2100),
+  method?: "exact_return" | "same_date",
+  lat: number, lon: number,
+  tzOffsetMinutes: number,                // фронт даёт смещение выбранного города
+  placeLabel: string.min(1)
+}
+Логика:
+
+Проверить, что у пользователя есть NatalChart; иначе 409 NATAL_NOT_INITIALIZED.
+
+Вызвать computeSolar(input).
+
+Если кэша не было — списать feature="solar_return" (1) при отсутствии подписки.
+
+Вернуть { ok:true, data: solar }.
+
+POST /astrology/solar/interpret
+Тело: { solarId?: string, payload?: SolarResult }
+
+Если передан solarId — загружает из кэша.
+
+Вызывает interpretSolar(...), возвращает JSON.
+
+GET /astrology/solar/list?from=2024&to=2030
+
+Вернёт список закэшированных соляров пользователя по годам/местам с метаданными.
+
+3.5 Тесты backend
+Файл: apps/api/src/tests/solar.spec.ts — ПОЛНЫЙ:
+
+Создать демо-пользователя с NatalChart.
+
+POST /solar/compute (2026, exact_return, Москва) → 200; проверить, что возвращён exactMomentUTC (ISO), есть planets, angles, house_cusps, meta.method="exact_return".
+
+Запрос с теми же параметрами второй раз → не списывает энергию (проверить UsageLog).
+
+POST /solar/compute (same_date) → 200, meta.method="same_date".
+
+/solar/interpret → 200, содержит ключи headline, sun_focus и т.д.
+
+Без NatalChart → 409 NATAL_NOT_INITIALIZED.
+
+Без точного времени рождения в профиле → 409 NATAL_INCOMPLETE.
+
+4) Фронтенд
+4.1 API-клиент
+Файл: apps/web/src/lib/api.ts — ДОБАВИТЬ:
+
+ts
+Копировать код
+export const computeSolar = (payload) => http.post('/astrology/solar/compute', payload);
+export const interpretSolar = (payload) => http.post('/astrology/solar/interpret', payload);
+export const listSolars = (params?: {from?:number; to?:number}) => http.get('/astrology/solar/list', { params });
+4.2 Экран «Соляр»
+Файл: apps/web/src/routes/Solar.tsx — НОВЫЙ (ПОЛНЫЙ):
+
+Вверху: выбор года (селект ближайшие 5 лет: текущий, +1, +2 …).
+
+Переключатель методики:
+
+Точный (возвращение Солнца) (по умолчанию)
+
+Та же дата (упрощённый)
+
+Поле Город соляра:
+
+Ввод текста → вы отдаёте lat/lon/tzOffsetMinutes (если нет геокодера — добавьте поля «широта/долгота/смещение» как минимум).
+
+Текст подсказки: «Укажите город, где будете в момент соляра — часовой пояс влияет на дома/углы».
+
+Кнопка «Рассчитать (−1 сфера)» / «Бесплатно по подписке».
+
+После ответа: показать момент соляра локальным временем, карту (reuse компонента визуализации), список факторов (Солнце/Луна/углы/соединения с наталом).
+
+Кнопка «Получить интерпретацию» → модалка с результатом interpretSolar.
+
+4.3 Платёжный UX
+Если бэкенд вернул 402/энергии не хватает — роут на покупку сфер.
+
+Для повторного года/локации показывать «Уже рассчитан — открыть».
+
+5) README — раздел «Соляр»
+Что такое точный соляр (return к долготе Солнца) и почему он предпочтителен.
+
+Что такое «та же дата» — упрощённый снимок, может отличаться.
+
+Требуются: точное время рождения, локация соляра (город, где будете в день рождения), выбор года.
+
+Стоимость: 1 сфера за новый расчёт года/локации (подписчики — бесплатно).
+
+6) Acceptance Criteria
+Пользователь может выбрать год и город; по умолчанию метод exact_return, есть опция same_date.
+
+Бэкенд вычисляет момент соляра с точностью до минут (итерационный поиск по долготе Солнца), строит карту на выбранной локации.
+
+Результат кэшируется; повторный запрос с теми же параметрами не списывает сферы.
+
+Интерпретация выдаёт структуру (Солнце/Луна/угловые/соединения) и практические советы.
+
+Тесты проходят.
+
+Вывести ПОЛНЫЙ список новых/изменённых файлов
+prisma/schema.prisma
+
+prisma/migrations/**/*
+
+apps/api/src/astrology/solar.ts
+
+apps/api/src/astrology/prompts/solar_interpretation.md
+
+apps/api/src/astrology/openai.ts
+
+apps/api/src/routes/astrology.ts
+
+apps/api/src/routes/energy.ts
+
+apps/api/src/tests/solar.spec.ts
+
+apps/web/src/lib/api.ts
+
+apps/web/src/routes/Solar.tsx
+
+README.md
+
+[END REPLIT PROMPT]

@@ -1,0 +1,249 @@
+[BEGIN REPLIT PROMPT]
+
+🎯 ЦЕЛЬ
+Добавить в проект AstroOrb модуль «Соляр» (Solar Return) — персональный годовой прогноз, построенный на основе сравнения натальной карты пользователя с положением планет в момент возвращения Солнца к своей натальной долготе (или по упрощённому режиму «та же дата»).
+
+---
+
+## 1) 📂 СТРУКТУРА ПРОЕКТА
+
+Текущие директории:
+- client/ — фронтенд (React + TypeScript)
+- server/ — бэкенд (Python + FastAPI)
+- shared/schema.ts — модели данных и типы (используется Drizzle ORM)
+- server/important_dates_api.py — расчёты через Swiss Ephemeris (уже существует)
+
+Все новые файлы и импорты нужно добавлять с учётом этой структуры.
+
+---
+
+## 2) ⚙️ ДАННЫЕ И БАЗА (Drizzle ORM)
+
+### Добавь в `shared/schema.ts` новую таблицу:
+
+```ts
+export const solarReturns = pgTable('solar_returns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  targetYear: integer('target_year').notNull(),
+  method: text('method').notNull(), // "exact_return" | "same_date"
+  latitude: real('latitude').notNull(),
+  longitude: real('longitude').notNull(),
+  tzOffsetMinutes: integer('tz_offset_minutes').notNull(),
+  placeLabel: text('place_label').notNull(),
+  exactMomentUTC: timestamp('exact_moment_utc', { withTimezone: true }),
+  data: jsonb('data').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+  unique_combo: uniqueIndex('solar_unique_combo').on(
+    table.userId,
+    table.targetYear,
+    table.method,
+    table.latitude,
+    table.longitude,
+    table.tzOffsetMinutes
+  ),
+}));
+3) 🧠 ЛОГИКА НА СЕРВЕРЕ (Python / FastAPI)
+Создай новый файл:
+server/solar_api.py
+
+Добавь два эндпоинта:
+
+python
+Копировать код
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from datetime import datetime
+from .important_dates_api import calculate_natal_chart, calculate_positions
+from .db import db, solar_returns
+from .energy import spend_sphere
+import swisseph as swe
+
+router = APIRouter(prefix="/solar", tags=["solar"])
+
+class SolarRequest(BaseModel):
+    target_year: int
+    method: str = "exact_return"  # "exact_return" | "same_date"
+    lat: float
+    lon: float
+    tz_offset_minutes: int
+    place_label: str
+
+@router.post("/compute")
+def compute_solar(req: SolarRequest, user=Depends(auth_user)):
+    natal = db.get_natal_chart(user.id)
+    if not natal or not natal["time_iso"] or not natal["lat"]:
+        raise HTTPException(status_code=409, detail="NATAL_INCOMPLETE")
+
+    existing = db.query(solar_returns).where(
+        (solar_returns.user_id == user.id) &
+        (solar_returns.target_year == req.target_year) &
+        (solar_returns.lat == req.lat) &
+        (solar_returns.lon == req.lon) &
+        (solar_returns.method == req.method)
+    ).first()
+
+    if existing:
+        return {"ok": True, "data": existing.data}
+
+    # 1. Получаем натальную долготу Солнца
+    natal_sun = natal["planets"]["Sun"]["longitude"]
+
+    # 2. Метод exact_return — поиск момента возвращения Солнца
+    if req.method == "exact_return":
+        jd_start = swe.julday(req.target_year, natal["month"], natal["day"], natal["hour"])
+        jd = jd_start
+        for _ in range(30):  # до 30 итераций
+            lon_sun, _ = swe.calc_ut(jd, swe.SUN)
+            diff = (lon_sun - natal_sun + 360) % 360
+            if diff < 0.001:
+                break
+            jd -= diff / 0.9856  # грубая коррекция
+        utc_dt = swe.revjul(jd, gregflag=1)
+        exact_moment = datetime(*utc_dt)
+    else:
+        # 3. Метод same_date — просто тот же день/время в новом году
+        y, m, d = req.target_year, natal["month"], natal["day"]
+        h, mi, s = map(int, natal["time_iso"].split(":"))
+        exact_moment = datetime(y, m, d, h, mi, s)
+
+    # 4. Строим солярную карту
+    solar_chart = calculate_natal_chart(
+        date_iso=exact_moment.date().isoformat(),
+        time_iso=exact_moment.time().isoformat(),
+        lat=req.lat,
+        lon=req.lon,
+        tz_offset_minutes=req.tz_offset_minutes
+    )
+
+    db.insert(solar_returns).values(
+        user_id=user.id,
+        target_year=req.target_year,
+        method=req.method,
+        latitude=req.lat,
+        longitude=req.lon,
+        tz_offset_minutes=req.tz_offset_minutes,
+        place_label=req.place_label,
+        exact_moment_utc=exact_moment,
+        data=solar_chart
+    ).execute()
+
+    # Списываем 1 сферу
+    spend_sphere(user.id, 1, "solar_return")
+
+    return {"ok": True, "data": solar_chart}
+
+
+@router.post("/interpret")
+def interpret_solar(req: dict, user=Depends(auth_user)):
+    """
+    Интерпретирует солярную карту с помощью AI.
+    """
+    from .ai_prompts import interpret_solar_prompt
+    chart = req.get("chart")
+    prompt = interpret_solar_prompt(chart, user)
+    result = call_openai(prompt)
+    return {"ok": True, "data": result}
+Подключи роутер в server/main.py:
+
+python
+Копировать код
+from .solar_api import router as solar_router
+app.include_router(solar_router)
+4) 🪐 PROMPT для интерпретации (AI)
+Создай файл:
+server/ai_prompts/interpret_solar_prompt.py
+
+python
+Копировать код
+def interpret_solar_prompt(chart, user):
+    name = user.name
+    gender = user.gender
+
+    return f"""
+Ты — опытный астролог, специализирующийся на солярах.
+Проанализируй карту на основе этих данных:
+
+{chart}
+
+Пиши живо и понятно. Для женщин — с теплом и пониманием, для мужчин — с ясностью и уверенностью.
+
+Структура ответа (в JSON):
+{{
+  "headline": "Основная тема года",
+  "sun_focus": ["..."],
+  "moon_mood": ["..."],
+  "angular_events": ["..."],
+  "natal_overlaps": ["..."],
+  "practical_tips": ["..."]
+}}
+"""
+5) 💎 CLIENT / FRONTEND
+Создай компонент:
+client/src/pages/Solar.tsx
+
+Основные элементы:
+
+Dropdown выбора года (2024–2030)
+
+Переключатель методики: Точный (по возвращению Солнца) / Та же дата
+
+Поле выбора города (используй существующий поиск по Nominatim)
+
+После расчёта отображай:
+
+время соляра (локальное)
+
+карту (тот же компонент, что и для натала)
+
+кнопка «Получить интерпретацию»
+
+Интерпретация появляется в модальном окне.
+
+API вызовы:
+
+ts
+Копировать код
+const computeSolar = async (payload) => post('/solar/compute', payload);
+const interpretSolar = async (payload) => post('/solar/interpret', payload);
+6) 💰 ОПЛАТА
+1 расчёт соляра = 1 сфера
+
+Пользователи с активной подпиской не тратят сферы
+
+При повторном запросе того же года и города — не списывать
+
+7) 🧩 UX-ПРАВИЛА
+Если у пользователя нет натальной карты — выдать сообщение:
+«Для расчёта соляра нужно сначала создать натальную карту».
+
+При расчёте — добавить анимацию “солнечное вращение” (медленный радиальный градиент).
+
+Если пользователь выбирает год — показывать предупреждение:
+«Убедитесь, что указали город, где будете в день рождения — от этого зависит точность прогноза».
+
+8) 🧪 ТЕСТЫ
+Добавь простые тесты:
+
+/solar/compute с method="exact_return" → возвращает exactMomentUTC
+
+/solar/compute повторно → данные из кэша
+
+/solar/interpret возвращает корректный JSON с ключом "headline"
+
+✅ РЕЗУЛЬТАТ
+
+После выполнения промта должно появиться:
+
+новая таблица solar_returns в БД (Drizzle)
+
+два API /solar/compute и /solar/interpret
+
+AI-интерпретация соляра (по JSON)
+
+экран “Соляр” в клиенте
+
+списание 1 сферы при новом расчёте
+
+[END REPLIT PROMPT]

@@ -1,0 +1,137 @@
+[BEGIN REPLIT PROMPT]
+
+Цель: Применить изменения для модуля «Соляр» в AstroOrb:
+- Стоимость нового расчёта соляра: **15 сфер**.
+- Если у пользователя нет натальной карты — соляр недоступен (гейтинг на фронте уже есть; на бэке — строгая проверка и 409).
+- Никаких TODO. Полные файлы/фрагменты ниже.
+
+## 1) Биллинг: списание 15 сфер
+
+Файл: `server/solar_api.py` — ОБНОВИТЬ место, где списываем сферы (ранее было 1):
+
+```python
+# было:
+# spend_sphere(user.id, 1, "solar_return")
+
+# стало:
+spend_sphere(user.id, 15, "solar_return")
+Если в проекте есть централизованный словарь фич — обновить константу:
+
+Файл: server/energy.py (или аналог, где описаны фичи) — УСТАНОВИТЬ:
+
+python
+Копировать код
+FEATURE_COSTS = {
+    "solar_return": 15,
+    # ...
+}
+2) Бэкенд: строгая проверка наличия натала (страховка к фронтовому гейтингу)
+В том же server/solar_api.py в начале compute_solar уже есть проверка.
+Убедиться, что возвращаем корректный код/сообщение:
+
+python
+Копировать код
+if not natal:
+    raise HTTPException(status_code=409, detail="NATAL_NOT_INITIALIZED")
+
+# если нет точного времени/места:
+missing = not natal.get("time_iso") or natal.get("lat") is None or natal.get("lon") is None
+if missing:
+    raise HTTPException(status_code=409, detail="NATAL_INCOMPLETE")
+3) Кэширование без повторного списания
+Проверка кэша до списания (оставляем, но подчёркиваем требования):
+
+python
+Копировать код
+existing = db.query(solar_returns).where(
+    (solar_returns.user_id == user.id) &
+    (solar_returns.target_year == req.target_year) &
+    (solar_returns.method == req.method) &
+    (solar_returns.latitude == req.lat) &
+    (solar_returns.longitude == req.lon) &
+    (solar_returns.tz_offset_minutes == req.tz_offset_minutes)
+).first()
+
+if existing:
+    # НИЧЕГО не списываем
+    return {"ok": True, "data": existing.data}
+4) Фронтенд: обновить тексты и бейдж стоимости
+Файл: client/src/pages/Solar.tsx — ОБНОВИТЬ подписи кнопок/подсказок:
+
+Кнопка расчёта:
+
+если нет подписки → «Рассчитать (−15 сфер)»
+
+если есть подписка → «Рассчитать (бесплатно по подписке)»
+
+Под подсказкой выбора города добавить:
+«Стоимость нового расчёта — 15 сфер. Повторный просмотр этого же года и места бесплатен.»
+
+Пример фрагмента:
+
+tsx
+Копировать код
+const isSubscriber = me?.subscription?.active;
+const ctaText = isSubscriber ? "Рассчитать (бесплатно по подписке)" : "Рассчитать (−15 сфер)";
+<Button onClick={onCompute}>{ctaText}</Button>
+5) UX-гейтинг (оставляем как есть) + серверные ошибки
+В этом же экране убедиться, что при отсутствии натала кнопка расчёта disabled, и показываем CTA «Сначала создайте натальную карту».
+
+Также обработать 409 от бэка:
+
+tsx
+Копировать код
+try {
+  await computeSolar(payload);
+} catch (e:any) {
+  if (e.response?.status === 409) {
+    const code = e.response?.data?.detail;
+    if (code === "NATAL_NOT_INITIALIZED" || code === "NATAL_INCOMPLETE") {
+      toast.error("Сначала создайте и сохраните точную натальную карту (с временем и местом).");
+      navigate("/natal");
+      return;
+    }
+  }
+  toast.error("Не удалось рассчитать соляр. Попробуйте позже.");
+}
+6) Тесты: обновить ожидания по списанию
+Файл: server/tests/test_solar.py (или текущий тестовый модуль) — ОБНОВИТЬ:
+
+Тест «списывает сферы при новом расчёте» → ожидать −15.
+
+Тест «повторный расчёт того же года/локации» → баланс не меняется.
+
+Тест «без натала» → 409 с detail "NATAL_NOT_INITIALIZED"/"NATAL_INCOMPLETE".
+
+Псевдо:
+
+python
+Копировать код
+balance_before = get_balance(user.id)
+resp = client.post("/solar/compute", json=payload, headers=auth)
+assert resp.status_code == 200
+assert get_balance(user.id) == balance_before - 15
+
+# повторно
+resp2 = client.post("/solar/compute", json=payload, headers=auth)
+assert resp2.status_code == 200
+assert get_balance(user.id) == balance_before - 15
+7) Документация
+Файл: README.md — В разделе «Соляр» обновить стоимость:
+
+«Новый расчёт — 15 сфер; подписка — бесплатно; повторный просмотр того же года/локации — бесплатно».
+
+Оставить примечание: «Сначала создайте натальную карту — без неё соляр недоступен».
+
+Acceptance Criteria
+/solar/compute списывает 15 сфер на новый (не закэшированный) расчёт; подписчики — без списаний.
+
+При повторе того же (год, метод, lat, lon, tzOffset) списаний нет.
+
+При отсутствии натала или неточности данных — 409 NATAL_NOT_INITIALIZED/NATAL_INCOMPLETE.
+
+На фронте кнопка отражает корректную цену и отключена без натала.
+
+Тесты обновлены и проходят.
+
+[END REPLIT PROMPT]

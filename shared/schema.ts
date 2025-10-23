@@ -4,6 +4,18 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Solar returns table (defined early for usersRelations reference)
+export const solarReturns = pgTable("solar_returns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  targetYear: integer("target_year").notNull(),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("solar_returns_user_id_idx").on(table.userId),
+  userYearIdx: index("solar_returns_user_year_idx").on(table.userId, table.targetYear),
+}));
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tgId: varchar("tg_id", { length: 255 }).notNull().unique(),
@@ -59,6 +71,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   importantDateUnlocks: many(importantDateUnlocks),
   importantDateInterpretations: many(importantDateInterpretations),
   yookassaPayments: many(yookassaPayments),
+  solarReturns: many(solarReturns),
 }));
 
 export const natalCharts = pgTable("natal_charts", {
@@ -265,6 +278,13 @@ export const aiQuestions = pgTable("ai_questions", {
 export const aiQuestionsRelations = relations(aiQuestions, ({ one }) => ({
   user: one(users, {
     fields: [aiQuestions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const solarReturnsRelations = relations(solarReturns, ({ one }) => ({
+  user: one(users, {
+    fields: [solarReturns.userId],
     references: [users.id],
   }),
 }));

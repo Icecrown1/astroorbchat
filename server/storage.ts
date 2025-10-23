@@ -14,6 +14,7 @@ import {
   importantDateInterpretations,
   yookassaPayments,
   referralRewards,
+  solarReturns,
   type User, 
   type InsertUser,
   type Subscription,
@@ -41,7 +42,9 @@ import {
   type YookassaPayment,
   type InsertYookassaPayment,
   type ReferralReward,
-  type InsertReferralReward
+  type InsertReferralReward,
+  type SolarReturn,
+  type InsertSolarReturn
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, lt } from "drizzle-orm";
@@ -125,6 +128,10 @@ export interface IStorage {
   // Referral reward operations
   createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
   getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]>;
+  
+  // Solar return operations
+  getSolarReturn(userId: string, targetYear: number): Promise<SolarReturn | undefined>;
+  createSolarReturn(solarReturn: InsertSolarReturn): Promise<SolarReturn>;
   
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -637,6 +644,23 @@ export class DatabaseStorage implements IStorage {
       .from(referralRewards)
       .where(eq(referralRewards.referrerId, referrerId))
       .orderBy(desc(referralRewards.createdAt));
+  }
+
+  // Solar return operations
+  async getSolarReturn(userId: string, targetYear: number): Promise<SolarReturn | undefined> {
+    const [solarReturn] = await db
+      .select()
+      .from(solarReturns)
+      .where(and(eq(solarReturns.userId, userId), eq(solarReturns.targetYear, targetYear)));
+    return solarReturn || undefined;
+  }
+
+  async createSolarReturn(insertSolarReturn: InsertSolarReturn): Promise<SolarReturn> {
+    const [solarReturn] = await db
+      .insert(solarReturns)
+      .values(insertSolarReturn)
+      .returning();
+    return solarReturn;
   }
 }
 
