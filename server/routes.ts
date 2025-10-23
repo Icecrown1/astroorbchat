@@ -1416,9 +1416,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         house_system: 'Placidus',
       });
       
-      // Extract Sun position from chart
-      const sunData = solarChartData.planets['Sun'];
-      
       // Create exact Solar Return date from calculated time
       const exactSolarDate = new Date(
         solarReturnTime.year,
@@ -1428,13 +1425,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         solarReturnTime.minute
       );
       
-      const solar = {
-        position: sunData.longitude,
-        sign: sunData.sign,
+      // Pass full Solar Return chart data for AI interpretation
+      const solarData = {
+        chart: solarChartData, // Complete chart: planets, houses, aspects, angles
         date: exactSolarDate,
+        location: location.trim(), // User-provided location string
+        targetYear: targetYear,
       };
       
-      const interpretation = await getAstrologyInterpretation("solar", solar, locale, user.gender);
+      const interpretation = await getAstrologyInterpretation("solar", solarData, locale, user.gender);
 
       // Localized insights
       const insights = locale === 'ru' ? [
@@ -1449,7 +1448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Prepare full response data
       const responseData = {
-        solar,
+        solar: {
+          position: solarChartData.planets['Sun'].longitude,
+          sign: solarChartData.planets['Sun'].sign,
+          date: exactSolarDate,
+        },
         interpretation,
         insights,
       };

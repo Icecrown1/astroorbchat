@@ -181,7 +181,10 @@ export async function getAstrologyInterpretation(
       aspects: JSON.stringify(data.aspects, null, 2)
     },
     solar: {
-      data: JSON.stringify(data, null, 2)
+      chart: JSON.stringify(data.chart, null, 2),
+      date: data.date?.toISOString() || '',
+      location: data.location || '',
+      targetYear: data.targetYear?.toString() || ''
     },
     horoscope: {
       period: data.period,
