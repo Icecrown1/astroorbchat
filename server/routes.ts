@@ -2125,11 +2125,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).userId;
       const daysForward = parseInt(req.query.days as string) || 60;
+      const externalChartId = req.query.externalChartId as string | undefined;
       
-      // Get user's natal chart
-      const natalChart = await storage.getNatalChart(userId);
-      if (!natalChart) {
-        return res.status(400).json({ ok: false, error: "Natal chart required. Please create your natal chart first." });
+      let natalChart;
+      
+      // If externalChartId is provided, use guest chart; otherwise use user's chart
+      if (externalChartId) {
+        natalChart = await storage.getExternalNatalChart(externalChartId);
+        if (!natalChart) {
+          return res.status(404).json({ ok: false, error: "External natal chart not found" });
+        }
+        // Verify ownership
+        if (natalChart.ownerId !== userId) {
+          return res.status(403).json({ ok: false, error: "Forbidden" });
+        }
+      } else {
+        natalChart = await storage.getNatalChart(userId);
+        if (!natalChart) {
+          return res.status(400).json({ ok: false, error: "Natal chart required. Please create your natal chart first." });
+        }
       }
       
       const chartData = natalChart.data as NatalChartResult;
@@ -2138,7 +2152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sunSign = chartData.planets?.Sun?.sign;
       const ascendantSign = chartData.angles?.Ascendant?.sign;
       
-      console.log(`[Important Dates] User sun sign: ${sunSign}, ascendant: ${ascendantSign}`);
+      console.log(`[Important Dates] ${externalChartId ? 'External chart' : 'User chart'} - Sun sign: ${sunSign}, Ascendant: ${ascendantSign}`);
       
       // Получаем важные даты с лунными фазами и транзитами планет
       const result = await getImportantDatesWithLunarPhases(
