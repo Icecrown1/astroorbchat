@@ -145,8 +145,9 @@ export default function MyNatalChart() {
       const response = await apiRequest('POST', '/api/natal/init', { locale });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/natal/me'] }); // Invalidate all locales
+    onSuccess: async () => {
+      // Принудительно обновляем данные карты для немедленного отображения
+      await queryClient.refetchQueries({ queryKey: ['/api/natal/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Карта создана!' : 'Chart created!',
@@ -257,8 +258,15 @@ export default function MyNatalChart() {
               size="lg"
               data-testid="button-create-chart"
             >
-              <Sparkles className="w-5 h-5 mr-2" />
-              {locale === 'ru' ? 'Создать карту бесплатно' : 'Create Chart for Free'}
+              {createChartMutation.isPending ? (
+                <Loader className="mr-2" size="sm" />
+              ) : (
+                <Sparkles className="w-5 h-5 mr-2" />
+              )}
+              {createChartMutation.isPending 
+                ? (locale === 'ru' ? 'Создаём...' : 'Creating...')
+                : (locale === 'ru' ? 'Создать карту бесплатно' : 'Create Chart for Free')
+              }
             </Button>
           </Card>
         </div>
