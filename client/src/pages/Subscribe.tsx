@@ -23,11 +23,10 @@ interface UserMeResponse {
   };
 }
 
-interface PricesResponse {
-  ok: boolean;
-  data: {
-    tonRate: number;
-  };
+interface ExchangeRatesData {
+  usdRub: { rate: number; cached: boolean; updatedAt: string };
+  tonUsd: { rate: number; cached: boolean; updatedAt: string };
+  tonRub: number;
 }
 
 type SubscriptionPeriod = 'monthly' | 'semiannual' | 'annual';
@@ -97,8 +96,11 @@ export default function Subscribe() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data: pricesData, isLoading: pricesLoading } = useQuery<PricesResponse>({
-    queryKey: ['/api/payments/price'],
+  // Fetch exchange rates (TON refreshed on page load, RUB from daily cache)
+  const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useQuery<{ ok: boolean; data: ExchangeRatesData }>({
+    queryKey: ['/api/exchange-rates'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: 'always', // Always refetch on page load for fresh TON rate
   });
 
   const { data: userData } = useQuery<UserMeResponse>({
@@ -298,11 +300,30 @@ export default function Subscribe() {
     },
   });
 
+  // Calculate TON price from exchange rates
   const getTonPrice = (usdPrice: number) => {
-    if (pricesData?.ok && pricesData.data?.tonRate) {
-      return (usdPrice / pricesData.data.tonRate).toFixed(2);
+    if (exchangeRatesData?.ok && exchangeRatesData.data?.tonUsd?.rate) {
+      return (usdPrice / exchangeRatesData.data.tonUsd.rate).toFixed(2);
     }
-    return (usdPrice / 7.5).toFixed(2);
+    return (usdPrice / 5.5).toFixed(2); // Fallback
+  };
+
+  // Calculate RUB price from exchange rates
+  const getRubPrice = (usdPrice: number) => {
+    if (exchangeRatesData?.ok && exchangeRatesData.data?.usdRub?.rate) {
+      return Math.round(usdPrice * exchangeRatesData.data.usdRub.rate);
+    }
+    return Math.round(usdPrice * 78.5); // Fallback
+  };
+
+  // Get formatted rate info for display
+  const getRateInfo = () => {
+    if (!exchangeRatesData?.ok) return null;
+    const { usdRub, tonUsd } = exchangeRatesData.data;
+    return {
+      usdRub: usdRub.rate.toFixed(2),
+      tonUsd: tonUsd.rate.toFixed(2),
+    };
   };
 
   const getLocalizedFeatures = (tier: string) => {
@@ -422,7 +443,7 @@ export default function Subscribe() {
           </Card>
         )}
 
-        {pricesLoading ? (
+        {ratesLoading ? (
           <div className="flex justify-center py-12">
             <Loader />
           </div>
@@ -452,6 +473,28 @@ export default function Subscribe() {
               })}
             </div>
             
+            {/* Exchange rates info */}
+            {exchangeRatesData?.ok && (
+              <Card className="p-3 mb-4 bg-muted/50">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-4 text-muted-foreground">
+                    <span>1 USD = {getRateInfo()?.usdRub} ₽</span>
+                    <span>1 TON = ${getRateInfo()?.tonUsd}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => refetchRates()}
+                    className="h-7 px-2"
+                    data-testid="button-refresh-rates"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    {locale === 'ru' ? 'Обновить' : 'Refresh'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {/* Auto-Renewal Option (only for YooKassa payments) */}
             <Card className="p-4 mb-6 bg-muted/50">
               <div className="flex items-start gap-3">
@@ -481,7 +524,7 @@ export default function Subscribe() {
             <div className="grid gap-6 md:grid-cols-2">
               {SUBSCRIPTION_TIERS.map((tier) => {
                 const totalPrice = calculatePeriodPrice(tier.monthlyPrice, selectedPeriod);
-                const totalRubPrice = calculatePeriodPrice(tier.monthlyRubPrice, selectedPeriod);
+                const totalRubPrice = getRubPrice(totalPrice); // Dynamic RUB price from exchange rates
                 const periodConfig = PERIOD_CONFIG[selectedPeriod];
                 
                 return (

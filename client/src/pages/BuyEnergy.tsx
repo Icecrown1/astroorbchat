@@ -6,18 +6,26 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet, RefreshCw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 
+// Base USD prices (fixed)
 const ENERGY_PACKS = [
-  { amount: 20, usdPrice: 1.99, rubPrice: 199, popular: false },
-  { amount: 50, usdPrice: 4.99, rubPrice: 499, popular: true },
-  { amount: 120, usdPrice: 8.99, rubPrice: 899, popular: false },
+  { amount: 20, usdPrice: 1.99, popular: false },
+  { amount: 50, usdPrice: 4.99, popular: true },
+  { amount: 120, usdPrice: 8.99, popular: false },
 ];
+
+// Exchange rates response type
+interface ExchangeRatesData {
+  usdRub: { rate: number; cached: boolean; updatedAt: string };
+  tonUsd: { rate: number; cached: boolean; updatedAt: string };
+  tonRub: number;
+}
 
 export default function BuyEnergy() {
   const [, navigate] = useLocation();
@@ -46,8 +54,11 @@ export default function BuyEnergy() {
     queryKey: ['/api/user/me'],
   });
 
-  const { data: pricesData, isLoading: pricesLoading } = useQuery({
-    queryKey: ['/api/payments/price'],
+  // Fetch exchange rates (TON refreshed on page load, RUB from daily cache)
+  const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useQuery<{ ok: boolean; data: ExchangeRatesData }>({
+    queryKey: ['/api/exchange-rates'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: 'always', // Always refetch on page load for fresh TON rate
   });
 
   const tonMutation = useMutation({
@@ -274,12 +285,31 @@ export default function BuyEnergy() {
     },
   });
 
+  // Calculate TON price from exchange rates
   const getTonPrice = (usdPrice: number) => {
-    const data = pricesData as any;
-    if (data?.ok && data.data?.tonRate) {
-      return (usdPrice / data.data.tonRate).toFixed(2);
+    if (exchangeRatesData?.ok && exchangeRatesData.data?.tonUsd?.rate) {
+      return (usdPrice / exchangeRatesData.data.tonUsd.rate).toFixed(2);
     }
-    return (usdPrice / 7.5).toFixed(2);
+    return (usdPrice / 5.5).toFixed(2); // Fallback
+  };
+
+  // Calculate RUB price from exchange rates
+  const getRubPrice = (usdPrice: number) => {
+    if (exchangeRatesData?.ok && exchangeRatesData.data?.usdRub?.rate) {
+      return Math.round(usdPrice * exchangeRatesData.data.usdRub.rate);
+    }
+    return Math.round(usdPrice * 78.5); // Fallback
+  };
+
+  // Get formatted rate info for display
+  const getRateInfo = () => {
+    if (!exchangeRatesData?.ok) return null;
+    const { usdRub, tonUsd } = exchangeRatesData.data;
+    return {
+      usdRub: usdRub.rate.toFixed(2),
+      tonUsd: tonUsd.rate.toFixed(2),
+      usdRubUpdated: new Date(usdRub.updatedAt).toLocaleDateString(),
+    };
   };
 
   return (
@@ -321,12 +351,34 @@ export default function BuyEnergy() {
           </Button>
         </div>
 
-        {pricesLoading ? (
+        {ratesLoading ? (
           <div className="flex justify-center py-12">
             <Loader />
           </div>
         ) : (
           <>
+            {/* Exchange rates info */}
+            {exchangeRatesData?.ok && (
+              <Card className="p-3 mb-4 bg-muted/50">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-4 text-muted-foreground">
+                    <span>1 USD = {getRateInfo()?.usdRub} ₽</span>
+                    <span>1 TON = ${getRateInfo()?.tonUsd}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => refetchRates()}
+                    className="h-7 px-2"
+                    data-testid="button-refresh-rates"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    {locale === 'ru' ? 'Обновить' : 'Refresh'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             <div className="grid gap-4 md:grid-cols-3">
             {ENERGY_PACKS.map((pack, index) => (
               <Card
@@ -358,7 +410,7 @@ export default function BuyEnergy() {
                       ≈ {getTonPrice(pack.usdPrice)} TON
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {pack.rubPrice} ₽
+                      {getRubPrice(pack.usdPrice)} ₽
                     </p>
                   </div>
                 </div>
@@ -431,7 +483,7 @@ export default function BuyEnergy() {
                     ) : (
                       <>
                         <ShoppingBag className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? `Оплатить ${pack.rubPrice} ₽` : `Pay ${pack.rubPrice} ₽`}
+                        {locale === 'ru' ? `Оплатить ${getRubPrice(pack.usdPrice)} ₽` : `Pay ${getRubPrice(pack.usdPrice)} ₽`}
                       </>
                     )}
                   </Button>
@@ -463,7 +515,7 @@ export default function BuyEnergy() {
               setPendingYookassaPack(null);
             }
           }}
-          amount={`${pendingYookassaPack.rubPrice} ₽`}
+          amount={`${getRubPrice(pendingYookassaPack.usdPrice)} ₽`}
           description={locale === 'ru' 
             ? `Покупка ${pendingYookassaPack.amount} орбов энергии`
             : `Purchase ${pendingYookassaPack.amount} energy orbs`

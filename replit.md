@@ -49,6 +49,14 @@ Preferred communication style: Simple, everyday language.
   - **TON Blockchain**: Via TON Connect with server-side verification.
   - **Telegram Stars**: With webhook security and idempotency checks.
   - **ЮKassa (YooKassa)**: Russian ruble payments with webhook IP verification, payment status tracking, and UUID-based idempotency. Includes legal compliance for self-employed individuals (самозанятый).
+- **Dynamic Exchange Rates** (November 26, 2025):
+  - **USD/RUB**: Daily rate from Central Bank of Russia (ЦБ РФ) API: `https://www.cbr-xml-daily.ru/daily_json.js`
+  - **TON/USD**: Real-time rate from CoinGecko API, cached 5 minutes
+  - Backend service: `server/lib/exchangeRates.ts`
+  - API endpoint: `GET /api/exchange-rates` (public, no auth)
+  - Cron endpoint: `POST /api/cron/update-exchange-rates` for daily CBR refresh
+  - Frontend displays current rates with refresh button on BuyEnergy and Subscribe pages
+  - Fallback rates: USD/RUB = 78.50, TON/USD = 5.50
 - **Subscription System**: 
   - Standard and Pro tiers with varying orb allowances, free plans, and energy boosts
   - Multi-period options: Monthly, 6-month (-10%), Annual (-25%) with auto-renewal
