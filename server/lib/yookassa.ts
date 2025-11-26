@@ -53,6 +53,17 @@ export interface CreatePaymentParams {
   customerPhone?: string; // Phone for receipt (alternative to email)
   metadata?: Record<string, any>;
   idempotencyKey?: string; // Idempotency key to prevent duplicate payments
+  savePaymentMethod?: boolean; // Save payment method for recurring payments
+}
+
+export interface CreateRecurringPaymentParams {
+  amount: string;
+  description: string;
+  paymentMethodId: string; // Saved payment method ID
+  metadata?: Record<string, any>;
+  idempotencyKey?: string;
+  customerEmail?: string;
+  customerPhone?: string;
 }
 
 export interface YooKassaPayment {
@@ -66,6 +77,17 @@ export interface YooKassaPayment {
   confirmation?: {
     type: string;
     confirmation_url?: string;
+  };
+  payment_method?: {
+    type: string;
+    id: string;
+    saved: boolean;
+    card?: {
+      last4: string;
+      card_type: string;
+      expiry_year?: string;
+      expiry_month?: string;
+    };
   };
   metadata?: Record<string, any>;
   created_at: string;
@@ -123,6 +145,12 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
         ],
       },
     };
+
+    // Add save_payment_method for recurring payments (auto-renewal)
+    if (params.savePaymentMethod) {
+      paymentData.save_payment_method = true;
+      console.log('[YooKassa] Payment will save payment method for recurring');
+    }
 
     console.log('[YooKassa] Payment data with receipt:', JSON.stringify(paymentData, null, 2));
 
@@ -266,5 +294,78 @@ export function parseWebhookPayload(body: any): YooKassaPayment | null {
   } catch (error: any) {
     console.error('[YooKassa] Error parsing webhook payload:', error);
     return null;
+  }
+}
+
+/**
+ * Create a recurring payment using saved payment method
+ * Used for auto-renewal of subscriptions
+ * Does NOT require confirmation URL - payment is processed immediately
+ */
+export async function createRecurringPayment(params: CreateRecurringPaymentParams): Promise<YooKassaPayment> {
+  const isTestMode = process.env.YOOKASSA_TEST_MODE === 'true';
+
+  console.log('[YooKassa] Creating recurring payment:', {
+    amount: params.amount,
+    description: params.description,
+    paymentMethodId: params.paymentMethodId.substring(0, 12) + '...',
+    testMode: isTestMode,
+  });
+  
+  const yooKassa = await getYooKassaClient();
+
+  try {
+    // Build receipt for 54-ФЗ (required for самозанятый)
+    const receiptCustomer = params.customerEmail 
+      ? { email: params.customerEmail }
+      : params.customerPhone 
+        ? { phone: params.customerPhone }
+        : { email: 'no-email@astro-orb.app' };
+
+    const paymentData: any = {
+      amount: {
+        value: params.amount,
+        currency: 'RUB',
+      },
+      payment_method_id: params.paymentMethodId,
+      description: params.description,
+      capture: true,
+      metadata: params.metadata || {},
+      test: isTestMode,
+      receipt: {
+        customer: receiptCustomer,
+        items: [
+          {
+            description: params.description,
+            quantity: '1',
+            amount: {
+              value: params.amount,
+              currency: 'RUB',
+            },
+            vat_code: 1,
+          },
+        ],
+      },
+    };
+
+    console.log('[YooKassa] Recurring payment data:', JSON.stringify(paymentData, null, 2));
+
+    const idempotencyKey = params.idempotencyKey || undefined;
+    const payment = await yooKassa.createPayment(paymentData, idempotencyKey);
+
+    console.log('[YooKassa] Recurring payment created:', {
+      id: payment.id,
+      status: payment.status,
+      paid: payment.paid,
+    });
+
+    return payment;
+  } catch (error: any) {
+    console.error('[YooKassa] ========== ERROR CREATING RECURRING PAYMENT ==========');
+    console.error('[YooKassa] Error message:', error.message);
+    console.error('[YooKassa] Error code:', error.code);
+    console.error('[YooKassa] Full error:', JSON.stringify(error, null, 2));
+    console.error('[YooKassa] =======================================================');
+    throw new Error(`Failed to create recurring payment: ${error.message}`);
   }
 }

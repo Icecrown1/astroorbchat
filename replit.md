@@ -49,7 +49,19 @@ Preferred communication style: Simple, everyday language.
   - **TON Blockchain**: Via TON Connect with server-side verification.
   - **Telegram Stars**: With webhook security and idempotency checks.
   - **ЮKassa (YooKassa)**: Russian ruble payments with webhook IP verification, payment status tracking, and UUID-based idempotency. Includes legal compliance for self-employed individuals (самозанятый).
-- **Subscription System**: Standard and Pro tiers with varying orb allowances, free plans, and energy boosts.
+- **Subscription System**: 
+  - Standard and Pro tiers with varying orb allowances, free plans, and energy boosts
+  - Multi-period options: Monthly, 6-month (-10%), Annual (-25%) with auto-renewal
+  - **Auto-Renewal System** (November 26, 2025):
+    - Works only with YooKassa ruble payments
+    - User can enable via checkbox on Subscribe page
+    - Uses `save_payment_method: true` to store payment method
+    - Payment method ID saved in subscription `paymentMethodId` field
+    - Subscription fields: `autoRenew`, `periodMonths`, `paymentMethodId`
+    - Cron job `/api/cron/process-renewals` handles daily processing:
+      - Processes renewals 1 day before expiration
+      - Sends 3-day advance warnings via Telegram
+    - Library: `server/lib/subscriptionRenewal.ts` for renewal logic
 - **Geocoding**: Two-tier system: local cities database fallback to Nominatim API.
 - **Referral System**: Rewards credited to `purchasedEnergy`, tracked in `referralRewards` table, with UI for history and statistics.
 - **Telegram Stars Admin Panel**: Backend and frontend components for transaction history, balance, and withdrawal instructions.

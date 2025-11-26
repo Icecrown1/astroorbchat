@@ -4,9 +4,10 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, CreditCard, Check, Sparkles, Wallet } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, RefreshCw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
@@ -84,6 +85,7 @@ export default function Subscribe() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
   const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
+  const [autoRenew, setAutoRenew] = useState(false); // Auto-renewal option
 
 
   useEffect(() => {
@@ -197,11 +199,12 @@ export default function Subscribe() {
   });
 
   const yookassaMutation = useMutation({
-    mutationFn: async ({ tier, email, period }: { tier: SubscriptionTier, email: string | undefined, period: SubscriptionPeriod }) => {
+    mutationFn: async ({ tier, email, period, enableAutoRenew }: { tier: SubscriptionTier, email: string | undefined, period: SubscriptionPeriod, enableAutoRenew: boolean }) => {
       console.log('[YooKassa] ============ FRONTEND: Creating subscription payment ============');
       console.log('[YooKassa] Tier:', tier.tier);
       console.log('[YooKassa] Period:', period);
       console.log('[YooKassa] Email:', email);
+      console.log('[YooKassa] Auto-Renew:', enableAutoRenew);
       console.log('[YooKassa] WebApp Platform:', WebApp.platform);
       console.log('[YooKassa] WebApp Version:', WebApp.version);
       console.log('[YooKassa] initDataUnsafe:', WebApp.initDataUnsafe);
@@ -230,9 +233,8 @@ export default function Subscribe() {
       let response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription',
         tier: tier.tier,
-        period: period,
-        months: periodConfig.months,
-        amountRub: totalPriceRub,
+        periodMonths: periodConfig.months,
+        autoRenew: enableAutoRenew,
         customerEmail: email || null,
         idempotencyKey
       });
@@ -248,9 +250,8 @@ export default function Subscribe() {
         response = await apiRequest('POST', '/api/payments/yookassa/create', {
           kind: 'subscription',
           tier: tier.tier,
-          period: period,
-          months: periodConfig.months,
-          amountRub: totalPriceRub,
+          periodMonths: periodConfig.months,
+          autoRenew: enableAutoRenew,
           customerEmail: email || null,
           idempotencyKey
         });
@@ -428,7 +429,7 @@ export default function Subscribe() {
         ) : (
           <>
             {/* Period Selector */}
-            <div className="flex justify-center gap-2 mb-6">
+            <div className="flex justify-center gap-2 mb-4">
               {(['monthly', 'semiannual', 'annual'] as SubscriptionPeriod[]).map((period) => {
                 const config = PERIOD_CONFIG[period];
                 return (
@@ -450,6 +451,32 @@ export default function Subscribe() {
                 );
               })}
             </div>
+            
+            {/* Auto-Renewal Option (only for YooKassa payments) */}
+            <Card className="p-4 mb-6 bg-muted/50">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="auto-renew"
+                  checked={autoRenew}
+                  onCheckedChange={(checked) => setAutoRenew(checked === true)}
+                  data-testid="checkbox-auto-renew"
+                />
+                <div className="space-y-1">
+                  <label
+                    htmlFor="auto-renew"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    {locale === 'ru' ? 'Автопродление подписки' : 'Auto-renew subscription'}
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'ru' 
+                      ? 'Подписка будет автоматически продлеваться. Вы можете отменить в любой момент. Работает только с оплатой рублями.'
+                      : 'Subscription will automatically renew. You can cancel anytime. Works only with ruble payments.'}
+                  </p>
+                </div>
+              </div>
+            </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
               {SUBSCRIPTION_TIERS.map((tier) => {
@@ -628,7 +655,7 @@ export default function Subscribe() {
           onOpenChange={setShowEmailDialog}
           onConfirm={(email) => {
             if (pendingYookassaTier) {
-              yookassaMutation.mutate({ tier: pendingYookassaTier, email, period: selectedPeriod });
+              yookassaMutation.mutate({ tier: pendingYookassaTier, email, period: selectedPeriod, enableAutoRenew: autoRenew });
               setPendingYookassaTier(null);
             }
           }}

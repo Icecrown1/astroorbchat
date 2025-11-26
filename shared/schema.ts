@@ -127,6 +127,13 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodEnd: timestamp("current_period_end").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // Auto-renewal fields
+  autoRenew: boolean("auto_renew").notNull().default(false), // User opted into auto-renewal
+  paymentMethodId: varchar("payment_method_id", { length: 255 }), // YooKassa saved payment method for recurring
+  paymentProvider: varchar("payment_provider", { length: 20 }), // 'yookassa', 'ton', 'stars'
+  periodMonths: integer("period_months").notNull().default(1), // 1, 6, or 12 months
+  amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }), // Price for renewal
+  lastRenewalNotification: timestamp("last_renewal_notification"), // Prevent duplicate notifications
 }, (table) => ({
   userIdIdx: index("subscriptions_user_id_idx").on(table.userId),
 }));
@@ -382,10 +389,16 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
   status: z.enum(["active", "canceled", "expired"]),
   startedAt: z.date().or(z.string()),
   currentPeriodEnd: z.date().or(z.string()),
+  autoRenew: z.boolean().optional(),
+  paymentMethodId: z.string().optional().nullable(),
+  paymentProvider: z.enum(["yookassa", "ton", "stars"]).optional().nullable(),
+  periodMonths: z.number().int().min(1).max(12).optional(),
+  amountRUB: z.string().or(z.number()).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  lastRenewalNotification: true,
 });
 
 export const insertPaymentSchema = createInsertSchema(payments, {

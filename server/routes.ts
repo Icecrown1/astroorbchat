@@ -3098,6 +3098,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       energy: z.number().refine(val => [20, 50, 120].includes(val))
     }).optional(),
     tier: z.enum(["standard", "pro"]).optional(),
+    periodMonths: z.number().refine(val => [1, 6, 12].includes(val)).optional(), // Subscription period
+    autoRenew: z.boolean().optional(), // Auto-renewal for subscriptions
     customerEmail: z.string().email().optional().nullable(),
     idempotencyKey: z.string().min(1).max(64), // Client-generated idempotency key (required)
   });
@@ -3216,13 +3218,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountRUB = packConfig.rub;
         energyAmount = validated.pack.energy;
       } else if (validated.kind === "subscription" && validated.tier) {
-        const tierConfig = {
-          standard: { rub: "450.00", label: "Standard Subscription (1 month)" },
-          pro: { rub: "750.00", label: "Pro Subscription (1 month)" },
-        }[validated.tier];
-
-        description = `Подписка ${validated.tier === 'standard' ? 'Standard (100 орбов/день)' : 'Pro (250 орбов/день)'} на 1 месяц`;
-        amountRUB = tierConfig.rub;
+        const periodMonths = validated.periodMonths || 1;
+        
+        // Base monthly prices in RUB
+        const basePrices = {
+          standard: 1200, // $12 ≈ 1200₽
+          pro: 1800,      // $18 ≈ 1800₽
+        };
+        
+        // Calculate discount based on period
+        let discountMultiplier = 1;
+        let periodLabel = '1 месяц';
+        if (periodMonths === 6) {
+          discountMultiplier = 0.9; // 10% off
+          periodLabel = '6 месяцев';
+        } else if (periodMonths === 12) {
+          discountMultiplier = 0.75; // 25% off
+          periodLabel = '12 месяцев';
+        }
+        
+        const basePrice = basePrices[validated.tier];
+        const totalPrice = Math.round(basePrice * periodMonths * discountMultiplier);
+        
+        description = `Подписка ${validated.tier === 'standard' ? 'Standard (100 орбов/день)' : 'Pro (250 орбов/день)'} на ${periodLabel}`;
+        amountRUB = totalPrice.toFixed(2);
         tier = validated.tier;
       } else {
         console.error('[YooKassa] Invalid request - missing pack or tier');
@@ -3323,18 +3342,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerEmail = validated.customerEmail || (user?.tgId ? `tg${user.tgId}@astro-orb.app` : undefined);
       console.log('[YooKassa] Customer email for receipt:', customerEmail);
 
+      // Determine if we should save payment method for auto-renewal (subscriptions only)
+      const shouldSavePaymentMethod = validated.kind === 'subscription' && validated.autoRenew === true;
+      
       const ykPayment = await createYooKassaPayment({
         amount: amountRUB,
         description,
         returnUrl,
         customerEmail,
         idempotencyKey: validated.idempotencyKey, // Use client's idempotency key for YooKassa
+        savePaymentMethod: shouldSavePaymentMethod,
         metadata: {
           internalPaymentId: yookassaPayment.id,
           userId,
           kind: validated.kind,
           tier,
           energyAmount,
+          periodMonths: validated.periodMonths || 1,
+          autoRenew: validated.autoRenew || false,
         },
       });
 
@@ -3664,24 +3689,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
         const tier = dbPayment.tier as "standard" | "pro";
         
+        // Get metadata from webhook (periodMonths, autoRenew)
+        const periodMonths = payment.metadata?.periodMonths || 1;
+        const autoRenew = payment.metadata?.autoRenew === true || payment.metadata?.autoRenew === 'true';
+        
+        // Extract saved payment method ID if payment method was saved
+        const paymentMethodId = payment.payment_method?.saved ? payment.payment_method.id : null;
+        
+        console.log('[YooKassa Webhook] Subscription details:', {
+          tier,
+          periodMonths,
+          autoRenew,
+          paymentMethodSaved: !!paymentMethodId,
+        });
+        
         const startedAt = new Date();
-        const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
+        const currentPeriodEnd = dayjs(startedAt).add(periodMonths, "month").toDate();
 
         const existingSub = await storage.getSubscription(dbPayment.userId);
         
+        // Subscription data with auto-renewal fields
+        const subscriptionData = {
+          tier,
+          status: "active" as const,
+          currentPeriodEnd,
+          autoRenew,
+          paymentMethodId,
+          paymentProvider: 'yookassa' as const,
+          periodMonths,
+          amountRUB: dbPayment.amountRUB, // Store for recurring payments
+        };
+        
         if (existingSub) {
-          await storage.updateSubscription(existingSub.id, {
-            tier,
-            status: "active",
-            currentPeriodEnd,
-          });
+          await storage.updateSubscription(existingSub.id, subscriptionData);
         } else {
           await storage.createSubscription({
             userId: dbPayment.userId,
-            tier,
-            status: "active",
             startedAt,
-            currentPeriodEnd,
+            ...subscriptionData,
           });
         }
 
@@ -3695,7 +3740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         await handleSubscriptionReferralBonus(storage, dbPayment.userId);
-        console.log(`[YooKassa Webhook] Activated ${tier} subscription for user ${dbPayment.userId}`);
+        console.log(`[YooKassa Webhook] Activated ${tier} subscription for user ${dbPayment.userId} (period: ${periodMonths}mo, autoRenew: ${autoRenew})`);
       }
 
       // Mark payment as completed
@@ -3734,6 +3779,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
       name: "Astro Orb",
       iconUrl: `${process.env.SERVER_URL || "https://astro-orb.replit.app"}/icon.png`,
     });
+  });
+
+  // Cron endpoint for subscription auto-renewals and notifications
+  // Should be called periodically (e.g., every hour via external cron service)
+  app.post("/api/cron/subscription-check", async (req, res) => {
+    try {
+      // Verify cron secret (optional security measure)
+      const cronSecret = req.headers['x-cron-secret'];
+      const expectedSecret = process.env.CRON_SECRET;
+      
+      if (expectedSecret && cronSecret !== expectedSecret) {
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
+      }
+
+      console.log('[CRON] Starting subscription check...');
+
+      const results = {
+        renewals: { processed: 0, successful: 0, failed: 0 },
+        notifications: { checked: 0, sent: 0 },
+      };
+
+      // Import subscription renewal functions
+      const { 
+        getSubscriptionsForRenewal, 
+        processAutoRenewal,
+        getSubscriptionsForNotification,
+        getDaysUntilExpiry,
+        getExpiryNotificationMessage,
+      } = await import('./lib/subscriptionRenewal');
+
+      // 1. Process auto-renewals
+      const renewalSubscriptions = await getSubscriptionsForRenewal(storage);
+      console.log('[CRON] Found', renewalSubscriptions.length, 'subscriptions for renewal');
+
+      for (const sub of renewalSubscriptions) {
+        results.renewals.processed++;
+        const result = await processAutoRenewal(sub, storage);
+        if (result.success) {
+          results.renewals.successful++;
+        } else {
+          results.renewals.failed++;
+          console.log('[CRON] Renewal failed for', sub.id, ':', result.message);
+        }
+      }
+
+      // 2. Check for expiration notifications
+      const notificationSubscriptions = await getSubscriptionsForNotification(storage);
+      console.log('[CRON] Found', notificationSubscriptions.length, 'subscriptions for notification');
+
+      for (const sub of notificationSubscriptions) {
+        results.notifications.checked++;
+        
+        try {
+          const daysUntilExpiry = getDaysUntilExpiry(sub.currentPeriodEnd);
+          const message = getExpiryNotificationMessage(daysUntilExpiry, sub.tier, sub.autoRenew, 'ru');
+          
+          // Get user's Telegram ID for notification
+          const user = await storage.getUser(sub.userId);
+          if (user?.tgId) {
+            // Send notification via Telegram bot
+            const botToken = process.env.TELEGRAM_BOT_TOKEN;
+            if (botToken) {
+              const telegramMessage = `${message.title}\n\n${message.message}`;
+              
+              try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: user.tgId,
+                    text: telegramMessage,
+                    parse_mode: 'HTML',
+                  }),
+                });
+                
+                results.notifications.sent++;
+                
+                // Mark notification as sent
+                await storage.updateSubscription(sub.id, {
+                  lastRenewalNotification: new Date(),
+                });
+                
+                console.log('[CRON] Sent notification to user', sub.userId, '- expires in', daysUntilExpiry, 'days');
+              } catch (telegramError) {
+                console.error('[CRON] Failed to send Telegram notification:', telegramError);
+              }
+            }
+          }
+        } catch (notifError) {
+          console.error('[CRON] Notification error for subscription', sub.id, ':', notifError);
+        }
+      }
+
+      console.log('[CRON] Subscription check completed:', results);
+      res.json({ ok: true, results });
+    } catch (error: any) {
+      console.error('[CRON] Subscription check error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Admin endpoint to manually trigger subscription check
+  app.post("/api/admin/trigger-subscription-check", requireAdmin, async (req, res) => {
+    try {
+      // Forward to cron endpoint
+      const response = await fetch(`http://localhost:${process.env.PORT || 5000}/api/cron/subscription-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': process.env.CRON_SECRET || '',
+        },
+      });
+      
+      const result = await response.json();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get subscription auto-renewal status
+  app.get("/api/user/subscription/auto-renew", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const subscription = await storage.getSubscription(userId);
+      
+      if (!subscription) {
+        return res.json({ 
+          ok: true, 
+          data: { 
+            hasSubscription: false,
+            autoRenew: false,
+          } 
+        });
+      }
+
+      res.json({
+        ok: true,
+        data: {
+          hasSubscription: true,
+          autoRenew: subscription.autoRenew || false,
+          paymentProvider: subscription.paymentProvider,
+          hasPaymentMethod: !!subscription.paymentMethodId,
+          periodMonths: subscription.periodMonths || 1,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Toggle auto-renewal
+  app.post("/api/user/subscription/auto-renew", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { autoRenew } = req.body;
+      
+      const subscription = await storage.getSubscription(userId);
+      
+      if (!subscription) {
+        return res.status(404).json({ ok: false, error: "No subscription found" });
+      }
+
+      // If turning off auto-renew, also clear payment method
+      const updateData: any = { autoRenew: !!autoRenew };
+      if (!autoRenew) {
+        updateData.paymentMethodId = null;
+      }
+
+      await storage.updateSubscription(subscription.id, updateData);
+      
+      res.json({ 
+        ok: true, 
+        data: { 
+          autoRenew: !!autoRenew,
+          message: autoRenew 
+            ? 'Автопродление включено' 
+            : 'Автопродление отключено'
+        } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
   });
 
   const httpServer = createServer(app);
