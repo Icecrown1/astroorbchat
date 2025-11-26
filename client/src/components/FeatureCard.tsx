@@ -12,6 +12,7 @@ interface FeatureCardProps {
   onClick: () => void;
   disabled?: boolean;
   className?: string;
+  locale?: 'ru' | 'en';
 }
 
 export function FeatureCard({
@@ -22,6 +23,7 @@ export function FeatureCard({
   onClick,
   disabled = false,
   className,
+  locale = 'en',
 }: FeatureCardProps) {
   return (
     <Card
@@ -61,7 +63,7 @@ export function FeatureCard({
           </p>
           
           <div className="flex items-center text-sm text-primary font-medium">
-            Explore
+            {locale === 'ru' ? 'Открыть' : 'Explore'}
             <ArrowRight className="w-4 h-4 ml-1" />
           </div>
         </div>

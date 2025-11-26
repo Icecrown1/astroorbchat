@@ -14,9 +14,9 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 
 const ENERGY_PACKS = [
-  { amount: 20, usdPrice: 2.99, rubPrice: 150, popular: false },
-  { amount: 50, usdPrice: 5.99, rubPrice: 300, popular: true },
-  { amount: 120, usdPrice: 11.99, rubPrice: 600, popular: false },
+  { amount: 20, usdPrice: 1.99, rubPrice: 199, popular: false },
+  { amount: 50, usdPrice: 4.99, rubPrice: 499, popular: true },
+  { amount: 120, usdPrice: 8.99, rubPrice: 899, popular: false },
 ];
 
 export default function BuyEnergy() {

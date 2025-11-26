@@ -29,34 +29,60 @@ interface PricesResponse {
   };
 }
 
-const SUBSCRIPTION_TIERS = [
+type SubscriptionPeriod = 'monthly' | 'semiannual' | 'annual';
+
+interface SubscriptionTier {
+  tier: string;
+  name: string;
+  monthlyPrice: number;
+  monthlyRubPrice: number;
+  dailyEnergy: number;
+  features: string[];
+  popular?: boolean;
+}
+
+const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
     tier: 'standard',
     name: 'Standard',
-    price: 9,
-    rubPrice: 450,
+    monthlyPrice: 12,
+    monthlyRubPrice: 1200,
     dailyEnergy: 100,
     features: ['100 energy orbs daily', 'All astrology features', 'Daily horoscope', 'Basic support'],
   },
   {
     tier: 'pro',
     name: 'Pro',
-    price: 15,
-    rubPrice: 750,
+    monthlyPrice: 18,
+    monthlyRubPrice: 1800,
     dailyEnergy: 250,
     features: ['250 energy orbs daily', 'All astrology features', 'Priority AI responses', 'Premium support', 'Advanced insights'],
     popular: true,
   },
 ];
 
+const PERIOD_CONFIG: Record<SubscriptionPeriod, { months: number; discountPercent: number; labelRu: string; labelEn: string }> = {
+  monthly: { months: 1, discountPercent: 0, labelRu: '1 месяц', labelEn: '1 month' },
+  semiannual: { months: 6, discountPercent: 10, labelRu: '6 месяцев', labelEn: '6 months' },
+  annual: { months: 12, discountPercent: 25, labelRu: '1 год', labelEn: '1 year' },
+};
+
+function calculatePeriodPrice(monthlyPrice: number, period: SubscriptionPeriod): number {
+  const config = PERIOD_CONFIG[period];
+  const totalPrice = monthlyPrice * config.months;
+  const discount = totalPrice * (config.discountPercent / 100);
+  return Math.round((totalPrice - discount) * 100) / 100;
+}
+
 export default function Subscribe() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('monthly');
   const [walletConnected, setWalletConnected] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
-  const [pendingYookassaTier, setPendingYookassaTier] = useState<typeof SUBSCRIPTION_TIERS[0] | null>(null);
+  const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
   const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
 
 
@@ -80,16 +106,20 @@ export default function Subscribe() {
   const currentSubscription = userData?.data?.subscription;
 
   const mutation = useMutation({
-    mutationFn: async (tier: typeof SUBSCRIPTION_TIERS[0]) => {
+    mutationFn: async ({ tier, period }: { tier: SubscriptionTier; period: SubscriptionPeriod }) => {
+      const periodConfig = PERIOD_CONFIG[period];
+      const totalPrice = calculatePeriodPrice(tier.monthlyPrice, period);
       const response = await apiRequest('POST', '/api/payments/ton/create', {
         kind: 'subscription',
         tier: tier.tier,
-        amountUSD: tier.price,
+        amountUSD: totalPrice,
+        period: period,
+        months: periodConfig.months,
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
-    onSuccess: async (data, tier) => {
+    onSuccess: async (data, { tier }) => {
       try {
         await sendTransaction(
           data.walletAddress,
@@ -167,9 +197,10 @@ export default function Subscribe() {
   });
 
   const yookassaMutation = useMutation({
-    mutationFn: async ({ tier, email }: { tier: typeof SUBSCRIPTION_TIERS[0], email: string | undefined }) => {
+    mutationFn: async ({ tier, email, period }: { tier: SubscriptionTier, email: string | undefined, period: SubscriptionPeriod }) => {
       console.log('[YooKassa] ============ FRONTEND: Creating subscription payment ============');
       console.log('[YooKassa] Tier:', tier.tier);
+      console.log('[YooKassa] Period:', period);
       console.log('[YooKassa] Email:', email);
       console.log('[YooKassa] WebApp Platform:', WebApp.platform);
       console.log('[YooKassa] WebApp Version:', WebApp.version);
@@ -179,11 +210,10 @@ export default function Subscribe() {
         throw new Error(locale === 'ru' ? 'Пользователь не авторизован' : 'User not authenticated');
       }
       
+      const periodConfig = PERIOD_CONFIG[period];
+      const totalPriceRub = calculatePeriodPrice(tier.monthlyRubPrice, period);
+      
       // Generate unique idempotency key using UUID v4 (if not already generated)
-      // The key is persisted in state to handle retries correctly:
-      // - First click: generate new UUID and save to state
-      // - Retries: reuse the same UUID to prevent duplicate payments
-      // - Success/Error: clear the key for next payment attempt
       let idempotencyKey = yookassaIdempotencyKey;
       if (!idempotencyKey) {
         idempotencyKey = crypto.randomUUID();
@@ -191,6 +221,8 @@ export default function Subscribe() {
       }
       
       console.log('[YooKassa] User ID:', userData.data.id);
+      console.log('[YooKassa] Total Price RUB:', totalPriceRub);
+      console.log('[YooKassa] Months:', periodConfig.months);
       console.log('[YooKassa] Idempotency Key (UUID v4):', idempotencyKey);
       console.log('[YooKassa] Is retry:', !!yookassaIdempotencyKey);
       
@@ -198,13 +230,14 @@ export default function Subscribe() {
       let response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription',
         tier: tier.tier,
+        period: period,
+        months: periodConfig.months,
+        amountRub: totalPriceRub,
         customerEmail: email || null,
         idempotencyKey
       });
       
       // If server asks to retry (payment being created by another request), wait and retry
-      // Backend returns { ok: true, status: 'pending', retryAfter: N } for race conditions
-      // Allow up to 2 retries to handle edge cases
       let retryCount = 0;
       while (response.status === 'pending' && response.retryAfter && retryCount < 2) {
         const retryAfter = response.retryAfter || 3;
@@ -215,6 +248,9 @@ export default function Subscribe() {
         response = await apiRequest('POST', '/api/payments/yookassa/create', {
           kind: 'subscription',
           tier: tier.tier,
+          period: period,
+          months: periodConfig.months,
+          amountRub: totalPriceRub,
           customerEmail: email || null,
           idempotencyKey
         });
@@ -390,150 +426,189 @@ export default function Subscribe() {
             <Loader />
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            {SUBSCRIPTION_TIERS.map((tier) => (
-              <Card
-                key={tier.tier}
-                className={`p-6 cursor-pointer transition-all hover-elevate ${
-                  selectedTier === tier.tier ? 'ring-2 ring-primary' : ''
-                } ${tier.popular ? 'relative' : ''}`}
-                onClick={() => setSelectedTier(tier.tier)}
-                data-testid={`card-subscription-${tier.tier}`}
-              >
-                {tier.popular && (
-                  <Badge className="absolute -top-2 -right-2 bg-primary">
-                    {t.subscribe.mostPopular}
-                  </Badge>
-                )}
-
-                <div className="mb-6">
-                  <h3 className="text-2xl font-display font-bold mb-2">
-                    {tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}
-                  </h3>
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-4xl font-bold">${tier.price}</span>
-                    <span className="text-muted-foreground">{t.subscribe.perMonth}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    ≈ {getTonPrice(tier.price)} TON
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {tier.rubPrice} ₽ {t.subscribe.perMonth}
-                  </p>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
-                    <Sparkles className="w-5 h-5 text-chart-3" />
-                    <span className="font-bold">{tier.dailyEnergy} {t.common.orbs} {locale === 'ru' ? 'ежедневно' : 'daily'}</span>
-                  </div>
-                  {getLocalizedFeatures(tier.tier).map((feature, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
-                      <span className="text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
+          <>
+            {/* Period Selector */}
+            <div className="flex justify-center gap-2 mb-6">
+              {(['monthly', 'semiannual', 'annual'] as SubscriptionPeriod[]).map((period) => {
+                const config = PERIOD_CONFIG[period];
+                return (
                   <Button
-                    className="w-full"
-                    variant="outline"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!walletConnected) {
-                        try {
-                          await connectWallet();
-                          setWalletConnected(true);
-                          mutation.mutate(tier);
-                        } catch (error: any) {
-                          toast({
-                            title: t.common.error,
-                            description: error.message || 'Failed to connect wallet',
-                            variant: 'destructive',
-                          });
-                        }
-                      } else {
-                        mutation.mutate(tier);
-                      }
-                    }}
-                    disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
-                    data-testid={`button-subscribe-ton-${tier.tier}`}
-                  >
-                    {mutation.isPending && selectedTier === tier.tier ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        {t.subscribe.subscribing}
-                      </>
-                    ) : currentSubscription?.tier === tier.tier ? (
-                      t.subscribe.currentPlan
-                    ) : !walletConnected ? (
-                      <>
-                        <Wallet className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        {t.subscribe.subscribeWith}
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingYookassaTier(tier);
-                      setShowEmailDialog(true);
-                    }}
-                    disabled={yookassaMutation.isPending || currentSubscription?.tier === tier.tier}
-                    data-testid={`button-subscribe-rubles-${tier.tier}`}
-                  >
-                    {yookassaMutation.isPending ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        {t.subscribe.subscribing}
-                      </>
-                    ) : currentSubscription?.tier === tier.tier ? (
-                      t.subscribe.currentPlan
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? `Оплатить ${tier.rubPrice} ₽` : `Pay ${tier.rubPrice} ₽`}
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* DEV ONLY: Free subscription button */}
-                {import.meta.env.DEV && (
-                  <Button
-                    className="w-full mt-2"
-                    variant="secondary"
+                    key={period}
+                    variant={selectedPeriod === period ? 'default' : 'outline'}
                     size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      devSubscribeMutation.mutate(tier.tier as 'standard' | 'pro');
-                    }}
-                    disabled={devSubscribeMutation.isPending}
-                    data-testid={`button-dev-subscribe-${tier.tier}`}
+                    onClick={() => setSelectedPeriod(period)}
+                    className="relative"
+                    data-testid={`button-period-${period}`}
                   >
-                    {devSubscribeMutation.isPending ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        Activating...
-                      </>
-                    ) : (
-                      <>
-                        Dev: Free Subscribe
-                      </>
+                    {locale === 'ru' ? config.labelRu : config.labelEn}
+                    {config.discountPercent > 0 && (
+                      <Badge className="absolute -top-2 -right-2 bg-chart-3 text-xs px-1">
+                        -{config.discountPercent}%
+                      </Badge>
                     )}
                   </Button>
-                )}
-              </Card>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {SUBSCRIPTION_TIERS.map((tier) => {
+                const totalPrice = calculatePeriodPrice(tier.monthlyPrice, selectedPeriod);
+                const totalRubPrice = calculatePeriodPrice(tier.monthlyRubPrice, selectedPeriod);
+                const periodConfig = PERIOD_CONFIG[selectedPeriod];
+                
+                return (
+                  <Card
+                    key={tier.tier}
+                    className={`p-6 cursor-pointer transition-all hover-elevate ${
+                      selectedTier === tier.tier ? 'ring-2 ring-primary' : ''
+                    } ${tier.popular ? 'relative' : ''}`}
+                    onClick={() => setSelectedTier(tier.tier)}
+                    data-testid={`card-subscription-${tier.tier}`}
+                  >
+                    {tier.popular && (
+                      <Badge className="absolute -top-2 -right-2 bg-primary">
+                        {t.subscribe.mostPopular}
+                      </Badge>
+                    )}
+
+                    <div className="mb-6">
+                      <h3 className="text-2xl font-display font-bold mb-2">
+                        {tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}
+                      </h3>
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="text-4xl font-bold">${totalPrice}</span>
+                        <span className="text-muted-foreground">
+                          / {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}
+                        </span>
+                      </div>
+                      {selectedPeriod !== 'monthly' && (
+                        <p className="text-sm text-muted-foreground line-through">
+                          ${tier.monthlyPrice * periodConfig.months} {locale === 'ru' ? 'без скидки' : 'without discount'}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        ≈ {getTonPrice(totalPrice)} TON
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {totalRubPrice} ₽
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
+                        <Sparkles className="w-5 h-5 text-chart-3" />
+                        <span className="font-bold">{tier.dailyEnergy} {t.common.orbs} {locale === 'ru' ? 'ежедневно' : 'daily'}</span>
+                      </div>
+                      {getLocalizedFeatures(tier.tier).map((feature, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <Check className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
+                          <span className="text-sm">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!walletConnected) {
+                            try {
+                              await connectWallet();
+                              setWalletConnected(true);
+                              mutation.mutate({ tier, period: selectedPeriod });
+                            } catch (error: any) {
+                              toast({
+                                title: t.common.error,
+                                description: error.message || 'Failed to connect wallet',
+                                variant: 'destructive',
+                              });
+                            }
+                          } else {
+                            mutation.mutate({ tier, period: selectedPeriod });
+                          }
+                        }}
+                        disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
+                        data-testid={`button-subscribe-ton-${tier.tier}`}
+                      >
+                        {mutation.isPending && selectedTier === tier.tier ? (
+                          <>
+                            <Loader className="mr-2" size="sm" />
+                            {t.subscribe.subscribing}
+                          </>
+                        ) : currentSubscription?.tier === tier.tier ? (
+                          t.subscribe.currentPlan
+                        ) : !walletConnected ? (
+                          <>
+                            <Wallet className="w-4 h-4 mr-2" />
+                            {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            {t.subscribe.subscribeWith}
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingYookassaTier(tier);
+                          setShowEmailDialog(true);
+                        }}
+                        disabled={yookassaMutation.isPending || currentSubscription?.tier === tier.tier}
+                        data-testid={`button-subscribe-rubles-${tier.tier}`}
+                      >
+                        {yookassaMutation.isPending ? (
+                          <>
+                            <Loader className="mr-2" size="sm" />
+                            {t.subscribe.subscribing}
+                          </>
+                        ) : currentSubscription?.tier === tier.tier ? (
+                          t.subscribe.currentPlan
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            {locale === 'ru' ? `Оплатить ${totalRubPrice} ₽` : `Pay ${totalRubPrice} ₽`}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* DEV ONLY: Free subscription button */}
+                    {import.meta.env.DEV && (
+                      <Button
+                        className="w-full mt-2"
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          devSubscribeMutation.mutate(tier.tier as 'standard' | 'pro');
+                        }}
+                        disabled={devSubscribeMutation.isPending}
+                        data-testid={`button-dev-subscribe-${tier.tier}`}
+                      >
+                        {devSubscribeMutation.isPending ? (
+                          <>
+                            <Loader className="mr-2" size="sm" />
+                            Activating...
+                          </>
+                        ) : (
+                          <>
+                            Dev: Free Subscribe
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <Card className="mt-6 p-4 bg-muted/50">
@@ -553,14 +628,14 @@ export default function Subscribe() {
           onOpenChange={setShowEmailDialog}
           onConfirm={(email) => {
             if (pendingYookassaTier) {
-              yookassaMutation.mutate({ tier: pendingYookassaTier, email });
+              yookassaMutation.mutate({ tier: pendingYookassaTier, email, period: selectedPeriod });
               setPendingYookassaTier(null);
             }
           }}
-          amount={`${pendingYookassaTier.rubPrice} ₽`}
+          amount={`${calculatePeriodPrice(pendingYookassaTier.monthlyRubPrice, selectedPeriod)} ₽`}
           description={locale === 'ru' 
-            ? `Подписка ${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'}`
-            : `${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} Subscription`
+            ? `Подписка ${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} (${PERIOD_CONFIG[selectedPeriod].labelRu})`
+            : `${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} Subscription (${PERIOD_CONFIG[selectedPeriod].labelEn})`
           }
         />
       )}

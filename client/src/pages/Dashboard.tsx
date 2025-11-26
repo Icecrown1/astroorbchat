@@ -190,6 +190,7 @@ export default function Dashboard() {
               energyCost={feature.energyCost}
               onClick={() => navigate(feature.path)}
               disabled={!data?.data?.natalInitialized || energy < feature.energyCost}
+              locale={locale}
             />
           ))}
         </div>

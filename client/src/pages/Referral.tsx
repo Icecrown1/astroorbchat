@@ -88,8 +88,8 @@ export default function Referral() {
       toast({
         title: locale === 'ru' ? 'Успех!' : 'Success!',
         description: locale === 'ru' 
-          ? 'Реферальная регистрация симулирована. +5 энергии начислено!'
-          : 'Referral signup simulated. +5 energy credited!',
+          ? 'Реферальная регистрация симулирована. +10 энергии начислено!'
+          : 'Referral signup simulated. +10 energy credited!',
       });
       // Invalidate relevant queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['/api/referral/code'] });
@@ -150,8 +150,8 @@ export default function Referral() {
               <div className="flex items-center gap-3">
                 <Gift className="w-8 h-8 text-chart-3" />
                 <div>
-                  <p className="text-2xl font-bold">+5</p>
-                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'За регистрацию' : 'Per signup'}</p>
+                  <p className="text-2xl font-bold">+10</p>
+                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Вам за приглашение' : 'For you per invite'}</p>
                 </div>
               </div>
             </Card>
@@ -159,8 +159,8 @@ export default function Referral() {
               <div className="flex items-center gap-3">
                 <Gift className="w-8 h-8 text-chart-4" />
                 <div>
-                  <p className="text-2xl font-bold">+10</p>
-                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'За подписку' : 'Per subscription'}</p>
+                  <p className="text-2xl font-bold">+5</p>
+                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Другу при регистрации' : 'Friend on signup'}</p>
                 </div>
               </div>
             </Card>

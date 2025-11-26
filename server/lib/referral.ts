@@ -15,16 +15,22 @@ export async function applyReferralBonus(storage: any, userId: string, referralC
 
   await storage.updateUser(userId, { referredById: referrer.id });
 
-  const currentPurchasedEnergy = referrer.purchasedEnergy || 0;
-  await storage.updateUser(referrer.id, { purchasedEnergy: currentPurchasedEnergy + 5 });
+  // Пригласивший получает 10 сфер
+  const referrerCurrentEnergy = referrer.purchasedEnergy || 0;
+  await storage.updateUser(referrer.id, { purchasedEnergy: referrerCurrentEnergy + 10 });
 
-  // Create referral reward record
+  // Создаём запись о награде пригласившему
   await storage.createReferralReward({
     referrerId: referrer.id,
     referredUserId: userId,
     rewardType: 'signup',
-    energyAmount: 5,
+    energyAmount: 10,
   });
+
+  // Приглашённый получает 5 сфер
+  const user = await storage.getUser(userId);
+  const userCurrentEnergy = user?.purchasedEnergy || 0;
+  await storage.updateUser(userId, { purchasedEnergy: userCurrentEnergy + 5 });
 
   return true;
 }
