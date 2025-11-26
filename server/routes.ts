@@ -17,6 +17,7 @@ import { geocodeCityWithFallback } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createPayment as createYooKassaPayment, getPayment as getYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
+import { getAllExchangeRates, forceRefreshAllRates, getCacheStatus } from "./lib/exchangeRates";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
@@ -3959,6 +3960,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? 'Автопродление включено' 
             : 'Автопродление отключено'
         } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // EXCHANGE RATES ENDPOINTS
+  // ============================================================================
+
+  // Get current exchange rates (public endpoint - used by payment pages)
+  // TON/USD is refreshed on each request (cached 5 min), USD/RUB cached daily
+  app.get("/api/exchange-rates", async (req, res) => {
+    try {
+      console.log('[ExchangeRates] Getting exchange rates...');
+      const rates = await getAllExchangeRates();
+      
+      res.json({
+        ok: true,
+        data: {
+          usdRub: {
+            rate: rates.usdRub.rate,
+            cached: rates.usdRub.cached,
+            updatedAt: rates.usdRub.updatedAt,
+            source: 'cbr', // Central Bank of Russia
+          },
+          tonUsd: {
+            rate: rates.tonUsd.rate,
+            cached: rates.tonUsd.cached,
+            updatedAt: rates.tonUsd.updatedAt,
+            source: 'coingecko',
+          },
+          tonRub: rates.tonRub, // Calculated: TON/USD * USD/RUB
+        },
+      });
+    } catch (error: any) {
+      console.error('[ExchangeRates] Error getting rates:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Cron endpoint: Force refresh exchange rates (daily for CBR)
+  app.post("/api/cron/update-exchange-rates", async (req, res) => {
+    try {
+      console.log('[CRON] Updating exchange rates...');
+      const result = await forceRefreshAllRates();
+      
+      console.log('[CRON] Exchange rates updated:', result);
+      res.json({
+        ok: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error('[CRON] Exchange rates update error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Admin endpoint: Get cache status
+  app.get("/api/admin/exchange-rates/status", requireAdmin, async (req, res) => {
+    try {
+      const status = getCacheStatus();
+      res.json({
+        ok: true,
+        data: status,
       });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
