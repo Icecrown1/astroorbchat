@@ -34,8 +34,7 @@ type SubscriptionPeriod = 'monthly' | 'semiannual' | 'annual';
 interface SubscriptionTier {
   tier: string;
   name: string;
-  monthlyPrice: number;
-  monthlyRubPrice: number;
+  monthlyPrice: number; // USD price (RUB calculated dynamically from exchange rates)
   dailyEnergy: number;
   features: string[];
   popular?: boolean;
@@ -45,16 +44,14 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
     tier: 'standard',
     name: 'Standard',
-    monthlyPrice: 12,
-    monthlyRubPrice: 1200,
+    monthlyPrice: 12, // USD, RUB calculated dynamically
     dailyEnergy: 100,
     features: ['100 energy orbs daily', 'All astrology features', 'Daily horoscope', 'Basic support'],
   },
   {
     tier: 'pro',
     name: 'Pro',
-    monthlyPrice: 18,
-    monthlyRubPrice: 1800,
+    monthlyPrice: 18, // USD, RUB calculated dynamically
     dailyEnergy: 250,
     features: ['250 energy orbs daily', 'All astrology features', 'Priority AI responses', 'Premium support', 'Advanced insights'],
     popular: true,
@@ -216,7 +213,8 @@ export default function Subscribe() {
       }
       
       const periodConfig = PERIOD_CONFIG[period];
-      const totalPriceRub = calculatePeriodPrice(tier.monthlyRubPrice, period);
+      const totalPriceUsd = calculatePeriodPrice(tier.monthlyPrice, period);
+      const totalPriceRub = getRubPrice(totalPriceUsd); // Dynamic RUB price from exchange rates
       
       // Generate unique idempotency key using UUID v4 (if not already generated)
       let idempotencyKey = yookassaIdempotencyKey;
@@ -702,7 +700,7 @@ export default function Subscribe() {
               setPendingYookassaTier(null);
             }
           }}
-          amount={`${calculatePeriodPrice(pendingYookassaTier.monthlyRubPrice, selectedPeriod)} ₽`}
+          amount={`${getRubPrice(calculatePeriodPrice(pendingYookassaTier.monthlyPrice, selectedPeriod))} ₽`}
           description={locale === 'ru' 
             ? `Подписка ${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} (${PERIOD_CONFIG[selectedPeriod].labelRu})`
             : `${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} Subscription (${PERIOD_CONFIG[selectedPeriod].labelEn})`
