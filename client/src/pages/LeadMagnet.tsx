@@ -37,8 +37,6 @@ interface HoroscopeResult {
     afternoon: { title: string; description: string };
     evening: { title: string; description: string };
     overall: { summary: string; keyAdvice: string };
-    luckyTime: string;
-    luckyColor: string;
   };
   sunSign: string;
   ascendant?: string;
@@ -401,21 +399,6 @@ export default function LeadMagnet() {
                   content={result.horoscope.evening}
                 />
               </div>
-
-              {/* Lucky info */}
-              <Card className="p-4 backdrop-blur-sm bg-card/80">
-                <div className="flex justify-around text-center">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Удачное время</p>
-                    <p className="font-medium">{result.horoscope.luckyTime}</p>
-                  </div>
-                  <div className="w-px bg-border" />
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Удачный цвет</p>
-                    <p className="font-medium">{result.horoscope.luckyColor}</p>
-                  </div>
-                </div>
-              </Card>
 
               {/* CTA to Telegram */}
               <motion.div

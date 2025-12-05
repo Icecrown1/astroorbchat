@@ -4062,12 +4062,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[LEAD] Coordinates:', coords);
 
       // Calculate natal chart using Python Swiss Ephemeris
+      // IMPORTANT: Convert local time to UTC for accurate calculations (same as main app)
+      const localYear = birthdayDate.getFullYear();
+      const localMonth = birthdayDate.getMonth() + 1;
+      const localDay = birthdayDate.getDate();
+      const localHour = birthTime ? parseInt(birthTime.split(':')[0]) : 12;
+      const localMinute = birthTime ? parseInt(birthTime.split(':')[1]) : 0;
+      
+      // Use timezone based on birth place location (approximate by longitude)
+      // Russia spans +2 to +12 UTC; use longitude to estimate timezone offset
+      const tzOffsetHours = Math.round(coords.lon / 15); // Approximate timezone from longitude
+      const birthTimezone = `Etc/GMT${tzOffsetHours >= 0 ? '-' : '+'}${Math.abs(tzOffsetHours)}`; // Note: Etc/GMT has inverted sign
+      
+      // Convert local birth time to UTC using dayjs
+      const localDateTimeStr = `${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')} ${String(localHour).padStart(2, '0')}:${String(localMinute).padStart(2, '0')}:00`;
+      const localDateTime = dayjs.tz(localDateTimeStr, birthTimezone);
+      const utcDateTime = localDateTime.utc();
+      
+      console.log('[LEAD] Local birth time:', localDateTimeStr, 'TZ:', birthTimezone);
+      console.log('[LEAD] UTC birth time:', utcDateTime.format('YYYY-MM-DD HH:mm'));
+      
       const natalInput = {
-        year: birthdayDate.getFullYear(),
-        month: birthdayDate.getMonth() + 1,
-        day: birthdayDate.getDate(),
-        hour: birthTime ? parseInt(birthTime.split(':')[0]) : 12,
-        minute: birthTime ? parseInt(birthTime.split(':')[1]) : 0,
+        year: utcDateTime.year(),
+        month: utcDateTime.month() + 1,
+        day: utcDateTime.date(),
+        hour: utcDateTime.hour(),
+        minute: utcDateTime.minute(),
         latitude: coords.lat,
         longitude: coords.lon,
       };
@@ -4170,8 +4190,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               summary: horoscopeResult.work || horoscopeResult.money || 'Продуктивный день с хорошими перспективами',
               keyAdvice: horoscopeResult.self_care || horoscopeResult.love || 'Доверяйте своей интуиции и прислушивайтесь к внутреннему голосу',
             },
-            luckyTime: '14:00 - 16:00',
-            luckyColor: 'Синий',
           },
         },
       });
