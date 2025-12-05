@@ -526,6 +526,47 @@ export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, 
   status: true,
 });
 
+// Instagram Lead Magnet table - stores leads from landing page before they join Telegram
+export const leads = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  gender: varchar("gender", { length: 20 }).notNull(),
+  birthdayDate: timestamp("birthday_date").notNull(),
+  birthTime: varchar("birth_time", { length: 5 }),
+  birthPlace: text("birth_place"),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Moscow"),
+  email: text("email"),
+  instagramUsername: text("instagram_username"),
+  natalChart: jsonb("natal_chart"), // Cached natal chart calculation
+  horoscope: jsonb("horoscope"), // Cached generated horoscope
+  convertedToUserId: varchar("converted_to_user_id", { length: 255 }), // Linked user after Telegram join
+  source: varchar("source", { length: 50 }).default("instagram"), // Traffic source tracking
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  convertedAt: timestamp("converted_at"), // When user joined Telegram
+}, (table) => ({
+  emailIdx: index("leads_email_idx").on(table.email),
+  convertedUserIdx: index("leads_converted_user_idx").on(table.convertedToUserId),
+}));
+
+export const insertLeadSchema = createInsertSchema(leads, {
+  name: z.string().min(1).max(100),
+  gender: z.enum(["male", "female"]),
+  birthdayDate: z.coerce.date(),
+  birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  birthPlace: z.string().min(1).optional().nullable(),
+  timezone: z.string().default("Europe/Moscow"),
+  email: z.string().email().optional().nullable(),
+  instagramUsername: z.string().optional().nullable(),
+  source: z.string().default("instagram"),
+}).omit({
+  id: true,
+  natalChart: true,
+  horoscope: true,
+  convertedToUserId: true,
+  createdAt: true,
+  convertedAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -569,3 +610,6 @@ export type InsertYookassaPayment = z.infer<typeof insertYookassaPaymentSchema>;
 export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({ id: true, createdAt: true });
 export type ReferralReward = typeof referralRewards.$inferSelect;
 export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
+
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = z.infer<typeof insertLeadSchema>;
