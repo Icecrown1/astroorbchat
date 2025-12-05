@@ -4222,7 +4222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: lead.id,
           name: lead.name,
           gender: lead.gender,
-          birthDate: lead.birthDate,
+          birthDate: lead.birthdayDate,
           birthTime: lead.birthTime,
           birthPlace: lead.birthPlace,
           timezone: lead.timezone,

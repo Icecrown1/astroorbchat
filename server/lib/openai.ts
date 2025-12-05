@@ -697,7 +697,7 @@ Return structured JSON with ${hostName} and ${partnerName} names in texts:
 export interface HoroscopeInterpretationInput {
   profile: { name: string; gender: string; timezone: string };
   natal: any;
-  transits?: any[];
+  transits?: any[] | Record<string, { sign: string; natalHouse: number; longitude: number }>;
 }
 
 export interface HoroscopeInterpretationResult {
@@ -723,6 +723,14 @@ export interface HoroscopeInterpretationResult {
     health: string;
     self_care?: string;
   };
+  money?: string;
+  work?: string;
+  study?: string;
+  love?: string;
+  health?: string;
+  self_care?: string;
+  overview?: string;
+  advice?: string;
 }
 
 export async function interpretHoroscope(

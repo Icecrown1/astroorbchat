@@ -17,7 +17,7 @@ import {
   FormLabel, 
   FormMessage 
 } from '@/components/ui/form';
-import { Star, Sparkles, Moon, Sun, ArrowRight, Send, Briefcase, Heart, Activity } from 'lucide-react';
+import { Star, Sparkles, Moon, Sun, ArrowRight, Send, Briefcase, Heart, Activity, Wallet, Calendar } from 'lucide-react';
 
 const leadFormSchema = z.object({
   name: z.string().min(2, 'Введите ваше имя'),
@@ -32,11 +32,14 @@ type LeadFormData = z.infer<typeof leadFormSchema>;
 
 interface HoroscopeResult {
   leadId: string;
+  monthName: string;
   horoscope: {
-    morning: { title: string; description: string };
-    afternoon: { title: string; description: string };
-    evening: { title: string; description: string };
-    overall: { summary: string; keyAdvice: string };
+    overview: string;
+    money: string;
+    work: string;
+    love: string;
+    health: string;
+    advice: string;
   };
   sunSign: string;
   ascendant?: string;
@@ -119,7 +122,7 @@ export default function LeadMagnet() {
             Astro Orb
           </h1>
           <p className="text-muted-foreground">
-            Персональный гороскоп на сегодня
+            Персональный прогноз на декабрь 2024
           </p>
         </motion.div>
 
@@ -356,7 +359,7 @@ export default function LeadMagnet() {
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', delay: 0.2 }}
                 >
-                  <Sun className="w-16 h-16 mx-auto text-chart-3 mb-4" />
+                  <Calendar className="w-16 h-16 mx-auto text-chart-3 mb-4" />
                 </motion.div>
                 <h2 className="text-2xl font-display font-bold mb-1">
                   {form.getValues('name')}, ваш знак — {result.sunSign}
@@ -366,39 +369,56 @@ export default function LeadMagnet() {
                     Асцендент: {result.ascendant}
                   </p>
                 )}
+                <p className="text-sm text-chart-1 mt-2 font-medium">
+                  Прогноз на {result.monthName}
+                </p>
               </Card>
 
-              {/* Overall summary */}
+              {/* Monthly overview */}
               <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-chart-1/10 to-chart-2/10">
                 <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-chart-3" />
-                  Прогноз на сегодня
+                  Общий обзор месяца
                 </h3>
-                <p className="text-foreground/90 leading-relaxed mb-4">
-                  {result.horoscope.overall.summary}
+                <p className="text-foreground/90 leading-relaxed">
+                  {result.horoscope.overview}
                 </p>
-                <div className="p-4 bg-primary/20 rounded-lg border border-primary/30">
-                  <p className="text-sm font-medium text-primary">
-                    Ключевой совет: {result.horoscope.overall.keyAdvice}
-                  </p>
-                </div>
               </Card>
 
-              {/* Thematic sections */}
+              {/* Monthly sections */}
               <div className="grid gap-4">
-                <TimeCard 
+                <MonthlyCard 
+                  icon={<Wallet className="w-5 h-5 text-chart-4" />}
+                  title="Финансы"
+                  content={result.horoscope.money}
+                />
+                <MonthlyCard 
                   icon={<Briefcase className="w-5 h-5 text-chart-3" />}
-                  content={result.horoscope.morning}
+                  title="Работа и карьера"
+                  content={result.horoscope.work}
                 />
-                <TimeCard 
+                <MonthlyCard 
                   icon={<Heart className="w-5 h-5 text-pink-500" />}
-                  content={result.horoscope.afternoon}
+                  title="Любовь и отношения"
+                  content={result.horoscope.love}
                 />
-                <TimeCard 
+                <MonthlyCard 
                   icon={<Activity className="w-5 h-5 text-green-500" />}
-                  content={result.horoscope.evening}
+                  title="Здоровье"
+                  content={result.horoscope.health}
                 />
               </div>
+
+              {/* Key advice */}
+              <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-primary/20 to-chart-2/20 border-primary/30">
+                <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-chart-1" />
+                  Главный совет на месяц
+                </h3>
+                <p className="text-foreground/90 leading-relaxed">
+                  {result.horoscope.advice}
+                </p>
+              </Card>
 
               {/* CTA to Telegram */}
               <motion.div
@@ -454,20 +474,22 @@ function LoadingStep({ text, delay }: { text: string; delay: number }) {
   );
 }
 
-function TimeCard({ 
+function MonthlyCard({ 
   icon, 
+  title,
   content 
 }: { 
   icon: React.ReactNode;
-  content: { title: string; description: string };
+  title: string;
+  content: string;
 }) {
   return (
     <Card className="p-4 backdrop-blur-sm bg-card/80">
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{icon}</div>
         <div>
-          <h4 className="font-medium mb-1">{content.title}</h4>
-          <p className="text-sm text-foreground/80 leading-relaxed">{content.description}</p>
+          <h4 className="font-medium mb-1">{title}</h4>
+          <p className="text-sm text-foreground/80 leading-relaxed">{content}</p>
         </div>
       </div>
     </Card>
