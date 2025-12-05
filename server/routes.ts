@@ -4074,6 +4074,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[LEAD] Calculating natal chart with Python/SwissEph:', natalInput);
       const natalChart = await calculateNatalChartPython(natalInput);
+      console.log('[LEAD] Natal chart result:', JSON.stringify(natalChart, null, 2));
+      
+      // Validate natal chart result
+      if (!natalChart || !natalChart.planets || !natalChart.planets.sun) {
+        console.error('[LEAD] Invalid natal chart result:', natalChart);
+        return res.status(500).json({ ok: false, error: 'Ошибка расчёта натальной карты. Попробуйте позже.' });
+      }
+      
       console.log('[LEAD] Natal chart calculated, Sun sign:', natalChart.planets.sun.sign);
 
       // Calculate today's transits

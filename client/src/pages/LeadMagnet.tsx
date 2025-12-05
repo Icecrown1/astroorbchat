@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { 
   Form, 
   FormControl, 
@@ -235,11 +234,10 @@ export default function LeadMagnet() {
                         <FormItem>
                           <FormLabel>Место рождения</FormLabel>
                           <FormControl>
-                            <CityAutocomplete
-                              value={field.value}
-                              onChange={field.onChange}
-                              placeholder="Город, Страна"
-                              locale="ru"
+                            <Input
+                              placeholder="Введите город, страну"
+                              {...field}
+                              data-testid="input-lead-birthplace"
                             />
                           </FormControl>
                           <FormMessage />
