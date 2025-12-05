@@ -4031,6 +4031,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==========================================
+  // LEAD MAGNET ENDPOINTS (PUBLIC - NO AUTH)
+  // ==========================================
+
+  // Calculate horoscope for lead magnet (Instagram landing page)
+  app.post("/api/lead/calculate", async (req, res) => {
+    try {
+      console.log('[LEAD] Calculating horoscope for lead magnet...');
+      
+      const { name, gender, birthDate, birthTime, birthPlace, email } = req.body;
+
+      // Validate required fields
+      if (!name || !gender || !birthDate || !birthPlace) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: 'Заполните обязательные поля: имя, пол, дата рождения, место рождения' 
+        });
+      }
+
+      // Parse birth date
+      const birthdayDate = new Date(birthDate);
+      if (isNaN(birthdayDate.getTime())) {
+        return res.status(400).json({ ok: false, error: 'Неверный формат даты' });
+      }
+
+      // Geocode birth place
+      console.log('[LEAD] Geocoding birth place:', birthPlace);
+      const coords = await geocodeCityWithFallback(birthPlace);
+      console.log('[LEAD] Coordinates:', coords);
+
+      // Calculate natal chart using Python Swiss Ephemeris
+      const natalInput = {
+        year: birthdayDate.getFullYear(),
+        month: birthdayDate.getMonth() + 1,
+        day: birthdayDate.getDate(),
+        hour: birthTime ? parseInt(birthTime.split(':')[0]) : 12,
+        minute: birthTime ? parseInt(birthTime.split(':')[1]) : 0,
+        latitude: coords.lat,
+        longitude: coords.lon,
+      };
+
+      console.log('[LEAD] Calculating natal chart with Python/SwissEph:', natalInput);
+      const natalChart = await calculateNatalChartPython(natalInput);
+      console.log('[LEAD] Natal chart calculated, Sun sign:', natalChart.planets.sun.sign);
+
+      // Calculate today's transits
+      const timezone = 'Europe/Moscow';
+      const nowTime = dayjs().tz(timezone);
+      const transitData = {
+        year: nowTime.year(),
+        month: nowTime.month() + 1,
+        day: nowTime.date(),
+        hour: nowTime.hour(),
+        minute: nowTime.minute(),
+      };
+
+      console.log('[LEAD] Calculating transits for:', transitData);
+      const transits = await calculateTransits(transitData);
+      console.log('[LEAD] Transits calculated:', Object.keys(transits.planets).length, 'planets');
+
+      // Map transits to natal houses
+      const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart);
+      console.log('[LEAD] Transits mapped to natal houses');
+
+      // Generate personalized horoscope using OpenAI
+      const horoscopeResult = await interpretHoroscope({
+        profile: {
+          name,
+          gender,
+          timezone,
+        },
+        natal: natalChart,
+        transits: transitsInNatalHouses,
+      }, 'ru');
+
+      console.log('[LEAD] Horoscope generated successfully');
+
+      // Create lead in database
+      const lead = await storage.createLead({
+        name,
+        gender,
+        birthdayDate,
+        birthTime: birthTime || null,
+        birthPlace,
+        timezone,
+        email: email || null,
+        source: 'instagram',
+      });
+
+      // Update lead with calculated data
+      await storage.updateLead(lead.id, {
+        natalChart: natalChart,
+        horoscope: horoscopeResult,
+      });
+
+      console.log('[LEAD] Lead created with ID:', lead.id);
+
+      // Get sun sign and ascendant from natal chart
+      const sunSign = natalChart.planets.sun.sign;
+      // Ascendant sign comes from angles
+      const ascendantSign = natalChart.angles?.ascendant?.sign || null;
+
+      // Format horoscope for lead magnet display
+      // The interpretHoroscope returns { morning: { money, work, love, health }, day: {...}, evening: {...} }
+      const formatPeriod = (period: any, periodName: string) => {
+        if (!period) return { title: periodName, description: 'Позитивная энергия дня' };
+        const aspects = [period.money, period.work, period.love, period.health].filter(Boolean);
+        return {
+          title: periodName,
+          description: aspects.length > 0 ? aspects.join(' ') : 'Хорошие перспективы в этот период'
+        };
+      };
+
+      // Format response for frontend
+      res.json({
+        ok: true,
+        data: {
+          leadId: lead.id,
+          sunSign: getZodiacSignRu(sunSign),
+          ascendant: ascendantSign ? getZodiacSignRu(ascendantSign) : null,
+          horoscope: {
+            morning: formatPeriod(horoscopeResult.morning, 'Утренняя энергия'),
+            afternoon: formatPeriod(horoscopeResult.day, 'Дневная активность'),
+            evening: formatPeriod(horoscopeResult.evening, 'Вечерний отдых'),
+            overall: {
+              summary: horoscopeResult.morning?.work || horoscopeResult.day?.work || 'Позитивный день с возможностями для роста',
+              keyAdvice: horoscopeResult.morning?.love || horoscopeResult.evening?.health || 'Доверяйте интуиции',
+            },
+            luckyTime: '14:00 - 16:00',
+            luckyColor: 'Синий',
+          },
+        },
+      });
+
+    } catch (error: any) {
+      console.error('[LEAD] Error calculating horoscope:', error);
+      res.status(500).json({ 
+        ok: false, 
+        error: 'Ошибка расчёта гороскопа. Попробуйте снова.' 
+      });
+    }
+  });
+
+  // Get lead by ID (for Telegram bot to retrieve lead data)
+  app.get("/api/lead/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const lead = await storage.getLead(id);
+      
+      if (!lead) {
+        return res.status(404).json({ ok: false, error: 'Lead not found' });
+      }
+
+      res.json({ ok: true, data: lead });
+    } catch (error: any) {
+      console.error('[LEAD] Error getting lead:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Helper function for Russian zodiac sign names
+  function getZodiacSignRu(sign: string): string {
+    const signs: Record<string, string> = {
+      'Aries': 'Овен',
+      'Taurus': 'Телец',
+      'Gemini': 'Близнецы',
+      'Cancer': 'Рак',
+      'Leo': 'Лев',
+      'Virgo': 'Дева',
+      'Libra': 'Весы',
+      'Scorpio': 'Скорпион',
+      'Sagittarius': 'Стрелец',
+      'Capricorn': 'Козерог',
+      'Aquarius': 'Водолей',
+      'Pisces': 'Рыбы',
+    };
+    return signs[sign] || sign;
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }

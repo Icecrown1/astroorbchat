@@ -28,6 +28,7 @@ import Admin from '@/pages/Admin';
 import Archive from '@/pages/Archive';
 import Legal from '@/pages/Legal';
 import PaymentSuccess from '@/pages/PaymentSuccess';
+import LeadMagnet from '@/pages/LeadMagnet';
 
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
@@ -40,7 +41,11 @@ function Router() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated && location !== '/register' && location !== '/login' && location !== '/legal' && !location.startsWith('/payment-success')) {
+    // Public routes that don't require authentication
+    const publicRoutes = ['/register', '/login', '/legal', '/lead'];
+    const isPublicRoute = publicRoutes.includes(location) || location.startsWith('/payment-success');
+    
+    if (!isAuthenticated && !isPublicRoute) {
       navigate('/login');
     }
   }, [isAuthenticated, location, navigate]);
@@ -50,6 +55,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/legal" component={Legal} />
+      <Route path="/lead" component={LeadMagnet} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/my-natal-chart" component={MyNatalChart} />
       <Route path="/natal-chart" component={NatalChart} />

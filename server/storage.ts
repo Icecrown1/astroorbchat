@@ -15,6 +15,7 @@ import {
   yookassaPayments,
   referralRewards,
   solarReturns,
+  leads,
   type User, 
   type InsertUser,
   type Subscription,
@@ -44,7 +45,9 @@ import {
   type ReferralReward,
   type InsertReferralReward,
   type SolarReturn,
-  type InsertSolarReturn
+  type InsertSolarReturn,
+  type Lead,
+  type InsertLead
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, lt } from "drizzle-orm";
@@ -138,6 +141,12 @@ export interface IStorage {
   getAllPayments(): Promise<Payment[]>;
   getAllSubscriptions(): Promise<Subscription[]>;
   addPurchasedEnergy(userId: string, amount: number): Promise<User | undefined>;
+  
+  // Lead magnet operations
+  getLead(id: string): Promise<Lead | undefined>;
+  createLead(lead: InsertLead): Promise<Lead>;
+  updateLead(id: string, data: Partial<Lead>): Promise<Lead | undefined>;
+  markLeadConverted(leadId: string, userId: string): Promise<Lead | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -666,6 +675,41 @@ export class DatabaseStorage implements IStorage {
       .values(insertSolarReturn)
       .returning();
     return solarReturn;
+  }
+
+  // Lead magnet operations
+  async getLead(id: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+    return lead || undefined;
+  }
+
+  async createLead(insertLead: InsertLead): Promise<Lead> {
+    const [lead] = await db
+      .insert(leads)
+      .values(insertLead)
+      .returning();
+    return lead;
+  }
+
+  async updateLead(id: string, data: Partial<Lead>): Promise<Lead | undefined> {
+    const [lead] = await db
+      .update(leads)
+      .set(data)
+      .where(eq(leads.id, id))
+      .returning();
+    return lead || undefined;
+  }
+
+  async markLeadConverted(leadId: string, userId: string): Promise<Lead | undefined> {
+    const [lead] = await db
+      .update(leads)
+      .set({ 
+        convertedToUserId: userId,
+        convertedAt: new Date()
+      })
+      .where(eq(leads.id, leadId))
+      .returning();
+    return lead || undefined;
   }
 }
 
