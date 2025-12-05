@@ -727,9 +727,11 @@ export interface HoroscopeInterpretationResult {
 
 export async function interpretHoroscope(
   input: HoroscopeInterpretationInput,
-  locale: string = 'ru'
+  locale: string = 'ru',
+  period: 'daily' | 'monthly' = 'daily',
+  monthName?: string
 ): Promise<HoroscopeInterpretationResult> {
-  console.log('[INTERPRET_HOROSCOPE] Starting daily horoscope generation, locale:', locale);
+  console.log(`[INTERPRET_HOROSCOPE] Starting ${period} horoscope generation, locale:`, locale);
   
   const languageInstruction = locale === 'ru'
     ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
@@ -743,14 +745,15 @@ export async function interpretHoroscope(
   const planetPositions = extractKeyPlanetPositions(input.natal, locale);
   
   // Localized labels
+  const isMonthly = period === 'monthly';
   const labels = {
     period: locale === 'ru' ? 'Период' : 'Period',
-    date: locale === 'ru' ? 'Дата' : 'Date',
+    date: locale === 'ru' ? (isMonthly ? 'Месяц' : 'Дата') : (isMonthly ? 'Month' : 'Date'),
     name: locale === 'ru' ? 'Имя' : 'Name',
     gender: locale === 'ru' ? 'Пол' : 'Gender',
     timezone: locale === 'ru' ? 'Часовой пояс' : 'Timezone',
     planets: locale === 'ru' ? 'Основные позиции планет' : 'Key planet positions',
-    transits: locale === 'ru' ? 'Транзиты дня' : 'Day transits'
+    transits: locale === 'ru' ? (isMonthly ? 'Транзиты месяца' : 'Транзиты дня') : (isMonthly ? 'Month transits' : 'Day transits')
   };
   
   // Include transits if available (compact summary without data loss)
@@ -766,9 +769,12 @@ export async function interpretHoroscope(
     }
   }
 
+  const periodValue = isMonthly ? 'month' : 'day';
+  const dateValue = isMonthly && monthName ? monthName : today;
+
   const promptData = `
-${labels.period}: day
-${labels.date}: ${today}
+${labels.period}: ${periodValue}
+${labels.date}: ${dateValue}
 ${labels.name}: ${input.profile.name}
 ${labels.gender}: ${input.profile.gender}
 ${labels.timezone}: ${input.profile.timezone}
@@ -776,7 +782,9 @@ ${labels.timezone}: ${input.profile.timezone}
 ${labels.planets}: ${planetPositions}${transitsInfo}
   `.trim();
 
-  const promptText = loadPrompt('horoscope', {});
+  // Use different prompt for monthly vs daily
+  const promptFile = isMonthly ? 'horoscope_monthly' : 'horoscope';
+  const promptText = loadPrompt(promptFile, {});
   const finalPrompt = `${languageInstruction}\n\n${toneInstruction}\n\n${promptText}\n\n${promptData}`;
 
   console.log('[INTERPRET_HOROSCOPE] Prompt length:', finalPrompt.length);

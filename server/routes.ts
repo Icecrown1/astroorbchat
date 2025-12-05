@@ -4123,7 +4123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart);
       console.log('[LEAD] Transits mapped to natal houses');
 
-      // Generate personalized horoscope using OpenAI
+      // Generate personalized MONTHLY horoscope using OpenAI (December 2024)
       const horoscopeResult = await interpretHoroscope({
         profile: {
           name,
@@ -4132,9 +4132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         natal: natalChart,
         transits: transitsInNatalHouses,
-      }, 'ru');
+      }, 'ru', 'monthly', 'Декабрь 2024');
 
-      console.log('[LEAD] Horoscope generated successfully');
+      console.log('[LEAD] Monthly horoscope generated successfully');
 
       // Create lead in database
       const lead = await storage.createLead({
@@ -4161,9 +4161,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ascendant sign comes from angles
       const ascendantSign = natalChart.angles?.Ascendant?.sign || null;
 
-      // Format horoscope for lead magnet display
-      // interpretHoroscope returns flat object: { money, work, study, love, health, self_care }
-      // We display 3 thematic areas for the lead magnet
+      // Format monthly horoscope for lead magnet display
+      // interpretHoroscope for monthly returns: { overview, money, work, love, health, advice }
       
       // Format response for frontend with actual horoscope content
       res.json({
@@ -4172,24 +4171,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           leadId: lead.id,
           sunSign: getZodiacSignRu(sunSign),
           ascendant: ascendantSign ? getZodiacSignRu(ascendantSign) : null,
+          monthName: 'Декабрь 2024',
           horoscope: {
-            // Thematic blocks combining related areas
-            morning: {
-              title: 'Финансы и работа',
-              description: horoscopeResult.money || horoscopeResult.work || 'Благоприятный день для финансовых дел'
-            },
-            afternoon: {
-              title: 'Любовь и отношения', 
-              description: horoscopeResult.love || 'Гармоничные отношения с близкими'
-            },
-            evening: {
-              title: 'Здоровье и забота о себе',
-              description: horoscopeResult.health || horoscopeResult.self_care || 'Уделите внимание отдыху'
-            },
-            overall: {
-              summary: horoscopeResult.work || horoscopeResult.money || 'Продуктивный день с хорошими перспективами',
-              keyAdvice: horoscopeResult.self_care || horoscopeResult.love || 'Доверяйте своей интуиции и прислушивайтесь к внутреннему голосу',
-            },
+            overview: horoscopeResult.overview || 'Декабрь принесёт интересные возможности',
+            money: horoscopeResult.money || 'Благоприятный период для финансовых дел',
+            work: horoscopeResult.work || 'Хорошие карьерные перспективы',
+            love: horoscopeResult.love || 'Гармоничные отношения с близкими',
+            health: horoscopeResult.health || 'Уделите внимание отдыху',
+            advice: horoscopeResult.advice || 'Доверяйте своей интуиции',
           },
         },
       });
