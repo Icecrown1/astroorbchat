@@ -17,7 +17,7 @@ import {
   FormLabel, 
   FormMessage 
 } from '@/components/ui/form';
-import { Star, Sparkles, Moon, Sun, ArrowRight, Send } from 'lucide-react';
+import { Star, Sparkles, Moon, Sun, ArrowRight, Send, Briefcase, Heart, Activity } from 'lucide-react';
 
 const leadFormSchema = z.object({
   name: z.string().min(2, 'Введите ваше имя'),
@@ -379,28 +379,25 @@ export default function LeadMagnet() {
                 <p className="text-foreground/90 leading-relaxed mb-4">
                   {result.horoscope.overall.summary}
                 </p>
-                <div className="p-4 bg-chart-3/10 rounded-lg">
-                  <p className="text-sm font-medium text-chart-3">
+                <div className="p-4 bg-primary/20 rounded-lg border border-primary/30">
+                  <p className="text-sm font-medium text-primary">
                     Ключевой совет: {result.horoscope.overall.keyAdvice}
                   </p>
                 </div>
               </Card>
 
-              {/* Time periods */}
+              {/* Thematic sections */}
               <div className="grid gap-4">
                 <TimeCard 
-                  title="Утро" 
-                  icon="🌅"
+                  icon={<Briefcase className="w-5 h-5 text-chart-3" />}
                   content={result.horoscope.morning}
                 />
                 <TimeCard 
-                  title="День" 
-                  icon="☀️"
+                  icon={<Heart className="w-5 h-5 text-pink-500" />}
                   content={result.horoscope.afternoon}
                 />
                 <TimeCard 
-                  title="Вечер" 
-                  icon="🌙"
+                  icon={<Activity className="w-5 h-5 text-green-500" />}
                   content={result.horoscope.evening}
                 />
               </div>
@@ -475,21 +472,19 @@ function LoadingStep({ text, delay }: { text: string; delay: number }) {
 }
 
 function TimeCard({ 
-  title, 
   icon, 
   content 
 }: { 
-  title: string; 
-  icon: string;
+  icon: React.ReactNode;
   content: { title: string; description: string };
 }) {
   return (
     <Card className="p-4 backdrop-blur-sm bg-card/80">
       <div className="flex items-start gap-3">
-        <span className="text-2xl">{icon}</span>
+        <div className="mt-0.5">{icon}</div>
         <div>
-          <h4 className="font-medium mb-1">{title}: {content.title}</h4>
-          <p className="text-sm text-muted-foreground">{content.description}</p>
+          <h4 className="font-medium mb-1">{content.title}</h4>
+          <p className="text-sm text-foreground/80 leading-relaxed">{content.description}</p>
         </div>
       </div>
     </Card>

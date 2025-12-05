@@ -4142,17 +4142,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ascendantSign = natalChart.angles?.Ascendant?.sign || null;
 
       // Format horoscope for lead magnet display
-      // The interpretHoroscope returns { morning: { money, work, love, health }, day: {...}, evening: {...} }
-      const formatPeriod = (period: any, periodName: string) => {
-        if (!period) return { title: periodName, description: 'Позитивная энергия дня' };
-        const aspects = [period.money, period.work, period.love, period.health].filter(Boolean);
-        return {
-          title: periodName,
-          description: aspects.length > 0 ? aspects.join(' ') : 'Хорошие перспективы в этот период'
-        };
-      };
-
-      // Format response for frontend
+      // interpretHoroscope returns flat object: { money, work, study, love, health, self_care }
+      // We display 3 thematic areas for the lead magnet
+      
+      // Format response for frontend with actual horoscope content
       res.json({
         ok: true,
         data: {
@@ -4160,12 +4153,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sunSign: getZodiacSignRu(sunSign),
           ascendant: ascendantSign ? getZodiacSignRu(ascendantSign) : null,
           horoscope: {
-            morning: formatPeriod(horoscopeResult.morning, 'Утренняя энергия'),
-            afternoon: formatPeriod(horoscopeResult.day, 'Дневная активность'),
-            evening: formatPeriod(horoscopeResult.evening, 'Вечерний отдых'),
+            // Thematic blocks combining related areas
+            morning: {
+              title: 'Финансы и работа',
+              description: horoscopeResult.money || horoscopeResult.work || 'Благоприятный день для финансовых дел'
+            },
+            afternoon: {
+              title: 'Любовь и отношения', 
+              description: horoscopeResult.love || 'Гармоничные отношения с близкими'
+            },
+            evening: {
+              title: 'Здоровье и забота о себе',
+              description: horoscopeResult.health || horoscopeResult.self_care || 'Уделите внимание отдыху'
+            },
             overall: {
-              summary: horoscopeResult.morning?.work || horoscopeResult.day?.work || 'Позитивный день с возможностями для роста',
-              keyAdvice: horoscopeResult.morning?.love || horoscopeResult.evening?.health || 'Доверяйте интуиции',
+              summary: horoscopeResult.work || horoscopeResult.money || 'Продуктивный день с хорошими перспективами',
+              keyAdvice: horoscopeResult.self_care || horoscopeResult.love || 'Доверяйте своей интуиции и прислушивайтесь к внутреннему голосу',
             },
             luckyTime: '14:00 - 16:00',
             luckyColor: 'Синий',
