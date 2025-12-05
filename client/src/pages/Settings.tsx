@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Save, LogOut, Trash2, Languages, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Languages, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,16 +53,6 @@ export default function Settings() {
   const { toast } = useToast();
   const { user, updateUser, clearAuth } = useAuth();
   const { t, locale, setLocale } = useTranslation();
-
-  const handleLogoutAndClear = () => {
-    clearAuth();
-    queryClient.clear();
-    toast({
-      title: locale === 'ru' ? 'Вышли из аккаунта' : 'Logged Out',
-      description: locale === 'ru' ? 'Теперь вы можете снова протестировать регистрацию' : 'You can now test registration again',
-    });
-    navigate('/register');
-  };
 
   const { data, isLoading, error } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
@@ -405,31 +395,6 @@ export default function Settings() {
           </div>
         </Card>
 
-        {!import.meta.env.PROD && (
-          <Card className="p-6 mt-6 border-destructive/50">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-destructive">{locale === 'ru' ? 'Панель разработки' : 'Development Panel'}</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {locale === 'ru' ? 'Инструменты для тестирования и разработки' : 'Tools for testing and development'}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Button
-                variant="destructive"
-                onClick={handleLogoutAndClear}
-                className="w-full"
-                data-testid="button-dev-logout"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                {locale === 'ru' ? 'Выйти и очистить данные' : 'Logout & Clear Data'}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                {locale === 'ru' ? 'Это выполнит выход и очистит все локальные данные. Используйте для повторного тестирования регистрации.' : 'This will log you out and clear all local data. Use this to test registration again.'}
-              </p>
-            </div>
-          </Card>
-        )}
       </div>
     </div>
   );

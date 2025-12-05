@@ -4076,13 +4076,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const natalChart = await calculateNatalChartPython(natalInput);
       console.log('[LEAD] Natal chart result:', JSON.stringify(natalChart, null, 2));
       
-      // Validate natal chart result
-      if (!natalChart || !natalChart.planets || !natalChart.planets.sun) {
+      // Validate natal chart result (Python returns planet names with capital letters)
+      if (!natalChart || !natalChart.planets || !natalChart.planets.Sun) {
         console.error('[LEAD] Invalid natal chart result:', natalChart);
         return res.status(500).json({ ok: false, error: 'Ошибка расчёта натальной карты. Попробуйте позже.' });
       }
       
-      console.log('[LEAD] Natal chart calculated, Sun sign:', natalChart.planets.sun.sign);
+      console.log('[LEAD] Natal chart calculated, Sun sign:', natalChart.planets.Sun.sign);
 
       // Calculate today's transits
       const timezone = 'Europe/Moscow';
@@ -4136,10 +4136,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[LEAD] Lead created with ID:', lead.id);
 
-      // Get sun sign and ascendant from natal chart
-      const sunSign = natalChart.planets.sun.sign;
+      // Get sun sign and ascendant from natal chart (Python returns with capital letters)
+      const sunSign = natalChart.planets.Sun.sign;
       // Ascendant sign comes from angles
-      const ascendantSign = natalChart.angles?.ascendant?.sign || null;
+      const ascendantSign = natalChart.angles?.Ascendant?.sign || null;
 
       // Format horoscope for lead magnet display
       // The interpretHoroscope returns { morning: { money, work, love, health }, day: {...}, evening: {...} }
