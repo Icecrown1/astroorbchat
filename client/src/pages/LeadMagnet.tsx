@@ -25,7 +25,6 @@ const leadFormSchema = z.object({
   birthDate: z.string().min(1, 'Введите дату рождения'),
   birthTime: z.string().optional(),
   birthPlace: z.string().min(2, 'Введите место рождения'),
-  email: z.string().email('Введите корректный email').optional().or(z.literal('')),
 });
 
 type LeadFormData = z.infer<typeof leadFormSchema>;
@@ -57,7 +56,6 @@ export default function LeadMagnet() {
       birthDate: '',
       birthTime: '',
       birthPlace: '',
-      email: '',
     },
   });
 
@@ -241,31 +239,6 @@ export default function LeadMagnet() {
                               data-testid="input-lead-birthplace"
                             />
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Email (optional) */}
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Email <span className="text-muted-foreground text-xs">(опционально)</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="email" 
-                              placeholder="your@email.com" 
-                              {...field} 
-                              data-testid="input-lead-email"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground">
-                            Для получения персональных прогнозов
-                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
