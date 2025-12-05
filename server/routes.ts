@@ -4174,20 +4174,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get lead by ID (for Telegram bot to retrieve lead data)
+  // Get lead by ID (for registration form to retrieve lead data)
+  // Returns only minimal data needed for form pre-fill (no full PII exposure)
   app.get("/api/lead/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      
+      // Validate lead ID format (nanoid format: 21 chars alphanumeric)
+      if (!id || id.length !== 21 || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+        return res.status(404).json({ ok: false, error: 'Not found' });
+      }
+      
       const lead = await storage.getLead(id);
       
       if (!lead) {
-        return res.status(404).json({ ok: false, error: 'Lead not found' });
+        return res.status(404).json({ ok: false, error: 'Not found' });
       }
 
-      res.json({ ok: true, data: lead });
+      // Don't return already converted leads
+      if (lead.convertedToUserId) {
+        return res.status(410).json({ ok: false, error: 'Already used' });
+      }
+
+      // Return only minimal data needed for form pre-fill
+      // Don't expose natal chart or full interpretation data
+      res.json({ 
+        ok: true, 
+        data: {
+          id: lead.id,
+          name: lead.name,
+          gender: lead.gender,
+          birthDate: lead.birthDate,
+          birthTime: lead.birthTime,
+          birthPlace: lead.birthPlace,
+          timezone: lead.timezone,
+        }
+      });
     } catch (error: any) {
       console.error('[LEAD] Error getting lead:', error);
-      res.status(500).json({ ok: false, error: error.message });
+      res.status(500).json({ ok: false, error: 'Server error' });
+    }
+  });
+
+  // Mark lead as converted after user registration
+  // Note: Lead ID comes from Telegram start_param which is tied to specific user session
+  app.post("/api/lead/:id/convert", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).userId;
+      
+      // Validate lead ID format
+      if (!id || id.length !== 21 || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+        return res.status(404).json({ ok: false, error: 'Not found' });
+      }
+      
+      const lead = await storage.getLead(id);
+      if (!lead) {
+        return res.status(404).json({ ok: false, error: 'Not found' });
+      }
+
+      // Already converted - idempotent success if same user
+      if (lead.convertedToUserId) {
+        if (lead.convertedToUserId === userId) {
+          return res.json({ ok: true, data: { alreadyConverted: true } });
+        }
+        return res.status(410).json({ ok: false, error: 'Already used' });
+      }
+
+      const updatedLead = await storage.markLeadConverted(id, userId);
+      console.log('[LEAD] Lead converted:', id, '-> User:', userId);
+      
+      res.json({ ok: true, data: { converted: true } });
+    } catch (error: any) {
+      console.error('[LEAD] Error converting lead:', error);
+      res.status(500).json({ ok: false, error: 'Server error' });
     }
   });
 

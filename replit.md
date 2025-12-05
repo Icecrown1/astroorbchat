@@ -89,6 +89,16 @@ Preferred communication style: Simple, everyday language.
     - Events in 10th house from Ascendant (career/public status)
   - **Clickable Events**: Each event opens modal with AI-generated personalized interpretation (costs 2 orbs)
   - **Python Swiss Ephemeris Integration**: `important_dates_api.py` calculates astronomical events with high accuracy
+- **Instagram Lead Magnet** (December 5, 2025):
+  - **Public Landing Page**: `/lead` page for collecting user data without authentication
+  - **Database Table**: `leads` table stores collected data with conversion tracking
+  - **Free Personalized Horoscope**: Uses same natal chart + horoscope pipeline (Swiss Ephemeris + OpenAI)
+  - **Flow**: User fills form → AI calculates horoscope → Shows result → Deep-link to Telegram bot
+  - **Deep-Link Integration**: Format `t.me/botname?start=lead_xxx` transfers lead ID to Mini App
+  - **Registration Pre-fill**: Mini App detects lead ID from startParam, fetches lead data, pre-fills registration form
+  - **Conversion Tracking**: Lead marked as converted after successful registration
+  - **Security**: Returns minimal PII, validates lead ID format, handles 404/410 gracefully
+  - **API Endpoints**: `POST /api/lead/calculate`, `GET /api/lead/:id`, `POST /api/lead/:id/convert`
 
 ## External Dependencies
 - **Telegram Integration**: `@twa-dev/sdk`

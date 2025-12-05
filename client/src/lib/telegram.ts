@@ -83,6 +83,60 @@ export function openLink(url: string) {
 }
 
 /**
+ * Get the start parameter from Telegram WebApp
+ * Returns the raw startParam value from various sources
+ */
+export function getStartParam(): string | null {
+  // Method 1: Telegram WebApp startParam (most reliable)
+  const tgApp = telegram as any;
+  if (tgApp.startParam) {
+    console.log('[StartParam] Found via startParam:', tgApp.startParam);
+    return tgApp.startParam;
+  }
+
+  // Method 2: Telegram initDataUnsafe start_param
+  if (telegram.initDataUnsafe?.start_param) {
+    console.log('[StartParam] Found via initDataUnsafe.start_param:', telegram.initDataUnsafe.start_param);
+    return telegram.initDataUnsafe.start_param;
+  }
+
+  // Method 3: URL Hash (#tgWebAppStartParam=CODE)
+  if (window.location.hash) {
+    const hash = window.location.hash.slice(1);
+    const hashParams = new URLSearchParams(hash);
+    const codeFromHash = hashParams.get('tgWebAppStartParam');
+    if (codeFromHash) {
+      console.log('[StartParam] Found via URL hash:', codeFromHash);
+      return codeFromHash;
+    }
+  }
+
+  // Method 4: URL Search Parameters (?startapp=CODE)
+  const urlParams = new URLSearchParams(window.location.search);
+  const codeFromQuery = urlParams.get('startapp');
+  if (codeFromQuery) {
+    console.log('[StartParam] Found via URL query:', codeFromQuery);
+    return codeFromQuery;
+  }
+
+  console.log('[StartParam] No start parameter found');
+  return null;
+}
+
+/**
+ * Extract lead ID from start parameter (format: lead_xxx)
+ */
+export function getLeadIdFromStartParam(): string | null {
+  const startParam = getStartParam();
+  if (startParam && startParam.startsWith('lead_')) {
+    const leadId = startParam.substring(5); // Remove 'lead_' prefix
+    console.log('[Lead] Found lead ID:', leadId);
+    return leadId;
+  }
+  return null;
+}
+
+/**
  * Smart extraction of referral code from Telegram
  * Tries 4 different methods to find the referral code:
  * 1. Telegram WebApp startParam

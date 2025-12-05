@@ -22,7 +22,7 @@ import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { getInitData, getReferralCode } from '@/lib/telegram';
+import { getInitData, getReferralCode, getLeadIdFromStartParam } from '@/lib/telegram';
 import { formatTimezoneWithOffset } from '@/lib/timezone';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -33,11 +33,23 @@ dayjs.extend(timezone);
 
 const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
+interface LeadData {
+  id: string;
+  name: string;
+  gender: 'male' | 'female' | 'other';
+  birthDate: string;
+  birthTime: string | null;
+  birthPlace: string | null;
+  timezone: string;
+}
+
 export default function Register() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<any>({});
   const [isCheckingTelegram, setIsCheckingTelegram] = useState(true);
   const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [leadData, setLeadData] = useState<LeadData | null>(null);
   const [, navigate] = useLocation();
   const { setAuth } = useAuth();
   const { toast } = useToast();
@@ -192,19 +204,66 @@ export default function Register() {
     };
   }, [navigate]);
 
-  // Extract referral code from Telegram (after Telegram context is ready)
+  // Extract referral code or lead ID from Telegram (after Telegram context is ready)
   useEffect(() => {
     if (!isCheckingTelegram) {
-      const code = getReferralCode();
-      if (code) {
-        console.log('[Registration] Referral code detected:', code);
-        setReferralCode(code);
-        toast({
-          title: locale === 'ru' ? '🎁 Реферальный код применён!' : '🎁 Referral code applied!',
-          description: locale === 'ru' 
-            ? 'Вы получите бонус после регистрации' 
-            : 'You will receive a bonus after registration',
-        });
+      // Check for lead ID first (format: lead_xxx)
+      const extractedLeadId = getLeadIdFromStartParam();
+      if (extractedLeadId) {
+        console.log('[Registration] Lead ID detected:', extractedLeadId);
+        setLeadId(extractedLeadId);
+        
+        // Fetch lead data from server
+        fetch(`/api/lead/${extractedLeadId}`)
+          .then(res => {
+            if (res.status === 404 || res.status === 410) {
+              // Lead not found or already used - proceed with normal registration
+              console.log('[Registration] Lead not available, proceeding with normal registration');
+              setLeadId(null);
+              return null;
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.ok && data.data) {
+              const lead = data.data;
+              console.log('[Registration] Lead data loaded:', lead);
+              
+              setLeadData({
+                id: lead.id,
+                name: lead.name,
+                gender: lead.gender,
+                birthDate: lead.birthDate,
+                birthTime: lead.birthTime,
+                birthPlace: lead.birthPlace,
+                timezone: lead.timezone,
+              });
+              
+              toast({
+                title: locale === 'ru' ? 'Данные загружены' : 'Data loaded',
+                description: locale === 'ru' 
+                  ? 'Ваши данные с сайта уже заполнены' 
+                  : 'Your data from the website is pre-filled',
+              });
+            }
+          })
+          .catch(err => {
+            console.error('[Registration] Failed to load lead data:', err);
+            setLeadId(null);
+          });
+      } else {
+        // Check for regular referral code
+        const code = getReferralCode();
+        if (code) {
+          console.log('[Registration] Referral code detected:', code);
+          setReferralCode(code);
+          toast({
+            title: locale === 'ru' ? 'Реферальный код применён!' : 'Referral code applied!',
+            description: locale === 'ru' 
+              ? 'Вы получите бонус после регистрации' 
+              : 'You will receive a bonus after registration',
+          });
+        }
       }
     }
   }, [isCheckingTelegram, locale, toast]);
@@ -249,6 +308,26 @@ export default function Register() {
       timezone: dayjs.tz.guess(),
     },
   });
+
+  // Pre-fill forms when lead data is loaded
+  useEffect(() => {
+    if (leadData) {
+      console.log('[Registration] Pre-filling forms with lead data:', leadData);
+      
+      // Step 1: name and gender
+      step1Form.setValue('name', leadData.name);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (step1Form as any).setValue('gender', leadData.gender);
+      
+      // Step 2: birth date, time, place
+      step2Form.setValue('birthdayDate', leadData.birthDate);
+      step2Form.setValue('birthTime', leadData.birthTime || '');
+      step2Form.setValue('birthPlace', leadData.birthPlace || '');
+      
+      // Step 3: timezone
+      step3Form.setValue('timezone', leadData.timezone);
+    }
+  }, [leadData, step1Form, step2Form, step3Form]);
 
   const handleStep1 = (data: any) => {
     setFormData({ ...formData, ...data });
@@ -319,6 +398,22 @@ export default function Register() {
         
         // Wait a bit for auth to be saved
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Mark lead as converted if registration came from lead magnet
+        if (leadId && result.data.token) {
+          try {
+            await fetch(`/api/lead/${leadId}/convert`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${result.data.token}`
+              },
+            });
+            console.log('[Registration] Lead converted successfully:', leadId);
+          } catch (err) {
+            console.error('[Registration] Failed to convert lead:', err);
+          }
+        }
         
         toast({
           title: t.auth.welcomeDefault,

@@ -22,7 +22,7 @@ import { Star, Sparkles, Moon, Sun, ArrowRight, Send } from 'lucide-react';
 
 const leadFormSchema = z.object({
   name: z.string().min(2, 'Введите ваше имя'),
-  gender: z.enum(['male', 'female'], { required_error: 'Выберите пол' }),
+  gender: z.enum(['male', 'female', 'other'], { required_error: 'Выберите пол' }),
   birthDate: z.string().min(1, 'Введите дату рождения'),
   birthTime: z.string().optional(),
   birthPlace: z.string().min(2, 'Введите место рождения'),
