@@ -93,7 +93,7 @@ export default function LeadMagnet() {
   const telegramDeepLink = result ? `https://t.me/${botUsername}?start=lead_${result.leadId}` : '';
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #F5E6D3 0%, #FCDFD4 30%, #F5C4C4 60%, #E8B4B8 100%)' }}>
+    <div className="min-h-screen relative overflow-hidden">
       {/* Sparkle effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Top area sparkles */}
