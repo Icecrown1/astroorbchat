@@ -93,14 +93,30 @@ export default function LeadMagnet() {
   const telegramDeepLink = result ? `https://t.me/${botUsername}?start=lead_${result.leadId}` : '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-chart-1/10 relative overflow-hidden">
-      {/* Cosmic background effects */}
+    <div className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #F5E6D3 0%, #FCDFD4 30%, #F5C4C4 60%, #E8B4B8 100%)' }}>
+      {/* Sparkle effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-chart-1 rounded-full animate-pulse" />
-        <div className="absolute top-40 right-20 w-1 h-1 bg-chart-2 rounded-full animate-pulse delay-100" />
-        <div className="absolute top-60 left-1/3 w-1.5 h-1.5 bg-chart-3 rounded-full animate-pulse delay-200" />
-        <div className="absolute bottom-40 right-1/4 w-2 h-2 bg-chart-4 rounded-full animate-pulse delay-300" />
-        <div className="absolute bottom-20 left-20 w-1 h-1 bg-chart-5 rounded-full animate-pulse delay-400" />
+        {/* Top area sparkles */}
+        <div className="absolute top-[10%] left-[15%] w-1 h-1 bg-white/60 rounded-full animate-pulse" />
+        <div className="absolute top-[15%] right-[25%] w-1.5 h-1.5 bg-amber-200/50 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+        <div className="absolute top-[20%] left-[40%] w-1 h-1 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-[25%] right-[15%] w-0.5 h-0.5 bg-amber-100/60 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+        <div className="absolute top-[8%] left-[60%] w-1 h-1 bg-white/50 rounded-full animate-pulse" style={{ animationDelay: '0.7s' }} />
+        
+        {/* Middle area sparkles */}
+        <div className="absolute top-[35%] left-[10%] w-0.5 h-0.5 bg-white/50 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+        <div className="absolute top-[40%] right-[30%] w-1 h-1 bg-amber-100/40 rounded-full animate-pulse" style={{ animationDelay: '0.8s' }} />
+        <div className="absolute top-[45%] left-[25%] w-1 h-1 bg-white/30 rounded-full animate-pulse" style={{ animationDelay: '1.2s' }} />
+        <div className="absolute top-[50%] right-[10%] w-1.5 h-1.5 bg-amber-200/40 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+        
+        {/* Bottom area sparkles */}
+        <div className="absolute top-[60%] left-[20%] w-1 h-1 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }} />
+        <div className="absolute top-[65%] right-[20%] w-0.5 h-0.5 bg-amber-100/50 rounded-full animate-pulse" style={{ animationDelay: '1.1s' }} />
+        <div className="absolute top-[70%] left-[45%] w-1 h-1 bg-white/35 rounded-full animate-pulse" style={{ animationDelay: '0.9s' }} />
+        <div className="absolute top-[75%] right-[35%] w-1 h-1 bg-amber-200/30 rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
+        <div className="absolute top-[80%] left-[8%] w-1.5 h-1.5 bg-white/45 rounded-full animate-pulse" style={{ animationDelay: '1.3s' }} />
+        <div className="absolute top-[85%] right-[12%] w-0.5 h-0.5 bg-amber-100/40 rounded-full animate-pulse" style={{ animationDelay: '0.55s' }} />
+        <div className="absolute top-[90%] left-[55%] w-1 h-1 bg-white/30 rounded-full animate-pulse" style={{ animationDelay: '0.85s' }} />
       </div>
 
       <div className="container max-w-lg mx-auto px-4 py-8 relative z-10">
@@ -112,14 +128,14 @@ export default function LeadMagnet() {
         >
           <div className="flex justify-center mb-4">
             <div className="relative">
-              <Moon className="w-16 h-16 text-chart-1" />
-              <Sparkles className="w-6 h-6 text-chart-3 absolute -top-1 -right-1 animate-pulse" />
+              <Moon className="w-16 h-16 text-rose-400" />
+              <Sparkles className="w-6 h-6 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
             </div>
           </div>
-          <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-chart-1 via-chart-2 to-chart-3 bg-clip-text text-transparent mb-2">
+          <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 bg-clip-text text-transparent mb-2">
             Astro Orb
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-rose-700/70">
             Персональный прогноз на декабрь 2024
           </p>
         </motion.div>
@@ -132,7 +148,7 @@ export default function LeadMagnet() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
             >
-              <Card className="p-6 backdrop-blur-sm bg-card/80">
+              <Card className="p-6 backdrop-blur-sm bg-white/90 border-rose-200/50 shadow-lg">
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                     {/* Name */}
@@ -267,11 +283,11 @@ export default function LeadMagnet() {
               exit={{ opacity: 0, scale: 0.9 }}
               className="text-center py-16"
             >
-              <Card className="p-8 backdrop-blur-sm bg-card/80">
+              <Card className="p-8 backdrop-blur-sm bg-white/90 border-rose-200/50 shadow-lg">
                 <div className="relative w-32 h-32 mx-auto mb-6">
                   {/* Animated cosmic orb */}
                   <motion.div
-                    className="absolute inset-0 rounded-full bg-gradient-to-r from-chart-1 via-chart-2 to-chart-3"
+                    className="absolute inset-0 rounded-full bg-gradient-to-r from-rose-400 via-pink-400 to-amber-300"
                     animate={{
                       rotate: 360,
                       scale: [1, 1.1, 1],
@@ -282,12 +298,12 @@ export default function LeadMagnet() {
                     }}
                   />
                   <motion.div
-                    className="absolute inset-2 rounded-full bg-background"
+                    className="absolute inset-2 rounded-full bg-white"
                     animate={{ opacity: [0.8, 1, 0.8] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Star className="w-12 h-12 text-chart-1" />
+                    <Star className="w-12 h-12 text-rose-400" />
                   </div>
                 </div>
 
@@ -296,10 +312,10 @@ export default function LeadMagnet() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <h3 className="text-xl font-display font-bold mb-2">
+                  <h3 className="text-xl font-display font-bold text-rose-800 mb-2">
                     Считываем звёзды...
                   </h3>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-rose-600/70 text-sm">
                     Анализируем положение планет для вашего персонального прогноза
                   </p>
                 </motion.div>
@@ -326,34 +342,34 @@ export default function LeadMagnet() {
               className="space-y-6"
             >
               {/* Header with sun sign */}
-              <Card className="p-6 backdrop-blur-sm bg-card/80 text-center">
+              <Card className="p-6 backdrop-blur-sm bg-white/90 border-rose-200/50 shadow-lg text-center">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', delay: 0.2 }}
                 >
-                  <Calendar className="w-16 h-16 mx-auto text-chart-3 mb-4" />
+                  <Calendar className="w-16 h-16 mx-auto text-rose-400 mb-4" />
                 </motion.div>
-                <h2 className="text-2xl font-display font-bold mb-1">
+                <h2 className="text-2xl font-display font-bold text-rose-800 mb-1">
                   {form.getValues('name')}, ваш знак — {result.sunSign}
                 </h2>
                 {result.ascendant && (
-                  <p className="text-muted-foreground">
+                  <p className="text-rose-600/70">
                     Асцендент: {result.ascendant}
                   </p>
                 )}
-                <p className="text-sm text-chart-1 mt-2 font-medium">
+                <p className="text-sm text-amber-600 mt-2 font-medium">
                   Прогноз на {result.monthName}
                 </p>
               </Card>
 
               {/* Monthly overview */}
-              <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-chart-1/10 to-chart-2/10">
-                <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-chart-3" />
+              <Card className="p-6 backdrop-blur-sm bg-white/80 border-rose-200/50 shadow-md">
+                <h3 className="text-lg font-display font-bold text-rose-800 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
                   Общий обзор месяца
                 </h3>
-                <p className="text-foreground/90 leading-relaxed">
+                <p className="text-rose-900/80 leading-relaxed">
                   {result.horoscope.overview}
                 </p>
               </Card>
@@ -361,34 +377,34 @@ export default function LeadMagnet() {
               {/* Monthly sections */}
               <div className="grid gap-4">
                 <MonthlyCard 
-                  icon={<Wallet className="w-5 h-5 text-chart-4" />}
+                  icon={<Wallet className="w-5 h-5 text-amber-500" />}
                   title="Финансы"
                   content={result.horoscope.money}
                 />
                 <MonthlyCard 
-                  icon={<Briefcase className="w-5 h-5 text-chart-3" />}
+                  icon={<Briefcase className="w-5 h-5 text-rose-500" />}
                   title="Работа и карьера"
                   content={result.horoscope.work}
                 />
                 <MonthlyCard 
-                  icon={<Heart className="w-5 h-5 text-pink-500" />}
+                  icon={<Heart className="w-5 h-5 text-pink-400" />}
                   title="Любовь и отношения"
                   content={result.horoscope.love}
                 />
                 <MonthlyCard 
-                  icon={<Activity className="w-5 h-5 text-green-500" />}
+                  icon={<Activity className="w-5 h-5 text-rose-400" />}
                   title="Здоровье"
                   content={result.horoscope.health}
                 />
               </div>
 
               {/* Key advice */}
-              <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-primary/20 to-chart-2/20 border-primary/30">
-                <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-chart-1" />
+              <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-rose-100/80 to-amber-100/80 border-rose-300/50 shadow-lg">
+                <h3 className="text-lg font-display font-bold text-rose-800 mb-3 flex items-center gap-2">
+                  <Star className="w-5 h-5 text-amber-500" />
                   Главный совет на месяц
                 </h3>
-                <p className="text-foreground/90 leading-relaxed">
+                <p className="text-rose-900/80 leading-relaxed">
                   {result.horoscope.advice}
                 </p>
               </Card>
@@ -399,12 +415,12 @@ export default function LeadMagnet() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <Card className="p-6 backdrop-blur-sm bg-gradient-to-r from-primary/20 to-chart-2/20 border-primary/30">
+                <Card className="p-6 backdrop-blur-sm bg-gradient-to-r from-rose-100/80 to-amber-100/80 border-rose-300/50 shadow-lg">
                   <div className="text-center">
-                    <h3 className="text-lg font-display font-bold mb-2">
+                    <h3 className="text-lg font-display font-bold text-rose-800 mb-2">
                       Хотите больше?
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
+                    <p className="text-sm text-rose-700/70 mb-4">
                       Получите полный разбор натальной карты, еженедельные прогнозы и персональные советы в нашем приложении
                     </p>
                     <Button 
@@ -432,13 +448,13 @@ export default function LeadMagnet() {
 function LoadingStep({ text, delay }: { text: string; delay: number }) {
   return (
     <motion.div
-      className="flex items-center gap-2 text-sm text-muted-foreground"
+      className="flex items-center gap-2 text-sm text-rose-600/70"
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: delay * 0.5 + 0.5 }}
     >
       <motion.div
-        className="w-2 h-2 rounded-full bg-chart-1"
+        className="w-2 h-2 rounded-full bg-rose-400"
         animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 1, repeat: Infinity, delay: delay * 0.3 }}
       />
@@ -457,12 +473,12 @@ function MonthlyCard({
   content: string;
 }) {
   return (
-    <Card className="p-4 backdrop-blur-sm bg-card/80">
+    <Card className="p-4 backdrop-blur-sm bg-white/80 border-rose-200/40 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{icon}</div>
         <div>
-          <h4 className="font-medium mb-1">{title}</h4>
-          <p className="text-sm text-foreground/80 leading-relaxed">{content}</p>
+          <h4 className="font-medium text-rose-800 mb-1">{title}</h4>
+          <p className="text-sm text-rose-900/70 leading-relaxed">{content}</p>
         </div>
       </div>
     </Card>
