@@ -180,27 +180,27 @@ export default function Login() {
   // Show loading state for Mini App or Dev auth
   if (authMethod === 'miniapp' || authMethod === 'dev') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-8 text-center">
           <div className="space-y-4">
             <div className="flex justify-center">
-              <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30 animate-pulse">
-                <Sparkles className="w-10 h-10 text-purple-300" />
+              <div className="w-20 h-20 bg-rose-400/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-rose-400/30 animate-pulse">
+                <Sparkles className="w-10 h-10 text-rose-500" />
               </div>
             </div>
             
-            <h1 className="text-4xl font-bold text-white font-syne">
+            <h1 className="text-4xl font-bold text-rose-800 font-syne">
               Astro Orb
             </h1>
             
-            <p className="text-lg text-purple-200">
+            <p className="text-lg text-rose-600/70">
               AI-Powered Astrology Readings
             </p>
           </div>
 
           <div className="space-y-6 pt-8">
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-              <p className="text-white mb-6">
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-8 border border-rose-200/50 shadow-lg">
+              <p className="text-rose-700 mb-6">
                 {authMethod === 'miniapp' ? "Вход через Telegram Mini App..." : "Вход в dev режиме..."}
               </p>
               
@@ -215,7 +215,7 @@ export default function Login() {
               )}
             </div>
 
-            <p className="text-sm text-purple-300">
+            <p className="text-sm text-rose-600/70">
               {authMethod === 'miniapp' ? "Автоматическая аутентификация через Telegram" : "Dev режим: автоматическая аутентификация"}
             </p>
           </div>
@@ -228,30 +228,30 @@ export default function Login() {
   const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8 text-center">
         <div className="space-y-4">
           <div className="flex justify-center">
-            <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30">
-              <Sparkles className="w-10 h-10 text-purple-300" />
+            <div className="w-20 h-20 bg-rose-400/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-rose-400/30">
+              <Sparkles className="w-10 h-10 text-rose-500" />
             </div>
           </div>
           
-          <h1 className="text-4xl font-bold text-white font-syne">
+          <h1 className="text-4xl font-bold text-rose-800 font-syne">
             Astro Orb
           </h1>
           
-          <p className="text-lg text-purple-200">
+          <p className="text-lg text-rose-600/70">
             AI-Powered Astrology Readings
           </p>
         </div>
 
         <div className="space-y-6 pt-8">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-8 border border-rose-200/50 shadow-lg">
             {allowWithoutTelegram ? (
               // Show direct registration button for moderation/testing
               <>
-                <p className="text-white mb-6">
+                <p className="text-rose-700 mb-6">
                   Создайте профиль для доступа к персональным астрологическим прогнозам
                 </p>
                 <Button 
@@ -266,7 +266,7 @@ export default function Login() {
             ) : (
               // Show Telegram Login Widget (default behavior)
               <>
-                <p className="text-white mb-6">
+                <p className="text-rose-700 mb-6">
                   Sign in with your Telegram account to access your personalized astrology dashboard
                 </p>
                 
@@ -279,7 +279,7 @@ export default function Login() {
             )}
           </div>
 
-          <p className="text-sm text-purple-300">
+          <p className="text-sm text-rose-600/70">
             {allowWithoutTelegram 
               ? "Для модерации: можно создать профиль без Telegram" 
               : "By signing in, you agree to use Telegram authentication for secure access"}
