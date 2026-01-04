@@ -20,6 +20,7 @@ import { useEffect } from 'react';
 import type { User as UserType, Subscription } from '@shared/schema';
 import wideCardBg from '@assets/Image_1767537750216.jpg';
 import moonIcon from '@assets/Image_(1)_1767538920082.jpg';
+import relationshipsIcon from '@assets/Image_(2)_1767540356081.jpg';
 
 interface UserMeResponse {
   ok: boolean;
@@ -97,7 +98,7 @@ export default function Dashboard() {
 
           {/* Relationships - Full width */}
           <FeatureCardWide
-            icon={<Users className="w-8 h-8 text-rose-400" />}
+            icon={<img src={relationshipsIcon} alt="" className="w-10 h-10 object-contain" />}
             title={locale === 'ru' ? 'Отношения' : 'Relationships'}
             description={locale === 'ru' ? 'Анализ ваших связей и партнёрств.' : 'Analysis of your connections.'}
             cost={4}
@@ -116,7 +117,7 @@ export default function Dashboard() {
             />
             <FeatureCardSmall
               icon={<Sun className="w-6 h-6 text-yellow-400" />}
-              title={locale === 'ru' ? 'Солнечный возврат' : 'Solar Return'}
+              title={locale === 'ru' ? 'Соляр' : 'Solar Return'}
               description={locale === 'ru' ? 'Прогноз на ваш личный год.' : 'Your personal year forecast.'}
               cost={1}
               onClick={() => navigate('/solar-today')}
