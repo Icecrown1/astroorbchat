@@ -274,8 +274,11 @@
 
   body {
     @apply text-foreground font-sans antialiased;
-    background: linear-gradient(180deg, #F5E6D3 0%, #FCDFD4 30%, #F5C4C4 60%, #E8B4B8 100%);
+    background-image: url('/attached_assets/Background_Gradient_1767535518303.png');
+    background-size: cover;
+    background-position: center;
     background-attachment: fixed;
+    background-repeat: no-repeat;
     min-height: 100vh;
   }
 }
