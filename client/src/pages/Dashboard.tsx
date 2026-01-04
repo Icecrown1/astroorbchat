@@ -19,6 +19,7 @@ import {
 import { useEffect } from 'react';
 import type { User as UserType, Subscription } from '@shared/schema';
 import wideCardBg from '@assets/Image_1767537750216.jpg';
+import moonIcon from '@assets/Image_(1)_1767538920082.jpg';
 
 interface UserMeResponse {
   ok: boolean;
@@ -86,7 +87,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           {/* Natal Chart - Full width */}
           <FeatureCardWide
-            icon={<Moon className="w-8 h-8 text-amber-300" />}
+            icon={<img src={moonIcon} alt="" className="w-10 h-10 object-contain" />}
             title={locale === 'ru' ? 'Натальная карта' : 'Natal Chart'}
             description={locale === 'ru' ? 'Узнайте свою судьбу по звездам.' : 'Discover your destiny in the stars.'}
             cost={2}
