@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEffect } from 'react';
 import type { User as UserType, Subscription } from '@shared/schema';
+import wideCardBg from '@assets/Image_1767537750216.jpg';
 
 interface UserMeResponse {
   ok: boolean;
@@ -90,6 +91,7 @@ export default function Dashboard() {
             description={locale === 'ru' ? 'Узнайте свою судьбу по звездам.' : 'Discover your destiny in the stars.'}
             cost={2}
             onClick={() => navigate('/my-natal-chart')}
+            backgroundImage={wideCardBg}
           />
 
           {/* Relationships - Full width */}
@@ -99,6 +101,7 @@ export default function Dashboard() {
             description={locale === 'ru' ? 'Анализ ваших связей и партнёрств.' : 'Analysis of your connections.'}
             cost={4}
             onClick={() => navigate('/compatibility')}
+            backgroundImage={wideCardBg}
           />
 
           {/* Two columns: Horoscope & Solar Return */}
@@ -178,13 +181,22 @@ interface FeatureCardWideProps {
   description: string;
   cost: number;
   onClick: () => void;
+  backgroundImage?: string;
 }
 
-function FeatureCardWide({ icon, title, description, cost, onClick }: FeatureCardWideProps) {
+function FeatureCardWide({ icon, title, description, cost, onClick, backgroundImage }: FeatureCardWideProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white/70 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-white/50 hover-elevate transition-all text-left"
+      className="w-full rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-white/50 hover-elevate transition-all text-left overflow-hidden"
+      style={backgroundImage ? {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      } : {
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(4px)',
+      }}
       data-testid={`card-${title.toLowerCase().replace(/\s/g, '-')}`}
     >
       <div className="flex-shrink-0">
