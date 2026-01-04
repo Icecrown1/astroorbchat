@@ -114,6 +114,7 @@ export default function Dashboard() {
               description={locale === 'ru' ? 'Ежедневные и еженедельные прогнозы.' : 'Daily and weekly forecasts.'}
               cost={7}
               onClick={() => navigate('/horoscope')}
+              backgroundImage={wideCardBg}
             />
             <FeatureCardSmall
               icon={<Sun className="w-6 h-6 text-yellow-400" />}
@@ -121,6 +122,7 @@ export default function Dashboard() {
               description={locale === 'ru' ? 'Прогноз на ваш личный год.' : 'Your personal year forecast.'}
               cost={1}
               onClick={() => navigate('/solar-today')}
+              backgroundImage={wideCardBg}
             />
           </div>
 
@@ -132,6 +134,7 @@ export default function Dashboard() {
               description={locale === 'ru' ? 'Узнайте, кто вам подходит.' : 'Find your perfect match.'}
               cost={3}
               onClick={() => navigate('/compatibility')}
+              backgroundImage={wideCardBg}
             />
             <FeatureCardSmall
               icon={<MessageCircle className="w-6 h-6 text-amber-400" />}
@@ -139,6 +142,7 @@ export default function Dashboard() {
               description={locale === 'ru' ? 'Получите ответ на свой вопрос.' : 'Get answers to your questions.'}
               cost={5}
               onClick={() => navigate('/ask')}
+              backgroundImage={wideCardBg}
             />
           </div>
         </div>
@@ -224,13 +228,22 @@ interface FeatureCardSmallProps {
   description: string;
   cost: number;
   onClick: () => void;
+  backgroundImage?: string;
 }
 
-function FeatureCardSmall({ icon, title, description, cost, onClick }: FeatureCardSmallProps) {
+function FeatureCardSmall({ icon, title, description, cost, onClick, backgroundImage }: FeatureCardSmallProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white/70 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-start shadow-sm border border-white/50 hover-elevate transition-all text-left"
+      className="w-full rounded-2xl p-4 flex flex-col items-start shadow-sm border border-white/50 hover-elevate transition-all text-left overflow-hidden"
+      style={backgroundImage ? {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      } : {
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(4px)',
+      }}
       data-testid={`card-${title.toLowerCase().replace(/\s/g, '-')}`}
     >
       <div className="flex items-center justify-between w-full mb-2">
