@@ -8,6 +8,7 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
+import backgroundImage from '@assets/Background_Gradient_1767535518303.png';
 import NotFound from '@/pages/not-found';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -80,16 +81,27 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <LocaleProvider>
-        <TonConnectUIProvider manifestUrl={manifestUrl}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </TonConnectUIProvider>
-      </LocaleProvider>
-    </QueryClientProvider>
+    <div 
+      className="min-h-screen"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        <LocaleProvider>
+          <TonConnectUIProvider manifestUrl={manifestUrl}>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </TonConnectUIProvider>
+        </LocaleProvider>
+      </QueryClientProvider>
+    </div>
   );
 }
 
