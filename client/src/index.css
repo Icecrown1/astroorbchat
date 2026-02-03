@@ -14,7 +14,7 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 100% / 0;
+  --background: 240 4% 96%;
 
   --foreground: 240 8% 12%;
 
@@ -273,8 +273,7 @@
   }
 
   body {
-    @apply text-foreground font-sans antialiased;
-    min-height: 100vh;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
