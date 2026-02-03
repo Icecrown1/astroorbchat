@@ -4,11 +4,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Users, Copy, Share2, Gift } from 'lucide-react';
+import { ArrowLeft, Users, Copy, Share2, Gift, Crown, Star, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 import { useEffect } from 'react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
@@ -33,6 +34,39 @@ export default function Referral() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { t, locale } = useTranslation();
+  const { tier } = useEnergy();
+  
+  // Tier-based rewards info
+  const getRewardInfo = () => {
+    switch (tier) {
+      case 'premium':
+        return {
+          referrerReward: locale === 'ru' ? '+5 дней Premium' : '+5 Premium days',
+          referredReward: locale === 'ru' ? '+5 дней Premium' : '+5 Premium days',
+          icon: Crown,
+          color: 'text-yellow-500',
+          bgColor: 'bg-yellow-500/10',
+        };
+      case 'standard':
+        return {
+          referrerReward: '+15 орбов',
+          referredReward: '+5 орбов',
+          icon: Star,
+          color: 'text-primary',
+          bgColor: 'bg-primary/10',
+        };
+      default: // free
+        return {
+          referrerReward: locale === 'ru' ? '7 дней Standard' : '7 days Standard',
+          referredReward: locale === 'ru' ? '3 дня Premium' : '3 days Premium',
+          icon: Calendar,
+          color: 'text-chart-3',
+          bgColor: 'bg-chart-3/10',
+        };
+    }
+  };
+  
+  const rewardInfo = getRewardInfo();
 
   const { data, isLoading } = useQuery<ReferralCodeResponse>({
     queryKey: ['/api/referral/code'],
@@ -146,11 +180,11 @@ export default function Referral() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 mb-6">
-            <Card className="p-4 bg-chart-3/10 border-chart-3/20">
+            <Card className={`p-4 ${rewardInfo.bgColor} border-primary/20`}>
               <div className="flex items-center gap-3">
-                <Gift className="w-8 h-8 text-chart-3" />
+                <rewardInfo.icon className={`w-8 h-8 ${rewardInfo.color}`} />
                 <div>
-                  <p className="text-2xl font-bold">+10</p>
+                  <p className="text-2xl font-bold">{rewardInfo.referrerReward}</p>
                   <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Вам за приглашение' : 'For you per invite'}</p>
                 </div>
               </div>
@@ -159,12 +193,20 @@ export default function Referral() {
               <div className="flex items-center gap-3">
                 <Gift className="w-8 h-8 text-chart-4" />
                 <div>
-                  <p className="text-2xl font-bold">+5</p>
+                  <p className="text-2xl font-bold">{rewardInfo.referredReward}</p>
                   <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Другу при регистрации' : 'Friend on signup'}</p>
                 </div>
               </div>
             </Card>
           </div>
+          
+          {tier === 'free' && (
+            <div className="mb-4 p-3 rounded-lg bg-muted text-sm text-muted-foreground text-center">
+              {locale === 'ru' 
+                ? 'Оформите подписку, чтобы получать больше наград за рефералов!'
+                : 'Subscribe to get more rewards for referrals!'}
+            </div>
+          )}
 
           {referralLink && (
             <div className="space-y-3">

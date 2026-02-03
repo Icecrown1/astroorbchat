@@ -15,7 +15,6 @@ import {
   Sun,
   Heart,
   MessageCircle,
-  ShoppingBag,
   CreditCard,
   Users,
   Settings as SettingsIcon,
@@ -33,56 +32,61 @@ interface UserMeResponse {
     subscription?: Subscription | null;
     natalInitialized?: boolean;
     energy: number;
+    orbs?: number;
+    tier?: 'free' | 'standard' | 'premium';
+    orbsResetAt?: string;
   };
 }
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { energy, setEnergy, setResetAt } = useEnergy();
+  const { orbs, tier, setOrbs, setTier, setResetAt, setEnergy } = useEnergy();
   const { t, locale } = useTranslation();
 
+  // Orb costs from ORB_COSTS config
+  // oracle: 0.5, daily: 1, planet/house: 2, dates: 3, weekly: 5, monthly: 15, guest_chart/compatibility: 20
   const FEATURES = [
     {
       icon: Moon,
       title: locale === 'ru' ? 'Моя натальная карта' : 'My Natal Chart',
       description: locale === 'ru' ? 'Ваш космический отпечаток' : 'Your cosmic blueprint',
-      energyCost: 0,
+      energyCost: 0, // Free for all users
       path: '/my-natal-chart',
     },
     {
       icon: Users,
       title: locale === 'ru' ? 'Гостевые карты' : 'Guest Charts',
       description: locale === 'ru' ? 'Карты для друзей и партнёров' : 'Charts for friends and partners',
-      energyCost: 2,
+      energyCost: 20, // natal_external
       path: '/natal-chart',
     },
     {
       icon: Sun,
       title: t.dashboard.solarReturn,
       description: t.dashboard.solarReturnDesc,
-      energyCost: 15,
+      energyCost: 15, // horoscope_monthly (solar return maps to monthly)
       path: '/solar-today',
     },
     {
       icon: Sparkles,
       title: t.dashboard.horoscope,
       description: t.dashboard.horoscopeDesc,
-      energyCost: 2,
+      energyCost: 1, // horoscope_daily
       path: '/horoscope',
     },
     {
       icon: Heart,
       title: t.dashboard.compatibility,
       description: t.dashboard.compatibilityDesc,
-      energyCost: 2,
+      energyCost: 20, // compatibility
       path: '/compatibility',
     },
     {
       icon: MessageCircle,
       title: t.dashboard.askOracle,
       description: t.dashboard.askOracleDesc,
-      energyCost: 1,
+      energyCost: 0.5, // oracle
       path: '/ask',
     },
   ];
@@ -114,10 +118,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (data?.ok && data.data) {
+      // Set new orbs system
+      if (data.data.orbs !== undefined) {
+        setOrbs(data.data.orbs);
+      }
+      if (data.data.tier) {
+        setTier(data.data.tier);
+      }
+      if (data.data.orbsResetAt) {
+        setResetAt(new Date(data.data.orbsResetAt));
+      }
+      // Legacy compatibility
       setEnergy(data.data.energy);
-      setResetAt(new Date(data.data.energyResetAt));
     }
-  }, [data, setEnergy, setResetAt]);
+  }, [data, setEnergy, setOrbs, setTier, setResetAt]);
 
   if (isLoading) {
     return (
@@ -160,8 +174,8 @@ export default function Dashboard() {
           <EnergyBadge />
         </div>
 
-        {/* Low Energy Alert */}
-        {energy < 10 && (
+        {/* Low Orbs Alert - only for Standard tier */}
+        {tier === 'standard' && orbs < 10 && (
           <div className="mb-6">
             <LowEnergyAlert />
           </div>
@@ -181,31 +195,33 @@ export default function Dashboard() {
 
         {/* Feature Cards */}
         <div className="grid gap-4 md:grid-cols-2 mb-6">
-          {FEATURES.map((feature) => (
-            <FeatureCard
-              key={feature.path}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-              energyCost={feature.energyCost}
-              onClick={() => navigate(feature.path)}
-              disabled={!data?.data?.natalInitialized || energy < feature.energyCost}
-              locale={locale}
-            />
-          ))}
+          {FEATURES.map((feature) => {
+            // Free users: only natal chart
+            const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart';
+            // Standard users: need enough orbs
+            const notEnoughOrbs = tier === 'standard' && orbs < feature.energyCost;
+            // Premium: never disabled
+            const isDisabled = !data?.data?.natalInitialized || 
+              (tier !== 'premium' && (isLockedForFree || notEnoughOrbs));
+            
+            return (
+              <FeatureCard
+                key={feature.path}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                energyCost={feature.energyCost}
+                onClick={() => navigate(feature.path)}
+                disabled={isDisabled}
+                locked={isLockedForFree}
+                locale={locale}
+              />
+            );
+          })}
         </div>
 
         {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-8">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => navigate('/buy-energy')}
-            data-testid="button-buy-energy"
-          >
-            <ShoppingBag className="w-4 h-4 mr-2" />
-            {t.nav.buyEnergy}
-          </Button>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
           <Button
             variant="outline"
             className="w-full"
@@ -213,7 +229,9 @@ export default function Dashboard() {
             data-testid="button-subscribe"
           >
             <CreditCard className="w-4 h-4 mr-2" />
-            {t.nav.subscribe}
+            {tier === 'free' 
+              ? (locale === 'ru' ? 'Оформить подписку' : 'Subscribe') 
+              : t.nav.subscribe}
           </Button>
           <Button
             variant="outline"

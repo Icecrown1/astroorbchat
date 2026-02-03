@@ -11,6 +11,7 @@ interface FeatureCardProps {
   energyCost: number;
   onClick: () => void;
   disabled?: boolean;
+  locked?: boolean;  // True when feature requires subscription upgrade
   className?: string;
   locale?: 'ru' | 'en';
 }
@@ -22,6 +23,7 @@ export function FeatureCard({
   energyCost,
   onClick,
   disabled = false,
+  locked = false,
   className,
   locale = 'en',
 }: FeatureCardProps) {
@@ -36,15 +38,21 @@ export function FeatureCard({
       onClick={disabled ? undefined : onClick}
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      {disabled && (
+      {locked && (
         <div className="absolute top-4 left-4">
           <Lock className="w-5 h-5 text-muted-foreground" />
         </div>
       )}
       
       <div className="flex items-start gap-4">
-        <div className="p-3 rounded-lg bg-primary/10">
-          <Icon className="w-6 h-6 text-primary" />
+        <div className={cn(
+          "p-3 rounded-lg",
+          locked ? "bg-muted" : "bg-primary/10"
+        )}>
+          <Icon className={cn(
+            "w-6 h-6",
+            locked ? "text-muted-foreground" : "text-primary"
+          )} />
         </div>
         
         <div className="flex-1 min-w-0">
@@ -52,18 +60,30 @@ export function FeatureCard({
             <h3 className="text-lg font-semibold text-card-foreground">
               {title}
             </h3>
-            <Badge variant="secondary" className="shrink-0">
-              <Sparkles className="w-3 h-3 mr-1" />
-              {energyCost}
-            </Badge>
+            {energyCost > 0 && (
+              <Badge variant={locked ? "outline" : "secondary"} className="shrink-0">
+                <Sparkles className="w-3 h-3 mr-1" />
+                {energyCost % 1 === 0 ? energyCost : energyCost.toFixed(1)}
+              </Badge>
+            )}
+            {energyCost === 0 && (
+              <Badge variant="default" className="shrink-0 bg-green-600 hover:bg-green-700">
+                {locale === 'ru' ? 'Бесплатно' : 'Free'}
+              </Badge>
+            )}
           </div>
           
           <p className="text-sm text-muted-foreground mb-3">
             {description}
           </p>
           
-          <div className="flex items-center text-sm text-primary font-medium">
-            {locale === 'ru' ? 'Открыть' : 'Explore'}
+          <div className={cn(
+            "flex items-center text-sm font-medium",
+            locked ? "text-muted-foreground" : "text-primary"
+          )}>
+            {locked 
+              ? (locale === 'ru' ? 'Нужна подписка' : 'Subscription required')
+              : (locale === 'ru' ? 'Открыть' : 'Explore')}
             <ArrowRight className="w-4 h-4 ml-1" />
           </div>
         </div>

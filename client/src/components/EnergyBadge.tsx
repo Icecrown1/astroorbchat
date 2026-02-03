@@ -1,15 +1,21 @@
-import { Sparkles } from 'lucide-react';
-import { useEnergy } from '@/store/useEnergy';
+import { Sparkles, Infinity, Lock, Crown, Star } from 'lucide-react';
+import { useEnergy, SubscriptionTier } from '@/store/useEnergy';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
 import { useState, useEffect } from 'react';
+import { useTranslation } from '@/contexts/LocaleContext';
 
-export function EnergyBadge({ className }: { className?: string }) {
-  const { energy, resetAt } = useEnergy();
+interface EnergyBadgeProps {
+  className?: string;
+}
+
+export function EnergyBadge({ className }: EnergyBadgeProps) {
+  const { orbs, tier, resetAt } = useEnergy();
   const [timeUntilReset, setTimeUntilReset] = useState<string>('');
+  const { locale } = useTranslation();
 
   useEffect(() => {
-    if (!resetAt) return;
+    if (!resetAt || tier === 'free' || tier === 'premium') return;
 
     const updateTimer = () => {
       const now = dayjs();
@@ -17,39 +23,94 @@ export function EnergyBadge({ className }: { className?: string }) {
       const diff = reset.diff(now);
 
       if (diff <= 0) {
-        setTimeUntilReset('Resetting...');
+        setTimeUntilReset(locale === 'ru' ? 'Обновление...' : 'Resetting...');
         return;
       }
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeUntilReset(`${hours}h ${minutes}m`);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      if (days > 0) {
+        setTimeUntilReset(locale === 'ru' ? `${days}д` : `${days}d`);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeUntilReset(`${hours}h ${minutes}m`);
+      }
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 60000); // Update every minute
+    const interval = setInterval(updateTimer, 60000);
 
     return () => clearInterval(interval);
-  }, [resetAt]);
+  }, [resetAt, tier, locale]);
+
+  const getBadgeContent = () => {
+    switch (tier) {
+      case 'premium':
+        return {
+          icon: Crown,
+          value: <Infinity className="w-6 h-6" />,
+          label: locale === 'ru' ? 'Безлимит' : 'Unlimited',
+          gradient: 'from-yellow-500 to-amber-600',
+          shadowColor: 'shadow-yellow-500/30',
+        };
+      case 'standard':
+        return {
+          icon: Star,
+          value: orbs.toString(),
+          label: locale === 'ru' ? `из 250 орбов` : `of 250 orbs`,
+          gradient: 'from-chart-1 to-chart-3',
+          shadowColor: 'shadow-primary/20',
+        };
+      default: // free
+        return {
+          icon: Lock,
+          value: '0',
+          label: locale === 'ru' ? 'Оформите подписку' : 'Subscribe',
+          gradient: 'from-muted to-muted-foreground/30',
+          shadowColor: 'shadow-none',
+          muted: true,
+        };
+    }
+  };
+
+  const content = getBadgeContent();
+  const IconComponent = content.icon;
 
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-2 px-4 py-2 rounded-full',
-        'bg-gradient-to-r from-chart-1 to-chart-3',
-        'shadow-lg shadow-primary/20',
+        'inline-flex items-center gap-3 px-5 py-3 rounded-full',
+        `bg-gradient-to-r ${content.gradient}`,
+        `shadow-lg ${content.shadowColor}`,
+        content.muted && 'opacity-60',
         className
       )}
       data-testid="badge-energy"
     >
-      <Sparkles className="w-5 h-5 text-white animate-pulse" />
-      <div className="flex flex-col">
-        <span className="font-mono text-2xl font-bold text-white tabular-nums">
-          {energy}
+      <IconComponent className={cn(
+        'w-5 h-5',
+        content.muted ? 'text-muted-foreground' : 'text-white',
+        tier === 'premium' && 'animate-pulse'
+      )} />
+      <div className="flex flex-col items-center">
+        <span className={cn(
+          'font-mono text-2xl font-bold tabular-nums flex items-center gap-1',
+          content.muted ? 'text-muted-foreground' : 'text-white'
+        )}>
+          {typeof content.value === 'string' ? content.value : content.value}
+          {tier !== 'premium' && tier !== 'free' && (
+            <Sparkles className="w-4 h-4 text-white/80" />
+          )}
         </span>
-        {timeUntilReset && (
-          <span className="text-xs text-white/80 font-medium">
-            Reset: {timeUntilReset}
+        <span className={cn(
+          'text-xs font-medium',
+          content.muted ? 'text-muted-foreground' : 'text-white/80'
+        )}>
+          {content.label}
+        </span>
+        {tier === 'standard' && timeUntilReset && (
+          <span className="text-[10px] text-white/60 font-medium mt-0.5">
+            {locale === 'ru' ? 'Сброс:' : 'Reset:'} {timeUntilReset}
           </span>
         )}
       </div>

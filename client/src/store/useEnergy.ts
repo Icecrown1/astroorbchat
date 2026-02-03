@@ -1,17 +1,43 @@
 import { create } from 'zustand';
 
-interface EnergyState {
-  energy: number;
+export type SubscriptionTier = 'free' | 'standard' | 'premium';
+
+interface OrbsState {
+  orbs: number;
+  tier: SubscriptionTier;
   resetAt: Date | null;
+  setOrbs: (orbs: number) => void;
+  setTier: (tier: SubscriptionTier) => void;
+  setResetAt: (date: Date | null) => void;
+  decreaseOrbs: (amount: number) => void;
+  
+  // Legacy compatibility (energy maps to orbs)
+  energy: number;
   setEnergy: (energy: number) => void;
-  setResetAt: (date: Date) => void;
   decreaseEnergy: (amount: number) => void;
 }
 
-export const useEnergy = create<EnergyState>((set) => ({
-  energy: 0,
+export const useEnergy = create<OrbsState>((set) => ({
+  orbs: 0,
+  tier: 'free',
   resetAt: null,
-  setEnergy: (energy) => set({ energy }),
+  
+  setOrbs: (orbs) => set({ orbs, energy: orbs }),
+  setTier: (tier) => set({ tier }),
   setResetAt: (date) => set({ resetAt: date }),
-  decreaseEnergy: (amount) => set((state) => ({ energy: Math.max(0, state.energy - amount) })),
+  decreaseOrbs: (amount) => set((state) => ({ 
+    orbs: Math.max(0, state.orbs - amount),
+    energy: Math.max(0, state.energy - amount)
+  })),
+  
+  // Legacy compatibility
+  energy: 0,
+  setEnergy: (energy) => set({ energy, orbs: energy }),
+  decreaseEnergy: (amount) => set((state) => ({ 
+    energy: Math.max(0, state.energy - amount),
+    orbs: Math.max(0, state.orbs - amount)
+  })),
 }));
+
+// Re-export for convenience
+export const useOrbs = useEnergy;

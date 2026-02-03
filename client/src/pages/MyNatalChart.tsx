@@ -8,11 +8,12 @@ import { PlanetModal } from '@/components/PlanetModal';
 import { Loader, FullPageLoader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
 import { ImportantDatesList } from '@/components/ImportantDatesList';
-import { ArrowLeft, Sparkles, RefreshCw, Calendar } from 'lucide-react';
+import { ArrowLeft, Sparkles, RefreshCw, Calendar, Lock, Crown } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { translatePlanet, translateSign } from '@/lib/astroTranslations';
+import { useEnergy } from '@/store/useEnergy';
 import {
   Accordion,
   AccordionContent,
@@ -99,8 +100,12 @@ export default function MyNatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { tier } = useEnergy();
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
   const [expandedPlanet, setExpandedPlanet] = useState<string | null>(null);
+  
+  // Free users see short descriptions and need to subscribe for detailed interpretations
+  const canAccessDetailedInterpretations = tier !== 'free';
 
   // Load user's OWN natal chart from cache with locale-specific interpretations
   const { data: chartResponse, isLoading: chartLoading } = useQuery<any>({
@@ -388,16 +393,32 @@ export default function MyNatalChart() {
                       <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
                         {getPlanetDescription(planet.name, planet.sign, locale)}
                       </p>
-                      <Button
-                        onClick={() => setSelectedPlanet(planet.name)}
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        data-testid={`button-detailed-${planet.name}`}
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
-                      </Button>
+                      {canAccessDetailedInterpretations ? (
+                        <Button
+                          onClick={() => setSelectedPlanet(planet.name)}
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          data-testid={`button-detailed-${planet.name}`}
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
+                          {tier === 'standard' && (
+                            <span className="ml-2 text-xs opacity-70">2 орба</span>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => navigate('/subscribe')}
+                          variant="default"
+                          size="sm"
+                          className="w-full"
+                          data-testid={`button-subscribe-${planet.name}`}
+                        >
+                          <Crown className="w-4 h-4 mr-2" />
+                          {locale === 'ru' ? 'Оформите подписку для подробной трактовки' : 'Subscribe for detailed interpretation'}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -411,13 +432,35 @@ export default function MyNatalChart() {
               <h2 className="text-lg font-semibold">
                 {locale === 'ru' ? 'Важные даты' : 'Important Dates'}
               </h2>
+              {!canAccessDetailedInterpretations && (
+                <Lock className="w-4 h-4 text-muted-foreground ml-auto" />
+              )}
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               {locale === 'ru' 
                 ? 'Персональные астрологические события на ближайшие 3 месяца на основе транзитов к вашей натальной карте' 
                 : 'Personalized astrological events for the next 3 months based on transits to your natal chart'}
             </p>
-            <ImportantDatesList />
+            {canAccessDetailedInterpretations ? (
+              <ImportantDatesList />
+            ) : (
+              <div className="text-center py-6 bg-muted/30 rounded-lg">
+                <Lock className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  {locale === 'ru' 
+                    ? 'Доступ к важным датам требует подписку' 
+                    : 'Access to important dates requires a subscription'}
+                </p>
+                <Button
+                  onClick={() => navigate('/subscribe')}
+                  size="sm"
+                  data-testid="button-subscribe-dates"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  {locale === 'ru' ? 'Оформить подписку' : 'Subscribe'}
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       </div>

@@ -20,8 +20,30 @@ Preferred communication style: Simple, everyday language.
 - **API**: RESTful endpoints for core functionalities.
 - **Astrology Engine**: Python-based Swiss Ephemeris for astronomical calculations.
 - **AI Integration**: OpenAI (GPT-5) for astrological interpretations, using custom prompts with gender-based tone and full localization. Includes personalized compatibility readings and horoscopes.
-- **Business Logic**: Gamified energy system with daily resets, configurable feature costs, subscription tiers, and referral rewards. Users can update their profile every 30 days.
-- **Energy System Architecture**: Dual-field energy system with `freeEnergy` (daily reset) and `purchasedEnergy` (persists).
+- **Business Logic**: Tier-based orb system with monthly resets, configurable feature costs, subscription tiers, and referral rewards. Users can update their profile every 30 days.
+- **Monetization System** (February 2026):
+  - **Subscription Tiers**:
+    - **Free**: Basic natal chart with short planet descriptions only. No orbs.
+    - **Standard** (190₽/mo): 250 orbs/month. Users pay per feature with orbs.
+    - **Premium** (349₽/mo): Unlimited access to all features.
+  - **Orb Costs** (ORB_COSTS in energy.ts):
+    - Oracle: 0.5 orbs
+    - Daily horoscope: 1 orb
+    - Planet/House interpretation: 2 orbs
+    - Important dates: 3 orbs
+    - Weekly horoscope: 5 orbs
+    - Monthly horoscope/Solar Return: 15 orbs
+    - Guest charts/Compatibility: 20 orbs
+  - **Subscription Prices** (RUB):
+    - Standard: 190/mo, 159/mo (6-month), 119/mo (annual)
+    - Premium: 349/mo, 299/mo (6-month), 189/mo (annual)
+  - **Monthly Orb Reset**: Standard subscribers get 250 orbs on the 1st of each month
+  - **Database Fields**: `subscriptionOrbs`, `referralOrbs`, `orbsResetAt` in users table
+- **Referral System** (Tier-based rewards, February 2026):
+  - **Free users**: Referrer gets 7 days Standard, referred gets 3 days Premium
+  - **Standard users**: Referrer gets +15 orbs, referred gets +5 orbs
+  - **Premium users**: Both get +5 days Premium extension
+  - Rewards tracked in `referralRewards` table with `rewardKind` (orbs/subscription_days) and `subscriptionDays` fields
 
 ### System Design Choices
 - **Data Caching**: 
@@ -71,7 +93,7 @@ Preferred communication style: Simple, everyday language.
       - Sends 3-day advance warnings via Telegram
     - Library: `server/lib/subscriptionRenewal.ts` for renewal logic
 - **Geocoding**: Two-tier system: local cities database fallback to Nominatim API.
-- **Referral System**: Rewards credited to `purchasedEnergy`, tracked in `referralRewards` table, with UI for history and statistics.
+- **Referral System**: Tier-based rewards (see Monetization System above), tracked in `referralRewards` table with UI for history and statistics.
 - **Telegram Stars Admin Panel**: Backend and frontend components for transaction history, balance, and withdrawal instructions.
 - **Compatibility Archive**: Tab-based interface for past compatibility readings with auto-deletion, including full chart data for AI analysis.
 - **Global Error Handling**: Automatic cleanup of stale authentication tokens on 401 errors.

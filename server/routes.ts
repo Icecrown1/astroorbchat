@@ -6,7 +6,18 @@ import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
 import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
-import { checkAndResetEnergy, checkSubscriptionExpiry, deductEnergy, getNextResetTime, ENERGY_COSTS } from "./lib/energy";
+import { 
+  checkAndResetEnergy, 
+  checkSubscriptionExpiry, 
+  deductEnergy, 
+  getNextResetTime, 
+  ENERGY_COSTS,
+  ORB_COSTS,
+  canAccessFeature,
+  deductOrbs,
+  getUserTier,
+  checkAndResetOrbs,
+} from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
 import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence, interpretImportantDate, interpretHoroscope, generateWeeklyPlan, generateMonthlyPlan, getImportantDateInterpretation, type PlanetInterpretationData, type HouseInfluenceData, type ImportantDateInterpretationInput } from "./lib/openai";
