@@ -287,6 +287,68 @@ export interface PlanetInterpretationResult {
   advice: string[];
 }
 
+// Short interpretation for free users (without subscription)
+export interface PlanetShortInterpretation {
+  title: string;
+  summary: string;
+}
+
+export async function getPlanetShortInterpretation(
+  data: PlanetInterpretationData,
+  locale: string = 'ru'
+): Promise<PlanetShortInterpretation> {
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке. Весь текст должен быть на русском.'
+    : 'IMPORTANT: Respond STRICTLY in English. All text must be in English.';
+
+  const profileGender = data.profile.gender ? `, ${data.profile.gender}` : '';
+
+  const localizedPlanetName = translatePlanet(data.planet.name, locale);
+  const localizedSign = translateSign(data.planet.sign, locale);
+
+  const promptText = loadPrompt('planet_short', {
+    planet_name: localizedPlanetName,
+    planet_sign: localizedSign,
+    profile_name: data.profile.name,
+    profile_gender: profileGender
+  });
+
+  const finalPrompt = `${languageInstruction}\n\n${promptText}`;
+
+  const systemMessage = locale === 'ru'
+    ? "Ты астролог. Даёшь краткие характеристики планет. Возвращаешь только валидный JSON."
+    : "You are an astrologer. You give brief planet characteristics. Return only valid JSON.";
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemMessage },
+      { role: "user", content: finalPrompt }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 300
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate short planet interpretation');
+  }
+
+  try {
+    const result = JSON.parse(content);
+    const fallbackTitle = locale === 'ru' 
+      ? `${localizedPlanetName} в ${localizedSign}`
+      : `${localizedPlanetName} in ${localizedSign}`;
+    
+    return {
+      title: result.title || fallbackTitle,
+      summary: result.summary || ''
+    };
+  } catch (e) {
+    throw new Error('Failed to parse short planet interpretation');
+  }
+}
+
 export async function getPlanetInterpretation(
   data: PlanetInterpretationData,
   locale: string = 'ru'

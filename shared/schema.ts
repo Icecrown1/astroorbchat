@@ -30,7 +30,12 @@ export const users = pgTable("users", {
   timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Moscow"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  freeEnergy: integer("free_energy").notNull().default(10),
+  // New orb system: subscriptionOrbs = monthly orbs for Standard (250/month), referralOrbs = orbs from referrals
+  subscriptionOrbs: decimal("subscription_orbs", { precision: 10, scale: 1 }).notNull().default("0"),
+  referralOrbs: decimal("referral_orbs", { precision: 10, scale: 1 }).notNull().default("0"),
+  orbsResetAt: timestamp("orbs_reset_at").notNull().defaultNow(),
+  // Legacy fields - kept for migration, can be removed later
+  freeEnergy: integer("free_energy").notNull().default(0),
   purchasedEnergy: integer("purchased_energy").notNull().default(0),
   energyResetAt: timestamp("energy_reset_at").notNull().defaultNow(),
   lastProfileUpdate: timestamp("last_profile_update"),
@@ -192,6 +197,9 @@ export const referralRewards = pgTable("referral_rewards", {
   referredUserId: varchar("referred_user_id", { length: 255 }).notNull(),
   rewardType: varchar("reward_type", { length: 20 }).notNull(), // 'signup' or 'subscription'
   energyAmount: integer("energy_amount").notNull(),
+  // New fields for different reward types based on subscription tier
+  rewardKind: varchar("reward_kind", { length: 30 }).notNull().default("orbs"), // 'orbs', 'subscription_standard_days', 'subscription_premium_days'
+  subscriptionDays: integer("subscription_days"), // Days of subscription granted (for free users)
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   referrerIdIdx: index("referral_rewards_referrer_id_idx").on(table.referrerId),

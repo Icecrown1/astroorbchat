@@ -376,7 +376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/user/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      await checkAndResetEnergy(storage, userId);
+      
+      // Import new orb functions
+      const { getUserOrbs, getUserTier, checkAndResetOrbs } = await import('./lib/energy.js');
       
       const user = await storage.getUser(userId);
       if (!user) {
@@ -386,10 +388,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // IMPORTANT: Check subscription expiry to keep dashboard status accurate
       const subscription = await checkSubscriptionExpiry(storage, userId);
       const natalChart = await storage.getNatalChart(userId);
+      
+      // IMPORTANT: Reset monthly orbs if needed (for Standard subscribers)
+      await checkAndResetOrbs(storage, userId);
+      
+      // Get orb info for new system
+      const orbInfo = await getUserOrbs(storage, userId);
+      const tier = await getUserTier(storage, userId);
 
       res.json({ ok: true, data: { 
         ...user, 
+        // Legacy energy field for backward compatibility
         energy: (user.freeEnergy || 0) + (user.purchasedEnergy || 0),
+        // New orb system
+        orbs: orbInfo,
+        tier,
         subscription, 
         natalInitialized: !!natalChart 
       } });
@@ -1044,12 +1057,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Получаем интерпретацию от AI
+      // Check user's subscription tier
+      const { getUserTier, deductOrbs } = await import('./lib/energy.js');
+      const tier = await getUserTier(storage, userId);
+      
+      // Free users get short interpretation (no charge)
+      // Standard/Premium users get full interpretation (Standard pays orbs, Premium unlimited)
+      if (tier === 'free') {
+        // Return short interpretation for free users
+        const { getPlanetShortInterpretation } = await import('./lib/openai.js');
+        const shortInterpretation = await getPlanetShortInterpretation(interpretationData, locale);
+        
+        return res.json({
+          ok: true,
+          data: {
+            ...shortInterpretation,
+            isShort: true,
+            requiresSubscription: true
+          }
+        });
+      }
+      
+      // For Standard users, deduct orbs (Premium is free)
+      if (tier === 'standard') {
+        const deductResult = await deductOrbs(storage, userId, 'planet_interpretation');
+        if (!deductResult.ok) {
+          return res.status(402).json({
+            ok: false,
+            error: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
+            requiresSubscription: true
+          });
+        }
+      }
+      
+      // Get full interpretation for subscribed users
       const interpretation = await getPlanetInterpretation(interpretationData, locale);
 
       res.json({
         ok: true,
-        data: interpretation
+        data: {
+          ...interpretation,
+          isShort: false,
+          requiresSubscription: false
+        }
       });
     } catch (error: any) {
       console.error('Planet interpretation error:', error);

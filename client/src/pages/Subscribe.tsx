@@ -34,41 +34,91 @@ type SubscriptionPeriod = 'monthly' | 'semiannual' | 'annual';
 interface SubscriptionTier {
   tier: string;
   name: string;
-  monthlyPrice: number; // USD price (RUB calculated dynamically from exchange rates)
-  dailyEnergy: number;
-  features: string[];
+  nameRu: string;
+  monthlyOrbs: number | 'unlimited';
+  features: { ru: string[]; en: string[] };
   popular?: boolean;
+  // Fixed RUB prices per month for each period
+  pricesRub: {
+    monthly: number;
+    semiannual: number; // per month when paid for 6 months
+    annual: number;     // per month when paid for 12 months
+  };
 }
 
 const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
     tier: 'standard',
     name: 'Standard',
-    monthlyPrice: 12, // USD, RUB calculated dynamically
-    dailyEnergy: 100,
-    features: ['100 energy orbs daily', 'All astrology features', 'Daily horoscope', 'Basic support'],
+    nameRu: 'Стандарт',
+    monthlyOrbs: 250,
+    pricesRub: {
+      monthly: 190,
+      semiannual: 159,
+      annual: 119,
+    },
+    features: {
+      ru: [
+        '250 звёзд в месяц',
+        'Все астрологические функции',
+        'Ежедневные гороскопы',
+        'Детальные интерпретации планет',
+        'Важные даты',
+      ],
+      en: [
+        '250 stars per month',
+        'All astrology features',
+        'Daily horoscopes',
+        'Detailed planet interpretations',
+        'Important dates',
+      ],
+    },
   },
   {
-    tier: 'pro',
-    name: 'Pro',
-    monthlyPrice: 18, // USD, RUB calculated dynamically
-    dailyEnergy: 250,
-    features: ['250 energy orbs daily', 'All astrology features', 'Priority AI responses', 'Premium support', 'Advanced insights'],
+    tier: 'premium',
+    name: 'Premium',
+    nameRu: 'Премиум',
+    monthlyOrbs: 'unlimited',
+    pricesRub: {
+      monthly: 349,
+      semiannual: 299,
+      annual: 189,
+    },
+    features: {
+      ru: [
+        'Безлимитный доступ ко всему',
+        'Все астрологические функции',
+        'Приоритетная обработка AI',
+        'Премиум поддержка',
+        'Эксклюзивные инсайты',
+      ],
+      en: [
+        'Unlimited access to everything',
+        'All astrology features',
+        'Priority AI processing',
+        'Premium support',
+        'Exclusive insights',
+      ],
+    },
     popular: true,
   },
 ];
 
-const PERIOD_CONFIG: Record<SubscriptionPeriod, { months: number; discountPercent: number; labelRu: string; labelEn: string }> = {
-  monthly: { months: 1, discountPercent: 0, labelRu: '1 месяц', labelEn: '1 month' },
-  semiannual: { months: 6, discountPercent: 10, labelRu: '6 месяцев', labelEn: '6 months' },
-  annual: { months: 12, discountPercent: 25, labelRu: '1 год', labelEn: '1 year' },
+const PERIOD_CONFIG: Record<SubscriptionPeriod, { months: number; labelRu: string; labelEn: string; savingRu?: string; savingEn?: string }> = {
+  monthly: { months: 1, labelRu: '1 месяц', labelEn: '1 month' },
+  semiannual: { months: 6, labelRu: '6 месяцев', labelEn: '6 months', savingRu: '-16%', savingEn: '-16%' },
+  annual: { months: 12, labelRu: '1 год', labelEn: '1 year', savingRu: '-37%', savingEn: '-37%' },
 };
+
+function calculatePeriodPriceRub(tier: SubscriptionTier, period: SubscriptionPeriod): number {
+  const pricePerMonth = tier.pricesRub[period];
+  const months = PERIOD_CONFIG[period].months;
+  return pricePerMonth * months;
+}
 
 function calculatePeriodPrice(monthlyPrice: number, period: SubscriptionPeriod): number {
   const config = PERIOD_CONFIG[period];
-  const totalPrice = monthlyPrice * config.months;
-  const discount = totalPrice * (config.discountPercent / 100);
-  return Math.round((totalPrice - discount) * 100) / 100;
+  return Math.round(monthlyPrice * config.months * 100) / 100;
 }
 
 export default function Subscribe() {
@@ -109,11 +159,12 @@ export default function Subscribe() {
   const mutation = useMutation({
     mutationFn: async ({ tier, period }: { tier: SubscriptionTier; period: SubscriptionPeriod }) => {
       const periodConfig = PERIOD_CONFIG[period];
-      const totalPrice = calculatePeriodPrice(tier.monthlyPrice, period);
+      const totalPriceRub = calculatePeriodPriceRub(tier, period);
+      const totalPriceUsd = totalPriceRub / (exchangeRatesData?.data?.usdRub?.rate || 78.5);
       const response = await apiRequest('POST', '/api/payments/ton/create', {
         kind: 'subscription',
         tier: tier.tier,
-        amountUSD: totalPrice,
+        amountUSD: totalPriceUsd,
         period: period,
         months: periodConfig.months,
       });
@@ -130,7 +181,7 @@ export default function Subscribe() {
         queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
         toast({
           title: t.common.success,
-          description: `${tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}! ${tier.dailyEnergy} ${t.common.orbs}`,
+          description: `${getLocalizedTierName(tier)}! ${getOrbsDisplay(tier)}`,
         });
         navigate('/dashboard');
       } catch (error: any) {
@@ -213,8 +264,7 @@ export default function Subscribe() {
       }
       
       const periodConfig = PERIOD_CONFIG[period];
-      const totalPriceUsd = calculatePeriodPrice(tier.monthlyPrice, period);
-      const totalPriceRub = getRubPrice(totalPriceUsd); // Dynamic RUB price from exchange rates
+      const totalPriceRub = calculatePeriodPriceRub(tier, period);
       
       // Generate unique idempotency key using UUID v4 (if not already generated)
       let idempotencyKey = yookassaIdempotencyKey;
@@ -324,35 +374,21 @@ export default function Subscribe() {
     };
   };
 
-  const getLocalizedFeatures = (tier: string) => {
-    if (tier === 'standard') {
-      return locale === 'ru' ? [
-        '100 сфер ежедневно',
-        'Бесплатный план на неделю',
-        'Бесплатный план на месяц',
-        'Базовая поддержка'
-      ] : [
-        '100 orbs daily',
-        'Free weekly plan',
-        'Free monthly plan',
-        'Basic support'
-      ];
-    } else {
-      return locale === 'ru' ? [
-        '250 сфер ежедневно',
-        'Бесплатный план на неделю',
-        'Бесплатный план на месяц',
-        'Приоритет в обработке',
-        'Премиум поддержка'
-      ] : [
-        '250 orbs daily',
-        'Free weekly plan',
-        'Free monthly plan',
-        'Priority processing',
-        'Premium support'
-      ];
-    }
+  const getLocalizedFeatures = (tier: SubscriptionTier) => {
+    return locale === 'ru' ? tier.features.ru : tier.features.en;
   };
+
+  const getLocalizedTierName = (tier: SubscriptionTier) => {
+    return locale === 'ru' ? tier.nameRu : tier.name;
+  };
+
+  const getOrbsDisplay = (tier: SubscriptionTier) => {
+    if (tier.monthlyOrbs === 'unlimited') {
+      return locale === 'ru' ? 'Безлимит' : 'Unlimited';
+    }
+    return `${tier.monthlyOrbs} ${locale === 'ru' ? 'звёзд/мес' : 'stars/mo'}`;
+  };
+
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
@@ -461,9 +497,9 @@ export default function Subscribe() {
                     data-testid={`button-period-${period}`}
                   >
                     {locale === 'ru' ? config.labelRu : config.labelEn}
-                    {config.discountPercent > 0 && (
+                    {config.savingRu && (
                       <Badge className="absolute -top-2 -right-2 bg-chart-3 text-xs px-1">
-                        -{config.discountPercent}%
+                        {locale === 'ru' ? config.savingRu : config.savingEn}
                       </Badge>
                     )}
                   </Button>
@@ -521,8 +557,9 @@ export default function Subscribe() {
 
             <div className="grid gap-6 md:grid-cols-2">
               {SUBSCRIPTION_TIERS.map((tier) => {
-                const totalPrice = calculatePeriodPrice(tier.monthlyPrice, selectedPeriod);
-                const totalRubPrice = getRubPrice(totalPrice); // Dynamic RUB price from exchange rates
+                const totalPriceRub = calculatePeriodPriceRub(tier, selectedPeriod);
+                const pricePerMonthRub = tier.pricesRub[selectedPeriod];
+                const basePricePerMonth = tier.pricesRub.monthly;
                 const periodConfig = PERIOD_CONFIG[selectedPeriod];
                 
                 return (
@@ -542,33 +579,30 @@ export default function Subscribe() {
 
                     <div className="mb-6">
                       <h3 className="text-2xl font-display font-bold mb-2">
-                        {tier.tier === 'standard' ? t.subscribe.standard : t.subscribe.pro}
+                        {getLocalizedTierName(tier)}
                       </h3>
                       <div className="flex items-baseline gap-2 mb-1">
-                        <span className="text-4xl font-bold">${totalPrice}</span>
+                        <span className="text-4xl font-bold">{pricePerMonthRub} ₽</span>
                         <span className="text-muted-foreground">
-                          / {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}
+                          / {locale === 'ru' ? 'мес' : 'mo'}
                         </span>
                       </div>
                       {selectedPeriod !== 'monthly' && (
                         <p className="text-sm text-muted-foreground line-through">
-                          ${tier.monthlyPrice * periodConfig.months} {locale === 'ru' ? 'без скидки' : 'without discount'}
+                          {basePricePerMonth} ₽/{locale === 'ru' ? 'мес' : 'mo'}
                         </p>
                       )}
-                      <p className="text-sm text-muted-foreground">
-                        ≈ {getTonPrice(totalPrice)} TON
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {totalRubPrice} ₽
+                      <p className="text-sm text-chart-3 font-medium">
+                        {locale === 'ru' ? 'Итого за' : 'Total for'} {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}: {totalPriceRub} ₽
                       </p>
                     </div>
 
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
                         <Sparkles className="w-5 h-5 text-chart-3" />
-                        <span className="font-bold">{tier.dailyEnergy} {t.common.orbs} {locale === 'ru' ? 'ежедневно' : 'daily'}</span>
+                        <span className="font-bold">{getOrbsDisplay(tier)}</span>
                       </div>
-                      {getLocalizedFeatures(tier.tier).map((feature, index) => (
+                      {getLocalizedFeatures(tier).map((feature, index) => (
                         <div key={index} className="flex items-start gap-2">
                           <Check className="w-5 h-5 text-chart-3 shrink-0 mt-0.5" />
                           <span className="text-sm">{feature}</span>
@@ -641,7 +675,7 @@ export default function Subscribe() {
                         ) : (
                           <>
                             <CreditCard className="w-4 h-4 mr-2" />
-                            {locale === 'ru' ? `Оплатить ${totalRubPrice} ₽` : `Pay ${totalRubPrice} ₽`}
+                            {locale === 'ru' ? `Оплатить ${totalPriceRub} ₽` : `Pay ${totalPriceRub} ₽`}
                           </>
                         )}
                       </Button>
@@ -700,10 +734,10 @@ export default function Subscribe() {
               setPendingYookassaTier(null);
             }
           }}
-          amount={`${getRubPrice(calculatePeriodPrice(pendingYookassaTier.monthlyPrice, selectedPeriod))} ₽`}
+          amount={`${calculatePeriodPriceRub(pendingYookassaTier, selectedPeriod)} ₽`}
           description={locale === 'ru' 
-            ? `Подписка ${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} (${PERIOD_CONFIG[selectedPeriod].labelRu})`
-            : `${pendingYookassaTier.tier === 'standard' ? 'Standard' : 'Pro'} Subscription (${PERIOD_CONFIG[selectedPeriod].labelEn})`
+            ? `Подписка ${pendingYookassaTier.nameRu} (${PERIOD_CONFIG[selectedPeriod].labelRu})`
+            : `${pendingYookassaTier.name} Subscription (${PERIOD_CONFIG[selectedPeriod].labelEn})`
           }
         />
       )}
