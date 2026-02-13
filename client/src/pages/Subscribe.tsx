@@ -35,7 +35,7 @@ interface SubscriptionTier {
   tier: string;
   name: string;
   nameRu: string;
-  monthlyOrbs: number | 'unlimited';
+  monthlyOrbs: number;
   features: { ru: string[]; en: string[] };
   popular?: boolean;
   // Fixed RUB prices per month for each period
@@ -60,14 +60,14 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     features: {
       ru: [
         '250 звёзд в месяц',
-        'Все астрологические функции',
+        'Весь функционал, кроме Соляра',
         'Ежедневные гороскопы',
         'Детальные интерпретации планет',
         'Важные даты',
       ],
       en: [
         '250 stars per month',
-        'All astrology features',
+        'All features except Solar Return',
         'Daily horoscopes',
         'Detailed planet interpretations',
         'Important dates',
@@ -78,7 +78,7 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     tier: 'premium',
     name: 'Premium',
     nameRu: 'Премиум',
-    monthlyOrbs: 'unlimited',
+    monthlyOrbs: 550,
     pricesRub: {
       monthly: 349,
       semiannual: 299,
@@ -86,15 +86,15 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     },
     features: {
       ru: [
-        'Безлимитный доступ ко всему',
-        'Все астрологические функции',
+        '550 звёзд в месяц',
+        'Весь функционал, включая Соляр',
         'Приоритетная обработка AI',
         'Премиум поддержка',
         'Эксклюзивные инсайты',
       ],
       en: [
-        'Unlimited access to everything',
-        'All astrology features',
+        '550 stars per month',
+        'All features including Solar Return',
         'Priority AI processing',
         'Premium support',
         'Exclusive insights',
@@ -383,9 +383,6 @@ export default function Subscribe() {
   };
 
   const getOrbsDisplay = (tier: SubscriptionTier) => {
-    if (tier.monthlyOrbs === 'unlimited') {
-      return locale === 'ru' ? 'Безлимит' : 'Unlimited';
-    }
     return `${tier.monthlyOrbs} ${locale === 'ru' ? 'звёзд/мес' : 'stars/mo'}`;
   };
 

@@ -33,6 +33,7 @@ interface UserMeResponse {
     natalInitialized?: boolean;
     energy: number;
     orbs?: number;
+    maxOrbs?: number;
     tier?: 'free' | 'standard' | 'premium';
     orbsResetAt?: string;
   };
@@ -41,53 +42,59 @@ interface UserMeResponse {
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { orbs, tier, setOrbs, setTier, setResetAt, setEnergy } = useEnergy();
+  const { orbs, tier, setOrbs, setMaxOrbs, setTier, setResetAt, setEnergy } = useEnergy();
   const { t, locale } = useTranslation();
 
   // Orb costs from ORB_COSTS config
-  // oracle: 0.5, daily: 1, planet/house: 2, dates: 3, weekly: 5, monthly: 15, guest_chart/compatibility: 20
+  // oracle: 0.5, daily: 1, planet/house: 2, dates: 3, weekly: 5, monthly: 15, solar: 15 (Premium only), guest_chart/compatibility: 20
   const FEATURES = [
     {
       icon: Moon,
       title: locale === 'ru' ? 'Моя натальная карта' : 'My Natal Chart',
       description: locale === 'ru' ? 'Ваш космический отпечаток' : 'Your cosmic blueprint',
-      energyCost: 0, // Free for all users
+      energyCost: 0,
       path: '/my-natal-chart',
+      premiumOnly: false,
     },
     {
       icon: Users,
       title: locale === 'ru' ? 'Гостевые карты' : 'Guest Charts',
       description: locale === 'ru' ? 'Карты для друзей и партнёров' : 'Charts for friends and partners',
-      energyCost: 20, // natal_external
+      energyCost: 20,
       path: '/natal-chart',
+      premiumOnly: false,
     },
     {
       icon: Sun,
       title: t.dashboard.solarReturn,
       description: t.dashboard.solarReturnDesc,
-      energyCost: 15, // horoscope_monthly (solar return maps to monthly)
+      energyCost: 15,
       path: '/solar-today',
+      premiumOnly: true, // Solar return is Premium-only
     },
     {
       icon: Sparkles,
       title: t.dashboard.horoscope,
       description: t.dashboard.horoscopeDesc,
-      energyCost: 1, // horoscope_daily
+      energyCost: 1,
       path: '/horoscope',
+      premiumOnly: false,
     },
     {
       icon: Heart,
       title: t.dashboard.compatibility,
       description: t.dashboard.compatibilityDesc,
-      energyCost: 20, // compatibility
+      energyCost: 20,
       path: '/compatibility',
+      premiumOnly: false,
     },
     {
       icon: MessageCircle,
       title: t.dashboard.askOracle,
       description: t.dashboard.askOracleDesc,
-      energyCost: 0.5, // oracle
+      energyCost: 0.5,
       path: '/ask',
+      premiumOnly: false,
     },
   ];
 
@@ -122,6 +129,9 @@ export default function Dashboard() {
       if (data.data.orbs !== undefined) {
         setOrbs(data.data.orbs);
       }
+      if (data.data.maxOrbs !== undefined) {
+        setMaxOrbs(data.data.maxOrbs);
+      }
       if (data.data.tier) {
         setTier(data.data.tier);
       }
@@ -131,7 +141,7 @@ export default function Dashboard() {
       // Legacy compatibility
       setEnergy(data.data.energy);
     }
-  }, [data, setEnergy, setOrbs, setTier, setResetAt]);
+  }, [data, setEnergy, setOrbs, setMaxOrbs, setTier, setResetAt]);
 
   if (isLoading) {
     return (
@@ -196,13 +206,14 @@ export default function Dashboard() {
         {/* Feature Cards */}
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {FEATURES.map((feature) => {
-            // Free users: only natal chart
+            // Free users: only natal chart is accessible
             const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart';
-            // Standard users: need enough orbs
-            const notEnoughOrbs = tier === 'standard' && orbs < feature.energyCost;
-            // Premium: never disabled
-            const isDisabled = !data?.data?.natalInitialized || 
-              (tier !== 'premium' && (isLockedForFree || notEnoughOrbs));
+            // Standard users: solar return is Premium-only
+            const isPremiumLocked = feature.premiumOnly && tier !== 'premium';
+            // Not enough orbs (for Standard and Premium)
+            const notEnoughOrbs = tier !== 'free' && !isPremiumLocked && feature.energyCost > 0 && orbs < feature.energyCost;
+            // Disabled if natal chart not initialized or not enough orbs
+            const isDisabled = !data?.data?.natalInitialized || notEnoughOrbs;
             
             return (
               <FeatureCard
@@ -214,6 +225,7 @@ export default function Dashboard() {
                 onClick={() => navigate(feature.path)}
                 disabled={isDisabled}
                 locked={isLockedForFree}
+                premiumOnly={isPremiumLocked}
                 locale={locale}
               />
             );

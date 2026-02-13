@@ -7,15 +7,8 @@ export function generateReferralCode(): string {
 }
 
 /**
- * Apply referral bonus when a new user signs up with a referral code
- * 
- * New tier-based rewards:
- * - Free referrer: Gets 7 days of Standard subscription
- * - Free referred: Gets 3 days of Premium subscription
- * - Standard referrer: Gets 15 orbs
- * - Standard referred: Gets 5 orbs
- * - Premium referrer: Gets 5 extra days of Premium
- * - Premium referred: Gets 5 extra days of Premium
+ * Track referral when a new user signs up with a referral code.
+ * Only saves the referral link — rewards are given later when the friend PAYS for subscription.
  */
 export async function applyReferralBonus(storage: any, userId: string, referralCode: string): Promise<boolean> {
   if (!referralCode) return false;
@@ -26,27 +19,16 @@ export async function applyReferralBonus(storage: any, userId: string, referralC
     return false;
   }
 
+  // Only track the referral relationship — no rewards until friend pays
   await storage.updateUser(userId, { referredById: referrer.id });
-
-  // Get tiers for both users
-  const referrerTier = await getUserTier(storage, referrer.id);
-  const referredUser = await storage.getUser(userId);
-  const referredTier = await getUserTier(storage, userId);
   
-  // Determine rewards based on referrer's tier
-  const rewardConfig = REFERRAL_REWARDS[referrerTier];
-  
-  // Apply reward to referrer
-  await applyReward(storage, referrer.id, rewardConfig.referrer, 'signup_referrer', userId);
-  
-  // Apply reward to referred user
-  await applyReward(storage, userId, rewardConfig.referred, 'signup_referred', referrer.id);
-
+  console.log('[REFERRAL] Tracked referral link:', userId, '→ referrer:', referrer.id);
   return true;
 }
 
 /**
- * Apply subscription referral bonus when a referred user subscribes
+ * Apply subscription referral bonus when a referred user PAYS for subscription
+ * This is the main referral reward trigger
  */
 export async function handleSubscriptionReferralBonus(storage: any, userId: string): Promise<void> {
   const user = await storage.getUser(userId);
@@ -56,33 +38,58 @@ export async function handleSubscriptionReferralBonus(storage: any, userId: stri
     if (referrer) {
       const referrerTier = await getUserTier(storage, referrer.id);
       
-      // Standard subscribers get orbs, Premium gets extra days
-      if (referrerTier === 'standard') {
-        const currentOrbs = referrer.subscriptionOrbs || 0;
+      if (referrerTier === 'free') {
+        // Free referrer gets 7 days Standard + 3 days Premium
+        await applyReward(storage, referrer.id, 
+          { type: 'subscription_standard_days', days: 7 }, 
+          'subscription_referrer', userId
+        );
+        // Also give 3 days Premium on top
+        await applyReward(storage, referrer.id, 
+          { type: 'subscription_premium_days', days: 3 }, 
+          'subscription_referrer_premium', userId
+        );
+      } else if (referrerTier === 'standard') {
+        // Standard: +10 orbs + extend subscription
+        const currentOrbs = parseFloat(referrer.referralOrbs || '0');
         await storage.updateUser(referrer.id, { 
-          subscriptionOrbs: currentOrbs + 15 
+          referralOrbs: (currentOrbs + 10).toString() 
         });
+        
+        // Extend subscription by 3 days
+        const subscription = await storage.getSubscription(referrer.id);
+        if (subscription?.currentPeriodEnd) {
+          const newEnd = dayjs(subscription.currentPeriodEnd).add(3, 'day').toDate();
+          await storage.updateSubscription(subscription.id, { currentPeriodEnd: newEnd });
+        }
         
         await storage.createReferralReward({
           referrerId: referrer.id,
           referredUserId: userId,
           rewardType: 'subscription',
-          energyAmount: 15,
+          energyAmount: 10,
           rewardKind: 'orbs',
         });
       } else if (referrerTier === 'premium') {
-        // Add 5 days to Premium subscription
-        const currentEnd = referrer.subscriptionEnd ? new Date(referrer.subscriptionEnd) : new Date();
-        const newEnd = dayjs(currentEnd).add(5, 'day').toDate();
-        await storage.updateUser(referrer.id, { subscriptionEnd: newEnd });
+        // Premium: +20 orbs + extend subscription
+        const currentOrbs = parseFloat(referrer.referralOrbs || '0');
+        await storage.updateUser(referrer.id, { 
+          referralOrbs: (currentOrbs + 20).toString() 
+        });
+        
+        // Extend subscription by 3 days
+        const subscription = await storage.getSubscription(referrer.id);
+        if (subscription?.currentPeriodEnd) {
+          const newEnd = dayjs(subscription.currentPeriodEnd).add(3, 'day').toDate();
+          await storage.updateSubscription(subscription.id, { currentPeriodEnd: newEnd });
+        }
         
         await storage.createReferralReward({
           referrerId: referrer.id,
           referredUserId: userId,
           rewardType: 'subscription',
-          energyAmount: 0,
-          rewardKind: 'subscription_days',
-          subscriptionDays: 5,
+          energyAmount: 20,
+          rewardKind: 'orbs',
         });
       }
     }
@@ -121,9 +128,9 @@ async function applyReward(
       subscriptionEnd: newEnd,
     };
     
-    // If upgrading to Standard, give them 250 orbs if they don't have any
-    if (tierName === 'standard' && !user.subscriptionOrbs) {
-      updates.subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS;
+    // If upgrading, give them monthly orbs if they don't have any
+    if ((tierName === 'standard' || tierName === 'premium') && !user.subscriptionOrbs) {
+      updates.subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[tierName as 'standard' | 'premium'];
       updates.orbsResetAt = dayjs().add(1, 'month').startOf('month').toDate();
     }
     

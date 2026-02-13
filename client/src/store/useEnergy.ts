@@ -4,9 +4,11 @@ export type SubscriptionTier = 'free' | 'standard' | 'premium';
 
 interface OrbsState {
   orbs: number;
+  maxOrbs: number;
   tier: SubscriptionTier;
   resetAt: Date | null;
   setOrbs: (orbs: number) => void;
+  setMaxOrbs: (maxOrbs: number) => void;
   setTier: (tier: SubscriptionTier) => void;
   setResetAt: (date: Date | null) => void;
   decreaseOrbs: (amount: number) => void;
@@ -19,10 +21,12 @@ interface OrbsState {
 
 export const useEnergy = create<OrbsState>((set) => ({
   orbs: 0,
+  maxOrbs: 0,
   tier: 'free',
   resetAt: null,
   
   setOrbs: (orbs) => set({ orbs, energy: orbs }),
+  setMaxOrbs: (maxOrbs) => set({ maxOrbs }),
   setTier: (tier) => set({ tier }),
   setResetAt: (date) => set({ resetAt: date }),
   decreaseOrbs: (amount) => set((state) => ({ 

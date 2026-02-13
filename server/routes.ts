@@ -412,8 +412,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Legacy energy field for backward compatibility
         energy: (user.freeEnergy || 0) + (user.purchasedEnergy || 0),
         // New orb system
-        orbs: orbInfo,
+        orbs: orbInfo.total,
+        maxOrbs: orbInfo.maxOrbs,
         tier,
+        orbsResetAt: user.orbsResetAt,
         subscription, 
         natalInitialized: !!natalChart 
       } });
@@ -1417,17 +1419,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Not in cache - check subscription and energy
-      await checkAndResetEnergy(storage, userId);
-      const subscription = await checkSubscriptionExpiry(storage, userId);
-      const hasActiveSubscription = subscription && (subscription.status === 'active' || subscription.status === 'canceled');
-
-      // CHECK energy availability (but don't deduct yet)
-      if (!hasActiveSubscription) {
-        const updatedUser = await storage.getUser(userId);
-        if (!updatedUser || (updatedUser.freeEnergy + updatedUser.purchasedEnergy) < ENERGY_COSTS.solar) {
-          return res.status(402).json({ ok: false, error: "Insufficient energy" });
+      // Not in cache - check access (Premium-only feature)
+      const { canAccessFeature: checkAccess } = await import('./lib/energy.js');
+      const accessCheck = await checkAccess(storage, userId, 'solar_return');
+      
+      if (!accessCheck.allowed) {
+        if (accessCheck.requiresPremium) {
+          return res.status(403).json({ ok: false, error: "Premium subscription required for Solar Return" });
         }
+        if (accessCheck.requiresSubscription) {
+          return res.status(402).json({ ok: false, error: "Subscription required" });
+        }
+        return res.status(402).json({ ok: false, error: "Insufficient orbs" });
       }
 
       // Get natal Sun longitude for accurate Solar Return calculation
@@ -1520,12 +1523,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: responseData,
       });
 
-      // DEDUCT ENERGY AFTER SUCCESSFUL CALCULATION (per architect feedback)
-      if (!hasActiveSubscription) {
-        const deductResult = await deductEnergy(storage, userId, 'solar');
-        if (!deductResult.ok) {
-          console.error('[SOLAR] Failed to deduct energy after calculation:', deductResult.error);
-        }
+      // DEDUCT ORBS AFTER SUCCESSFUL CALCULATION
+      const { deductOrbs: deductSolarOrbs } = await import('./lib/energy.js');
+      const deductResult = await deductSolarOrbs(storage, userId, 'solar_return');
+      if (!deductResult.ok) {
+        console.error('[SOLAR] Failed to deduct orbs after calculation:', deductResult.error);
       }
 
       console.log(`[SOLAR] Calculated and cached solar return for year ${targetYear}`);

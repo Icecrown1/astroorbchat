@@ -1,4 +1,4 @@
-import { Sparkles, Infinity, Lock, Crown, Star } from 'lucide-react';
+import { Sparkles, Lock, Crown, Star } from 'lucide-react';
 import { useEnergy, SubscriptionTier } from '@/store/useEnergy';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
@@ -10,12 +10,12 @@ interface EnergyBadgeProps {
 }
 
 export function EnergyBadge({ className }: EnergyBadgeProps) {
-  const { orbs, tier, resetAt } = useEnergy();
+  const { orbs, maxOrbs, tier, resetAt } = useEnergy();
   const [timeUntilReset, setTimeUntilReset] = useState<string>('');
   const { locale } = useTranslation();
 
   useEffect(() => {
-    if (!resetAt || tier === 'free' || tier === 'premium') return;
+    if (!resetAt || tier === 'free') return;
 
     const updateTimer = () => {
       const now = dayjs();
@@ -48,8 +48,8 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
       case 'premium':
         return {
           icon: Crown,
-          value: <Infinity className="w-6 h-6" />,
-          label: locale === 'ru' ? 'Безлимит' : 'Unlimited',
+          value: orbs.toString(),
+          label: locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`,
           gradient: 'from-yellow-500 to-amber-600',
           shadowColor: 'shadow-yellow-500/30',
         };
@@ -57,7 +57,7 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
         return {
           icon: Star,
           value: orbs.toString(),
-          label: locale === 'ru' ? `из 250 орбов` : `of 250 orbs`,
+          label: locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`,
           gradient: 'from-chart-1 to-chart-3',
           shadowColor: 'shadow-primary/20',
         };
@@ -65,7 +65,9 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
         return {
           icon: Lock,
           value: '0',
-          label: locale === 'ru' ? 'Оформите подписку' : 'Subscribe',
+          label: locale === 'ru' 
+            ? 'Оформи подписку или пригласи друга' 
+            : 'Subscribe or invite a friend',
           gradient: 'from-muted to-muted-foreground/30',
           shadowColor: 'shadow-none',
           muted: true,
@@ -97,18 +99,18 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
           'font-mono text-2xl font-bold tabular-nums flex items-center gap-1',
           content.muted ? 'text-muted-foreground' : 'text-white'
         )}>
-          {typeof content.value === 'string' ? content.value : content.value}
-          {tier !== 'premium' && tier !== 'free' && (
+          {content.value}
+          {tier !== 'free' && (
             <Sparkles className="w-4 h-4 text-white/80" />
           )}
         </span>
         <span className={cn(
-          'text-xs font-medium',
+          'text-xs font-medium text-center max-w-[180px]',
           content.muted ? 'text-muted-foreground' : 'text-white/80'
         )}>
           {content.label}
         </span>
-        {tier === 'standard' && timeUntilReset && (
+        {(tier === 'standard' || tier === 'premium') && timeUntilReset && (
           <span className="text-[10px] text-white/60 font-medium mt-0.5">
             {locale === 'ru' ? 'Сброс:' : 'Reset:'} {timeUntilReset}
           </span>

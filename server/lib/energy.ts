@@ -7,8 +7,8 @@ dayjs.extend(timezone);
 
 // New pricing system based on subscription tiers
 // Free users: only natal chart with short descriptions
-// Standard: 250 orbs/month, pay per feature
-// Premium: unlimited everything
+// Standard: 250 orbs/month, all features except solar return
+// Premium: 550 orbs/month, all features including solar return
 
 export const ORB_COSTS = {
   // Low priority (1 orb)
@@ -27,9 +27,13 @@ export const ORB_COSTS = {
   
   // High priority (15-20 orbs)
   horoscope_monthly: 15,
+  solar_return: 15,          // Solar return - Premium only
   natal_external: 20,        // Guest natal chart
   compatibility: 20,         // Compatibility analysis
 } as const;
+
+// Features that require Premium tier (not available in Standard)
+export const PREMIUM_ONLY_FEATURES: Array<keyof typeof ORB_COSTS> = ['solar_return'];
 
 // Legacy costs mapping for backward compatibility
 export const ENERGY_COSTS = {
@@ -47,8 +51,11 @@ export const ENERGY_COSTS = {
   planet_interpretation: 2,
 } as const;
 
-// Monthly orbs for Standard subscription
-export const SUBSCRIPTION_MONTHLY_ORBS = 250;
+// Monthly orbs per subscription tier
+export const SUBSCRIPTION_MONTHLY_ORBS = {
+  standard: 250,
+  premium: 550,
+} as const;
 
 // Subscription pricing in RUB
 export const SUBSCRIPTION_PRICES = {
@@ -65,21 +72,22 @@ export const SUBSCRIPTION_PRICES = {
 } as const;
 
 // Referral rewards based on subscription tier
+// Rewards are given when the REFERRED user PAYS for a subscription
 export const REFERRAL_REWARDS = {
-  // Free users get temporary subscription access
+  // Free users: referrer gets 7 days Standard + 3 days Premium
   free: {
     referrer: { type: 'subscription_standard_days', days: 7 },
     referred: { type: 'subscription_premium_days', days: 3 },
   },
-  // Standard subscribers get orbs
+  // Standard subscribers: +10 orbs per invite + subscription extension when friend pays
   standard: {
-    referrer: { type: 'orbs', amount: 15 },
-    referred: { type: 'orbs', amount: 5 },
+    referrer: { type: 'orbs', amount: 10 },
+    referred: { type: 'orbs', amount: 0 },
   },
-  // Premium subscribers get extra subscription days
+  // Premium subscribers: +20 orbs per invite + subscription extension when friend pays
   premium: {
-    referrer: { type: 'subscription_premium_days', days: 5 },
-    referred: { type: 'subscription_premium_days', days: 5 },
+    referrer: { type: 'orbs', amount: 20 },
+    referred: { type: 'orbs', amount: 0 },
   },
 } as const;
 
@@ -145,24 +153,43 @@ export async function canAccessFeature(
   storage: any,
   userId: string,
   feature: keyof typeof ORB_COSTS
-): Promise<{ allowed: boolean; requiresSubscription: boolean; cost: number; tier: 'free' | 'standard' | 'premium' }> {
+): Promise<{ allowed: boolean; requiresSubscription: boolean; requiresPremium: boolean; cost: number; tier: 'free' | 'standard' | 'premium' }> {
   const tier = await getUserTier(storage, userId);
   const cost = ORB_COSTS[feature];
-  
-  // Premium has unlimited access
-  if (tier === 'premium') {
-    return { allowed: true, requiresSubscription: false, cost: 0, tier };
-  }
+  const isPremiumOnly = PREMIUM_ONLY_FEATURES.includes(feature);
   
   // Free users can only access natal chart (without detailed interpretations)
   if (tier === 'free') {
-    return { allowed: false, requiresSubscription: true, cost, tier };
+    return { allowed: false, requiresSubscription: true, requiresPremium: false, cost, tier };
   }
   
-  // Standard users pay with orbs
+  // Standard users: check if feature is Premium-only (e.g. solar return)
+  if (tier === 'standard') {
+    if (isPremiumOnly) {
+      return { allowed: false, requiresSubscription: false, requiresPremium: true, cost, tier };
+    }
+    
+    // Standard users pay with orbs
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return { allowed: false, requiresSubscription: true, requiresPremium: false, cost, tier };
+    }
+    
+    const totalOrbs = parseFloat(user.subscriptionOrbs || '0') + parseFloat(user.referralOrbs || '0');
+    
+    return { 
+      allowed: totalOrbs >= cost, 
+      requiresSubscription: false, 
+      requiresPremium: false,
+      cost, 
+      tier 
+    };
+  }
+  
+  // Premium: all features available, pay with orbs (550/month)
   const user = await storage.getUser(userId);
   if (!user) {
-    return { allowed: false, requiresSubscription: true, cost, tier };
+    return { allowed: false, requiresSubscription: true, requiresPremium: false, cost, tier };
   }
   
   const totalOrbs = parseFloat(user.subscriptionOrbs || '0') + parseFloat(user.referralOrbs || '0');
@@ -170,12 +197,13 @@ export async function canAccessFeature(
   return { 
     allowed: totalOrbs >= cost, 
     requiresSubscription: false, 
+    requiresPremium: false,
     cost, 
     tier 
   };
 }
 
-// Reset monthly orbs for Standard subscribers
+// Reset monthly orbs for Standard/Premium subscribers
 export async function checkAndResetOrbs(storage: any, userId: string): Promise<void> {
   const user = await storage.getUser(userId);
   if (!user) return;
@@ -186,19 +214,19 @@ export async function checkAndResetOrbs(storage: any, userId: string): Promise<v
   if (now >= resetAt) {
     const tier = await getUserTier(storage, userId);
     
-    if (tier === 'standard') {
-      // Reset subscription orbs to 250 for Standard
+    if (tier === 'standard' || tier === 'premium') {
+      const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[tier];
       const nextReset = getNextOrbsResetTime(user.timezone);
       await storage.updateUser(userId, {
-        subscriptionOrbs: SUBSCRIPTION_MONTHLY_ORBS.toString(),
+        subscriptionOrbs: monthlyOrbs.toString(),
         orbsResetAt: nextReset,
       });
-      console.log('[ORBS] Reset monthly orbs for Standard user:', userId);
+      console.log(`[ORBS] Reset monthly orbs to ${monthlyOrbs} for ${tier} user:`, userId);
     }
   }
 }
 
-// Deduct orbs for a feature (Standard tier only, Premium is unlimited)
+// Deduct orbs for a feature (both Standard and Premium pay with orbs)
 export async function deductOrbs(
   storage: any,
   userId: string,
@@ -206,15 +234,14 @@ export async function deductOrbs(
 ): Promise<{ ok: boolean; error?: string }> {
   const tier = await getUserTier(storage, userId);
   
-  // Premium users don't pay
-  if (tier === 'premium') {
-    await storage.createUsageLog({ userId, feature, cost: 0 });
-    return { ok: true };
-  }
-  
   // Free users cannot use paid features
   if (tier === 'free') {
     return { ok: false, error: 'Subscription required' };
+  }
+  
+  // Check if feature is Premium-only
+  if (tier === 'standard' && PREMIUM_ONLY_FEATURES.includes(feature)) {
+    return { ok: false, error: 'Premium subscription required' };
   }
   
   // Check and reset orbs if needed
@@ -230,7 +257,7 @@ export async function deductOrbs(
   const referralOrbs = parseFloat(user.referralOrbs || '0');
   const totalOrbs = subscriptionOrbs + referralOrbs;
   
-  console.log('[ORBS] Deducting:', { feature, cost, subscriptionOrbs, referralOrbs, totalOrbs });
+  console.log('[ORBS] Deducting:', { feature, cost, subscriptionOrbs, referralOrbs, totalOrbs, tier });
   
   if (totalOrbs < cost) {
     return { ok: false, error: 'Insufficient orbs' };
@@ -266,7 +293,7 @@ export async function deductEnergy(
 ): Promise<{ ok: boolean; error?: string }> {
   // Map legacy feature names to new orb costs
   const featureMapping: Record<string, keyof typeof ORB_COSTS> = {
-    solar: 'horoscope_monthly',
+    solar: 'solar_return',
     horoscope: 'horoscope_daily',
     compatibility: 'compatibility',
     ask: 'oracle',
@@ -294,8 +321,8 @@ export async function getUserOrbs(storage: any, userId: string): Promise<{
   subscriptionOrbs: number; 
   referralOrbs: number; 
   total: number;
+  maxOrbs: number;
   tier: 'free' | 'standard' | 'premium';
-  isUnlimited: boolean;
 }> {
   await checkAndResetOrbs(storage, userId);
   
@@ -303,17 +330,18 @@ export async function getUserOrbs(storage: any, userId: string): Promise<{
   const tier = await getUserTier(storage, userId);
   
   if (!user) {
-    return { subscriptionOrbs: 0, referralOrbs: 0, total: 0, tier: 'free', isUnlimited: false };
+    return { subscriptionOrbs: 0, referralOrbs: 0, total: 0, maxOrbs: 0, tier: 'free' };
   }
   
   const subscriptionOrbs = parseFloat(user.subscriptionOrbs || '0');
   const referralOrbs = parseFloat(user.referralOrbs || '0');
+  const maxOrbs = tier === 'free' ? 0 : SUBSCRIPTION_MONTHLY_ORBS[tier];
   
   return {
     subscriptionOrbs,
     referralOrbs,
     total: subscriptionOrbs + referralOrbs,
+    maxOrbs,
     tier,
-    isUnlimited: tier === 'premium',
   };
 }

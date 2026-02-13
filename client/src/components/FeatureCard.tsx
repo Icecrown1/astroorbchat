@@ -12,6 +12,7 @@ interface FeatureCardProps {
   onClick: () => void;
   disabled?: boolean;
   locked?: boolean;  // True when feature requires subscription upgrade
+  premiumOnly?: boolean;  // True when feature requires Premium tier specifically
   className?: string;
   locale?: 'ru' | 'en';
 }
@@ -24,21 +25,24 @@ export function FeatureCard({
   onClick,
   disabled = false,
   locked = false,
+  premiumOnly = false,
   className,
   locale = 'en',
 }: FeatureCardProps) {
+  const isBlocked = locked || premiumOnly;
+  
   return (
     <Card
       className={cn(
-        'relative p-6 cursor-pointer transition-all',
-        'hover-elevate active-elevate-2',
-        disabled && 'opacity-60 cursor-not-allowed grayscale',
+        'relative p-6 transition-all',
+        isBlocked ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer hover-elevate active-elevate-2',
+        disabled && !isBlocked && 'opacity-60 cursor-not-allowed',
         className
       )}
-      onClick={disabled ? undefined : onClick}
+      onClick={isBlocked || disabled ? undefined : onClick}
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      {locked && (
+      {isBlocked && (
         <div className="absolute top-4 left-4">
           <Lock className="w-5 h-5 text-muted-foreground" />
         </div>
@@ -47,27 +51,35 @@ export function FeatureCard({
       <div className="flex items-start gap-4">
         <div className={cn(
           "p-3 rounded-lg",
-          locked ? "bg-muted" : "bg-primary/10"
+          isBlocked ? "bg-muted" : "bg-primary/10"
         )}>
           <Icon className={cn(
             "w-6 h-6",
-            locked ? "text-muted-foreground" : "text-primary"
+            isBlocked ? "text-muted-foreground" : "text-primary"
           )} />
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-card-foreground">
+            <h3 className={cn(
+              "text-lg font-semibold",
+              isBlocked ? "text-muted-foreground" : "text-card-foreground"
+            )}>
               {title}
             </h3>
-            {energyCost > 0 && (
+            {premiumOnly && (
+              <Badge variant="outline" className="shrink-0 border-yellow-500/50 text-yellow-600">
+                Premium
+              </Badge>
+            )}
+            {!premiumOnly && energyCost > 0 && (
               <Badge variant={locked ? "outline" : "secondary"} className="shrink-0">
                 <Sparkles className="w-3 h-3 mr-1" />
                 {energyCost % 1 === 0 ? energyCost : energyCost.toFixed(1)}
               </Badge>
             )}
-            {energyCost === 0 && (
-              <Badge variant="default" className="shrink-0 bg-green-600 hover:bg-green-700">
+            {!premiumOnly && energyCost === 0 && (
+              <Badge variant="default" className="shrink-0 bg-green-600 no-default-hover-elevate no-default-active-elevate">
                 {locale === 'ru' ? 'Бесплатно' : 'Free'}
               </Badge>
             )}
@@ -79,11 +91,13 @@ export function FeatureCard({
           
           <div className={cn(
             "flex items-center text-sm font-medium",
-            locked ? "text-muted-foreground" : "text-primary"
+            isBlocked ? "text-muted-foreground" : "text-primary"
           )}>
-            {locked 
-              ? (locale === 'ru' ? 'Нужна подписка' : 'Subscription required')
-              : (locale === 'ru' ? 'Открыть' : 'Explore')}
+            {premiumOnly
+              ? (locale === 'ru' ? 'Только Премиум' : 'Premium only')
+              : locked 
+                ? (locale === 'ru' ? 'Нужна подписка' : 'Subscription required')
+                : (locale === 'ru' ? 'Открыть' : 'Explore')}
             <ArrowRight className="w-4 h-4 ml-1" />
           </div>
         </div>

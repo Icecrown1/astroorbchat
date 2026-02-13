@@ -37,28 +37,29 @@ export default function Referral() {
   const { tier } = useEnergy();
   
   // Tier-based rewards info
+  // Rewards are triggered when invited friend PAYS for subscription
   const getRewardInfo = () => {
     switch (tier) {
       case 'premium':
         return {
-          referrerReward: locale === 'ru' ? '+5 дней Premium' : '+5 Premium days',
-          referredReward: locale === 'ru' ? '+5 дней Premium' : '+5 Premium days',
+          referrerReward: locale === 'ru' ? '+20 орбов + продление подписки' : '+20 orbs + subscription extension',
+          referredReward: '',
           icon: Crown,
           color: 'text-yellow-500',
           bgColor: 'bg-yellow-500/10',
         };
       case 'standard':
         return {
-          referrerReward: '+15 орбов',
-          referredReward: '+5 орбов',
+          referrerReward: locale === 'ru' ? '+10 орбов + продление подписки' : '+10 orbs + subscription extension',
+          referredReward: '',
           icon: Star,
           color: 'text-primary',
           bgColor: 'bg-primary/10',
         };
       default: // free
         return {
-          referrerReward: locale === 'ru' ? '7 дней Standard' : '7 days Standard',
-          referredReward: locale === 'ru' ? '3 дня Premium' : '3 days Premium',
+          referrerReward: locale === 'ru' ? '7 дней Standard + 3 дня Premium' : '7 days Standard + 3 days Premium',
+          referredReward: '',
           icon: Calendar,
           color: 'text-chart-3',
           bgColor: 'bg-chart-3/10',
@@ -179,32 +180,25 @@ export default function Referral() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 mb-6">
-            <Card className={`p-4 ${rewardInfo.bgColor} border-primary/20`}>
-              <div className="flex items-center gap-3">
-                <rewardInfo.icon className={`w-8 h-8 ${rewardInfo.color}`} />
-                <div>
-                  <p className="text-2xl font-bold">{rewardInfo.referrerReward}</p>
-                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Вам за приглашение' : 'For you per invite'}</p>
-                </div>
+          <Card className={`p-4 ${rewardInfo.bgColor} border-primary/20 mb-4`}>
+            <div className="flex items-center gap-3">
+              <rewardInfo.icon className={`w-8 h-8 ${rewardInfo.color}`} />
+              <div>
+                <p className="text-xl font-bold">{rewardInfo.referrerReward}</p>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'ru' 
+                    ? 'Когда приглашённый друг оплачивает подписку' 
+                    : 'When invited friend pays for subscription'}
+                </p>
               </div>
-            </Card>
-            <Card className="p-4 bg-chart-4/10 border-chart-4/20">
-              <div className="flex items-center gap-3">
-                <Gift className="w-8 h-8 text-chart-4" />
-                <div>
-                  <p className="text-2xl font-bold">{rewardInfo.referredReward}</p>
-                  <p className="text-sm text-muted-foreground">{locale === 'ru' ? 'Другу при регистрации' : 'Friend on signup'}</p>
-                </div>
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
           
           {tier === 'free' && (
             <div className="mb-4 p-3 rounded-lg bg-muted text-sm text-muted-foreground text-center">
               {locale === 'ru' 
-                ? 'Оформите подписку, чтобы получать больше наград за рефералов!'
-                : 'Subscribe to get more rewards for referrals!'}
+                ? 'Пригласи друга и получи дни подписки, когда он оплатит!'
+                : 'Invite a friend and get subscription days when they pay!'}
             </div>
           )}
 
