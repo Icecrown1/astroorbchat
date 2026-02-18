@@ -9,17 +9,26 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/Loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap, Eye } from 'lucide-react';
+import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap, Eye, Star } from 'lucide-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
-interface PlanetInterpretation {
+interface BriefInterpretation {
+  title: string;
+  summary: string;
+  isShort: boolean;
+  requiresSubscription: boolean;
+}
+
+interface DetailedInterpretation {
   title: string;
   summary: string;
   strengths: string[];
   risks: string[];
   advice: string[];
+  isShort: boolean;
+  requiresSubscription: boolean;
 }
 
 interface HouseInfluenceResult {
@@ -43,26 +52,27 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
   const { locale } = useTranslation();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [detailedData, setDetailedData] = useState<DetailedInterpretation | null>(null);
   const [houseInfluence, setHouseInfluence] = useState<HouseInfluenceResult | null>(null);
 
   useEffect(() => {
     setIsOpen(!!planet);
-    // КРИТИЧНО: Сбрасываем платную интерпретацию при смене планеты
-    // Это гарантирует, что для каждой планеты нужна новая покупка
+    setDetailedData(null);
     setHouseInfluence(null);
-    // Сбрасываем мутацию чтобы избежать race condition
     houseInfluenceMutation.reset();
+    detailedMutation.reset();
   }, [planet]);
 
-  const { data, isLoading, error } = useQuery<PlanetInterpretation>({
-    queryKey: ['/api/astrology/planet-interpretation', planet, locale, chartType, chartId],
+  const { data: briefData, isLoading, error } = useQuery<BriefInterpretation>({
+    queryKey: ['/api/astrology/planet-interpretation', 'brief', planet, locale, chartType, chartId],
     queryFn: async () => {
       if (!planet) throw new Error('No planet selected');
       const response = await apiRequest('POST', '/api/astrology/planet-interpretation', {
         planet,
         locale,
         chartType,
-        chartId
+        chartId,
+        mode: 'brief'
       });
       return response.data;
     },
@@ -70,7 +80,6 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
     retry: 1
   });
 
-  // Проверяем статус купленных интерпретаций влияния домов
   const statusParams = new URLSearchParams();
   if (chartType) statusParams.append('chartType', chartType);
   if (chartId) statusParams.append('chartId', chartId);
@@ -81,18 +90,57 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
     retry: 1
   });
 
-  // Проверяем куплена ли интерпретация для текущей планеты и локали
   const isPurchased = planet && purchasedStatus?.data?.[locale]?.[planet];
 
   const handleClose = () => {
     setIsOpen(false);
-    setHouseInfluence(null); // Сброс при закрытии
-    setTimeout(onClose, 200); // Даем время на анимацию закрытия
+    setDetailedData(null);
+    setHouseInfluence(null);
+    setTimeout(onClose, 200);
   };
 
-  // Мутация для получения интерпретации влияния дома
-  // Для своей карты: первый раз платно (2 орба), потом бесплатно из кэша
-  // Для гостевых карт: всегда платно (2 орба)
+  const detailedMutation = useMutation({
+    mutationFn: async (requestedPlanet: string) => {
+      const response = await apiRequest('POST', '/api/astrology/planet-interpretation', {
+        planet: requestedPlanet,
+        locale,
+        chartType,
+        chartId,
+        mode: 'detailed'
+      });
+      return { data: response.data as DetailedInterpretation, requestedPlanet };
+    },
+    onSuccess: (result) => {
+      if (result.requestedPlanet !== planet) return;
+      setDetailedData(result.data);
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      toast({
+        title: locale === 'ru' ? 'Подробная трактовка получена' : 'Detailed interpretation received',
+        description: locale === 'ru' ? '2 звезды списаны' : '2 stars deducted',
+      });
+    },
+    onError: (error: any) => {
+      if (error.response?.status === 402) {
+        const isSubscriptionRequired = error.response?.data?.requiresSubscription;
+        toast({
+          title: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
+          description: isSubscriptionRequired
+            ? (locale === 'ru' ? 'Необходима подписка' : 'Subscription required')
+            : (locale === 'ru' 
+              ? `Нужно ${error.response?.data?.required || 2} звёзд. Доступно: ${error.response?.data?.available || 0}`
+              : `Required: ${error.response?.data?.required || 2} stars. Available: ${error.response?.data?.available || 0}`),
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: locale === 'ru' ? 'Ошибка' : 'Error',
+          description: error.response?.data?.error || error.message,
+          variant: 'destructive'
+        });
+      }
+    }
+  });
+
   const houseInfluenceMutation = useMutation({
     mutationFn: async (requestedPlanet: string) => {
       const response = await apiRequest('POST', '/api/astrology/house-influence', {
@@ -104,33 +152,21 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
       return { data: response.data, requestedPlanet, cached: response.cached };
     },
     onSuccess: (result: { data: HouseInfluenceResult; requestedPlanet: string; cached?: boolean }) => {
-      // КРИТИЧНО: Проверяем, что пользователь все еще смотрит ту же планету
-      // Иначе race condition покажет старые данные для новой планеты
-      if (result.requestedPlanet !== planet) {
-        console.log('[House Influence] Race condition prevented: planet changed during request');
-        return;
-      }
-      
+      if (result.requestedPlanet !== planet) return;
       setHouseInfluence(result.data);
-      
-      // Обновляем кэш статуса и энергию пользователя
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/house-influence-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      
       toast({
-        title: locale === 'ru' ? '✨ Интерпретация получена' : '✨ Interpretation received',
+        title: locale === 'ru' ? 'Интерпретация получена' : 'Interpretation received',
         description: locale === 'ru' 
           ? (result.cached ? 'Загружено из сохраненных' : 'Глубокая интерпретация влияния дома загружена')
           : (result.cached ? 'Loaded from saved' : 'Deep house influence interpretation loaded'),
       });
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error || error.message;
-      
-      // Проверяем, это ошибка недостатка энергии?
       if (error.response?.status === 402) {
         toast({
-          title: locale === 'ru' ? '⚡ Недостаточно звёзд' : '⚡ Insufficient stars',
+          title: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
           description: locale === 'ru' 
             ? `Нужно ${error.response?.data?.required || 2} звёзд. Доступно: ${error.response?.data?.available || 0}`
             : `Required: ${error.response?.data?.required || 2} stars. Available: ${error.response?.data?.available || 0}`,
@@ -139,7 +175,7 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
       } else {
         toast({
           title: locale === 'ru' ? 'Ошибка' : 'Error',
-          description: errorMessage,
+          description: error.response?.data?.error || error.message,
           variant: 'destructive'
         });
       }
@@ -147,18 +183,18 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
   });
 
   const PLANET_SYMBOLS: Record<string, string> = {
-    'Sun': '☉',
-    'Moon': '☽',
-    'Mercury': '☿',
-    'Venus': '♀',
-    'Mars': '♂',
-    'Jupiter': '♃',
-    'Saturn': '♄',
-    'Uranus': '♅',
-    'Neptune': '♆',
-    'North Node': '☊',
-    'South Node': '☋',
-    'Pluto': '♇'
+    'Sun': '\u2609',
+    'Moon': '\u263D',
+    'Mercury': '\u263F',
+    'Venus': '\u2640',
+    'Mars': '\u2642',
+    'Jupiter': '\u2643',
+    'Saturn': '\u2644',
+    'Uranus': '\u2645',
+    'Neptune': '\u2646',
+    'North Node': '\u260A',
+    'South Node': '\u260B',
+    'Pluto': '\u2647'
   };
 
   return (
@@ -174,100 +210,131 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {(error as any)?.response?.status === 402
-                ? (locale === 'ru' 
-                  ? 'Недостаточно звёзд для интерпретации планеты (2 звезды)'
-                  : 'Insufficient stars for planet interpretation (2 stars)')
-                : (locale === 'ru' 
-                  ? 'Не удалось загрузить интерпретацию. Попробуйте позже.'
-                  : 'Failed to load interpretation. Please try again later.')}
+              {locale === 'ru' 
+                ? 'Не удалось загрузить информацию о планете. Попробуйте позже.'
+                : 'Failed to load planet info. Please try again later.'}
             </AlertDescription>
           </Alert>
         )}
 
-        {data && (
+        {briefData && (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-2xl">
                 <span className="text-3xl" style={{ color: '#b87333' }}>
                   {planet && PLANET_SYMBOLS[planet]}
                 </span>
-                <span>{data.title}</span>
+                <span>{briefData.title}</span>
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-6 mt-4">
-              {/* Краткое описание */}
               <div className="p-4 bg-muted/50 rounded-lg border">
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  <p className="text-sm leading-relaxed">{data.summary}</p>
+                  <p className="text-sm leading-relaxed">{briefData.summary}</p>
                 </div>
               </div>
 
-              {/* Сильные стороны */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                  {locale === 'ru' ? 'Сильные стороны' : 'Strengths'}
-                </h3>
-                <ul className="space-y-2">
-                  {data.strengths.map((strength, index) => (
-                    <li 
-                      key={index} 
-                      className="flex items-start gap-3 text-sm"
-                      data-testid={`strength-${index}`}
+              {!detailedData && (
+                <div className="p-4 bg-accent/10 rounded-lg border border-accent/30">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <Star className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-sm mb-1">
+                          {locale === 'ru' ? 'Подробная трактовка' : 'Detailed interpretation'}
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {locale === 'ru' 
+                            ? 'Сильные стороны, на что обратить внимание и рекомендации'
+                            : 'Strengths, watch-outs, and personalized advice'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => planet && detailedMutation.mutate(planet)}
+                      disabled={detailedMutation.isPending}
+                      className="flex items-center gap-1.5 flex-shrink-0"
+                      data-testid="button-detailed-interpretation"
                     >
-                      <span className="text-green-600 mt-0.5">✓</span>
-                      <span>{strength}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Риски */}
-              {data.risks && data.risks.length > 0 && (
-                <div>
-                  <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
-                    {locale === 'ru' ? 'На что обратить внимание' : 'Watch Out For'}
-                  </h3>
-                  <ul className="space-y-2">
-                    {data.risks.map((risk, index) => (
-                      <li 
-                        key={index} 
-                        className="flex items-start gap-3 text-sm"
-                        data-testid={`risk-${index}`}
-                      >
-                        <span className="text-amber-600 mt-0.5">!</span>
-                        <span>{risk}</span>
-                      </li>
-                    ))}
-                  </ul>
+                      {detailedMutation.isPending ? (
+                        <Loader size="sm" />
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>{locale === 'ru' ? '2 звезды' : '2 stars'}</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {/* Советы */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
-                  <Lightbulb className="w-5 h-5 text-primary" />
-                  {locale === 'ru' ? 'Рекомендации' : 'Advice'}
-                </h3>
-                <ul className="space-y-2">
-                  {data.advice.map((item, index) => (
-                    <li 
-                      key={index} 
-                      className="flex items-start gap-3 text-sm"
-                      data-testid={`advice-${index}`}
-                    >
-                      <span className="text-primary mt-0.5">→</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {detailedData && (
+                <>
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                      {locale === 'ru' ? 'Сильные стороны' : 'Strengths'}
+                    </h3>
+                    <ul className="space-y-2">
+                      {detailedData.strengths.map((strength, index) => (
+                        <li 
+                          key={index} 
+                          className="flex items-start gap-3 text-sm"
+                          data-testid={`strength-${index}`}
+                        >
+                          <span className="text-green-600 mt-0.5">{'\u2713'}</span>
+                          <span>{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-              {/* Платная интерпретация влияния дома */}
+                  {detailedData.risks && detailedData.risks.length > 0 && (
+                    <div>
+                      <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        {locale === 'ru' ? 'На что обратить внимание' : 'Watch Out For'}
+                      </h3>
+                      <ul className="space-y-2">
+                        {detailedData.risks.map((risk, index) => (
+                          <li 
+                            key={index} 
+                            className="flex items-start gap-3 text-sm"
+                            data-testid={`risk-${index}`}
+                          >
+                            <span className="text-amber-600 mt-0.5">!</span>
+                            <span>{risk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+                      <Lightbulb className="w-5 h-5 text-primary" />
+                      {locale === 'ru' ? 'Рекомендации' : 'Advice'}
+                    </h3>
+                    <ul className="space-y-2">
+                      {detailedData.advice.map((item, index) => (
+                        <li 
+                          key={index} 
+                          className="flex items-start gap-3 text-sm"
+                          data-testid={`advice-${index}`}
+                        >
+                          <span className="text-primary mt-0.5">{'\u2192'}</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+
               <div className="p-4 bg-accent/10 rounded-lg border border-accent/30">
                 {!houseInfluence ? (
                   <div className="flex items-center justify-between gap-4">
@@ -302,7 +369,7 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       ) : (
                         <>
                           <Zap className="w-3.5 h-3.5" />
-                          <span>2</span>
+                          <span>{locale === 'ru' ? '2 звезды' : '2 stars'}</span>
                         </>
                       )}
                     </Button>
@@ -316,7 +383,6 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       </h3>
                     </div>
 
-                    {/* Сфера жизни */}
                     <div className="p-3 bg-primary/5 rounded-lg">
                       <p className="text-sm">
                         <span className="font-medium text-foreground">
@@ -326,7 +392,6 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       </p>
                     </div>
 
-                    {/* Как проявляется */}
                     <div>
                       <h4 className="text-sm font-medium mb-2">
                         {locale === 'ru' ? 'Как проявляется' : 'How it manifests'}
@@ -336,7 +401,6 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       </p>
                     </div>
 
-                    {/* Ключевые темы */}
                     <div>
                       <h4 className="text-sm font-medium mb-2">
                         {locale === 'ru' ? 'Ключевые темы' : 'Key themes'}
@@ -348,14 +412,13 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                             className="flex items-start gap-2 text-xs"
                             data-testid={`theme-${index}`}
                           >
-                            <span className="text-accent mt-0.5">•</span>
+                            <span className="text-accent mt-0.5">{'\u2022'}</span>
                             <span className="text-muted-foreground">{theme}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
-                    {/* Возможности */}
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
                         <TrendingUp className="w-4 h-4 text-green-600" />
@@ -368,14 +431,13 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                             className="flex items-start gap-2 text-sm"
                             data-testid={`opportunity-${index}`}
                           >
-                            <span className="text-green-600 mt-0.5">✓</span>
+                            <span className="text-green-600 mt-0.5">{'\u2713'}</span>
                             <span className="text-muted-foreground">{opp}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
-                    {/* Вызовы */}
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
                         <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -395,7 +457,6 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                       </ul>
                     </div>
 
-                    {/* Практические шаги */}
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-medium mb-2">
                         <Lightbulb className="w-4 h-4 text-primary" />
@@ -408,7 +469,7 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
                             className="flex items-start gap-2 text-sm"
                             data-testid={`work-${index}`}
                           >
-                            <span className="text-primary mt-0.5">→</span>
+                            <span className="text-primary mt-0.5">{'\u2192'}</span>
                             <span className="text-muted-foreground">{work}</span>
                           </li>
                         ))}

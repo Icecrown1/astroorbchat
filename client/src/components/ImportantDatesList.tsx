@@ -14,7 +14,7 @@ import { Moon, Sparkles, ArrowRight, Calendar, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getImportantDates, getImportantDateInterpretation, ImportantEvent, InterpretationResponse } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { translatePlanet, translateSign } from '@/lib/astroTranslations';
+import { translatePlanet, translateSign, translateSignPrepositional } from '@/lib/astroTranslations';
 import { Loader } from './Loader';
 import { useToast } from '@/hooks/use-toast';
 
@@ -102,12 +102,12 @@ export function ImportantDatesList({ externalChartId }: ImportantDatesListProps 
   const getEventTitle = (event: ImportantEvent) => {
     if (event.type === 'new_moon') {
       return locale === 'ru' 
-        ? `Новолуние в ${translateSign(event.sign, locale)}`
+        ? `Новолуние в ${translateSignPrepositional(event.sign, locale)}`
         : `New Moon in ${translateSign(event.sign, locale)}`;
     }
     if (event.type === 'full_moon') {
       return locale === 'ru'
-        ? `Полнолуние в ${translateSign(event.sign, locale)}`
+        ? `Полнолуние в ${translateSignPrepositional(event.sign, locale)}`
         : `Full Moon in ${translateSign(event.sign, locale)}`;
     }
     if (event.type === 'planet_transit' && event.planet) {

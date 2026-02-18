@@ -11,7 +11,7 @@
 
 ЗАДАЧА: Верни ТОЛЬКО валидный JSON в формате:
 {
-  "title": "{{planet_name}} в {{planet_sign}}",
+  "title": "{{planet_name}} в {{planet_sign_prep}}",
   "summary": "3-4 предложения по сути без воды",
   "strengths": ["пункт 1", "пункт 2", "пункт 3"],
   "risks": ["пункт 1", "пункт 2"],

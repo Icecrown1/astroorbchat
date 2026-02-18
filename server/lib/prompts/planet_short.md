@@ -7,7 +7,7 @@
 
 ЗАДАЧА: Верни ТОЛЬКО валидный JSON в формате:
 {
-  "title": "{{planet_name}} в {{planet_sign}}",
+  "title": "{{planet_name}} в {{planet_sign_prep}}",
   "summary": "1-2 предложения о ключевом влиянии на характер"
 }
 

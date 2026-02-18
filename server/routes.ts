@@ -941,13 +941,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Роут для интерпретации отдельной планеты (БЕЗ списания энергии)
+  // Planet interpretation endpoint
+  // mode='brief' → FREE for all users (short description of what the planet is responsible for)
+  // mode='detailed' → PAID (2 stars) for subscribers (full interpretation with strengths/risks/advice)
   app.post("/api/astrology/planet-interpretation", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { planet, locale = 'ru', chartType = 'own', chartId } = req.body;
+      const { planet, locale = 'ru', chartType = 'own', chartId, mode = 'brief' } = req.body;
       
-      // Валидация планеты
       const validPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'North Node', 'South Node'];
       if (!planet || !validPlanets.includes(planet)) {
         return res.status(400).json({ 
@@ -964,16 +965,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let savedChart: NatalChartResult;
       let chartOwner = user;
 
-      // Получаем данные карты в зависимости от типа
       if (chartType === 'guest' && chartId) {
-        // Загружаем гостевую карту
         const guestChart = await storage.getExternalNatal(chartId);
         
         if (!guestChart) {
           return res.status(404).json({ ok: false, error: "Guest chart not found" });
         }
         
-        // Проверяем владельца
         if (guestChart.ownerId !== userId) {
           return res.status(403).json({ ok: false, error: "Access denied" });
         }
@@ -986,7 +984,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         savedChart = guestChart.data as NatalChartResult;
-        // Для гостевой карты создаем минимальный профиль
         chartOwner = {
           ...user,
           name: guestChart.name,
@@ -994,7 +991,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthdayDate: guestChart.birthdayDate
         } as any;
       } else {
-        // Получаем сохраненную натальную карту пользователя
         const ownChart = await storage.getNatalChart(userId);
         
         if (!ownChart || !ownChart.data || typeof ownChart.data !== 'object' || !('planets' in ownChart.data)) {
@@ -1018,34 +1014,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Определяем дом, в котором находится планета
       const findHouse = (longitude: number): number => {
         if (!savedChart.houses || !Array.isArray(savedChart.houses.cusps)) return 1;
-        
         const cusps = savedChart.houses.cusps;
-        
-        // Перебираем дома и находим, в какой попадает планета
         for (let i = 0; i < 12; i++) {
           const houseStart = cusps[i];
           const nextHouseStart = cusps[(i + 1) % 12];
-          
-          // Учитываем переход через 0 градусов
           if (houseStart > nextHouseStart) {
-            if (longitude >= houseStart || longitude < nextHouseStart) {
-              return i + 1;
-            }
+            if (longitude >= houseStart || longitude < nextHouseStart) return i + 1;
           } else {
-            if (longitude >= houseStart && longitude < nextHouseStart) {
-              return i + 1;
-            }
+            if (longitude >= houseStart && longitude < nextHouseStart) return i + 1;
           }
         }
-        return 1; // Fallback
+        return 1;
       };
 
       const house = findHouse(planetData.longitude);
 
-      // Получаем аспекты планеты (если они есть)
       const chartAspects = (savedChart as any).aspects || [];
       const planetAspects = chartAspects.filter((aspect: any) => 
         aspect.planet1 === planet || aspect.planet2 === planet
@@ -1055,7 +1040,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orb_deg: aspect.orb
       }));
 
-      // Формируем данные для интерпретации
       const interpretationData: PlanetInterpretationData = {
         planet: {
           name: planet,
@@ -1070,14 +1054,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Check user's subscription tier
       const { getUserTier, deductOrbs } = await import('./lib/energy.js');
       const tier = await getUserTier(storage, userId);
-      
-      // Free users get short interpretation (no charge)
-      // Standard/Premium users get full interpretation (Standard pays orbs, Premium unlimited)
-      if (tier === 'free') {
-        // Return short interpretation for free users
+
+      // BRIEF MODE: Free for all users — short description of what the planet does
+      if (mode === 'brief') {
         const { getPlanetShortInterpretation } = await import('./lib/openai.js');
         const shortInterpretation = await getPlanetShortInterpretation(interpretationData, locale);
         
@@ -1086,12 +1067,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: {
             ...shortInterpretation,
             isShort: true,
-            requiresSubscription: true
+            requiresSubscription: tier === 'free'
           }
         });
       }
-      
-      // Deduct orbs for both Standard and Premium users
+
+      // DETAILED MODE: Costs 2 stars — full interpretation with strengths/risks/advice
+      if (tier === 'free') {
+        return res.status(402).json({
+          ok: false,
+          error: locale === 'ru' ? 'Необходима подписка' : 'Subscription required',
+          requiresSubscription: true
+        });
+      }
+
       const deductResult = await deductOrbs(storage, userId, 'planet_interpretation');
       if (!deductResult.ok) {
         return res.status(402).json({
@@ -1102,7 +1091,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get full interpretation for subscribed users
       const interpretation = await getPlanetInterpretation(interpretationData, locale);
 
       res.json({

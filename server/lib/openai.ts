@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
-import { translatePlanet, translateSign } from './astroTranslations';
+import { translatePlanet, translateSign, translateSignPrepositional } from './astroTranslations';
 
 // Using custom OpenAI API key provided by user
 // the newest OpenAI model is "gpt-4o" which is the latest available model
@@ -69,8 +69,9 @@ export async function getImportantDateInterpretation(
   let eventDescription = '';
   if (eventType === 'new_moon' || eventType === 'full_moon') {
     const signName = translateSign(eventData.sign, locale);
+    const signNamePrep = translateSignPrepositional(eventData.sign, locale);
     eventDescription = locale === 'ru'
-      ? `${eventTypeText} в знаке ${signName}`
+      ? `${eventTypeText} в знаке ${signNamePrep}`
       : `${eventTypeText} in ${signName}`;
     
     if (eventData.house_for_sun_sign) {
@@ -95,7 +96,7 @@ export async function getImportantDateInterpretation(
   const userName = userData.name || (locale === 'ru' ? 'пользователя' : 'the user');
   
   const userContext = locale === 'ru'
-    ? `${userData.name ? `Имя: ${userData.name}\n` : ''}Солнце в знаке ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Асцендент в ${translateSign(userData.ascendantSign, locale)}` : ''}.`
+    ? `${userData.name ? `Имя: ${userData.name}\n` : ''}Солнце в знаке ${translateSignPrepositional(userData.sunSign, locale)}${userData.ascendantSign ? `, Асцендент в ${translateSignPrepositional(userData.ascendantSign, locale)}` : ''}.`
     : `${userData.name ? `Name: ${userData.name}\n` : ''}Sun in ${translateSign(userData.sunSign, locale)}${userData.ascendantSign ? `, Ascendant in ${translateSign(userData.ascendantSign, locale)}` : ''}.`;
   
   const promptText = locale === 'ru'
@@ -306,9 +307,11 @@ export async function getPlanetShortInterpretation(
   const localizedPlanetName = translatePlanet(data.planet.name, locale);
   const localizedSign = translateSign(data.planet.sign, locale);
 
+  const localizedSignPrep = translateSignPrepositional(data.planet.sign, locale);
   const promptText = loadPrompt('planet_short', {
     planet_name: localizedPlanetName,
     planet_sign: localizedSign,
+    planet_sign_prep: localizedSignPrep,
     profile_name: data.profile.name,
     profile_gender: profileGender
   });
@@ -336,8 +339,9 @@ export async function getPlanetShortInterpretation(
 
   try {
     const result = JSON.parse(content);
+    const localizedSignPrep = translateSignPrepositional(data.planet.sign, locale);
     const fallbackTitle = locale === 'ru' 
-      ? `${localizedPlanetName} в ${localizedSign}`
+      ? `${localizedPlanetName} в ${localizedSignPrep}`
       : `${localizedPlanetName} in ${localizedSign}`;
     
     return {
@@ -370,9 +374,11 @@ export async function getPlanetInterpretation(
   const localizedPlanetName = translatePlanet(data.planet.name, locale);
   const localizedSign = translateSign(data.planet.sign, locale);
 
+  const localizedSignPrep = translateSignPrepositional(data.planet.sign, locale);
   const promptText = loadPrompt('planet', {
     planet_name: localizedPlanetName,
     planet_sign: localizedSign,
+    planet_sign_prep: localizedSignPrep,
     planet_house: String(data.planet.house),
     planet_aspects: aspectsText,
     profile_name: data.profile.name,
@@ -409,11 +415,11 @@ export async function getPlanetInterpretation(
 
   try {
     const result = JSON.parse(content);
-    // Локализуем фоллбэк заголовок
     const localizedPlanetName = translatePlanet(data.planet.name, locale);
+    const localizedSignPrep = translateSignPrepositional(data.planet.sign, locale);
     const localizedSign = translateSign(data.planet.sign, locale);
     const fallbackTitle = locale === 'ru' 
-      ? `${localizedPlanetName} в ${localizedSign}`
+      ? `${localizedPlanetName} в ${localizedSignPrep}`
       : `${localizedPlanetName} in ${localizedSign}`;
     
     return {
@@ -470,9 +476,11 @@ export async function getHouseInfluence(
   const profileAge = data.profile.age ? `, ${data.profile.age} ${locale === 'ru' ? 'лет' : 'years old'}` : '';
   const profileGender = data.profile.gender ? `, ${data.profile.gender}` : '';
 
+  const localizedSignPrep = translateSignPrepositional(data.planet.sign, locale);
   const promptText = loadPrompt('house_influence', {
     planet_name: localizedPlanetName,
     planet_sign: localizedSign,
+    planet_sign_prep: localizedSignPrep,
     planet_house: String(data.planet.house),
     short_theme: shortTheme,
     profile_name: data.profile.name,

@@ -84,3 +84,26 @@ export function translateSign(signName: string, locale: Locale): string {
   const normalizedName = signName.trim() as SignName;
   return SIGN_TRANSLATIONS[locale]?.[normalizedName] ?? signName;
 }
+
+const SIGN_PREPOSITIONAL_RU: Record<SignName, string> = {
+  'Aries': 'Овне',
+  'Taurus': 'Тельце',
+  'Gemini': 'Близнецах',
+  'Cancer': 'Раке',
+  'Leo': 'Льве',
+  'Virgo': 'Деве',
+  'Libra': 'Весах',
+  'Scorpio': 'Скорпионе',
+  'Sagittarius': 'Стрельце',
+  'Capricorn': 'Козероге',
+  'Aquarius': 'Водолее',
+  'Pisces': 'Рыбах',
+};
+
+export function translateSignPrepositional(signName: string, locale: Locale): string {
+  if (locale === 'ru') {
+    const normalizedName = signName.trim() as SignName;
+    return SIGN_PREPOSITIONAL_RU[normalizedName] ?? translateSign(signName, locale);
+  }
+  return translateSign(signName, locale);
+}

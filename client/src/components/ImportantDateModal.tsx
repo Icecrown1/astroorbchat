@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Lock, Sparkles, Calendar, CheckCircle, XCircle, Lightbulb, Clock } from 'lucide-react';
 import { ImportantEvent, ImportantDateInterpretation, getImportantDateDetail, unlockImportantDate } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { translatePlanet, translateSign } from '@/lib/astroTranslations';
+import { translatePlanet, translateSign, translateSignPrepositional } from '@/lib/astroTranslations';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient } from '@/lib/queryClient';
 import { Loader } from './Loader';
@@ -57,14 +57,16 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
     const planet = translatePlanet(event.planet, locale);
     const sign = event.sign ? translateSign(event.sign, locale) : '';
 
+    const signPrep = event.sign ? translateSignPrepositional(event.sign, locale) : '';
+
     if (event.kind === 'retrograde-start') {
       return locale === 'ru' 
-        ? `${planet} в ${sign} начинает ретроградное движение — пересмотрите планы в соответствующей сфере`
+        ? `${planet} в ${signPrep} начинает ретроградное движение — пересмотрите планы в соответствующей сфере`
         : `${planet} in ${sign} begins retrograde motion — review plans in this area`;
     }
     if (event.kind === 'retrograde-end') {
       return locale === 'ru'
-        ? `${planet} в ${sign} возвращается к директному движению — путь вперёд открыт`
+        ? `${planet} в ${signPrep} возвращается к директному движению — путь вперёд открыт`
         : `${planet} in ${sign} returns to direct motion — the way forward is clear`;
     }
     if (event.kind === 'ingress') {
@@ -140,7 +142,7 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             {translatePlanet(event.planet, locale)} {getEventTypeLabel(event.kind)}
-            {event.sign && ` ${locale === 'ru' ? 'в' : 'in'} ${translateSign(event.sign, locale)}`}
+            {event.sign && ` ${locale === 'ru' ? 'в' : 'in'} ${locale === 'ru' ? translateSignPrepositional(event.sign, locale) : translateSign(event.sign, locale)}`}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4" />
