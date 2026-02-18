@@ -316,8 +316,8 @@ export function ImportantDatesList({ externalChartId }: ImportantDatesListProps 
                   <Zap className="w-4 h-4 text-primary" />
                   <span className="text-sm font-medium text-foreground">
                     {locale === 'ru' 
-                      ? `✓ Списано ${interpretationResponse.cost} орба (новая интерпретация, в кэше на 7 дней)` 
-                      : `✓ ${interpretationResponse.cost} orbs deducted (new interpretation, cached for 7 days)`}
+                      ? `✓ Списана ${interpretationResponse.cost} звезда (новая интерпретация, в кэше на 7 дней)` 
+                      : `✓ ${interpretationResponse.cost} star deducted (new interpretation, cached for 7 days)`}
                   </span>
                 </div>
               )}

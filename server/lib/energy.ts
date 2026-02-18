@@ -60,14 +60,14 @@ export const SUBSCRIPTION_MONTHLY_ORBS = {
 // Subscription pricing in RUB
 export const SUBSCRIPTION_PRICES = {
   standard: {
-    monthly: 190,
+    monthly: 199,
     semiannual: 159, // per month when paid for 6 months
-    annual: 119,     // per month when paid for 12 months
+    annual: 99,      // per month when paid for 12 months
   },
   premium: {
-    monthly: 349,
-    semiannual: 299, // per month when paid for 6 months
-    annual: 189,     // per month when paid for 12 months
+    monthly: 399,
+    semiannual: 359, // per month when paid for 6 months
+    annual: 179,     // per month when paid for 12 months
   },
 } as const;
 
@@ -260,7 +260,7 @@ export async function deductOrbs(
   console.log('[ORBS] Deducting:', { feature, cost, subscriptionOrbs, referralOrbs, totalOrbs, tier });
   
   if (totalOrbs < cost) {
-    return { ok: false, error: 'Insufficient orbs' };
+    return { ok: false, error: 'Insufficient stars' };
   }
   
   // Deduct from subscription orbs first, then referral orbs

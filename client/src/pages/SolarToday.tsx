@@ -113,8 +113,8 @@ export default function SolarToday() {
       // Handle insufficient energy (402)
       if (error.response?.status === 402) {
         toast({
-          title: locale === 'ru' ? 'Недостаточно орбов' : 'Insufficient orbs',
-          description: locale === 'ru' ? 'Пополните баланс орбов' : 'Please top up your orbs',
+          title: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
+          description: locale === 'ru' ? 'Пополните баланс звёзд' : 'Please top up your stars',
           variant: 'destructive',
         });
         return;
@@ -174,7 +174,7 @@ export default function SolarToday() {
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-sm">
-                    {locale === 'ru' ? '💫 15 орбов' : '💫 15 orbs'}
+                    {locale === 'ru' ? '💫 15 звёзд' : '💫 15 stars'}
                   </Badge>
                 )}
               </div>
@@ -185,8 +185,8 @@ export default function SolarToday() {
                   <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground">
                     {locale === 'ru' 
-                      ? 'Новый расчет соляра стоит 15 орбов. Повторный просмотр этого же года — бесплатно.' 
-                      : 'New solar return calculation costs 15 orbs. Viewing the same year again is free.'}
+                      ? 'Новый расчет соляра стоит 15 звёзд. Повторный просмотр этого же года — бесплатно.' 
+                      : 'New solar return calculation costs 15 stars. Viewing the same year again is free.'}
                   </p>
                 </div>
               )}
@@ -264,7 +264,7 @@ export default function SolarToday() {
               ) : (
                 <>
                   <Sun className="w-4 h-4 mr-2" />
-                  {locale === 'ru' ? 'Рассчитать (−15 орбов)' : 'Calculate (−15 orbs)'}
+                  {locale === 'ru' ? 'Рассчитать (−15 звёзд)' : 'Calculate (−15 stars)'}
                 </>
               )}
             </Button>
@@ -290,8 +290,8 @@ export default function SolarToday() {
                 <Info className="w-4 h-4 text-primary" />
                 <p className="text-sm text-primary">
                   {locale === 'ru' 
-                    ? '📅 Сохраненный расчет — орбы не списаны' 
-                    : '📅 Cached calculation — no orbs deducted'}
+                    ? '📅 Сохраненный расчет — звёзды не списаны' 
+                    : '📅 Cached calculation — no stars deducted'}
                 </p>
               </div>
             )}

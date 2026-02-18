@@ -130,10 +130,10 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
       // Проверяем, это ошибка недостатка энергии?
       if (error.response?.status === 402) {
         toast({
-          title: locale === 'ru' ? '⚡ Недостаточно орбов' : '⚡ Insufficient orbs',
+          title: locale === 'ru' ? '⚡ Недостаточно звёзд' : '⚡ Insufficient stars',
           description: locale === 'ru' 
-            ? `Нужно ${error.response?.data?.required || 2} орбов. Доступно: ${error.response?.data?.available || 0}`
-            : `Required: ${error.response?.data?.required || 2} orbs. Available: ${error.response?.data?.available || 0}`,
+            ? `Нужно ${error.response?.data?.required || 2} звёзд. Доступно: ${error.response?.data?.available || 0}`
+            : `Required: ${error.response?.data?.required || 2} stars. Available: ${error.response?.data?.available || 0}`,
           variant: 'destructive'
         });
       } else {
@@ -174,9 +174,13 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {locale === 'ru' 
-                ? 'Не удалось загрузить интерпретацию. Попробуйте позже.'
-                : 'Failed to load interpretation. Please try again later.'}
+              {(error as any)?.response?.status === 402
+                ? (locale === 'ru' 
+                  ? 'Недостаточно звёзд для интерпретации планеты (2 звезды)'
+                  : 'Insufficient stars for planet interpretation (2 stars)')
+                : (locale === 'ru' 
+                  ? 'Не удалось загрузить интерпретацию. Попробуйте позже.'
+                  : 'Failed to load interpretation. Please try again later.')}
             </AlertDescription>
           </Alert>
         )}

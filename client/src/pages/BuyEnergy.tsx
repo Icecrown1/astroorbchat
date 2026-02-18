@@ -517,8 +517,8 @@ export default function BuyEnergy() {
           }}
           amount={`${getRubPrice(pendingYookassaPack.usdPrice)} ₽`}
           description={locale === 'ru' 
-            ? `Покупка ${pendingYookassaPack.amount} орбов энергии`
-            : `Purchase ${pendingYookassaPack.amount} energy orbs`
+            ? `Покупка ${pendingYookassaPack.amount} звёзд`
+            : `Purchase ${pendingYookassaPack.amount} stars`
           }
         />
       )}

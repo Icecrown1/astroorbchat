@@ -42,7 +42,7 @@ export default function Referral() {
     switch (tier) {
       case 'premium':
         return {
-          referrerReward: locale === 'ru' ? '+20 орбов + продление подписки' : '+20 orbs + subscription extension',
+          referrerReward: locale === 'ru' ? '+20 звёзд + продление подписки' : '+20 stars + subscription extension',
           referredReward: '',
           icon: Crown,
           color: 'text-yellow-500',
@@ -50,7 +50,7 @@ export default function Referral() {
         };
       case 'standard':
         return {
-          referrerReward: locale === 'ru' ? '+10 орбов + продление подписки' : '+10 orbs + subscription extension',
+          referrerReward: locale === 'ru' ? '+10 звёзд + продление подписки' : '+10 stars + subscription extension',
           referredReward: '',
           icon: Star,
           color: 'text-primary',

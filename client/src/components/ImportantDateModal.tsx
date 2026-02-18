@@ -186,7 +186,7 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
                       {!event.unlocked && <Lock className="w-4 h-4 mr-2" />}
                       {event.unlocked 
                         ? (locale === 'ru' ? 'Загрузить' : 'Load')
-                        : (locale === 'ru' ? 'Разблокировать (1 орб)' : 'Unlock (1 orb)')}
+                        : (locale === 'ru' ? 'Разблокировать (1 звезда)' : 'Unlock (1 star)')}
                     </>
                   )}
                 </Button>

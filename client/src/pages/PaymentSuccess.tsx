@@ -65,8 +65,8 @@ export default function PaymentSuccess() {
           setStatus('success');
           setEnergyAmount(amount || 0);
           setMessage(locale === 'ru' 
-            ? `Платёж успешно обработан! Начислено ${amount} орбов энергии.`
-            : `Payment successful! Credited ${amount} energy orbs.`
+            ? `Платёж успешно обработан! Начислено ${amount} звёзд.`
+            : `Payment successful! Credited ${amount} stars.`
           );
         } else if (paymentStatus === 'processing') {
           setStatus('processing');
@@ -115,8 +115,8 @@ export default function PaymentSuccess() {
           setStatus('success');
           setEnergyAmount(amount || 0);
           setMessage(locale === 'ru' 
-            ? `Транзакция найдена! Начислено ${amount} орбов энергии.`
-            : `Transaction found! Credited ${amount} energy orbs.`
+            ? `Транзакция найдена! Начислено ${amount} звёзд.`
+            : `Transaction found! Credited ${amount} stars.`
           );
           return true;
         } else if (paymentStatus === 'processing') {

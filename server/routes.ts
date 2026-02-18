@@ -1091,16 +1091,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // For Standard users, deduct orbs (Premium is free)
-      if (tier === 'standard') {
-        const deductResult = await deductOrbs(storage, userId, 'planet_interpretation');
-        if (!deductResult.ok) {
-          return res.status(402).json({
-            ok: false,
-            error: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
-            requiresSubscription: true
-          });
-        }
+      // Deduct orbs for both Standard and Premium users
+      const deductResult = await deductOrbs(storage, userId, 'planet_interpretation');
+      if (!deductResult.ok) {
+        return res.status(402).json({
+          ok: false,
+          error: locale === 'ru' ? 'Недостаточно звёзд' : 'Insufficient stars',
+          required: ORB_COSTS.planet_interpretation,
+          available: deductResult.available || 0
+        });
       }
       
       // Get full interpretation for subscribed users
@@ -1430,7 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (accessCheck.requiresSubscription) {
           return res.status(402).json({ ok: false, error: "Subscription required" });
         }
-        return res.status(402).json({ ok: false, error: "Insufficient orbs" });
+        return res.status(402).json({ ok: false, error: "Insufficient stars" });
       }
 
       // Get natal Sun longitude for accurate Solar Return calculation
@@ -3268,9 +3267,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (validated.kind === "energy_pack" && validated.pack) {
         const packConfig = {
-          20: { rub: "150.00", label: "20 Orbs Energy Pack" },
-          50: { rub: "300.00", label: "50 Orbs Energy Pack" },
-          120: { rub: "600.00", label: "120 Orbs Energy Pack" },
+          20: { rub: "150.00", label: "20 Stars Pack" },
+          50: { rub: "300.00", label: "50 Stars Pack" },
+          120: { rub: "600.00", label: "120 Stars Pack" },
         }[validated.pack.energy as 20 | 50 | 120];
 
         if (!packConfig) {
@@ -3278,7 +3277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ ok: false, error: "Invalid energy pack" });
         }
 
-        description = `Покупка ${validated.pack.energy} орбов энергии`;
+        description = `Покупка ${validated.pack.energy} звёзд`;
         amountRUB = packConfig.rub;
         energyAmount = validated.pack.energy;
       } else if (validated.kind === "subscription" && validated.tier) {
@@ -3304,7 +3303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const basePrice = basePrices[validated.tier];
         const totalPrice = Math.round(basePrice * periodMonths * discountMultiplier);
         
-        description = `Подписка ${validated.tier === 'standard' ? 'Standard (100 орбов/день)' : 'Pro (250 орбов/день)'} на ${periodLabel}`;
+        description = `Подписка ${validated.tier === 'standard' ? 'Standard (250 звёзд/мес)' : 'Pro (550 звёзд/мес)'} на ${periodLabel}`;
         amountRUB = totalPrice.toFixed(2);
         tier = validated.tier;
       } else {

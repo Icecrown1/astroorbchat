@@ -24,28 +24,29 @@ Preferred communication style: Simple, everyday language.
 - **Monetization System** (February 2026):
   - **Subscription Tiers**:
     - **Free**: Basic natal chart with short planet descriptions only. No orbs. All features grayed out and non-clickable.
-    - **Standard** (190₽/mo): 250 orbs/month. All features except Solar Return.
-    - **Premium** (349₽/mo): 550 orbs/month. All features including Solar Return.
-  - **Orb Costs** (ORB_COSTS in energy.ts):
-    - Oracle: 0.5 orbs
-    - Daily horoscope: 1 orb
-    - Planet/House interpretation: 2 orbs
-    - Important dates: 3 orbs
-    - Weekly horoscope: 5 orbs
-    - Monthly horoscope: 15 orbs
-    - Solar Return: 15 orbs (Premium only)
-    - Guest charts/Compatibility: 20 orbs
+    - **Standard** (199₽/mo): 250 stars/month. All features except Solar Return.
+    - **Premium** (399₽/mo): 550 stars/month. All features including Solar Return.
+  - **Star Costs** (ORB_COSTS in energy.ts):
+    - Oracle: 0.5 stars
+    - Daily horoscope: 1 star
+    - Planet/House interpretation: 2 stars
+    - Important dates: 3 stars
+    - Weekly horoscope: 5 stars
+    - Monthly horoscope: 15 stars
+    - Solar Return: 15 stars (Premium only)
+    - Guest charts/Compatibility: 20 stars
   - **Premium-Only Features**: Solar Return (`PREMIUM_ONLY_FEATURES` in energy.ts)
   - **Subscription Prices** (RUB):
-    - Standard: 190/mo, 159/mo (6-month), 119/mo (annual)
-    - Premium: 349/mo, 299/mo (6-month), 189/mo (annual)
-  - **Monthly Orb Reset**: Standard gets 250, Premium gets 550 orbs on the 1st of each month
+    - Standard: 199/mo, 159/mo (6-month), 99/mo (annual)
+    - Premium: 399/mo, 359/mo (6-month), 179/mo (annual)
+  - **Monthly Star Reset**: Standard gets 250, Premium gets 550 stars on the 1st of each month
   - **Database Fields**: `subscriptionOrbs`, `referralOrbs`, `orbsResetAt` in users table
+  - **UI Terminology**: "Stars" (EN) / "Звёзды" (RU) — internal code still uses "orbs" for variable names
 - **Referral System** (Tier-based rewards, February 2026):
   - Rewards triggered when invited friend PAYS for subscription
   - **Free users**: Referrer gets 7 days Standard + 3 days Premium
-  - **Standard users**: Referrer gets +10 orbs + subscription extension (3 days)
-  - **Premium users**: Referrer gets +20 orbs + subscription extension (3 days)
+  - **Standard users**: Referrer gets +10 stars + subscription extension (3 days)
+  - **Premium users**: Referrer gets +20 stars + subscription extension (3 days)
   - Rewards tracked in `referralRewards` table with `rewardKind` (orbs/subscription_days) and `subscriptionDays` fields
 
 ### System Design Choices

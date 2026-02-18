@@ -53,9 +53,9 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     nameRu: 'Стандарт',
     monthlyOrbs: 250,
     pricesRub: {
-      monthly: 190,
+      monthly: 199,
       semiannual: 159,
-      annual: 119,
+      annual: 99,
     },
     features: {
       ru: [
@@ -80,9 +80,9 @@ const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     nameRu: 'Премиум',
     monthlyOrbs: 550,
     pricesRub: {
-      monthly: 349,
-      semiannual: 299,
-      annual: 189,
+      monthly: 399,
+      semiannual: 359,
+      annual: 179,
     },
     features: {
       ru: [

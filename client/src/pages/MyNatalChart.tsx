@@ -404,7 +404,7 @@ export default function MyNatalChart() {
                           <Sparkles className="w-4 h-4 mr-2" />
                           {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
                           {tier === 'standard' && (
-                            <span className="ml-2 text-xs opacity-70">2 орба</span>
+                            <span className="ml-2 text-xs opacity-70">2 звезды</span>
                           )}
                         </Button>
                       ) : (
