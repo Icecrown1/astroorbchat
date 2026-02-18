@@ -17,6 +17,7 @@ import { translatePlanet, translateSign, translateSignPrepositional } from '@/li
 import { useToast } from '@/hooks/use-toast';
 import { queryClient } from '@/lib/queryClient';
 import { Loader } from './Loader';
+import { useEnergy } from '@/store/useEnergy';
 
 interface ImportantDateModalProps {
   event: ImportantEvent;
@@ -27,6 +28,7 @@ interface ImportantDateModalProps {
 export function ImportantDateModal({ event, open, onClose }: ImportantDateModalProps) {
   const { locale } = useTranslation();
   const { toast } = useToast();
+  const { decreaseOrbs } = useEnergy();
   const [interpretation, setInterpretation] = useState<ImportantDateInterpretation | null>(null);
 
   const formatDate = (dateStr: string) => {
@@ -93,6 +95,7 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
     },
     onSuccess: (data) => {
       setInterpretation(data);
+      decreaseOrbs(3);
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/important-dates'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({

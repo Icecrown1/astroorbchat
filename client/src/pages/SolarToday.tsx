@@ -12,11 +12,13 @@ import { ArrowLeft, Sun, Info, MapPin, Calendar } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 
 export default function SolarToday() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [solarData, setSolarData] = useState<any>(null);
   const [isCached, setIsCached] = useState(false);
   
@@ -67,6 +69,7 @@ export default function SolarToday() {
     onSuccess: (response) => {
       setSolarData(response.data);
       setIsCached(response.cached || false);
+      decreaseOrbs(15);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/solar/check'] });
       

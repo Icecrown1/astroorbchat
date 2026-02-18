@@ -14,6 +14,7 @@ import { CalendarRange, Lock, Calendar } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 import { useQuery } from '@tanstack/react-query';
 import {
   Accordion,
@@ -61,6 +62,7 @@ interface MonthlyPlanModalProps {
 export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [planData, setPlanData] = useState<MonthlyPlanData | null>(null);
   const [weeklyDetails, setWeeklyDetails] = useState<{ [key: number]: WeeklyPlanData }>({});
   const [loadingWeeks, setLoadingWeeks] = useState<Set<number>>(new Set());
@@ -80,6 +82,7 @@ export function MonthlyPlanModal({ open, onOpenChange }: MonthlyPlanModalProps) 
     },
     onSuccess: (data) => {
       setPlanData(data);
+      decreaseOrbs(15);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/horoscope/archive'] });
       toast({

@@ -12,6 +12,7 @@ import { ArrowLeft, Sparkles, Calendar, CalendarRange, Archive as ArchiveIcon } 
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 
 interface HoroscopeData {
   money: string;
@@ -26,6 +27,7 @@ export default function Horoscope() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [activeTab, setActiveTab] = useState<'day' | 'week' | 'month'>('day');
   const [horoscopeData, setHoroscopeData] = useState<HoroscopeData | null>(null);
   const [weeklyPlanOpen, setWeeklyPlanOpen] = useState(false);
@@ -42,6 +44,7 @@ export default function Horoscope() {
     },
     onSuccess: (data) => {
       setHoroscopeData(data);
+      decreaseOrbs(1);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: t.horoscope.generated,
@@ -166,6 +169,9 @@ export default function Horoscope() {
                 <p className="text-sm text-muted-foreground mb-6">
                   {t.horoscope.weeklyDescription || 'Получите подробный план на всю неделю с рекомендациями по каждому дню'}
                 </p>
+                <p className="text-sm text-primary font-medium mb-6">
+                  {t.horoscope.costWeekly}
+                </p>
                 <Button
                   variant="default"
                   size="lg"
@@ -187,6 +193,9 @@ export default function Horoscope() {
                 <h2 className="text-xl font-semibold mb-2">{t.horoscope.monthlyTitle}</h2>
                 <p className="text-sm text-muted-foreground mb-6">
                   {t.horoscope.monthlyDescription || 'Получите детальный прогноз на весь месяц с разбивкой по неделям'}
+                </p>
+                <p className="text-sm text-primary font-medium mb-6">
+                  {t.horoscope.costMonthly}
                 </p>
                 <Button
                   variant="default"

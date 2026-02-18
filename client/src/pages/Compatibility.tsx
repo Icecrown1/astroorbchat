@@ -17,6 +17,7 @@ import { ArrowLeft, Heart, HeartCrack, UserPlus, Users, Archive } from 'lucide-r
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
 import utc from 'dayjs/plugin/utc.js';
@@ -40,6 +41,7 @@ export default function Compatibility() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('new');
@@ -110,6 +112,7 @@ export default function Compatibility() {
     },
     onSuccess: (data) => {
       setCompatibilityData(data);
+      decreaseOrbs(20);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: t.compatibility.complete,

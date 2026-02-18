@@ -13,11 +13,13 @@ import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 
 export default function Ask() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [answer, setAnswer] = useState<string | null>(null);
 
   const askSchema = useMemo(() => z.object({
@@ -43,6 +45,7 @@ export default function Ask() {
     },
     onSuccess: (data) => {
       setAnswer(data.answer);
+      decreaseOrbs(0.5);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: t.ask.answerReceived,

@@ -10,6 +10,7 @@ import { UserPlus, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
+import { useEnergy } from '@/store/useEnergy';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
 import utc from 'dayjs/plugin/utc.js';
@@ -32,6 +33,7 @@ interface GuestChart {
 export function GuestChartForm() {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { decreaseOrbs } = useEnergy();
   const [formData, setFormData] = useState({
     name: '',
     gender: 'other' as 'male' | 'female' | 'other',
@@ -51,6 +53,7 @@ export function GuestChartForm() {
       return response.data;
     },
     onSuccess: () => {
+      decreaseOrbs(20);
       queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '', timezone: dayjs.tz.guess() });

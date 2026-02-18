@@ -13,6 +13,7 @@ import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap,
 import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useEnergy } from '@/store/useEnergy';
 
 interface BriefInterpretation {
   title: string;
@@ -51,6 +52,7 @@ interface PlanetModalProps {
 export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: PlanetModalProps) {
   const { locale } = useTranslation();
   const { toast } = useToast();
+  const { decreaseOrbs } = useEnergy();
   const [isOpen, setIsOpen] = useState(false);
   const [detailedData, setDetailedData] = useState<DetailedInterpretation | null>(null);
   const [houseInfluence, setHouseInfluence] = useState<HouseInfluenceResult | null>(null);
@@ -113,6 +115,7 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
     onSuccess: (result) => {
       if (result.requestedPlanet !== planet) return;
       setDetailedData(result.data);
+      decreaseOrbs(2);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Подробная трактовка получена' : 'Detailed interpretation received',
@@ -154,6 +157,9 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
     onSuccess: (result: { data: HouseInfluenceResult; requestedPlanet: string; cached?: boolean }) => {
       if (result.requestedPlanet !== planet) return;
       setHouseInfluence(result.data);
+      if (!result.cached) {
+        decreaseOrbs(2);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/astrology/house-influence-status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
