@@ -1,13 +1,14 @@
 import { Switch, Route, useLocation } from 'wouter';
 import { useEffect } from 'react';
 import { queryClient } from './lib/queryClient';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { initTelegram } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
+import { useEnergy } from '@/store/useEnergy';
 import NotFound from '@/pages/not-found';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -78,14 +79,49 @@ function Router() {
   );
 }
 
+function EnergySyncProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const { setOrbs, setMaxOrbs, setTier, setResetAt, setEnergy } = useEnergy();
+
+  const { data } = useQuery<any>({
+    queryKey: ['/api/user/me'],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+
+  useEffect(() => {
+    if (data?.ok && data.data) {
+      if (data.data.orbs !== undefined) {
+        setOrbs(data.data.orbs);
+      }
+      if (data.data.maxOrbs !== undefined) {
+        setMaxOrbs(data.data.maxOrbs);
+      }
+      if (data.data.tier) {
+        setTier(data.data.tier);
+      }
+      if (data.data.orbsResetAt) {
+        setResetAt(new Date(data.data.orbsResetAt));
+      }
+      if (data.data.energy !== undefined) {
+        setEnergy(data.data.energy);
+      }
+    }
+  }, [data, setOrbs, setMaxOrbs, setTier, setResetAt, setEnergy]);
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LocaleProvider>
         <TonConnectUIProvider manifestUrl={manifestUrl}>
           <TooltipProvider>
-            <Toaster />
-            <Router />
+            <EnergySyncProvider>
+              <Toaster />
+              <Router />
+            </EnergySyncProvider>
           </TooltipProvider>
         </TonConnectUIProvider>
       </LocaleProvider>
