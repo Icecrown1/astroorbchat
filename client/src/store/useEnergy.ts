@@ -25,21 +25,19 @@ export const useEnergy = create<OrbsState>((set) => ({
   tier: 'free',
   resetAt: null,
   
-  setOrbs: (orbs) => set({ orbs, energy: orbs }),
+  setOrbs: (orbs) => set({ orbs }),
   setMaxOrbs: (maxOrbs) => set({ maxOrbs }),
   setTier: (tier) => set({ tier }),
   setResetAt: (date) => set({ resetAt: date }),
   decreaseOrbs: (amount) => set((state) => ({ 
     orbs: Math.max(0, state.orbs - amount),
-    energy: Math.max(0, state.energy - amount)
   })),
   
-  // Legacy compatibility
+  // Legacy compatibility - does NOT override orbs
   energy: 0,
-  setEnergy: (energy) => set({ energy, orbs: energy }),
+  setEnergy: (energy) => set({ energy }),
   decreaseEnergy: (amount) => set((state) => ({ 
     energy: Math.max(0, state.energy - amount),
-    orbs: Math.max(0, state.orbs - amount)
   })),
 }));
 

@@ -85,7 +85,7 @@ export function GuestChartForm() {
               {locale === 'ru' ? 'Создать гостевую карту' : 'Create Guest Chart'}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {locale === 'ru' ? 'Для анализа совместимости (1 звезда)' : 'For compatibility analysis (1 star)'}
+              {locale === 'ru' ? 'Для анализа совместимости (20 звёзд)' : 'For compatibility analysis (20 stars)'}
             </p>
           </div>
         </div>
@@ -199,7 +199,7 @@ export function GuestChartForm() {
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                {locale === 'ru' ? 'Создать карту (1 звезда)' : 'Create Chart (1 star)'}
+                {locale === 'ru' ? 'Создать карту (20 звёзд)' : 'Create Chart (20 stars)'}
               </>
             )}
           </Button>
