@@ -801,15 +801,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/energy", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      await checkAndResetEnergy(storage, userId);
-      
-      const user = await storage.getUser(userId);
+      const { getUserOrbs } = await import('./lib/energy.js');
+      const orbInfo = await getUserOrbs(storage, userId);
 
       res.json({
         ok: true,
         data: {
-          energy: user ? (user.freeEnergy + user.purchasedEnergy) : 0,
-          resetAt: user?.energyResetAt || new Date(),
+          energy: orbInfo.total,
+          resetAt: (await storage.getUser(userId))?.orbsResetAt || new Date(),
         },
       });
     } catch (error: any) {
@@ -1265,24 +1264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const house = findHouse(planetData.longitude);
 
       // ПЛАТНО: Проверяем и списываем энергию (для обеих типов карт)
-      await checkAndResetEnergy(storage, userId);
-      const userForEnergy = await storage.getUser(userId);
-      if (!userForEnergy) {
-        return res.status(404).json({ ok: false, error: "User not found" });
-      }
-
-      const cost = ENERGY_COSTS.house_influence;
-      const totalEnergy = userForEnergy.freeEnergy + userForEnergy.purchasedEnergy;
-      if (totalEnergy < cost) {
-        return res.status(402).json({ 
-          ok: false, 
-          error: "Insufficient energy",
-          required: cost,
-          available: totalEnergy
-        });
-      }
-
-      // Списываем энергию
+      // Списываем звёзды
       const deductResult = await deductEnergy(storage, userId, "house_influence");
       if (!deductResult.ok) {
         return res.status(402).json({ ok: false, error: deductResult.error });
@@ -1537,8 +1519,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[HOROSCOPE] Request started - userId:', userId, 'locale:', locale);
 
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
@@ -1550,11 +1530,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!natalChart || !natalChart.data) {
         console.log('[HOROSCOPE] ERROR: NATAL_NOT_INITIALIZED');
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
-      }
-
-      const cost = ENERGY_COSTS.horoscope;
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(402).json({ ok: false, error: "Insufficient energy" });
       }
 
       console.log('[HOROSCOPE] Calling interpretHoroscope...');
@@ -1603,9 +1578,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[HOROSCOPE] Saved to database');
 
-      // Only deduct energy after successful execution
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: "horoscope", cost });
+      // Deduct stars after successful execution
+      const deductResult = await deductEnergy(storage, userId, 'horoscope');
+      if (!deductResult.ok) {
+        console.log('[HOROSCOPE] Failed to deduct stars:', deductResult.error);
+      }
 
       console.log('[HOROSCOPE] Request completed successfully');
 
@@ -1629,15 +1606,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[WEEKLY_PLAN] User ID:', userId);
       console.log('[WEEKLY_PLAN] Request body:', { week_start_iso, week_end_iso, locale });
 
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         console.log('[WEEKLY_PLAN] User not found');
         return res.status(404).json({ ok: false, error: "User not found" });
       }
-
-      console.log('[WEEKLY_PLAN] User energy:', (user.freeEnergy + user.purchasedEnergy));
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
@@ -1647,21 +1620,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[WEEKLY_PLAN] Natal chart exists');
-
-      // Check subscription status (CRITICAL: check expiry first!)
-      const subscription = await checkSubscriptionExpiry(storage, userId);
-      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'canceled';
-
-      console.log('[WEEKLY_PLAN] Has active subscription:', hasActiveSubscription);
-
-      // Subscribers get it free, others pay 1 orb
-      if (!hasActiveSubscription) {
-        const cost = ENERGY_COSTS.weekly_plan;
-        if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-          console.log('[WEEKLY_PLAN] Insufficient energy:', (user.freeEnergy + user.purchasedEnergy), '< cost:', cost);
-          return res.status(402).json({ ok: false, error: "Insufficient energy" });
-        }
-      }
 
       // Calculate week start (always Monday of current week if not provided)
       let weekStart = week_start_iso;
@@ -1725,12 +1683,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: result,
       });
 
-      // Deduct energy only if not subscriber
-      if (!hasActiveSubscription) {
-        const cost = ENERGY_COSTS.weekly_plan;
-        await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-        await storage.createUsageLog({ userId, feature: "weekly_plan", cost });
-        console.log('[WEEKLY_PLAN] Energy deducted:', cost);
+      // Deduct stars after successful execution
+      const weeklyDeductResult = await deductEnergy(storage, userId, 'weekly_plan');
+      if (!weeklyDeductResult.ok) {
+        console.log('[WEEKLY_PLAN] Failed to deduct stars:', weeklyDeductResult.error);
+      } else {
+        console.log('[WEEKLY_PLAN] Stars deducted successfully');
       }
 
       res.json({
@@ -1753,15 +1711,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[MONTHLY_PLAN] User ID:', userId);
       console.log('[MONTHLY_PLAN] Request body:', { month_iso, locale });
 
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         console.log('[MONTHLY_PLAN] User not found');
         return res.status(404).json({ ok: false, error: "User not found" });
       }
-
-      console.log('[MONTHLY_PLAN] User energy:', (user.freeEnergy + user.purchasedEnergy));
 
       // Check if natal chart exists in database
       const natalChart = await storage.getNatalChart(userId);
@@ -1771,21 +1725,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[MONTHLY_PLAN] Natal chart exists');
-
-      // Check subscription status (CRITICAL: check expiry first!)
-      const subscription = await checkSubscriptionExpiry(storage, userId);
-      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'canceled';
-
-      console.log('[MONTHLY_PLAN] Has active subscription:', hasActiveSubscription);
-
-      // Subscribers get it free, others pay 1 orb
-      if (!hasActiveSubscription) {
-        const cost = ENERGY_COSTS.monthly_plan;
-        if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-          console.log('[MONTHLY_PLAN] Insufficient energy:', (user.freeEnergy + user.purchasedEnergy), '< cost:', cost);
-          return res.status(402).json({ ok: false, error: "Insufficient energy" });
-        }
-      }
 
       // Calculate month start (always first day of current month)
       let monthStart = month_iso;
@@ -1845,12 +1784,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: result,
       });
 
-      // Deduct energy only if not subscriber
-      if (!hasActiveSubscription) {
-        const cost = ENERGY_COSTS.monthly_plan;
-        await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-        await storage.createUsageLog({ userId, feature: "monthly_plan", cost });
-        console.log('[MONTHLY_PLAN] Energy deducted:', cost);
+      // Deduct stars after successful execution
+      const monthlyDeductResult = await deductEnergy(storage, userId, 'monthly_plan');
+      if (!monthlyDeductResult.ok) {
+        console.log('[MONTHLY_PLAN] Failed to deduct stars:', monthlyDeductResult.error);
+      } else {
+        console.log('[MONTHLY_PLAN] Stars deducted successfully');
       }
 
       res.json({
@@ -1927,8 +1866,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { partner, professional = false, relationshipType = 'romantic', guestChartId } = req.body;
       const locale = req.body.locale || 'en';
 
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
@@ -1956,14 +1893,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           needsNewGuestChart = true;
         }
-      }
-
-      // Calculate cost based on whether we need to create a guest chart
-      const baseCost = professional ? ENERGY_COSTS.compatibility_professional : ENERGY_COSTS.compatibility;
-      const cost = needsNewGuestChart ? baseCost + 2 : baseCost;
-      
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
       // Execute the reading using Swiss Ephemeris for both charts
@@ -2158,10 +2087,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         houseOverlays: houseOverlays as any,
       });
 
-      // Only deduct energy after successful execution
-      const featureName = professional ? "compatibility_professional" : "compatibility";
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: featureName, cost });
+      // Deduct stars after successful execution
+      const compatFeatureName = professional ? "compatibility_professional" : "compatibility";
+      const compatDeductResult = await deductEnergy(storage, userId, compatFeatureName);
+      if (!compatDeductResult.ok) {
+        console.log('[COMPATIBILITY] Failed to deduct stars:', compatDeductResult.error);
+      }
 
       const strengths = locale === 'ru' ? [
         "Сильная эмоциональная связь и понимание",
@@ -2204,8 +2135,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { question } = req.body;
       const locale = req.body.locale || 'en';
 
-      // Check energy first (without deducting)
-      await checkAndResetEnergy(storage, userId);
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
@@ -2215,11 +2144,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const natalChart = await storage.getNatalChart(userId);
       if (!natalChart || !natalChart.data) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
-      }
-
-      const cost = ENERGY_COSTS.ask;
-      if ((user.freeEnergy + user.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
 
       // Execute the reading using full natal chart data as foundation
@@ -2234,9 +2158,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         answer,
       });
 
-      // Only deduct energy after successful execution
-      await storage.updateUser(userId, { purchasedEnergy: user.purchasedEnergy - cost });
-      await storage.createUsageLog({ userId, feature: "ask", cost });
+      // Deduct stars after successful execution
+      const askDeductResult = await deductEnergy(storage, userId, 'ask');
+      if (!askDeductResult.ok) {
+        console.log('[ASK] Failed to deduct stars:', askDeductResult.error);
+      }
 
       res.json({ ok: true, data: { answer } });
     } catch (error: any) {
@@ -2461,18 +2387,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!sunSign) {
         return res.status(400).json({ ok: false, error: "Could not determine Sun sign from natal chart" });
-      }
-      
-      // Check energy cost (2 orbs for new interpretation)
-      await checkAndResetEnergy(storage, userId);
-      const userAfterReset = await storage.getUser(userId);
-      if (!userAfterReset) {
-        return res.status(404).json({ ok: false, error: "User not found" });
-      }
-      
-      const cost = 2;  // 2 orbs for important date interpretation
-      if ((userAfterReset.freeEnergy + userAfterReset.purchasedEnergy) < cost) {
-        return res.status(400).json({ ok: false, error: "Insufficient energy" });
       }
       
       // Generate AI interpretation
