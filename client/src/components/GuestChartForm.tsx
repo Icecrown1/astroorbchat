@@ -11,14 +11,6 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
-import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone.js';
-import utc from 'dayjs/plugin/utc.js';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
-
-const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
 interface GuestChart {
   id: string;
@@ -27,7 +19,6 @@ interface GuestChart {
   birthdayDate: string;
   birthTime?: string | null;
   birthPlace?: string | null;
-  timezone?: string | null;
 }
 
 export function GuestChartForm() {
@@ -40,7 +31,6 @@ export function GuestChartForm() {
     birthdayDate: '',
     birthTime: '12:00',
     birthPlace: '',
-    timezone: dayjs.tz.guess(),
   });
 
   const { data: guestCharts, isLoading: chartsLoading } = useQuery<{ ok: boolean; data: GuestChart[] }>({
@@ -56,7 +46,7 @@ export function GuestChartForm() {
       decreaseOrbs(20);
       queryClient.invalidateQueries({ queryKey: ['/api/natal/external'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '', timezone: dayjs.tz.guess() });
+      setFormData({ name: '', gender: 'other', birthdayDate: '', birthTime: '12:00', birthPlace: '' });
       toast({
         title: locale === 'ru' ? "Гостевая карта создана!" : "Guest chart created!",
         description: locale === 'ru' ? "Карта сохранена и доступна для анализа совместимости." : "Chart saved and available for compatibility analysis.",
@@ -164,27 +154,6 @@ export function GuestChartForm() {
             />
           </div>
 
-          <div>
-            <Label htmlFor="guest-timezone">
-              {locale === 'ru' ? 'Часовой пояс' : 'Timezone'}
-            </Label>
-            <Select
-              value={formData.timezone}
-              onValueChange={(value) => setFormData({ ...formData, timezone: value })}
-            >
-              <SelectTrigger id="guest-timezone" data-testid="select-guest-timezone">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIMEZONES.map((tz) => (
-                  <SelectItem key={tz} value={tz}>
-                    {tz}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <Button
             onClick={() => createMutation.mutate()}
             disabled={!isFormValid || createMutation.isPending}
@@ -224,7 +193,6 @@ export function GuestChartForm() {
                     {new Date(chart.birthdayDate).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US')}
                     {chart.birthTime && ` • ${chart.birthTime}`}
                     {chart.birthPlace && ` • ${chart.birthPlace}`}
-                    {chart.timezone && ` • ${chart.timezone}`}
                   </p>
                 </div>
               </div>

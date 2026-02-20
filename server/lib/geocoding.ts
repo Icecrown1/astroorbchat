@@ -5,6 +5,7 @@
  */
 
 import { findCityCoordinates, CityCoordinates } from './cities';
+import { find as findTimezone } from 'geo-tz';
 
 /**
  * Получает координаты города
@@ -75,4 +76,18 @@ export async function geocodeCityWithFallback(cityName: string | null): Promise<
   // Fallback на Москву
   console.log(`[Geocoding] Using Moscow as fallback for: ${cityName || 'unknown'}`);
   return { lat: 55.7558, lon: 37.6173 };
+}
+
+export async function getTimezoneFromCity(cityName: string | null): Promise<string> {
+  const coords = await geocodeCityWithFallback(cityName);
+  try {
+    const timezones = findTimezone(coords.lat, coords.lon);
+    if (timezones && timezones.length > 0) {
+      console.log(`[Geocoding] Timezone for ${cityName || 'unknown'}: ${timezones[0]}`);
+      return timezones[0];
+    }
+  } catch (error) {
+    console.error(`[Geocoding] Error finding timezone for coords:`, error);
+  }
+  return 'Europe/Moscow';
 }

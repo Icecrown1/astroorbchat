@@ -23,16 +23,6 @@ import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { getInitData, getReferralCode, getLeadIdFromStartParam } from '@/lib/telegram';
-import { formatTimezoneWithOffset } from '@/lib/timezone';
-import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone.js';
-import utc from 'dayjs/plugin/utc.js';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
-
-const TIMEZONES = Intl.supportedValuesOf('timeZone');
-
 interface LeadData {
   id: string;
   name: string;
@@ -40,7 +30,6 @@ interface LeadData {
   birthDate: string;
   birthTime: string | null;
   birthPlace: string | null;
-  timezone: string;
 }
 
 export default function Register() {
@@ -236,7 +225,6 @@ export default function Register() {
                 birthDate: lead.birthDate,
                 birthTime: lead.birthTime,
                 birthPlace: lead.birthPlace,
-                timezone: lead.timezone,
               });
               
               toast({
@@ -281,9 +269,6 @@ export default function Register() {
     birthPlace: z.string().min(1, locale === 'ru' ? 'Место рождения обязательно' : 'Birth place is required'),
   }), [locale]);
 
-  const step3Schema = useMemo(() => z.object({
-    timezone: z.string().min(1, locale === 'ru' ? 'Часовой пояс обязателен' : 'Timezone is required'),
-  }), [locale]);
 
   const step1Form = useForm({
     resolver: zodResolver(step1Schema),
@@ -302,12 +287,6 @@ export default function Register() {
     },
   });
 
-  const step3Form = useForm({
-    resolver: zodResolver(step3Schema),
-    defaultValues: {
-      timezone: dayjs.tz.guess(),
-    },
-  });
 
   // Pre-fill forms when lead data is loaded
   useEffect(() => {
@@ -324,26 +303,19 @@ export default function Register() {
       step2Form.setValue('birthTime', leadData.birthTime || '');
       step2Form.setValue('birthPlace', leadData.birthPlace || '');
       
-      // Step 3: timezone
-      step3Form.setValue('timezone', leadData.timezone);
     }
-  }, [leadData, step1Form, step2Form, step3Form]);
+  }, [leadData, step1Form, step2Form]);
 
   const handleStep1 = (data: any) => {
     setFormData({ ...formData, ...data });
     setStep(2);
   };
 
-  const handleStep2 = (data: any) => {
-    setFormData({ ...formData, ...data });
-    setStep(3);
-  };
-
-  const handleStep3 = async (data: any) => {
+  const handleStep2 = async (data: any) => {
     const finalData = {
       ...formData,
       ...data,
-      ...(referralCode && { referralCode }), // Add referral code if present
+      ...(referralCode && { referralCode }),
     };
 
     try {
@@ -432,7 +404,7 @@ export default function Register() {
     }
   };
 
-  const progress = (step / 3) * 100;
+  const progress = (step / 2) * 100;
 
   // Show loading while checking Telegram context
   if (isCheckingTelegram) {
@@ -461,7 +433,7 @@ export default function Register() {
             {t.auth.welcomeDefault}
           </h1>
           <p className="text-center text-muted-foreground">
-            {t.common.next} {step} {t.common.back} 3
+            {t.common.next} {step} {t.common.back} 2
           </p>
         </div>
 
@@ -563,46 +535,6 @@ export default function Register() {
                 onClick={() => setStep(1)}
                 className="flex-1"
                 data-testid="button-back-step2"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t.common.back}
-              </Button>
-              <Button type="submit" className="flex-1" data-testid="button-next-step2">
-                {t.common.next}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {step === 3 && (
-          <form onSubmit={step3Form.handleSubmit(handleStep3)} className="space-y-4">
-            <div>
-              <Label htmlFor="timezone">{locale === 'ru' ? 'Часовой пояс' : 'Timezone'}</Label>
-              <Select
-                onValueChange={(value) => step3Form.setValue('timezone', value)}
-                defaultValue={dayjs.tz.guess()}
-              >
-                <SelectTrigger id="timezone" data-testid="select-timezone">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {formatTimezoneWithOffset(tz)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStep(2)}
-                className="flex-1"
-                data-testid="button-back-step3"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 {t.common.back}

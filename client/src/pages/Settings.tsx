@@ -23,12 +23,7 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import { Locale } from '@/lib/translations';
 import type { User, Subscription } from '@shared/schema';
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone.js';
 import { useEffect, useMemo } from 'react';
-
-dayjs.extend(timezone);
-
-const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
 interface UserMeResponse {
   ok: boolean;
@@ -77,7 +72,6 @@ export default function Settings() {
         message: locale === 'ru' ? 'Формат: ЧЧ:ММ (например, 14:30)' : 'Format: HH:MM (e.g., 14:30)'
       }),
     birthPlace: z.string().optional(),
-    timezone: z.string(),
   }), [locale]);
 
   const form = useForm({
@@ -89,7 +83,6 @@ export default function Settings() {
       birthdayDate: '',
       birthTime: '',
       birthPlace: '',
-      timezone: dayjs.tz.guess(),
     },
   });
 
@@ -104,7 +97,6 @@ export default function Settings() {
         birthdayDate: userData.birthdayDate ? dayjs(userData.birthdayDate).format('YYYY-MM-DD') : '',
         birthTime: userData.birthTime || '',
         birthPlace: userData.birthPlace || '',
-        timezone: userData.timezone || dayjs.tz.guess(),
       });
     }
   }, [data, form.reset]);
@@ -271,25 +263,6 @@ export default function Settings() {
                 placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
                 data-testid="input-birthplace"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="timezone">{locale === 'ru' ? 'Часовой пояс' : 'Timezone'}</Label>
-              <Select
-                onValueChange={(value) => form.setValue('timezone', value)}
-                value={form.watch('timezone')}
-              >
-                <SelectTrigger id="timezone" data-testid="select-timezone">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <Button

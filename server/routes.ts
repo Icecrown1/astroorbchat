@@ -24,7 +24,7 @@ import { getAstrologyInterpretation, getPlanetInterpretation, getHouseInfluence,
 import { calculateNatalChartPython, calculateSolarReturnTime, calculateTransits, mapTransitsToNatalHouses, type NatalChartResult } from "./lib/pythonNatal";
 import { ensureUserNatalChart, computeNatalFromUser, recomputeIfProfileChanged, ensureNatalInterpretation } from "./lib/natalService";
 import { findImportantEvents, extractNatalPlanets, getImportantDatesWithLunarPhases } from "./lib/transits";
-import { geocodeCityWithFallback } from "./lib/geocoding";
+import { geocodeCityWithFallback, getTimezoneFromCity } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createPayment as createYooKassaPayment, getPayment as getYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
@@ -60,7 +60,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/telegram", async (req, res) => {
     try {
-      const { initData, name, gender, birthdayDate, birthTime, birthPlace, timezone } = req.body;
+      const { initData, name, gender, birthdayDate, birthTime, birthPlace } = req.body;
+      const timezone = birthPlace ? await getTimezoneFromCity(birthPlace) : "Europe/Moscow";
 
       // Check if test auth is allowed
       const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
@@ -197,7 +198,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Request body:', req.body);
     
     try {
-      const { telegramId, firstName, lastName, username, name, gender, age, birthdayDate, birthTime, birthPlace, timezone, referralCode: inputReferralCode } = req.body;
+      const { telegramId, firstName, lastName, username, name, gender, age, birthdayDate, birthTime, birthPlace, referralCode: inputReferralCode } = req.body;
+      const resolvedTimezone = birthPlace ? await getTimezoneFromCity(birthPlace) : "Europe/Moscow";
       
       // Use provided telegramId or default to '999999999' for dev mode
       const testTgId = telegramId || '999999999';
@@ -206,7 +208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let user = await storage.getUserByTgId(testTgId);
 
       if (!user) {
-        // Create new user only if doesn't exist
         const referralCode = generateReferralCode();
         const displayName = firstName || name || "Dev User";
         
@@ -219,10 +220,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthdayDate: new Date(birthdayDate || new Date()),
           birthTime: birthTime || null,
           birthPlace: birthPlace || null,
-          timezone: timezone || "Europe/Moscow",
+          timezone: resolvedTimezone,
           referralCode,
           freeEnergy: 10,
-          energyResetAt: getNextResetTime(timezone || "Europe/Moscow"),
+          energyResetAt: getNextResetTime(resolvedTimezone),
         };
 
         user = await storage.createUser(newUser);
@@ -427,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/user/update", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { name, gender, age, birthdayDate, birthTime, birthPlace, timezone } = req.body;
+      const { name, gender, age, birthdayDate, birthTime, birthPlace } = req.body;
 
       // Get current user to check last profile update
       const currentUser = await storage.getUser(userId);
@@ -448,6 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const resolvedTimezone = birthPlace ? await getTimezoneFromCity(birthPlace) : (currentUser?.timezone || "Europe/Moscow");
       const user = await storage.updateUser(userId, {
         name,
         gender,
@@ -455,7 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthdayDate: new Date(birthdayDate),
         birthTime,
         birthPlace,
-        timezone,
+        timezone: resolvedTimezone,
         lastProfileUpdate: new Date(),
       });
 
@@ -557,12 +559,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // IMPORTANT: Credit subscription energy immediately (add to existing balance)
-      const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+      // Credit subscription orbs using the new system
+      const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+      const subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[tier as keyof typeof SUBSCRIPTION_MONTHLY_ORBS] || 250;
       const user = await storage.getUser(userId);
       if (user) {
         await storage.updateUser(userId, {
-          purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
+          subscriptionOrbs: subscriptionOrbs.toString(),
+          orbsResetAt: dayjs().add(30, 'days').toDate(),
         });
       }
       
@@ -665,7 +669,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthdayDate: z.string(),
         birthTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
         birthPlace: z.string().optional().nullable(),
-        timezone: z.string().default("Europe/Moscow"),
         locale: z.string().default("ru"),
       });
       
@@ -693,8 +696,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Geocode birth city to get coordinates
       const coords = await geocodeCityWithFallback(data.birthPlace || null);
       
-      // Convert local time to UTC for Swiss Ephemeris
-      const userTimezone = data.timezone || 'UTC';
+      // Auto-resolve timezone from birth place
+      const userTimezone = await getTimezoneFromCity(data.birthPlace || null);
       const localDateTimeStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(localHours).padStart(2, '0')}:${String(localMinutes).padStart(2, '0')}:00`;
       const localDateTime = dayjs.tz(localDateTimeStr, userTimezone);
       const utcDateTime = localDateTime.utc();
@@ -729,7 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthdayDate: new Date(data.birthdayDate),
         birthTime: data.birthTime || null,
         birthPlace: data.birthPlace || null,
-        timezone: data.timezone,
+        timezone: userTimezone,
         data: natalData,
       });
       
@@ -1952,8 +1955,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Geocode partner's birth city to get coordinates
         const partnerCoords = await geocodeCityWithFallback(partner.place);
         
-        // Convert local time to UTC for Swiss Ephemeris (use UTC as default timezone for partner)
-        const partnerTimezone = partner.timezone || 'UTC';
+        // Auto-resolve timezone from partner's birth place
+        const partnerTimezone = await getTimezoneFromCity(partner.place);
         const partnerLocalDateTimeStr = `${partnerYear}-${String(partnerMonth).padStart(2, '0')}-${String(partnerDay).padStart(2, '0')} ${String(partnerLocalHours).padStart(2, '0')}:${String(partnerLocalMinutes).padStart(2, '0')}:00`;
         const partnerLocalDateTime = dayjs.tz(partnerLocalDateTimeStr, partnerTimezone);
         const partnerUtcDateTime = partnerLocalDateTime.utc();
@@ -1969,7 +1972,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           house_system: 'Placidus',
         });
 
-        // Create guest chart
         const newGuestChart = await storage.createExternalNatal({
           ownerId: userId,
           name: partner.name,
@@ -1977,7 +1979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           birthdayDate: new Date(partner.date),
           birthTime: partner.time || null,
           birthPlace: partner.place || null,
-          timezone: partner.timezone || 'UTC',
+          timezone: partnerTimezone,
           data: person2ChartData as any,
         });
         finalGuestChartId = newGuestChart.id;

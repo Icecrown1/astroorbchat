@@ -236,8 +236,8 @@ export default function SolarToday() {
                 />
                 <p className="text-xs text-muted-foreground">
                   {locale === 'ru' 
-                    ? 'Укажите город, где вы планируете быть в день рождения. Это влияет на расчет часового пояса.' 
-                    : 'Enter the city where you plan to be on your birthday. This affects timezone calculation.'}
+                    ? 'Укажите город, где вы планируете быть в день рождения. Это влияет на расчёт карты.' 
+                    : 'Enter the city where you plan to be on your birthday. This affects chart calculation.'}
                 </p>
               </div>
             </div>

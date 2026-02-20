@@ -19,13 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone.js';
-import utc from 'dayjs/plugin/utc.js';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
-
-const TIMEZONES = Intl.supportedValuesOf('timeZone');
 
 interface GuestChart {
   id: string;
@@ -34,7 +27,6 @@ interface GuestChart {
   birthdayDate: string;
   birthTime?: string | null;
   birthPlace?: string | null;
-  timezone?: string | null;
 }
 
 export default function Compatibility() {
@@ -56,7 +48,6 @@ export default function Compatibility() {
     partnerDate: z.string().min(1, locale === 'ru' ? 'Дата рождения партнера обязательна' : 'Partner birth date is required'),
     partnerTime: z.string().regex(/^\d{2}:\d{2}$/).optional().or(z.literal('')),
     partnerPlace: z.string().optional(),
-    partnerTimezone: z.string().optional(),
     relationshipType: z.enum(['romantic', 'friendship', 'work', 'family']),
   }), [locale]);
 
@@ -68,7 +59,6 @@ export default function Compatibility() {
       partnerDate: '',
       partnerTime: '',
       partnerPlace: '',
-      partnerTimezone: 'UTC',
       relationshipType: 'romantic' as 'romantic' | 'friendship' | 'work' | 'family',
     },
   });
@@ -102,7 +92,6 @@ export default function Compatibility() {
           date: data.partnerDate,
           time: data.partnerTime || null,
           place: data.partnerPlace || null,
-          timezone: data.partnerTimezone || 'UTC',
         },
         relationshipType: data.relationshipType,
         guestChartId: selectedGuestId,
@@ -207,7 +196,6 @@ export default function Compatibility() {
                         form.setValue('partnerDate', formattedDate);
                         form.setValue('partnerTime', chart.birthTime || '');
                         form.setValue('partnerPlace', chart.birthPlace || '');
-                        form.setValue('partnerTimezone', chart.timezone || 'UTC');
                       }}
                       data-testid={`button-select-guest-${chart.id}`}
                     >
@@ -303,25 +291,6 @@ export default function Compatibility() {
                   placeholder={t.compatibility.placePlaceholder}
                   data-testid="input-partner-place"
                 />
-              </div>
-
-              <div>
-                <Label htmlFor="partnerTimezone">{locale === 'ru' ? 'Часовой пояс партнера' : 'Partner Timezone'}</Label>
-                <Select
-                  value={form.watch('partnerTimezone')}
-                  onValueChange={(value) => form.setValue('partnerTimezone', value)}
-                >
-                  <SelectTrigger id="partnerTimezone" data-testid="select-partner-timezone">
-                    <SelectValue placeholder={locale === 'ru' ? 'Выберите часовой пояс' : 'Select timezone'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMEZONES.map((tz) => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div>
