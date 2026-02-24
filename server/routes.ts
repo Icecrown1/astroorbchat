@@ -2677,7 +2677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const createPaymentSchema = z.object({
     kind: z.enum(["energy_pack", "subscription"]),
-    tier: z.enum(["standard", "pro"]).optional(),
+    tier: z.enum(["standard", "pro", "premium"]).optional(),
     energyAmount: z.number().optional(),
     amountUSD: z.number(),
     userWalletAddress: z.string().optional(), // TON wallet address of sender
@@ -2718,10 +2718,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAddress: normalizedUserAddress
       });
       
+      const normalizedPaymentTier = validated.tier ? ((validated.tier === 'premium' || validated.tier === 'pro') ? 'pro' : 'standard') : null;
       const payment = await storage.createPayment({
         userId,
         kind: validated.kind,
-        tier: validated.tier || null,
+        tier: normalizedPaymentTier,
         energyAmount: validated.energyAmount || null,
         amountUSD: validated.amountUSD.toString(),
         amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
@@ -2925,7 +2926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const updateSubscriptionSchema = z.object({
-    tier: z.enum(["standard", "pro"]),
+    tier: z.enum(["standard", "pro", "premium"]),
     status: z.enum(["active", "canceled", "expired"]),
   });
 
@@ -3016,10 +3017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else if (payment.kind === "subscription" && payment.tier) {
-        // Validate tier is correct type
-        if (payment.tier !== "standard" && payment.tier !== "pro") {
-          return res.status(400).json({ ok: false, error: "Invalid subscription tier" });
-        }
+        const normalizedTier = (payment.tier === 'premium' || payment.tier === 'pro') ? 'pro' : 'standard';
         
         const startedAt = new Date();
         const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
@@ -3028,14 +3026,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (existingSub) {
           await storage.updateSubscription(existingSub.id, {
-            tier: payment.tier,
+            tier: normalizedTier,
             status: "active",
             currentPeriodEnd,
           });
         } else {
           await storage.createSubscription({
             userId: payment.userId,
-            tier: payment.tier,
+            tier: normalizedTier,
             status: "active",
             startedAt,
             currentPeriodEnd,
@@ -3044,12 +3042,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await handleSubscriptionReferralBonus(storage, payment.userId);
         
-        // IMPORTANT: Credit subscription energy immediately (add to existing balance)
-        const subscriptionEnergy = payment.tier === 'standard' ? 100 : 250;
+        // Credit subscription orbs using the new system
+        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+        const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
+        const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
         const user = await storage.getUser(payment.userId);
         if (user) {
           await storage.updateUser(payment.userId, {
-            purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
+            subscriptionOrbs: monthlyOrbs.toString(),
+            orbsResetAt: dayjs().add(30, 'days').toDate(),
           });
         }
       }
@@ -3066,7 +3067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     pack: z.object({
       energy: z.number().refine(val => [20, 50, 120].includes(val))
     }).optional(),
-    tier: z.enum(["standard", "pro"]).optional(),
+    tier: z.enum(["standard", "pro", "premium"]).optional(),
     periodMonths: z.number().refine(val => [1, 6, 12].includes(val)).optional(), // Subscription period
     autoRenew: z.boolean().optional(), // Auto-renewal for subscriptions
     customerEmail: z.string().email().optional().nullable(),
@@ -3188,30 +3189,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         energyAmount = validated.pack.energy;
       } else if (validated.kind === "subscription" && validated.tier) {
         const periodMonths = validated.periodMonths || 1;
+        const normalizedTier = (validated.tier === 'premium' || validated.tier === 'pro') ? 'premium' : 'standard';
         
-        // Base monthly prices in RUB
-        const basePrices = {
-          standard: 1200, // $12 ≈ 1200₽
-          pro: 1800,      // $18 ≈ 1800₽
+        const subscriptionPricesPerMonth: Record<string, Record<number, number>> = {
+          standard: { 1: 199, 6: 159, 12: 99 },
+          premium:  { 1: 399, 6: 359, 12: 179 },
         };
         
-        // Calculate discount based on period
-        let discountMultiplier = 1;
+        const tierPrices = subscriptionPricesPerMonth[normalizedTier];
+        const pricePerMonth = tierPrices[periodMonths as 1 | 6 | 12] || tierPrices[1];
+        const totalPrice = pricePerMonth * periodMonths;
+        
         let periodLabel = '1 месяц';
-        if (periodMonths === 6) {
-          discountMultiplier = 0.9; // 10% off
-          periodLabel = '6 месяцев';
-        } else if (periodMonths === 12) {
-          discountMultiplier = 0.75; // 25% off
-          periodLabel = '12 месяцев';
-        }
+        if (periodMonths === 6) periodLabel = '6 месяцев';
+        else if (periodMonths === 12) periodLabel = '12 месяцев';
         
-        const basePrice = basePrices[validated.tier];
-        const totalPrice = Math.round(basePrice * periodMonths * discountMultiplier);
-        
-        description = `Подписка ${validated.tier === 'standard' ? 'Standard (250 звёзд/мес)' : 'Pro (550 звёзд/мес)'} на ${periodLabel}`;
+        const tierLabel = normalizedTier === 'standard' ? 'Standard (250 звёзд/мес)' : 'Premium (550 звёзд/мес)';
+        description = `Подписка ${tierLabel} на ${periodLabel}`;
         amountRUB = totalPrice.toFixed(2);
-        tier = validated.tier;
+        tier = normalizedTier === 'premium' ? 'pro' : 'standard';
       } else {
         console.error('[YooKassa] Invalid request - missing pack or tier');
         return res.status(400).json({ ok: false, error: "Invalid request: must specify pack or tier" });
@@ -3496,32 +3492,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`[YooKassa Check] Credited ${dbPayment.energyAmount} energy orbs`);
               }
             } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
-              const tier = dbPayment.tier as "standard" | "pro";
+              const normalizedTier = (dbPayment.tier === 'premium' || dbPayment.tier === 'pro') ? 'pro' : 'standard';
               const startedAt = new Date();
               const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
 
               const existingSub = await storage.getSubscription(dbPayment.userId);
               if (existingSub) {
                 await storage.updateSubscription(existingSub.id, {
-                  tier,
+                  tier: normalizedTier,
                   status: "active",
                   currentPeriodEnd,
                 });
               } else {
                 await storage.createSubscription({
                   userId: dbPayment.userId,
-                  tier,
+                  tier: normalizedTier,
                   status: "active",
                   startedAt,
                   currentPeriodEnd,
                 });
               }
 
-              const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+              const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+              const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
+              const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
               const user = await storage.getUser(dbPayment.userId);
               if (user) {
                 await storage.updateUser(dbPayment.userId, {
-                  purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
+                  subscriptionOrbs: monthlyOrbs.toString(),
+                  orbsResetAt: dayjs().add(30, 'days').toDate(),
                 });
               }
 
@@ -3656,7 +3655,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[YooKassa Webhook] ✓ Credited energy: ${oldEnergy} → ${newEnergy} (user: ${dbPayment.userId})`);
         }
       } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
-        const tier = dbPayment.tier as "standard" | "pro";
+        const dbTier = dbPayment.tier;
+        const normalizedTier = (dbTier === 'premium' || dbTier === 'pro') ? 'pro' : 'standard';
         
         // Get metadata from webhook (periodMonths, autoRenew)
         const periodMonths = payment.metadata?.periodMonths || 1;
@@ -3666,7 +3666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paymentMethodId = payment.payment_method?.saved ? payment.payment_method.id : null;
         
         console.log('[YooKassa Webhook] Subscription details:', {
-          tier,
+          tier: normalizedTier,
           periodMonths,
           autoRenew,
           paymentMethodSaved: !!paymentMethodId,
@@ -3679,14 +3679,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Subscription data with auto-renewal fields
         const subscriptionData = {
-          tier,
+          tier: normalizedTier,
           status: "active" as const,
           currentPeriodEnd,
           autoRenew,
           paymentMethodId,
           paymentProvider: 'yookassa' as const,
           periodMonths,
-          amountRUB: dbPayment.amountRUB, // Store for recurring payments
+          amountRUB: dbPayment.amountRUB,
         };
         
         if (existingSub) {
@@ -3699,17 +3699,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Credit subscription energy immediately
-        const subscriptionEnergy = tier === 'standard' ? 100 : 250;
+        // Credit subscription orbs using the new system
+        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+        const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
+        const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
         const user = await storage.getUser(dbPayment.userId);
         if (user) {
           await storage.updateUser(dbPayment.userId, {
-            purchasedEnergy: (user.purchasedEnergy || 0) + subscriptionEnergy,
+            subscriptionOrbs: monthlyOrbs.toString(),
+            orbsResetAt: dayjs().add(30, 'days').toDate(),
           });
         }
 
         await handleSubscriptionReferralBonus(storage, dbPayment.userId);
-        console.log(`[YooKassa Webhook] Activated ${tier} subscription for user ${dbPayment.userId} (period: ${periodMonths}mo, autoRenew: ${autoRenew})`);
+        console.log(`[YooKassa Webhook] Activated ${normalizedTier} subscription for user ${dbPayment.userId} (period: ${periodMonths}mo, autoRenew: ${autoRenew}, orbs: ${monthlyOrbs})`);
       }
 
       // Mark payment as completed
