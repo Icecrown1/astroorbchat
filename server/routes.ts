@@ -561,7 +561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Credit subscription orbs using the new system
       const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-      const subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[tier as keyof typeof SUBSCRIPTION_MONTHLY_ORBS] || 250;
+      const orbsKey = tier === 'pro' ? 'premium' : tier;
+      const subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS] || 250;
       const user = await storage.getUser(userId);
       if (user) {
         await storage.updateUser(userId, {
