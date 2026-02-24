@@ -534,9 +534,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const { tier } = req.body;
       
-      if (!tier || (tier !== 'standard' && tier !== 'pro')) {
-        return res.status(400).json({ ok: false, error: "Invalid tier. Use 'standard' or 'pro'" });
+      if (!tier || (tier !== 'standard' && tier !== 'pro' && tier !== 'premium')) {
+        return res.status(400).json({ ok: false, error: "Invalid tier. Use 'standard', 'pro', or 'premium'" });
       }
+      const dbTier = tier === 'premium' ? 'pro' : tier;
       
       const startedAt = new Date();
       const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
@@ -545,14 +546,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (existingSub) {
         await storage.updateSubscription(existingSub.id, {
-          tier,
+          tier: dbTier,
           status: 'active',
           currentPeriodEnd,
         });
       } else {
         await storage.createSubscription({
           userId,
-          tier,
+          tier: dbTier,
           status: 'active',
           startedAt,
           currentPeriodEnd,
@@ -561,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Credit subscription orbs using the new system
       const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-      const orbsKey = tier === 'pro' ? 'premium' : tier;
+      const orbsKey = dbTier === 'pro' ? 'premium' : dbTier;
       const subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS] || 250;
       const user = await storage.getUser(userId);
       if (user) {
