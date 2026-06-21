@@ -10,7 +10,7 @@ import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
 import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, RefreshCw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { sendTransaction, connectWallet, isWalletConnected } from '@/lib/ton';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 import type { User, Subscription } from '@shared/schema';
@@ -125,23 +125,24 @@ export default function Subscribe() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
+  const walletConnected = !!wallet;
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('monthly');
-  const [walletConnected, setWalletConnected] = useState(false);
+  const [pendingTonTier, setPendingTonTier] = useState<{ tier: SubscriptionTier; period: SubscriptionPeriod } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
   const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
-  const [autoRenew, setAutoRenew] = useState(false); // Auto-renewal option
+  const [autoRenew, setAutoRenew] = useState(false);
 
-
+  // Trigger TON subscription after wallet connects
   useEffect(() => {
-    const checkWallet = () => {
-      setWalletConnected(isWalletConnected());
-    };
-    checkWallet();
-    const interval = setInterval(checkWallet, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (walletConnected && pendingTonTier) {
+      mutation.mutate(pendingTonTier);
+      setPendingTonTier(null);
+    }
+  }, [walletConnected]);
 
   // Fetch exchange rates (TON refreshed on page load, RUB from daily cache)
   const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useQuery<{ ok: boolean; data: ExchangeRatesData }>({
@@ -171,26 +172,30 @@ export default function Subscribe() {
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
     },
-    onSuccess: async (data, { tier }) => {
-      try {
-        await sendTransaction(
-          data.walletAddress,
-          data.amountTON,
-          data.payload
-        );
-        queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-        toast({
-          title: t.common.success,
-          description: `${getLocalizedTierName(tier)}! ${getOrbsDisplay(tier)}`,
-        });
-        navigate('/dashboard');
-      } catch (error: any) {
-        toast({
-          title: t.common.error,
-          description: error.message || t.errors.calculationFailed,
-          variant: 'destructive',
-        });
-      }
+    onSuccess: async (data) => {
+      const transaction = {
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [
+          {
+            address: data.walletAddress,
+            amount: data.amountTON,
+          },
+        ],
+      };
+
+      // Fire-and-forget: don't await — wallet redirects back in Mini App
+      tonConnectUI.sendTransaction(transaction)
+        .then(result => console.log('[TON] Subscription tx signed:', result))
+        .catch(err => console.log('[TON] Subscription tx error (may be false alarm):', err));
+
+      toast({
+        title: locale === 'ru' ? 'Подтвердите транзакцию' : 'Confirm transaction',
+        description: locale === 'ru'
+          ? 'Подпишите транзакцию в кошельке'
+          : 'Sign the transaction in your wallet',
+      });
+
+      navigate(`/payment-success?paymentId=${data.paymentId}&type=ton`);
     },
     onError: (error: any) => {
       toast({
@@ -611,20 +616,11 @@ export default function Subscribe() {
                       <Button
                         className="w-full"
                         variant="outline"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           if (!walletConnected) {
-                            try {
-                              await connectWallet();
-                              setWalletConnected(true);
-                              mutation.mutate({ tier, period: selectedPeriod });
-                            } catch (error: any) {
-                              toast({
-                                title: t.common.error,
-                                description: error.message || 'Failed to connect wallet',
-                                variant: 'destructive',
-                              });
-                            }
+                            setPendingTonTier({ tier, period: selectedPeriod });
+                            tonConnectUI.openModal();
                           } else {
                             mutation.mutate({ tier, period: selectedPeriod });
                           }
