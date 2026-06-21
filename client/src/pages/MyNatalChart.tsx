@@ -412,11 +412,11 @@ export default function MyNatalChart() {
                           onClick={() => navigate('/subscribe')}
                           variant="default"
                           size="sm"
-                          className="w-full"
+                          className="w-full whitespace-normal h-auto py-2"
                           data-testid={`button-subscribe-${planet.name}`}
                         >
-                          <Crown className="w-4 h-4 mr-2" />
-                          {locale === 'ru' ? 'Оформите подписку для подробной трактовки' : 'Subscribe for detailed interpretation'}
+                          <Crown className="w-4 h-4 shrink-0" />
+                          {locale === 'ru' ? 'Оформить подписку' : 'Subscribe'}
                         </Button>
                       )}
                     </div>
