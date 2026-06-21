@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, RefreshCw, TrendingUp, RotateCcw } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
@@ -157,6 +157,23 @@ export default function Subscribe() {
 
   const currentSubscription = userData?.data?.subscription;
 
+  interface UpgradePreviewData {
+    canUpgrade: boolean;
+    canRenew: boolean;
+    currentTier?: string;
+    remainingDays?: number;
+    currentPeriodEnd?: string;
+    upgradePrice?: number;
+    upgradeStarsBonus?: number;
+    renewalPrice?: number;
+  }
+
+  const { data: upgradePreviewData } = useQuery<{ ok: boolean; data: UpgradePreviewData }>({
+    queryKey: ['/api/subscription/upgrade-preview'],
+    enabled: currentSubscription?.status === 'active',
+  });
+  const upgradePreview = upgradePreviewData?.data;
+
   const mutation = useMutation({
     mutationFn: async ({ tier, period }: { tier: SubscriptionTier; period: SubscriptionPeriod }) => {
       const periodConfig = PERIOD_CONFIG[period];
@@ -206,6 +223,51 @@ export default function Subscribe() {
     },
   });
 
+
+  const upgradeMutation = useMutation({
+    mutationFn: async ({ email }: { email?: string }) => {
+      const idempotencyKey = crypto.randomUUID();
+      const response = await apiRequest('POST', '/api/payments/yookassa/create', {
+        kind: 'subscription_upgrade',
+        idempotencyKey,
+        customerEmail: email || null,
+        autoRenew: false,
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      if (!response.data?.confirmationUrl) throw new Error(locale === 'ru' ? 'Не удалось создать платёж' : 'Failed to create payment');
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.confirmationUrl) window.location.href = data.confirmationUrl;
+    },
+    onError: (error: any) => {
+      toast({ title: t.common.error, description: error.message || t.errors.calculationFailed, variant: 'destructive' });
+    },
+  });
+
+  const renewalMutation = useMutation({
+    mutationFn: async ({ email }: { email?: string }) => {
+      const idempotencyKey = crypto.randomUUID();
+      const response = await apiRequest('POST', '/api/payments/yookassa/create', {
+        kind: 'subscription_renewal',
+        idempotencyKey,
+        customerEmail: email || null,
+        autoRenew: false,
+      });
+      if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
+      if (!response.data?.confirmationUrl) throw new Error(locale === 'ru' ? 'Не удалось создать платёж' : 'Failed to create payment');
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.confirmationUrl) window.location.href = data.confirmationUrl;
+    },
+    onError: (error: any) => {
+      toast({ title: t.common.error, description: error.message || t.errors.calculationFailed, variant: 'destructive' });
+    },
+  });
+
+  const [showUpgradeEmailDialog, setShowUpgradeEmailDialog] = useState(false);
+  const [showRenewalEmailDialog, setShowRenewalEmailDialog] = useState(false);
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
@@ -613,65 +675,122 @@ export default function Subscribe() {
                     </div>
 
                     <div className="space-y-2">
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!walletConnected) {
-                            setPendingTonTier({ tier, period: selectedPeriod });
-                            tonConnectUI.openModal();
-                          } else {
-                            mutation.mutate({ tier, period: selectedPeriod });
-                          }
-                        }}
-                        disabled={mutation.isPending || currentSubscription?.tier === tier.tier}
-                        data-testid={`button-subscribe-ton-${tier.tier}`}
-                      >
-                        {mutation.isPending && selectedTier === tier.tier ? (
+                      {(() => {
+                        const isActiveSub = currentSubscription?.status === 'active';
+                        // Map frontend tier name to DB tier name
+                        const dbTierName = tier.tier === 'premium' ? 'pro' : tier.tier;
+                        const isCurrentTier = isActiveSub && currentSubscription?.tier === dbTierName;
+                        const isHigherTierActive = isActiveSub && currentSubscription?.tier === 'pro' && tier.tier === 'standard';
+
+                        // --- CASE 1: This is the current active tier → show Renewal button ---
+                        if (isCurrentTier) {
+                          return (
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); setShowRenewalEmailDialog(true); }}
+                              disabled={renewalMutation.isPending}
+                              data-testid={`button-renewal-${tier.tier}`}
+                            >
+                              {renewalMutation.isPending ? (
+                                <><Loader className="mr-2" size="sm" />{locale === 'ru' ? 'Обработка...' : 'Processing...'}</>
+                              ) : (
+                                <>
+                                  <RotateCcw className="w-4 h-4 mr-2" />
+                                  {locale === 'ru'
+                                    ? `Продлить +30 дней за ${upgradePreview?.renewalPrice ?? (tier.tier === 'standard' ? 199 : 399)} ₽`
+                                    : `Renew +30 days for ${upgradePreview?.renewalPrice ?? (tier.tier === 'standard' ? 199 : 399)} ₽`}
+                                </>
+                              )}
+                            </Button>
+                          );
+                        }
+
+                        // --- CASE 2: Standard user viewing Premium → show Upgrade button ---
+                        if (isActiveSub && currentSubscription?.tier === 'standard' && tier.tier === 'premium' && upgradePreview?.canUpgrade) {
+                          return (
+                            <div className="space-y-2">
+                              <div className="text-xs text-muted-foreground text-center px-1">
+                                {locale === 'ru'
+                                  ? `Доплата за ${upgradePreview.remainingDays} оставшихся дней. Дата окончания не меняется. +${upgradePreview.upgradeStarsBonus} звёзд сразу.`
+                                  : `Prorated charge for ${upgradePreview.remainingDays} remaining days. Expiry unchanged. +${upgradePreview.upgradeStarsBonus} stars immediately.`}
+                              </div>
+                              <Button
+                                className="w-full"
+                                onClick={(e) => { e.stopPropagation(); setShowUpgradeEmailDialog(true); }}
+                                disabled={upgradeMutation.isPending}
+                                data-testid={`button-upgrade-${tier.tier}`}
+                              >
+                                {upgradeMutation.isPending ? (
+                                  <><Loader className="mr-2" size="sm" />{locale === 'ru' ? 'Обработка...' : 'Processing...'}</>
+                                ) : (
+                                  <>
+                                    <TrendingUp className="w-4 h-4 mr-2" />
+                                    {locale === 'ru'
+                                      ? `Апгрейд за ${upgradePreview.upgradePrice} ₽`
+                                      : `Upgrade for ${upgradePreview.upgradePrice} ₽`}
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        // --- CASE 3: Premium user viewing Standard → disabled downgrade ---
+                        if (isHigherTierActive) {
+                          return (
+                            <Button className="w-full" variant="outline" disabled data-testid={`button-downgrade-disabled-${tier.tier}`}>
+                              {locale === 'ru' ? 'Недоступно (понижение тарифа)' : 'Unavailable (downgrade)'}
+                            </Button>
+                          );
+                        }
+
+                        // --- CASE 4: No active sub or sub is canceled/expired → regular subscribe buttons ---
+                        return (
                           <>
-                            <Loader className="mr-2" size="sm" />
-                            {t.subscribe.subscribing}
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!walletConnected) {
+                                  setPendingTonTier({ tier, period: selectedPeriod });
+                                  tonConnectUI.openModal();
+                                } else {
+                                  mutation.mutate({ tier, period: selectedPeriod });
+                                }
+                              }}
+                              disabled={mutation.isPending}
+                              data-testid={`button-subscribe-ton-${tier.tier}`}
+                            >
+                              {mutation.isPending && selectedTier === tier.tier ? (
+                                <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+                              ) : !walletConnected ? (
+                                <><Wallet className="w-4 h-4 mr-2" />{locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}</>
+                              ) : (
+                                <><CreditCard className="w-4 h-4 mr-2" />{t.subscribe.subscribeWith}</>
+                              )}
+                            </Button>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingYookassaTier(tier);
+                                setShowEmailDialog(true);
+                              }}
+                              disabled={yookassaMutation.isPending}
+                              data-testid={`button-subscribe-rubles-${tier.tier}`}
+                            >
+                              {yookassaMutation.isPending ? (
+                                <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+                              ) : (
+                                <><CreditCard className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оплатить ${totalPriceRub} ₽` : `Pay ${totalPriceRub} ₽`}</>
+                              )}
+                            </Button>
                           </>
-                        ) : currentSubscription?.tier === tier.tier ? (
-                          t.subscribe.currentPlan
-                        ) : !walletConnected ? (
-                          <>
-                            <Wallet className="w-4 h-4 mr-2" />
-                            {locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4 mr-2" />
-                            {t.subscribe.subscribeWith}
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingYookassaTier(tier);
-                          setShowEmailDialog(true);
-                        }}
-                        disabled={yookassaMutation.isPending || currentSubscription?.tier === tier.tier}
-                        data-testid={`button-subscribe-rubles-${tier.tier}`}
-                      >
-                        {yookassaMutation.isPending ? (
-                          <>
-                            <Loader className="mr-2" size="sm" />
-                            {t.subscribe.subscribing}
-                          </>
-                        ) : currentSubscription?.tier === tier.tier ? (
-                          t.subscribe.currentPlan
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4 mr-2" />
-                            {locale === 'ru' ? `Оплатить ${totalPriceRub} ₽` : `Pay ${totalPriceRub} ₽`}
-                          </>
-                        )}
-                      </Button>
+                        );
+                      })()}
                     </div>
 
                     {/* DEV ONLY: Free subscription button */}
@@ -716,7 +835,7 @@ export default function Subscribe() {
         </Card>
       </div>
 
-      {/* Email Receipt Dialog */}
+      {/* Email Receipt Dialog — new subscription */}
       {pendingYookassaTier && (
         <EmailReceiptDialog
           open={showEmailDialog}
@@ -734,6 +853,32 @@ export default function Subscribe() {
           }
         />
       )}
+
+      {/* Email Receipt Dialog — upgrade Standard → Premium */}
+      <EmailReceiptDialog
+        open={showUpgradeEmailDialog}
+        onOpenChange={setShowUpgradeEmailDialog}
+        onConfirm={(email) => {
+          upgradeMutation.mutate({ email });
+        }}
+        amount={`${upgradePreview?.upgradePrice ?? '...'} ₽`}
+        description={locale === 'ru'
+          ? `Апгрейд до Премиум (доплата за ${upgradePreview?.remainingDays ?? '...'} дн.)`
+          : `Upgrade to Premium (prorated for ${upgradePreview?.remainingDays ?? '...'} days)`}
+      />
+
+      {/* Email Receipt Dialog — renewal same tier */}
+      <EmailReceiptDialog
+        open={showRenewalEmailDialog}
+        onOpenChange={setShowRenewalEmailDialog}
+        onConfirm={(email) => {
+          renewalMutation.mutate({ email });
+        }}
+        amount={`${upgradePreview?.renewalPrice ?? (currentSubscription?.tier === 'standard' ? 199 : 399)} ₽`}
+        description={locale === 'ru'
+          ? `Продление подписки +30 дней`
+          : `Subscription renewal +30 days`}
+      />
     </div>
   );
 }

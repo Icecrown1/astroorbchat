@@ -3098,7 +3098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // YooKassa payment endpoints
   const createYooKassaPaymentSchema = z.object({
-    kind: z.enum(["energy_pack", "subscription"]),
+    kind: z.enum(["energy_pack", "subscription", "subscription_upgrade", "subscription_renewal"]),
     pack: z.object({
       energy: z.number().refine(val => [20, 50, 120].includes(val))
     }).optional(),
@@ -3107,6 +3107,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     autoRenew: z.boolean().optional(), // Auto-renewal for subscriptions
     customerEmail: z.string().email().optional().nullable(),
     idempotencyKey: z.string().min(1).max(64), // Client-generated idempotency key (required)
+  });
+
+  // Upgrade/renewal preview for current subscriber
+  app.get("/api/subscription/upgrade-preview", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const sub = await storage.getSubscription(userId);
+
+      if (!sub || sub.status !== 'active') {
+        return res.json({ ok: true, data: { canUpgrade: false, canRenew: false } });
+      }
+
+      const now = new Date();
+      const periodEnd = new Date(sub.currentPeriodEnd);
+      const remainingMs = Math.max(0, periodEnd.getTime() - now.getTime());
+      const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+
+      const STANDARD_MONTHLY = 199;
+      const PREMIUM_MONTHLY = 399;
+
+      const result: Record<string, any> = {
+        canRenew: true,
+        canUpgrade: sub.tier === 'standard',
+        currentTier: sub.tier,
+        remainingDays,
+        currentPeriodEnd: sub.currentPeriodEnd,
+        renewalPrice: sub.tier === 'standard' ? STANDARD_MONTHLY : PREMIUM_MONTHLY,
+      };
+
+      if (sub.tier === 'standard') {
+        const dailyDelta = (PREMIUM_MONTHLY - STANDARD_MONTHLY) / 30;
+        result.upgradePrice = Math.max(1, Math.ceil(remainingDays * dailyDelta));
+        result.upgradeStarsBonus = 300; // 550 - 250
+      }
+
+      return res.json({ ok: true, data: result });
+    } catch (error: any) {
+      console.error('[Upgrade Preview] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
   });
 
   app.post("/api/payments/yookassa/create", requireAuth, async (req, res) => {
@@ -3243,6 +3283,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description = `Подписка ${tierLabel} на ${periodLabel}`;
         amountRUB = totalPrice.toFixed(2);
         tier = normalizedTier === 'premium' ? 'pro' : 'standard';
+      } else if (validated.kind === "subscription_upgrade") {
+        // Standard → Premium prorated upgrade: user pays difference for remaining days
+        const sub = await storage.getSubscription(userId);
+        if (!sub || sub.status !== 'active' || sub.tier !== 'standard') {
+          return res.status(400).json({ ok: false, error: "No active Standard subscription to upgrade" });
+        }
+        const remainingMs = Math.max(0, new Date(sub.currentPeriodEnd).getTime() - Date.now());
+        const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+        const dailyDelta = (399 - 199) / 30;
+        const upgradePrice = Math.max(1, Math.ceil(remainingDays * dailyDelta));
+        description = `Апгрейд до Premium (доплата за ${remainingDays} дн.)`;
+        amountRUB = upgradePrice.toFixed(2);
+        tier = 'pro';
+      } else if (validated.kind === "subscription_renewal") {
+        // Same-tier renewal: extend subscription by 30 days at monthly price
+        const sub = await storage.getSubscription(userId);
+        if (!sub || sub.status !== 'active') {
+          return res.status(400).json({ ok: false, error: "No active subscription to renew" });
+        }
+        const renewalPrice = sub.tier === 'standard' ? 199 : 399;
+        const tierName = sub.tier === 'standard' ? 'Standard' : 'Premium';
+        description = `Продление подписки ${tierName} (+30 дней)`;
+        amountRUB = renewalPrice.toFixed(2);
+        tier = sub.tier === 'standard' ? 'standard' : 'pro';
       } else {
         console.error('[YooKassa] Invalid request - missing pack or tier');
         return res.status(400).json({ ok: false, error: "Invalid request: must specify pack or tier" });
@@ -3560,6 +3624,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
 
               await handleSubscriptionReferralBonus(storage, dbPayment.userId);
+            } else if (dbPayment.kind === "subscription_upgrade") {
+              // Upgrade Standard → Premium: keep same expiry, just change tier + grant star diff
+              const existingSub = await storage.getSubscription(dbPayment.userId);
+              if (existingSub) {
+                await storage.updateSubscription(existingSub.id, {
+                  tier: 'pro',
+                  status: 'active',
+                });
+              }
+              const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+              const user = await storage.getUser(dbPayment.userId);
+              if (user) {
+                const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
+                const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard']; // 300
+                await storage.updateUser(dbPayment.userId, {
+                  subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
+                });
+              }
+              console.log(`[YooKassa Check] Upgraded to Premium for user ${dbPayment.userId}`);
+            } else if (dbPayment.kind === "subscription_renewal") {
+              // Renewal: extend currentPeriodEnd by 30 days, reset orbs
+              const existingSub = await storage.getSubscription(dbPayment.userId);
+              if (existingSub) {
+                const base = new Date(existingSub.currentPeriodEnd) > new Date()
+                  ? new Date(existingSub.currentPeriodEnd)
+                  : new Date();
+                const newPeriodEnd = dayjs(base).add(30, 'days').toDate();
+                await storage.updateSubscription(existingSub.id, {
+                  status: 'active',
+                  currentPeriodEnd: newPeriodEnd,
+                });
+                const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+                const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
+                const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
+                await storage.updateUser(dbPayment.userId, {
+                  subscriptionOrbs: monthlyOrbs.toString(),
+                  orbsResetAt: dayjs().add(30, 'days').toDate(),
+                });
+              }
+              console.log(`[YooKassa Check] Renewed subscription for user ${dbPayment.userId}`);
             }
 
             // Mark as completed
@@ -3574,6 +3678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 status: 'succeeded',
                 energyAmount: dbPayment.energyAmount,
                 tier: dbPayment.tier,
+                kind: dbPayment.kind,
               },
             });
           } else if (ykPayment.status === 'waiting_for_capture') {
@@ -3748,6 +3853,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await handleSubscriptionReferralBonus(storage, dbPayment.userId);
         console.log(`[YooKassa Webhook] Activated ${normalizedTier} subscription for user ${dbPayment.userId} (period: ${periodMonths}mo, autoRenew: ${autoRenew}, orbs: ${monthlyOrbs})`);
+      } else if (dbPayment.kind === "subscription_upgrade") {
+        // Upgrade Standard → Premium: keep same expiry, upgrade tier, grant star difference
+        const existingSub = await storage.getSubscription(dbPayment.userId);
+        if (existingSub) {
+          await storage.updateSubscription(existingSub.id, {
+            tier: 'pro',
+            status: 'active',
+            paymentProvider: 'yookassa',
+          });
+        }
+        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+        const user = await storage.getUser(dbPayment.userId);
+        if (user) {
+          const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
+          const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard'];
+          await storage.updateUser(dbPayment.userId, {
+            subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
+          });
+        }
+        console.log(`[YooKassa Webhook] ✓ Upgraded to Premium for user ${dbPayment.userId}`);
+      } else if (dbPayment.kind === "subscription_renewal") {
+        // Renewal: extend currentPeriodEnd by 30 days from current end (not from now), reset orbs
+        const existingSub = await storage.getSubscription(dbPayment.userId);
+        if (existingSub) {
+          const base = new Date(existingSub.currentPeriodEnd) > new Date()
+            ? new Date(existingSub.currentPeriodEnd)
+            : new Date();
+          const newPeriodEnd = dayjs(base).add(30, 'days').toDate();
+          await storage.updateSubscription(existingSub.id, {
+            status: 'active',
+            currentPeriodEnd: newPeriodEnd,
+            paymentProvider: 'yookassa',
+          });
+          const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
+          const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
+          const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
+          await storage.updateUser(dbPayment.userId, {
+            subscriptionOrbs: monthlyOrbs.toString(),
+            orbsResetAt: dayjs().add(30, 'days').toDate(),
+          });
+          console.log(`[YooKassa Webhook] ✓ Renewed subscription for user ${dbPayment.userId} until ${newPeriodEnd}`);
+        }
       }
 
       // Mark payment as completed

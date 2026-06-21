@@ -521,7 +521,7 @@ export const insertImportantDateInterpretationSchema = createInsertSchema(import
 
 export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, {
   userId: z.string(),
-  kind: z.enum(["energy_pack", "subscription"]),
+  kind: z.enum(["energy_pack", "subscription", "subscription_upgrade", "subscription_renewal"]),
   tier: z.string().optional(),
   energyAmount: z.number().optional(),
   amountRUB: z.string(), // Decimal as string
