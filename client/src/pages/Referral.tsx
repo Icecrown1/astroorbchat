@@ -13,17 +13,22 @@ import { useEnergy } from '@/store/useEnergy';
 import { useEffect } from 'react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
+interface ReferralItem {
+  id: string;
+  userName: string;
+  rewardType: string;
+  rewardKind: string;
+  energyAmount: number;
+  subscriptionDays: number | null;
+  createdAt: Date;
+}
+
 interface ReferralCodeResponse {
   ok: boolean;
   data: {
     referralCode: string;
-    referrals: Array<{
-      id: string;
-      userName: string;
-      rewardType: string;
-      energyAmount: number;
-      createdAt: Date;
-    }>;
+    referrals: ReferralItem[];
+    pendingChoices: ReferralItem[];
     totalRewards: number;
     totalReferrals: number;
   };
@@ -58,7 +63,7 @@ export default function Referral() {
         };
       default: // free
         return {
-          referrerReward: locale === 'ru' ? '7 дней Standard + 3 дня Premium' : '7 days Standard + 3 days Premium',
+          referrerReward: locale === 'ru' ? '7 дней Standard или 3 дня Premium' : '7 days Standard or 3 days Premium',
           referredReward: '',
           icon: Calendar,
           color: 'text-chart-3',
@@ -113,18 +118,24 @@ export default function Referral() {
     }
   };
 
-  // Dev-only mutation for simulating a referral signup without a real user
+  // Dev-only mutation: simulate a referred friend PAYING for a subscription.
+  // For free referrers this creates a pending choice (Standard 7d OR Premium 3d).
   const devSimulateReferralMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('POST', '/api/dev/test-referral', { action: 'simulate_signup' });
+      return await apiRequest('POST', '/api/dev/test-referral', { action: 'simulate_subscription' });
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       hapticFeedback('success');
+      const requiresChoice = res?.data?.requiresChoice;
       toast({
         title: locale === 'ru' ? 'Успех!' : 'Success!',
-        description: locale === 'ru' 
-          ? 'Реферальная регистрация симулирована. +10 энергии начислено!'
-          : 'Referral signup simulated. +10 energy credited!',
+        description: requiresChoice
+          ? (locale === 'ru'
+            ? 'Реферал оплатил подписку! Выберите награду ниже.'
+            : 'Referral paid for subscription! Choose your reward below.')
+          : (locale === 'ru'
+            ? 'Реферал оплатил подписку! Награда начислена.'
+            : 'Referral paid for subscription! Reward applied.'),
       });
       // Invalidate relevant queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['/api/referral/code'] });
@@ -136,12 +147,46 @@ export default function Referral() {
       toast({
         title: locale === 'ru' ? 'Ошибка' : 'Error',
         description: locale === 'ru' 
-          ? 'Не удалось симулировать реферальную регистрацию'
-          : 'Failed to simulate referral signup',
+          ? 'Не удалось симулировать оплату подписки рефералом'
+          : 'Failed to simulate referral subscription',
         variant: 'destructive',
       });
     },
   });
+
+  // Claim a pending choice reward: 'standard' (7 days) or 'premium' (3 days)
+  const claimChoiceMutation = useMutation({
+    mutationFn: async ({ rewardId, choice }: { rewardId: string; choice: 'standard' | 'premium' }) => {
+      return await apiRequest('POST', '/api/referral/claim-choice', { rewardId, choice });
+    },
+    onSuccess: (res: any) => {
+      hapticFeedback('success');
+      const tier = res?.data?.tier;
+      const days = res?.data?.days;
+      const tierLabel = tier === 'premium' ? 'Premium' : 'Standard';
+      toast({
+        title: locale === 'ru' ? 'Награда получена!' : 'Reward claimed!',
+        description: locale === 'ru'
+          ? `Вам начислено ${days} дн. подписки ${tierLabel}`
+          : `${days} days of ${tierLabel} subscription added`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/referral/code'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/energy'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+    },
+    onError: () => {
+      hapticFeedback('error');
+      toast({
+        title: locale === 'ru' ? 'Ошибка' : 'Error',
+        description: locale === 'ru'
+          ? 'Не удалось получить награду'
+          : 'Failed to claim reward',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const pendingChoices = data?.data?.pendingChoices || [];
 
   if (isLoading) {
     return (
@@ -249,6 +294,68 @@ export default function Referral() {
           )}
         </Card>
 
+        {pendingChoices.length > 0 && (
+          <Card className="p-6 mb-6 border-primary/40 bg-primary/5">
+            <div className="flex items-center gap-3 mb-4">
+              <Gift className="w-7 h-7 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {locale === 'ru' ? 'Награда за реферала!' : 'Referral reward!'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'ru'
+                    ? 'Ваш друг оформил подписку. Выберите награду:'
+                    : 'Your friend subscribed. Choose your reward:'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {pendingChoices.map((choice) => (
+                <div
+                  key={choice.id}
+                  className="space-y-3"
+                  data-testid={`pending-choice-${choice.id}`}
+                >
+                  <p className="text-sm font-medium">{choice.userName}</p>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <Button
+                      variant="outline"
+                      className="h-auto py-3 flex-col items-start gap-1"
+                      onClick={() => claimChoiceMutation.mutate({ rewardId: choice.id, choice: 'standard' })}
+                      disabled={claimChoiceMutation.isPending}
+                      data-testid={`button-claim-standard-${choice.id}`}
+                    >
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Star className="w-4 h-4 text-primary" />
+                        {locale === 'ru' ? '7 дней Standard' : '7 days Standard'}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {locale === 'ru' ? 'Все функции, кроме Solar Return' : 'All features except Solar Return'}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-auto py-3 flex-col items-start gap-1"
+                      onClick={() => claimChoiceMutation.mutate({ rewardId: choice.id, choice: 'premium' })}
+                      disabled={claimChoiceMutation.isPending}
+                      data-testid={`button-claim-premium-${choice.id}`}
+                    >
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Crown className="w-4 h-4 text-yellow-500" />
+                        {locale === 'ru' ? '3 дня Premium' : '3 days Premium'}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {locale === 'ru' ? 'Все функции, включая Solar Return' : 'All features including Solar Return'}
+                      </span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {data?.data?.referrals && data.data.referrals.length > 0 && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
@@ -272,26 +379,45 @@ export default function Referral() {
             </div>
 
             <div className="space-y-2">
-              {data.data.referrals.map((referral) => (
-                <div
-                  key={referral.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted"
-                  data-testid={`referral-item-${referral.id}`}
-                >
-                  <div>
-                    <p className="font-medium">{referral.userName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {referral.rewardType === 'signup' 
-                        ? (locale === 'ru' ? 'Регистрация' : 'Joined')
-                        : (locale === 'ru' ? 'Оформил подписку' : 'Subscribed')
-                      } · {new Date(referral.createdAt).toLocaleDateString()}
-                    </p>
+              {data.data.referrals.map((referral) => {
+                const isPending = referral.rewardKind === 'pending_choice';
+                const isSubscriptionDays =
+                  referral.rewardKind === 'subscription_standard_days' ||
+                  referral.rewardKind === 'subscription_premium_days';
+                const tierLabel = referral.rewardKind === 'subscription_premium_days' ? 'Premium' : 'Standard';
+
+                let rewardBadge: string;
+                if (isPending) {
+                  rewardBadge = locale === 'ru' ? 'Ожидает выбора' : 'Choice pending';
+                } else if (isSubscriptionDays && referral.subscriptionDays) {
+                  rewardBadge = locale === 'ru'
+                    ? `+${referral.subscriptionDays} дн. ${tierLabel}`
+                    : `+${referral.subscriptionDays}d ${tierLabel}`;
+                } else {
+                  rewardBadge = `+${referral.energyAmount} ${t.common.orbs}`;
+                }
+
+                return (
+                  <div
+                    key={referral.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted"
+                    data-testid={`referral-item-${referral.id}`}
+                  >
+                    <div>
+                      <p className="font-medium">{referral.userName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {referral.rewardType === 'signup'
+                          ? (locale === 'ru' ? 'Регистрация' : 'Joined')
+                          : (locale === 'ru' ? 'Оформил подписку' : 'Subscribed')
+                        } · {new Date(referral.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge variant={isPending ? 'outline' : (referral.rewardType === 'subscription' ? 'default' : 'secondary')}>
+                      {rewardBadge}
+                    </Badge>
                   </div>
-                  <Badge variant={referral.rewardType === 'subscription' ? 'default' : 'secondary'}>
-                    +{referral.energyAmount} {t.common.orbs}
-                  </Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}

@@ -131,6 +131,8 @@ export interface IStorage {
   // Referral reward operations
   createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
   getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]>;
+  getReferralReward(id: string): Promise<ReferralReward | undefined>;
+  claimReferralChoiceAtomic(params: { rewardId: string; referrerId: string; rewardKind: string; subscriptionDays: number; days: number; dbTier: "standard" | "pro"; monthlyOrbs: number; }): Promise<{ claimed: boolean; currentPeriodEnd?: Date }>;
   
   // Solar return operations
   getSolarReturn(userId: string, targetYear: number, location: string): Promise<SolarReturn | undefined>;
@@ -653,6 +655,99 @@ export class DatabaseStorage implements IStorage {
       .from(referralRewards)
       .where(eq(referralRewards.referrerId, referrerId))
       .orderBy(desc(referralRewards.createdAt));
+  }
+
+  async getReferralReward(id: string): Promise<ReferralReward | undefined> {
+    const [reward] = await db
+      .select()
+      .from(referralRewards)
+      .where(eq(referralRewards.id, id));
+    return reward;
+  }
+
+  // Atomically claim a pending referral choice reward AND apply its subscription/orbs
+  // in a single transaction. Either everything commits or nothing does — preventing both
+  // double-claim races and the "reward consumed but benefits never granted" failure mode.
+  // The conditional claim (WHERE reward_kind='pending_choice') ensures only one concurrent
+  // caller can succeed; a second caller re-evaluates the WHERE against the committed row and
+  // matches nothing.
+  async claimReferralChoiceAtomic(params: {
+    rewardId: string;
+    referrerId: string;
+    rewardKind: string;
+    subscriptionDays: number;
+    days: number;
+    dbTier: "standard" | "pro";
+    monthlyOrbs: number;
+  }): Promise<{ claimed: boolean; currentPeriodEnd?: Date }> {
+    return await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(referralRewards)
+        .set({ rewardKind: params.rewardKind, subscriptionDays: params.subscriptionDays })
+        .where(and(
+          eq(referralRewards.id, params.rewardId),
+          eq(referralRewards.referrerId, params.referrerId),
+          eq(referralRewards.rewardKind, "pending_choice")
+        ))
+        .returning();
+
+      if (!claimed) {
+        return { claimed: false };
+      }
+
+      const now = new Date();
+      const DAY_MS = 24 * 60 * 60 * 1000;
+
+      const [existingSub] = await tx
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, params.referrerId))
+        .limit(1);
+
+      let currentPeriodEnd: Date;
+      if (
+        existingSub?.currentPeriodEnd &&
+        new Date(existingSub.currentPeriodEnd).getTime() > now.getTime() &&
+        existingSub.status === "active"
+      ) {
+        currentPeriodEnd = new Date(new Date(existingSub.currentPeriodEnd).getTime() + params.days * DAY_MS);
+      } else {
+        currentPeriodEnd = new Date(now.getTime() + params.days * DAY_MS);
+      }
+
+      if (existingSub) {
+        await tx
+          .update(subscriptions)
+          .set({ tier: params.dbTier, status: "active", currentPeriodEnd })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        await tx.insert(subscriptions).values({
+          userId: params.referrerId,
+          tier: params.dbTier,
+          status: "active",
+          startedAt: now,
+          currentPeriodEnd,
+        });
+      }
+
+      const [user] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, params.referrerId))
+        .limit(1);
+
+      if (user && parseFloat(user.subscriptionOrbs ?? "0") <= 0) {
+        await tx
+          .update(users)
+          .set({
+            subscriptionOrbs: params.monthlyOrbs.toString(),
+            orbsResetAt: new Date(now.getTime() + 30 * DAY_MS),
+          })
+          .where(eq(users.id, params.referrerId));
+      }
+
+      return { claimed: true, currentPeriodEnd };
+    });
   }
 
   // Solar return operations

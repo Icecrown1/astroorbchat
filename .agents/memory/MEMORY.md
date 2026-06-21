@@ -1,0 +1,1 @@
+- [Subscription tier authority](subscription-tier-authority.md) — tier lives in `subscriptions` table not `users`; DB enum is standard|pro (premium↔pro); orbs are decimal strings.

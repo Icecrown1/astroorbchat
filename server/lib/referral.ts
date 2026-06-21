@@ -39,16 +39,16 @@ export async function handleSubscriptionReferralBonus(storage: any, userId: stri
       const referrerTier = await getUserTier(storage, referrer.id);
       
       if (referrerTier === 'free') {
-        // Free referrer gets 7 days Standard + 3 days Premium
-        await applyReward(storage, referrer.id, 
-          { type: 'subscription_standard_days', days: 7 }, 
-          'subscription_referrer', userId
-        );
-        // Also give 3 days Premium on top
-        await applyReward(storage, referrer.id, 
-          { type: 'subscription_premium_days', days: 3 }, 
-          'subscription_referrer_premium', userId
-        );
+        // Free referrer must CHOOSE: 7 days Standard OR 3 days Premium.
+        // Create a pending reward; user picks the tier later via /api/referral/claim-choice
+        await storage.createReferralReward({
+          referrerId: referrer.id,
+          referredUserId: userId,
+          rewardType: 'subscription',
+          energyAmount: 0,
+          rewardKind: 'pending_choice',
+        });
+        console.log('[REFERRAL] Created pending choice reward for free referrer:', referrer.id);
       } else if (referrerTier === 'standard') {
         // Standard: +10 orbs + extend subscription
         const currentOrbs = parseFloat(referrer.referralOrbs || '0');
@@ -97,67 +97,41 @@ export async function handleSubscriptionReferralBonus(storage: any, userId: stri
 }
 
 /**
- * Apply a specific reward to a user
+ * Free referrer claims a pending choice reward: 'standard' (7 days) or 'premium' (3 days).
+ * Applies the subscription to the referrer and converts the pending reward record.
  */
-async function applyReward(
-  storage: any, 
-  userId: string, 
-  reward: { type: string; days?: number; amount?: number },
-  rewardType: string,
-  relatedUserId: string
-): Promise<void> {
-  const user = await storage.getUser(userId);
-  if (!user) return;
-  
-  if (reward.type.includes('subscription') && reward.days) {
-    // Grant temporary subscription
-    const tierName = reward.type.includes('premium') ? 'premium' : 'standard';
-    const now = dayjs();
-    
-    // If user already has subscription, extend it
-    let newEnd: Date;
-    if (user.subscriptionEnd && dayjs(user.subscriptionEnd).isAfter(now)) {
-      newEnd = dayjs(user.subscriptionEnd).add(reward.days, 'day').toDate();
-    } else {
-      newEnd = now.add(reward.days, 'day').toDate();
-    }
-    
-    // Update subscription
-    const updates: any = {
-      subscriptionTier: tierName,
-      subscriptionEnd: newEnd,
-    };
-    
-    // If upgrading, give them monthly orbs if they don't have any
-    if ((tierName === 'standard' || tierName === 'premium') && !user.subscriptionOrbs) {
-      updates.subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[tierName as 'standard' | 'premium'];
-      updates.orbsResetAt = dayjs().add(1, 'month').startOf('month').toDate();
-    }
-    
-    await storage.updateUser(userId, updates);
-    
-    await storage.createReferralReward({
-      referrerId: userId === relatedUserId ? userId : relatedUserId,
-      referredUserId: userId,
-      rewardType,
-      energyAmount: 0,
-      rewardKind: 'subscription_days',
-      subscriptionDays: reward.days,
-    });
-    
-  } else if (reward.type === 'orbs' && reward.amount) {
-    // Grant orbs (to referralOrbs field for persistence)
-    const currentReferralOrbs = user.referralOrbs || 0;
-    await storage.updateUser(userId, { 
-      referralOrbs: currentReferralOrbs + reward.amount 
-    });
-    
-    await storage.createReferralReward({
-      referrerId: userId === relatedUserId ? userId : relatedUserId,
-      referredUserId: userId,
-      rewardType,
-      energyAmount: reward.amount,
-      rewardKind: 'orbs',
-    });
+export async function claimReferralChoice(
+  storage: any,
+  referrerId: string,
+  rewardId: string,
+  choice: 'standard' | 'premium'
+): Promise<{ tier: 'standard' | 'premium'; days: number; currentPeriodEnd: Date }> {
+  const tierName: 'standard' | 'premium' = choice === 'premium' ? 'premium' : 'standard';
+  const days = tierName === 'premium' ? 3 : 7;
+  // DB tier uses 'pro' for premium; getUserTier maps it back to 'premium'.
+  const dbTier: 'standard' | 'pro' = tierName === 'premium' ? 'pro' : 'standard';
+
+  // Claim + apply subscription + grant orbs in one transaction (atomic, race-safe).
+  const result = await storage.claimReferralChoiceAtomic({
+    rewardId,
+    referrerId,
+    rewardKind: tierName === 'premium' ? 'subscription_premium_days' : 'subscription_standard_days',
+    subscriptionDays: days,
+    days,
+    dbTier,
+    monthlyOrbs: SUBSCRIPTION_MONTHLY_ORBS[tierName],
+  });
+
+  if (!result.claimed) {
+    // Determine the precise reason for a helpful error message.
+    const reward = await storage.getReferralReward(rewardId);
+    if (!reward) throw new Error('Reward not found');
+    if (reward.referrerId !== referrerId) throw new Error('Reward does not belong to this user');
+    throw new Error('Reward has already been claimed');
   }
+
+  console.log('[REFERRAL] Claimed choice reward:', rewardId, '→', dbTier, days, 'days');
+
+  return { tier: tierName, days, currentPeriodEnd: result.currentPeriodEnd! };
 }
+

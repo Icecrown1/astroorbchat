@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
-import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus } from "./lib/referral";
+import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus, claimReferralChoice } from "./lib/referral";
 import { 
   checkAndResetEnergy, 
   checkSubscriptionExpiry, 
@@ -319,32 +319,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (action === 'simulate_subscription') {
-        // Find the most recently referred user for this referrer
-        const rewards = await storage.getReferralRewardsByReferrerId(userId);
-        
-        if (rewards.length === 0) {
-          return res.status(400).json({
-            ok: false,
-            error: 'No referred users found. Simulate a signup first using action: "simulate_signup"'
-          });
-        }
+        // Self-contained: create a virtual referred user, link them to the referrer,
+        // then trigger the subscription referral bonus (as if the friend just paid).
+        const testUser = {
+          tgId: `virtual_test_${Date.now()}`,
+          username: `test_referred_${Date.now()}`,
+          name: `Test User ${Date.now()}`,
+          gender: 'other' as const,
+          age: 25,
+          birthdayDate: new Date(),
+          birthTime: null,
+          birthPlace: null,
+          timezone: "America/New_York",
+          referralCode: generateReferralCode(),
+          freeEnergy: 10,
+          energyResetAt: getNextResetTime("America/New_York"),
+          referredById: referrer.id,
+        };
 
-        // Get the most recent referred user
-        const latestReward = rewards.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )[0];
+        const referredUser = await storage.createUser(testUser);
 
-        const referredUser = await storage.getUser(latestReward.referredUserId);
-        
-        if (!referredUser) {
-          return res.status(404).json({ ok: false, error: 'Referred user not found' });
-        }
-
-        // Apply subscription referral bonus
+        // Apply subscription referral bonus.
+        // Free referrer → creates a pending choice. Standard/Premium → applies orbs + extension.
         await handleSubscriptionReferralBonus(storage, referredUser.id);
 
         // Get updated referrer data
         const updatedReferrer = await storage.getUser(userId);
+        const referrerTier = await getUserTier(storage, userId);
 
         return res.json({
           ok: true,
@@ -357,10 +358,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             referrer: {
               id: updatedReferrer?.id,
               name: updatedReferrer?.name,
-              purchasedEnergy: updatedReferrer?.purchasedEnergy,
             },
-            rewardAmount: 10,
-            message: 'Simulated subscription purchase by your referred user. You received +10 energy!',
+            referrerTier,
+            requiresChoice: referrerTier === 'free',
+            message: referrerTier === 'free'
+              ? 'Simulated subscription purchase. Choose your reward: 7 days Standard or 3 days Premium.'
+              : 'Simulated subscription purchase by your referred user. Reward applied.',
           },
         });
       }
@@ -2588,23 +2591,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: reward.id,
             userName: referredUser?.name || 'Unknown',
             rewardType: reward.rewardType,
+            rewardKind: reward.rewardKind,
             energyAmount: reward.energyAmount,
+            subscriptionDays: reward.subscriptionDays,
             createdAt: reward.createdAt,
           };
         })
       );
+
+      // Pending choices: free referrer must pick Standard (7d) or Premium (3d)
+      const pendingChoices = referralsWithDetails.filter(r => r.rewardKind === 'pending_choice');
 
       res.json({
         ok: true,
         data: {
           referralCode: user.referralCode,
           referrals: referralsWithDetails,
+          pendingChoices,
           totalRewards: rewards.reduce((sum, r) => sum + r.energyAmount, 0),
           totalReferrals: rewards.filter(r => r.rewardType === 'signup').length,
         },
       });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Claim a pending referral choice reward (free referrer: Standard 7d OR Premium 3d)
+  app.post("/api/referral/claim-choice", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { rewardId, choice } = req.body;
+
+      if (!rewardId || !['standard', 'premium'].includes(choice)) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Invalid request. Provide rewardId and choice ("standard" or "premium")',
+        });
+      }
+
+      const result = await claimReferralChoice(storage, user.id, rewardId, choice);
+
+      res.json({ ok: true, data: result });
+    } catch (error: any) {
+      const message = error.message || 'Failed to claim reward';
+      const status = message.includes('already been claimed') ? 409
+        : message.includes('not found') ? 404
+        : message.includes('does not belong') ? 403
+        : 500;
+      res.status(status).json({ ok: false, error: message });
     }
   });
 
