@@ -29,7 +29,8 @@ export async function getTonPrice(): Promise<number> {
     console.error('Failed to fetch TON price:', error);
   }
 
-  return parseFloat(process.env.TON_PRICE_FALLBACK_USD_PER_TON || '7.5');
+  const fallback = parseFloat(process.env.TON_PRICE_FALLBACK_USD_PER_TON || '7.5');
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 7.5;
 }
 
 export function convertUSDToTON(usdAmount: number, tonPriceUSD: number): string {

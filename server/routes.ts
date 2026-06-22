@@ -2737,9 +2737,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get TON price and convert USD to TON
-      const tonPrice = await getTonPrice();
-      const amountTON = convertUSDToTON(validated.amountUSD, tonPrice);
+      // Get TON price and convert USD to TON.
+      // If the rate is unavailable or conversion produces an invalid amount, return 400
+      // so the client surfaces a clear "try again" message instead of an invalid payload.
+      let amountTON: string;
+      let tonPrice: number;
+      try {
+        tonPrice = await getTonPrice();
+        amountTON = convertUSDToTON(validated.amountUSD, tonPrice);
+      } catch (conversionError: any) {
+        console.error('[TON_CREATE] Conversion failed:', conversionError?.message);
+        return res.status(400).json({
+          ok: false,
+          error: "TON exchange rate is temporarily unavailable. Please try again in a minute.",
+        });
+      }
 
       // Normalize user wallet address to raw format (0:...) for consistent comparison
       const normalizedUserAddress = validated.userWalletAddress 
