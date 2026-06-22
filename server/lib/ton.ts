@@ -33,8 +33,18 @@ export async function getTonPrice(): Promise<number> {
 }
 
 export function convertUSDToTON(usdAmount: number, tonPriceUSD: number): string {
+  if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+    throw new Error('Invalid USD amount for TON conversion');
+  }
+  if (!Number.isFinite(tonPriceUSD) || tonPriceUSD <= 0) {
+    throw new Error('Invalid TON price for conversion');
+  }
   const tonAmount = usdAmount / tonPriceUSD;
-  return (tonAmount * 1_000_000_000).toFixed(0);
+  const nanoTon = tonAmount * 1_000_000_000;
+  if (!Number.isFinite(nanoTon) || nanoTon <= 0) {
+    throw new Error('TON conversion produced an invalid amount');
+  }
+  return nanoTon.toFixed(0);
 }
 
 export async function verifyTonTransaction(

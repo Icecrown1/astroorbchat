@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
+import { openPaymentLink } from '@/lib/telegram';
 
 // Base USD prices (fixed)
 const ENERGY_PACKS = [
@@ -99,12 +100,27 @@ export default function BuyEnergy() {
           amount: data.amountTON
         });
 
+        // Validate amountTON is a positive integer string (nanotons) before sending to TON Connect.
+        // If the TON exchange rate failed to load, amountTON can be "NaN"/"Infinity" which the
+        // TON Connect SDK rejects with "Invalid 'payload' in message at index 0".
+        const amountStr = String(data.amountTON ?? '');
+        if (!data.walletAddress || !/^\d+$/.test(amountStr) || amountStr === '0') {
+          toast({
+            title: t.common.error,
+            description: locale === 'ru'
+              ? 'Не удалось получить курс TON. Попробуйте ещё раз через минуту.'
+              : 'Failed to fetch TON exchange rate. Please try again in a minute.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         const transaction = {
           validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes max per TON Connect spec
           messages: [
             {
               address: data.walletAddress,
-              amount: data.amountTON,
+              amount: amountStr,
             },
           ],
         };
@@ -260,8 +276,9 @@ export default function BuyEnergy() {
       setYookassaIdempotencyKey(null);
       
       if (data.confirmationUrl) {
-        // Redirect to YooKassa payment page
-        window.location.href = data.confirmationUrl;
+        // Open YooKassa payment page. Inside Telegram Mini App window.location.href is
+        // unreliable (especially on iOS), so prefer WebApp.openLink with fallbacks.
+        openPaymentLink(data.confirmationUrl);
       } else {
         toast({
           title: t.common.error,

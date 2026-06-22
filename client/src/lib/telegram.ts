@@ -83,6 +83,33 @@ export function openLink(url: string) {
 }
 
 /**
+ * Reliably open an external payment URL from inside the Telegram Mini App.
+ * window.location.href is unreliable in the Mini App (especially on iOS), so we
+ * prefer WebApp.openLink and fall back to window.open / location only if needed.
+ */
+export function openPaymentLink(url: string) {
+  if (!url) return;
+  try {
+    const tg = telegram as any;
+    if (tg && typeof tg.openLink === 'function') {
+      tg.openLink(url, { try_instant_view: false });
+      return;
+    }
+  } catch (err) {
+    console.warn('[Payment] WebApp.openLink failed, falling back:', err);
+  }
+
+  try {
+    const opened = window.open(url, '_blank');
+    if (opened) return;
+  } catch (err) {
+    console.warn('[Payment] window.open failed, falling back:', err);
+  }
+
+  window.location.href = url;
+}
+
+/**
  * Get the start parameter from Telegram WebApp
  * Returns the raw startParam value from various sources
  */
