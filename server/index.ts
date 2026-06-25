@@ -48,6 +48,31 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
+  // Run payment reconciliation every 2 hours to catch any missed webhook activations
+  const RECONCILE_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
+  const runReconciliation = async () => {
+    try {
+      const port = parseInt(process.env.PORT || '5000', 10);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const cronSecret = process.env.CRON_SECRET;
+      if (cronSecret) headers['x-cron-secret'] = cronSecret;
+
+      const res = await fetch(`http://localhost:${port}/api/cron/reconcile-payments`, {
+        method: 'POST',
+        headers,
+      });
+      const data = await res.json() as any;
+      console.log('[RECONCILE] Scheduled run result:', JSON.stringify(data.results));
+    } catch (err: any) {
+      console.error('[RECONCILE] Scheduled run failed:', err?.message);
+    }
+  };
+
+  // Initial run after 5 minutes (give server time to fully start)
+  setTimeout(runReconciliation, 5 * 60 * 1000);
+  // Repeat every 2 hours
+  setInterval(runReconciliation, RECONCILE_INTERVAL_MS);
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

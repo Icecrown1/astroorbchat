@@ -534,6 +534,27 @@ export const insertYookassaPaymentSchema = createInsertSchema(yookassaPayments, 
   status: true,
 });
 
+// Webhook error log — captures failed/partial webhook processing for debugging
+export const webhookErrors = pgTable("webhook_errors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentId: varchar("payment_id", { length: 255 }), // internal or external payment ID
+  provider: varchar("provider", { length: 50 }).notNull(), // 'yookassa', 'ton', 'stars'
+  errorMessage: text("error_message").notNull(),
+  payload: jsonb("payload"), // raw webhook body for replay
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  providerIdx: index("webhook_errors_provider_idx").on(table.provider),
+  createdAtIdx: index("webhook_errors_created_at_idx").on(table.createdAt),
+}));
+
+export const insertWebhookErrorSchema = createInsertSchema(webhookErrors, {
+  provider: z.string(),
+  errorMessage: z.string(),
+}).omit({ id: true, createdAt: true });
+
+export type WebhookError = typeof webhookErrors.$inferSelect;
+export type InsertWebhookError = z.infer<typeof insertWebhookErrorSchema>;
+
 // Instagram Lead Magnet table - stores leads from landing page before they join Telegram
 export const leads = pgTable("leads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

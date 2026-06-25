@@ -16,6 +16,7 @@ import {
   referralRewards,
   solarReturns,
   leads,
+  webhookErrors,
   type User, 
   type InsertUser,
   type Subscription,
@@ -47,10 +48,12 @@ import {
   type SolarReturn,
   type InsertSolarReturn,
   type Lead,
-  type InsertLead
+  type InsertLead,
+  type WebhookError,
+  type InsertWebhookError,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, lt } from "drizzle-orm";
+import { eq, and, desc, isNull, lt, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -149,6 +152,12 @@ export interface IStorage {
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: string, data: Partial<Lead>): Promise<Lead | undefined>;
   markLeadConverted(leadId: string, userId: string): Promise<Lead | undefined>;
+
+  // Webhook error logging
+  logWebhookError(data: InsertWebhookError): Promise<WebhookError>;
+
+  // Reconciliation: pending YooKassa payments older than N minutes (with a real YK payment ID)
+  getPendingYookassaPayments(olderThanMinutes: number): Promise<YookassaPayment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -805,6 +814,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(leads.id, leadId))
       .returning();
     return lead || undefined;
+  }
+
+  async logWebhookError(data: InsertWebhookError): Promise<WebhookError> {
+    const [record] = await db
+      .insert(webhookErrors)
+      .values(data)
+      .returning();
+    return record;
+  }
+
+  async getPendingYookassaPayments(olderThanMinutes: number): Promise<YookassaPayment[]> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    return await db
+      .select()
+      .from(yookassaPayments)
+      .where(
+        and(
+          ne(yookassaPayments.status, 'completed'),
+          ne(yookassaPayments.status, 'canceled'),
+          lt(yookassaPayments.createdAt, cutoff)
+        )
+      )
+      .orderBy(yookassaPayments.createdAt);
   }
 }
 

@@ -28,6 +28,8 @@ import { geocodeCityWithFallback, getTimezoneFromCity } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createPayment as createYooKassaPayment, getPayment as getYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
+import { activateSucceededYookassaPayment, reconcileYookassaPayment } from "./lib/paymentActivation";
+import { sendSupportAlert } from "./lib/support";
 import { getAllExchangeRates, forceRefreshAllRates, getCacheStatus } from "./lib/exchangeRates";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -3588,101 +3590,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const ykPayment = await getYooKassaPayment(dbPayment.yookassaPaymentId);
           console.log('[YooKassa Check] YooKassa payment status:', ykPayment.status);
 
-          // If succeeded on YooKassa side, credit energy/subscription
+          // If succeeded on YooKassa side, activate via shared function
           if (ykPayment.status === 'succeeded' && ykPayment.paid) {
-            console.log('[YooKassa Check] Payment succeeded, crediting...');
-
-            // Credit energy or activate subscription
-            if (dbPayment.kind === "energy_pack" && dbPayment.energyAmount) {
-              const user = await storage.getUser(dbPayment.userId);
-              if (user) {
-                const newEnergy = (user.purchasedEnergy || 0) + dbPayment.energyAmount;
-                await storage.updateUser(dbPayment.userId, {
-                  purchasedEnergy: newEnergy,
-                });
-                console.log(`[YooKassa Check] Credited ${dbPayment.energyAmount} energy orbs`);
-              }
-            } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
-              const normalizedTier = (dbPayment.tier === 'premium' || dbPayment.tier === 'pro') ? 'pro' : 'standard';
-              const startedAt = new Date();
-              const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
-
-              const existingSub = await storage.getSubscription(dbPayment.userId);
-              if (existingSub) {
-                await storage.updateSubscription(existingSub.id, {
-                  tier: normalizedTier,
-                  status: "active",
-                  currentPeriodEnd,
-                });
-              } else {
-                await storage.createSubscription({
-                  userId: dbPayment.userId,
-                  tier: normalizedTier,
-                  status: "active",
-                  startedAt,
-                  currentPeriodEnd,
-                });
-              }
-
-              const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-              const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
-              const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-              const user = await storage.getUser(dbPayment.userId);
-              if (user) {
-                await storage.updateUser(dbPayment.userId, {
-                  subscriptionOrbs: monthlyOrbs.toString(),
-                  orbsResetAt: dayjs().add(30, 'days').toDate(),
-                });
-              }
-
-              await handleSubscriptionReferralBonus(storage, dbPayment.userId);
-            } else if (dbPayment.kind === "subscription_upgrade") {
-              // Upgrade Standard → Premium: keep same expiry, just change tier + grant star diff
-              const existingSub = await storage.getSubscription(dbPayment.userId);
-              if (existingSub) {
-                await storage.updateSubscription(existingSub.id, {
-                  tier: 'pro',
-                  status: 'active',
-                });
-              }
-              const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-              const user = await storage.getUser(dbPayment.userId);
-              if (user) {
-                const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
-                const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard']; // 300
-                await storage.updateUser(dbPayment.userId, {
-                  subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
-                });
-              }
-              console.log(`[YooKassa Check] Upgraded to Premium for user ${dbPayment.userId}`);
-            } else if (dbPayment.kind === "subscription_renewal") {
-              // Renewal: extend currentPeriodEnd by 30 days, reset orbs
-              const existingSub = await storage.getSubscription(dbPayment.userId);
-              if (existingSub) {
-                const base = new Date(existingSub.currentPeriodEnd) > new Date()
-                  ? new Date(existingSub.currentPeriodEnd)
-                  : new Date();
-                const newPeriodEnd = dayjs(base).add(30, 'days').toDate();
-                await storage.updateSubscription(existingSub.id, {
-                  status: 'active',
-                  currentPeriodEnd: newPeriodEnd,
-                });
-                const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-                const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
-                const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-                await storage.updateUser(dbPayment.userId, {
-                  subscriptionOrbs: monthlyOrbs.toString(),
-                  orbsResetAt: dayjs().add(30, 'days').toDate(),
-                });
-              }
-              console.log(`[YooKassa Check] Renewed subscription for user ${dbPayment.userId}`);
-            }
-
-            // Mark as completed
-            await storage.updateYookassaPayment(dbPayment.id, {
-              status: 'completed',
-              completedAt: new Date(),
-            });
+            console.log('[YooKassa Check] Payment succeeded, activating...');
+            await activateSucceededYookassaPayment(dbPayment, ykPayment, storage);
 
             return res.json({
               ok: true,
@@ -3794,131 +3705,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[YooKassa Webhook] Processing payment:', dbPayment.id);
       console.log('[YooKassa Webhook] Payment kind:', dbPayment.kind);
 
-      // Credit energy or activate subscription
-      if (dbPayment.kind === "energy_pack" && dbPayment.energyAmount) {
-        console.log('[YooKassa Webhook] Processing energy pack:', dbPayment.energyAmount, 'orbs');
-        const user = await storage.getUser(dbPayment.userId);
-        if (user) {
-          const oldEnergy = user.purchasedEnergy || 0;
-          const newEnergy = oldEnergy + dbPayment.energyAmount;
-          await storage.updateUser(dbPayment.userId, {
-            purchasedEnergy: newEnergy,
-          });
-          console.log(`[YooKassa Webhook] ✓ Credited energy: ${oldEnergy} → ${newEnergy} (user: ${dbPayment.userId})`);
-        }
-      } else if (dbPayment.kind === "subscription" && dbPayment.tier) {
-        const dbTier = dbPayment.tier;
-        const normalizedTier = (dbTier === 'premium' || dbTier === 'pro') ? 'pro' : 'standard';
-        
-        // Get metadata from webhook (periodMonths, autoRenew)
-        const periodMonths = payment.metadata?.periodMonths || 1;
-        const autoRenew = payment.metadata?.autoRenew === true || payment.metadata?.autoRenew === 'true';
-        
-        // Extract saved payment method ID if payment method was saved
-        const paymentMethodId = payment.payment_method?.saved ? payment.payment_method.id : null;
-        
-        console.log('[YooKassa Webhook] Subscription details:', {
-          tier: normalizedTier,
-          periodMonths,
-          autoRenew,
-          paymentMethodSaved: !!paymentMethodId,
-        });
-        
-        const startedAt = new Date();
-        const currentPeriodEnd = dayjs(startedAt).add(periodMonths, "month").toDate();
+      // Activate via shared function (idempotent)
+      const activationResult = await activateSucceededYookassaPayment(dbPayment, payment, storage);
+      console.log(`[YooKassa Webhook] Activation result: ${JSON.stringify(activationResult)}`);
 
-        const existingSub = await storage.getSubscription(dbPayment.userId);
-        
-        // Subscription data with auto-renewal fields
-        const subscriptionData = {
-          tier: normalizedTier,
-          status: "active" as const,
-          currentPeriodEnd,
-          autoRenew,
-          paymentMethodId,
-          paymentProvider: 'yookassa' as const,
-          periodMonths,
-          amountRUB: dbPayment.amountRUB,
-        };
-        
-        if (existingSub) {
-          await storage.updateSubscription(existingSub.id, subscriptionData);
-        } else {
-          await storage.createSubscription({
-            userId: dbPayment.userId,
-            startedAt,
-            ...subscriptionData,
-          });
-        }
-
-        // Credit subscription orbs using the new system
-        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-        const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
-        const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-        const user = await storage.getUser(dbPayment.userId);
-        if (user) {
-          await storage.updateUser(dbPayment.userId, {
-            subscriptionOrbs: monthlyOrbs.toString(),
-            orbsResetAt: dayjs().add(30, 'days').toDate(),
-          });
-        }
-
-        await handleSubscriptionReferralBonus(storage, dbPayment.userId);
-        console.log(`[YooKassa Webhook] Activated ${normalizedTier} subscription for user ${dbPayment.userId} (period: ${periodMonths}mo, autoRenew: ${autoRenew}, orbs: ${monthlyOrbs})`);
-      } else if (dbPayment.kind === "subscription_upgrade") {
-        // Upgrade Standard → Premium: keep same expiry, upgrade tier, grant star difference
-        const existingSub = await storage.getSubscription(dbPayment.userId);
-        if (existingSub) {
-          await storage.updateSubscription(existingSub.id, {
-            tier: 'pro',
-            status: 'active',
-            paymentProvider: 'yookassa',
-          });
-        }
-        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-        const user = await storage.getUser(dbPayment.userId);
-        if (user) {
-          const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
-          const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard'];
-          await storage.updateUser(dbPayment.userId, {
-            subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
-          });
-        }
-        console.log(`[YooKassa Webhook] ✓ Upgraded to Premium for user ${dbPayment.userId}`);
-      } else if (dbPayment.kind === "subscription_renewal") {
-        // Renewal: extend currentPeriodEnd by 30 days from current end (not from now), reset orbs
-        const existingSub = await storage.getSubscription(dbPayment.userId);
-        if (existingSub) {
-          const base = new Date(existingSub.currentPeriodEnd) > new Date()
-            ? new Date(existingSub.currentPeriodEnd)
-            : new Date();
-          const newPeriodEnd = dayjs(base).add(30, 'days').toDate();
-          await storage.updateSubscription(existingSub.id, {
-            status: 'active',
-            currentPeriodEnd: newPeriodEnd,
-            paymentProvider: 'yookassa',
-          });
-          const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-          const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
-          const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-          await storage.updateUser(dbPayment.userId, {
-            subscriptionOrbs: monthlyOrbs.toString(),
-            orbsResetAt: dayjs().add(30, 'days').toDate(),
-          });
-          console.log(`[YooKassa Webhook] ✓ Renewed subscription for user ${dbPayment.userId} until ${newPeriodEnd}`);
-        }
-      }
-
-      // Mark payment as completed
-      await storage.updateYookassaPayment(dbPayment.id, {
-        status: 'completed',
-        completedAt: new Date(),
-      });
-
-      console.log('[YooKassa Webhook] Payment completed successfully');
       res.json({ ok: true });
     } catch (error: any) {
       console.error('[YooKassa Webhook] Error:', error);
+      // Log the error to the database for debugging / replay
+      try {
+        await storage.logWebhookError({
+          paymentId: req.body?.object?.id || req.body?.object?.metadata?.internalPaymentId || null,
+          provider: 'yookassa',
+          errorMessage: error?.message || String(error),
+          payload: req.body || null,
+        });
+      } catch (logErr) {
+        console.error('[YooKassa Webhook] Failed to log webhook error:', logErr);
+      }
+      // Alert support immediately so a human can investigate / manually activate
+      await sendSupportAlert(
+        'Ошибка обработки вебхука ЮKassa',
+        `Вебхук получен, но активация не прошла.\n` +
+        `Ошибка: ${error?.message}\n` +
+        `paymentId: ${req.body?.object?.id || 'unknown'}\n` +
+        `internalId: ${req.body?.object?.metadata?.internalPaymentId || 'unknown'}`
+      ).catch(() => {});
       res.status(500).json({ ok: false, error: error.message });
     }
   });
@@ -4042,6 +3854,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true, results });
     } catch (error: any) {
       console.error('[CRON] Subscription check error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Reconciliation cron: find pending YooKassa payments and activate them if YK says succeeded
+  // Call every 2 hours via external cron or internal setInterval. Secured by x-cron-secret.
+  app.post("/api/cron/reconcile-payments", async (req, res) => {
+    try {
+      const cronSecret = req.headers['x-cron-secret'];
+      const expectedSecret = process.env.CRON_SECRET;
+      if (expectedSecret && cronSecret !== expectedSecret) {
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
+      }
+
+      console.log('[RECONCILE] Starting payment reconciliation...');
+      const pendingPayments = await storage.getPendingYookassaPayments(10); // older than 10 min
+      console.log(`[RECONCILE] Found ${pendingPayments.length} pending payments`);
+
+      const results = { activated: 0, alreadyDone: 0, notSucceeded: 0, noYkId: 0, errors: 0 };
+
+      for (const payment of pendingPayments) {
+        const result = await reconcileYookassaPayment(payment as any, storage);
+        results[result.action === 'activated' ? 'activated'
+          : result.action === 'alreadyDone' ? 'alreadyDone'
+          : result.action === 'notSucceeded' ? 'notSucceeded'
+          : result.action === 'noYkId' ? 'noYkId'
+          : 'errors']++;
+        if (result.action === 'activated') {
+          console.log(`[RECONCILE] ✓ Activated payment ${payment.id}: ${result.message}`);
+        }
+      }
+
+      console.log('[RECONCILE] Done:', results);
+      res.json({ ok: true, results });
+    } catch (error: any) {
+      console.error('[RECONCILE] Error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Admin: force-activate a specific YooKassa payment by its YooKassa payment ID
+  app.post("/api/admin/payments/force-activate", requireAdmin, async (req, res) => {
+    try {
+      const { yookassaPaymentId } = req.body;
+      if (!yookassaPaymentId || typeof yookassaPaymentId !== 'string') {
+        return res.status(400).json({ ok: false, error: "yookassaPaymentId is required" });
+      }
+
+      const dbPayment = await storage.getYookassaPaymentById(yookassaPaymentId);
+      if (!dbPayment) {
+        return res.status(404).json({ ok: false, error: "Payment not found in database" });
+      }
+
+      const ykPayment = await getYooKassaPayment(yookassaPaymentId);
+      if (ykPayment.status !== 'succeeded' || !ykPayment.paid) {
+        return res.status(400).json({
+          ok: false,
+          error: `Payment is not succeeded on YooKassa side (status: ${ykPayment.status})`,
+        });
+      }
+
+      const result = await activateSucceededYookassaPayment(dbPayment as any, ykPayment, storage);
+      console.log(`[ADMIN] Force-activated payment ${yookassaPaymentId}:`, result);
+
+      res.json({ ok: true, result, userId: dbPayment.userId, kind: dbPayment.kind });
+    } catch (error: any) {
+      console.error('[ADMIN] Force-activate error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
