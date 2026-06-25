@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, MessageCircle } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
@@ -24,6 +24,9 @@ import { Locale } from '@/lib/translations';
 import type { User, Subscription } from '@shared/schema';
 import dayjs from 'dayjs';
 import { useEffect, useMemo } from 'react';
+
+const SUPPORT_USERNAME =
+  (import.meta.env.VITE_SUPPORT_USERNAME || import.meta.env.VITE_BOT_USERNAME || 'AstroOrbBot').replace('@', '');
 
 interface UserMeResponse {
   ok: boolean;
@@ -285,6 +288,28 @@ export default function Settings() {
               )}
             </Button>
           </form>
+        </Card>
+
+        <Card className="p-6 mt-4">
+          <h3 className="text-lg font-semibold mb-1">
+            {locale === 'ru' ? 'Поддержка' : 'Support'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {locale === 'ru'
+              ? 'Возникли вопросы или проблемы с платежом? Напишите нам.'
+              : 'Have questions or a payment issue? Get in touch.'}
+          </p>
+          <a
+            href={`https://t.me/${SUPPORT_USERNAME}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="link-support-settings"
+          >
+            <Button variant="outline" className="gap-2">
+              <MessageCircle className="w-4 h-4" />
+              {locale === 'ru' ? 'Связаться с поддержкой' : 'Contact Support'}
+            </Button>
+          </a>
         </Card>
 
       </div>
