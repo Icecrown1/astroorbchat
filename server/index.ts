@@ -46,6 +46,11 @@ app.use((req, res, next) => {
   }
   console.log('[STARTUP] ✓ All required secrets configured');
 
+  // SUPPORT_CHAT_ID is optional but important — warn if missing so misconfiguration is caught early
+  if (!process.env.SUPPORT_CHAT_ID) {
+    console.warn('[STARTUP] WARNING: SUPPORT_CHAT_ID is not set — support alerts will be dropped to console instead of sent via Telegram');
+  }
+
   const server = await registerRoutes(app);
 
   // Run payment reconciliation every 2 hours to catch any missed webhook activations
