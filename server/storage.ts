@@ -843,6 +843,7 @@ export class DatabaseStorage implements IStorage {
         and(
           ne(yookassaPayments.status, 'completed'),
           ne(yookassaPayments.status, 'canceled'),
+          ne(yookassaPayments.status, 'failed'),
           lt(yookassaPayments.createdAt, cutoff)
         )
       )

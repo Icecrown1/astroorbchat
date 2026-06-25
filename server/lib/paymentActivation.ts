@@ -186,10 +186,29 @@ export async function reconcileYookassaPayment(
       return { action: 'activated', message: `Activated after ${minutesLate}min delay` };
     }
 
-    // Payment was cancelled or still pending
+    // Terminal failure states — mark as failed in our DB so they stop showing as "processing"
+    const terminalFailedStatuses = ['canceled', 'expired'];
+    if (terminalFailedStatuses.includes(ykPayment.status)) {
+      await storage.updateYookassaPayment(dbPayment.id, { status: 'failed' });
+      console.log(`[RECONCILE] Marked payment ${dbPayment.id} as failed (YK status: ${ykPayment.status})`);
+      return { action: 'notSucceeded', message: `Marked failed — YK status: ${ykPayment.status}` };
+    }
+
+    // Still pending on YooKassa side (waiting_for_capture, etc.)
     return { action: 'notSucceeded', message: `YK status: ${ykPayment.status}` };
   } catch (err: any) {
-    console.error(`[RECONCILE] Error checking payment ${dbPayment.id}:`, err?.message);
-    return { action: 'error', message: err?.message };
+    const errMsg: string = err?.message || '';
+    // 404 / payment not found in YooKassa — happens for very old payments; mark as failed
+    if (err?.status === 404 || errMsg.includes('404') || errMsg.toLowerCase().includes('not found')) {
+      try {
+        await storage.updateYookassaPayment(dbPayment.id, { status: 'failed' });
+        console.log(`[RECONCILE] Marked payment ${dbPayment.id} as failed (YK 404 — payment not found)`);
+      } catch (updateErr: any) {
+        console.error(`[RECONCILE] Could not mark payment ${dbPayment.id} as failed:`, updateErr?.message);
+      }
+      return { action: 'error', message: `YK 404 — marked failed` };
+    }
+    console.error(`[RECONCILE] Error checking payment ${dbPayment.id}:`, errMsg);
+    return { action: 'error', message: errMsg };
   }
 }

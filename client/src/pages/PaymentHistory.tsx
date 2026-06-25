@@ -23,7 +23,7 @@ interface Payment {
 
 export default function PaymentHistory() {
   const [, navigate] = useLocation();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data, isLoading, error } = useQuery<{ ok: boolean; data: Payment[] }>({
     queryKey: ["/api/payments/history"],
   });
@@ -44,13 +44,17 @@ export default function PaymentHistory() {
     return payment.kind;
   };
 
-  const getStatusColor = (status: string) => {
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  const getStatusColor = (status: string, createdAt: string) => {
     switch (status) {
       case "completed":
       case "confirmed":
         return "default";
-      case "pending":
-        return "secondary";
+      case "pending": {
+        const isOld = Date.now() - new Date(createdAt).getTime() > ONE_DAY_MS;
+        return isOld ? "destructive" : "secondary";
+      }
       case "failed":
         return "destructive";
       default:
@@ -58,14 +62,18 @@ export default function PaymentHistory() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string, createdAt: string) => {
     switch (status) {
       case "completed":
         return t.paymentHistory.completed;
       case "confirmed":
         return t.paymentHistory.confirmed;
-      case "pending":
-        return t.paymentHistory.pending;
+      case "pending": {
+        const isOld = Date.now() - new Date(createdAt).getTime() > ONE_DAY_MS;
+        return isOld
+          ? (locale === 'ru' ? 'Не завершён' : 'Not completed')
+          : t.paymentHistory.pending;
+      }
       case "failed":
         return t.paymentHistory.failed;
       default:
@@ -170,8 +178,8 @@ export default function PaymentHistory() {
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge variant={getStatusColor(payment.status)} data-testid={`badge-status-${payment.id}`}>
-                      {getStatusLabel(payment.status)}
+                    <Badge variant={getStatusColor(payment.status, payment.createdAt)} data-testid={`badge-status-${payment.id}`}>
+                      {getStatusLabel(payment.status, payment.createdAt)}
                     </Badge>
                   </div>
                 </CardHeader>
