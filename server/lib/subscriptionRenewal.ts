@@ -1,4 +1,5 @@
 import { createRecurringPayment } from './yookassa';
+import { sendSupportAlert } from './support';
 import dayjs from 'dayjs';
 import { nanoid } from 'nanoid';
 
@@ -106,6 +107,11 @@ export async function processAutoRenewal(
         paymentMethodId: null,
       });
 
+      await sendSupportAlert(
+        'Auto-renewal payment failed',
+        `userId: ${userId}\nsubscriptionId: ${id}\ntier: ${tier}\nYooKassa payment ID: ${payment.id}\nstatus: ${payment.status}`
+      );
+
       return {
         success: false,
         subscriptionId: id,
@@ -122,6 +128,11 @@ export async function processAutoRenewal(
     await storage.updateSubscription(id, {
       autoRenew: false,
     });
+
+    await sendSupportAlert(
+      'Auto-renewal processing error',
+      `userId: ${userId}\nsubscriptionId: ${id}\ntier: ${tier}\nerror: ${error.message}`
+    );
 
     return {
       success: false,
