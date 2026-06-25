@@ -169,17 +169,19 @@ export async function reconcileYookassaPayment(
         return { action: 'alreadyDone', message: result.message };
       }
 
-      // Alert support that we auto-recovered a missed payment
+      // Alert support only when payment has been succeeded for >30 minutes without activation
       const minutesLate = Math.round((Date.now() - new Date(dbPayment.createdAt).getTime()) / 60000);
-      await sendSupportAlert(
-        'Платёж восстановлен автоматически',
-        `Платёж был успешен на стороне ЮKassa, но не активирован вовремя.\n` +
-        `Восстановлено через: ${minutesLate} мин\n` +
-        `userId: ${dbPayment.userId}\n` +
-        `kind: ${dbPayment.kind}${dbPayment.tier ? ` (${dbPayment.tier})` : ''}\n` +
-        `amountRUB: ${dbPayment.amountRUB}\n` +
-        `yookassaPaymentId: ${dbPayment.yookassaPaymentId}`
-      );
+      if (minutesLate >= 30) {
+        await sendSupportAlert(
+          'Платёж восстановлен автоматически (>30 мин задержки)',
+          `Платёж был успешен на стороне ЮKassa, но не активирован вовремя.\n` +
+          `Восстановлено через: ${minutesLate} мин\n` +
+          `userId: ${dbPayment.userId}\n` +
+          `kind: ${dbPayment.kind}${dbPayment.tier ? ` (${dbPayment.tier})` : ''}\n` +
+          `amountRUB: ${dbPayment.amountRUB}\n` +
+          `yookassaPaymentId: ${dbPayment.yookassaPaymentId}`
+        );
+      }
 
       return { action: 'activated', message: `Activated after ${minutesLate}min delay` };
     }

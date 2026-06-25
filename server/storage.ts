@@ -158,6 +158,7 @@ export interface IStorage {
 
   // Reconciliation: pending YooKassa payments older than N minutes (with a real YK payment ID)
   getPendingYookassaPayments(olderThanMinutes: number): Promise<YookassaPayment[]>;
+  getPendingTonPayments(olderThanMinutes: number): Promise<Payment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -837,6 +838,20 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(yookassaPayments.createdAt);
+  }
+
+  async getPendingTonPayments(olderThanMinutes: number): Promise<Payment[]> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    return await db
+      .select()
+      .from(payments)
+      .where(
+        and(
+          eq(payments.status, 'pending'),
+          lt(payments.createdAt, cutoff)
+        )
+      )
+      .orderBy(payments.createdAt);
   }
 }
 

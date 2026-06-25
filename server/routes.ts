@@ -3869,23 +3869,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[RECONCILE] Starting payment reconciliation...');
-      const pendingPayments = await storage.getPendingYookassaPayments(10); // older than 10 min
-      console.log(`[RECONCILE] Found ${pendingPayments.length} pending payments`);
 
-      const results = { activated: 0, alreadyDone: 0, notSucceeded: 0, noYkId: 0, errors: 0 };
+      // 1. YooKassa: check all non-completed/non-canceled payments older than 10 min
+      const pendingYkPayments = await storage.getPendingYookassaPayments(10);
+      console.log(`[RECONCILE] Found ${pendingYkPayments.length} pending YooKassa payments`);
 
-      for (const payment of pendingPayments) {
+      const ykResults = { activated: 0, alreadyDone: 0, notSucceeded: 0, noYkId: 0, errors: 0 };
+      for (const payment of pendingYkPayments) {
         const result = await reconcileYookassaPayment(payment as any, storage);
-        results[result.action === 'activated' ? 'activated'
+        ykResults[result.action === 'activated' ? 'activated'
           : result.action === 'alreadyDone' ? 'alreadyDone'
           : result.action === 'notSucceeded' ? 'notSucceeded'
           : result.action === 'noYkId' ? 'noYkId'
           : 'errors']++;
         if (result.action === 'activated') {
-          console.log(`[RECONCILE] ✓ Activated payment ${payment.id}: ${result.message}`);
+          console.log(`[RECONCILE] ✓ YK activated ${payment.id}: ${result.message}`);
         }
       }
 
+      // 2. TON / Telegram Stars: alert support for any payment stuck pending >1 hour
+      // These cannot be auto-activated (require blockchain lookup), but we alert support.
+      const pendingTonPayments = await storage.getPendingTonPayments(60); // older than 60 min
+      console.log(`[RECONCILE] Found ${pendingTonPayments.length} pending TON/Stars payments (>1h)`);
+
+      let tonAlertsCount = 0;
+      for (const payment of pendingTonPayments) {
+        const minutesOld = Math.round((Date.now() - new Date(payment.createdAt).getTime()) / 60000);
+        await sendSupportAlert(
+          'TON/Stars платёж завис в статусе pending',
+          `Платёж не подтверждён более ${minutesOld} минут.\n` +
+          `Требуется ручная проверка блокчейн-транзакции.\n` +
+          `userId: ${payment.userId}\n` +
+          `paymentId: ${payment.id}\n` +
+          `kind: ${payment.kind}\n` +
+          `amountTON: ${payment.amountTON}\n` +
+          `walletAddress: ${payment.userWalletAddress || 'unknown'}\n` +
+          `createdAt: ${payment.createdAt.toISOString()}`
+        ).catch((e: any) => console.error('[RECONCILE] TON alert failed:', e?.message));
+        tonAlertsCount++;
+      }
+
+      const results = { yookassa: ykResults, tonStarsAlerts: tonAlertsCount };
       console.log('[RECONCILE] Done:', results);
       res.json({ ok: true, results });
     } catch (error: any) {
@@ -3894,10 +3918,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: force-activate a specific YooKassa payment by its YooKassa payment ID
+  // Admin: force-activate a specific YooKassa payment by userId + yookassaPaymentId
   app.post("/api/admin/payments/force-activate", requireAdmin, async (req, res) => {
     try {
-      const { yookassaPaymentId } = req.body;
+      const { userId, yookassaPaymentId } = req.body;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ ok: false, error: "userId is required" });
+      }
       if (!yookassaPaymentId || typeof yookassaPaymentId !== 'string') {
         return res.status(400).json({ ok: false, error: "yookassaPaymentId is required" });
       }
@@ -3905,6 +3932,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dbPayment = await storage.getYookassaPaymentById(yookassaPaymentId);
       if (!dbPayment) {
         return res.status(404).json({ ok: false, error: "Payment not found in database" });
+      }
+
+      // Verify the payment belongs to the specified user
+      if (dbPayment.userId !== userId) {
+        return res.status(403).json({
+          ok: false,
+          error: `Payment ${yookassaPaymentId} belongs to a different user`,
+        });
       }
 
       const ykPayment = await getYooKassaPayment(yookassaPaymentId);
@@ -3916,7 +3951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await activateSucceededYookassaPayment(dbPayment as any, ykPayment, storage);
-      console.log(`[ADMIN] Force-activated payment ${yookassaPaymentId}:`, result);
+      console.log(`[ADMIN] Force-activated payment ${yookassaPaymentId} for user ${userId}:`, result);
 
       res.json({ ok: true, result, userId: dbPayment.userId, kind: dbPayment.kind });
     } catch (error: any) {
