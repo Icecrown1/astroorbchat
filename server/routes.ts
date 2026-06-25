@@ -3751,6 +3751,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: list all pending/non-completed YooKassa payments with user info
+  app.get("/api/admin/payments/pending", requireAdmin, async (req, res) => {
+    try {
+      const pendingPayments = await storage.getPendingYookassaPayments(0);
+      const enriched = await Promise.all(
+        pendingPayments.map(async (p) => {
+          const user = await storage.getUser(p.userId);
+          return { ...p, userName: user?.name || p.userId };
+        })
+      );
+      res.json({ ok: true, payments: enriched });
+    } catch (error: any) {
+      console.error('[Admin] Pending payments error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Admin: list recent webhook errors
+  app.get("/api/admin/payments/webhook-errors", requireAdmin, async (req, res) => {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const errors = await storage.getRecentWebhookErrors(limit);
+      res.json({ ok: true, errors });
+    } catch (error: any) {
+      console.error('[Admin] Webhook errors fetch error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/.well-known/tonconnect-manifest.json", (req, res) => {
     res.json({
       url: process.env.SERVER_URL || "https://astro-orb.replit.app",

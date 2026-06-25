@@ -155,6 +155,7 @@ export interface IStorage {
 
   // Webhook error logging
   logWebhookError(data: InsertWebhookError): Promise<WebhookError>;
+  getRecentWebhookErrors(limit: number): Promise<WebhookError[]>;
 
   // Reconciliation: pending YooKassa payments older than N minutes (with a real YK payment ID)
   getPendingYookassaPayments(olderThanMinutes: number): Promise<YookassaPayment[]>;
@@ -823,6 +824,14 @@ export class DatabaseStorage implements IStorage {
       .values(data)
       .returning();
     return record;
+  }
+
+  async getRecentWebhookErrors(limit: number): Promise<WebhookError[]> {
+    return await db
+      .select()
+      .from(webhookErrors)
+      .orderBy(desc(webhookErrors.createdAt))
+      .limit(limit);
   }
 
   async getPendingYookassaPayments(olderThanMinutes: number): Promise<YookassaPayment[]> {
