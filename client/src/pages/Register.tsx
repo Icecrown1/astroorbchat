@@ -22,7 +22,7 @@ import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { getInitData, getReferralCode, getLeadIdFromStartParam } from '@/lib/telegram';
+import { getInitData, getReferralCode, getLeadIdFromStartParam, getWebSourceFromStartParam } from '@/lib/telegram';
 interface LeadData {
   id: string;
   name: string;
@@ -341,6 +341,7 @@ export default function Register() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           initData: initData || '', // Allow empty initData if override is enabled
+          signupSource: getWebSourceFromStartParam() || undefined,
           ...finalData 
         }),
         credentials: 'include',

@@ -1217,3 +1217,87 @@ ${labels.planets}: ${planetPositions}${transitsInfo}
     throw new Error('Failed to parse monthly plan response');
   }
 }
+
+// ============================================================
+// Generic per-sign daily horoscope for the SEO website
+// (public, non-personalized; cached per sign per day)
+// ============================================================
+
+export interface SignDayHoroscope {
+  intro: string;
+  work: string;
+  love: string;
+  care: string;
+  advice: string;
+  lucky: number;
+}
+
+const signHoroscopeCache = new Map<string, { date: string; data: SignDayHoroscope }>();
+
+/**
+ * Generates (or returns cached) generic daily horoscope for a sun sign.
+ * Cache key = sign slug; invalidated when the Moscow date changes.
+ * Max 12 GPT calls per day across all signs.
+ */
+export async function generateSignHoroscope(
+  signSlug: string,
+  signRu: string,
+  locale: string = 'ru'
+): Promise<SignDayHoroscope> {
+  const todayMsk = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' }); // YYYY-MM-DD
+
+  const cached = signHoroscopeCache.get(signSlug);
+  if (cached && cached.date === todayMsk) {
+    return cached.data;
+  }
+
+  const dateRu = new Date().toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
+  });
+
+  const promptText = loadPrompt('horoscope_sign', {
+    sign: signRu,
+    date: dateRu,
+  });
+
+  const languageInstruction = locale === 'ru'
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке.'
+    : 'IMPORTANT: Respond STRICTLY in English.';
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: "Ты опытный астролог-практик. Даёшь структурированные гороскопы с практичными советами. Возвращаешь только валидный JSON."
+      },
+      {
+        role: "user",
+        content: `${languageInstruction}\n\n${promptText}`
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 1200
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('Failed to generate sign horoscope');
+  }
+
+  const parsed = JSON.parse(content);
+  const data: SignDayHoroscope = {
+    intro: String(parsed.intro || ''),
+    work: String(parsed.work || ''),
+    love: String(parsed.love || ''),
+    care: String(parsed.care || ''),
+    advice: String(parsed.advice || ''),
+    lucky: Math.min(99, Math.max(1, parseInt(parsed.lucky, 10) || 7)),
+  };
+
+  signHoroscopeCache.set(signSlug, { date: todayMsk, data });
+  return data;
+}

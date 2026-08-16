@@ -151,6 +151,19 @@ export function getStartParam(): string | null {
 }
 
 /**
+ * Extract web attribution source from start parameter (format: web_{page}_{cta})
+ * Set by the SEO website deep-links: t.me/<bot>?start=web_pricing_premium
+ */
+export function getWebSourceFromStartParam(): string | null {
+  const startParam = getStartParam();
+  if (startParam && startParam.startsWith('web_')) {
+    console.log('[WebSource] Found web attribution:', startParam);
+    return startParam;
+  }
+  return null;
+}
+
+/**
  * Extract lead ID from start parameter (format: lead_xxx)
  */
 export function getLeadIdFromStartParam(): string | null {

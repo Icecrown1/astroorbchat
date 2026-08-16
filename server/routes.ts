@@ -65,6 +65,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { initData, name, gender, birthdayDate, birthTime, birthPlace } = req.body;
       const timezone = birthPlace ? await getTimezoneFromCity(birthPlace) : "Europe/Moscow";
 
+      // Web attribution: start_param like web_{page}_{cta} forwarded by the client
+      const signupSource = (typeof req.body.signupSource === 'string' && /^web_[a-z0-9_-]{1,60}$/i.test(req.body.signupSource))
+        ? req.body.signupSource.slice(0, 64)
+        : null;
+
       // Check if test auth is allowed
       const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
       const hasInitData = initData && initData.length > 0;
@@ -119,6 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             birthPlace: birthPlace || null,
             timezone: timezone || "Europe/Moscow",
             referralCode,
+            signupSource,
           });
         } else {
           // Minimal registration - just create user profile
@@ -134,6 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             birthPlace: null,
             timezone: "Europe/Moscow",
             referralCode,
+            signupSource,
           });
         }
 
@@ -4143,6 +4150,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // LEAD MAGNET ENDPOINTS (PUBLIC - NO AUTH)
   // ==========================================
 
+  // Public generic daily horoscope per sun sign — consumed by the SEO website (ISR).
+  // Cached in-memory per sign per Moscow day => max 12 OpenAI calls/day.
+  app.get("/api/public/sign-horoscope/:sign", async (req, res) => {
+    try {
+      const SIGN_RU: Record<string, string> = {
+        aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак',
+        leo: 'Лев', virgo: 'Дева', libra: 'Весы', scorpio: 'Скорпион',
+        sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
+      };
+      const slug = String(req.params.sign || '').toLowerCase();
+      const signRu = SIGN_RU[slug];
+      if (!signRu) {
+        return res.status(404).json({ ok: false, error: 'Unknown sign' });
+      }
+
+      const { generateSignHoroscope } = await import('./lib/openai.js');
+      const data = await generateSignHoroscope(slug, signRu, 'ru');
+
+      // Cacheable by CDN/proxies until next Moscow day (max 24h)
+      res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.json({ ok: true, sign: slug, data });
+    } catch (error: any) {
+      console.error('[PUBLIC_SIGN_HOROSCOPE] Error:', error);
+      res.status(503).json({ ok: false, error: 'Horoscope generation temporarily unavailable' });
+    }
+  });
+
   // Calculate horoscope for lead magnet (Instagram landing page)
   app.post("/api/lead/calculate", async (req, res) => {
     try {
@@ -4231,7 +4265,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transitsInNatalHouses = mapTransitsToNatalHouses(transits, natalChart);
       console.log('[LEAD] Transits mapped to natal houses');
 
-      // Generate personalized MONTHLY horoscope using OpenAI (December 2024)
+      // Generate personalized MONTHLY horoscope using OpenAI for the CURRENT month
+      const RU_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+      const currentMonthRu = `${RU_MONTHS[nowTime.month()]} ${nowTime.year()}`;
       const horoscopeResult = await interpretHoroscope({
         profile: {
           name,
@@ -4240,9 +4276,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         natal: natalChart,
         transits: transitsInNatalHouses,
-      }, 'ru', 'monthly', 'Декабрь 2024');
+      }, 'ru', 'monthly', currentMonthRu);
 
       console.log('[LEAD] Monthly horoscope generated successfully');
+
+      // Traffic source: 'instagram' by default, website sends its own (e.g. 'website_natal-chart')
+      const leadSource = (typeof req.body.source === 'string' && /^[a-z0-9_-]{1,50}$/i.test(req.body.source))
+        ? req.body.source
+        : 'instagram';
 
       // Create lead in database
       const lead = await storage.createLead({
@@ -4253,7 +4294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthPlace,
         timezone,
         email: email || null,
-        source: 'instagram',
+        source: leadSource,
       });
 
       // Update lead with calculated data
@@ -4279,9 +4320,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           leadId: lead.id,
           sunSign: getZodiacSignRu(sunSign),
           ascendant: ascendantSign ? getZodiacSignRu(ascendantSign) : null,
-          monthName: 'Декабрь 2024',
+          monthName: currentMonthRu,
           horoscope: {
-            overview: horoscopeResult.overview || 'Декабрь принесёт интересные возможности',
+            overview: horoscopeResult.overview || 'Этот месяц принесёт интересные возможности',
             money: horoscopeResult.money || 'Благоприятный период для финансовых дел',
             work: horoscopeResult.work || 'Хорошие карьерные перспективы',
             love: horoscopeResult.love || 'Гармоничные отношения с близкими',

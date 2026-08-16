@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   lastProfileUpdate: timestamp("last_profile_update"),
   referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
   referredById: varchar("referred_by_id", { length: 255 }),
+  signupSource: varchar("signup_source", { length: 64 }), // Web attribution: start_param web_{page}_{cta}
   isAdmin: boolean("is_admin").notNull().default(false),
   natalChart: jsonb("natal_chart"),
 }, (table) => ({

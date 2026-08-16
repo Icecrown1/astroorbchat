@@ -120,7 +120,11 @@ export default function LeadMagnet() {
             Astro Orb
           </h1>
           <p className="text-muted-foreground">
-            Персональный прогноз на декабрь 2024
+            Персональный прогноз на {(() => {
+              const m = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+              const now = new Date();
+              return `${m[now.getMonth()]} ${now.getFullYear()}`;
+            })()}
           </p>
         </motion.div>
 

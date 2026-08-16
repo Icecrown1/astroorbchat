@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/store/useAuth";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getInitData, getReferralCode, getTelegramUser } from "@/lib/telegram";
+import { getInitData, getReferralCode, getTelegramUser, getWebSourceFromStartParam } from "@/lib/telegram";
 
 declare global {
   interface Window {
@@ -59,6 +59,7 @@ export default function Login() {
         initData,
         name: tgUser?.first_name || "User",
         referralCode: referralCode || undefined,
+        signupSource: getWebSourceFromStartParam() || undefined,
       });
       
       if (response?.ok && response?.data) {
