@@ -50,7 +50,7 @@ export default function Matrix() {
   const [tapped, setTapped] = useState<OctagramNode | null>(null);
   const [pendingSection, setPendingSection] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<MatrixResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<MatrixResponse>({
     queryKey: ['/api/matrix/me', locale],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/matrix/me?locale=${locale}`);
@@ -120,7 +120,14 @@ export default function Matrix() {
           </div>
         </div>
 
-        {isLoading || !core ? (
+        {isError ? (
+          <Card className="p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              {ru ? 'Не получилось построить матрицу. Проверьте соединение и попробуйте ещё раз.' : 'Could not build the matrix. Check your connection and try again.'}
+            </p>
+            <Button className="mt-4" onClick={() => refetch()}>{ru ? 'Повторить' : 'Retry'}</Button>
+          </Card>
+        ) : isLoading || !core ? (
           <div className="py-24 flex justify-center"><Loader /></div>
         ) : (
           <>
