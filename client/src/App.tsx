@@ -64,6 +64,7 @@ function Router() {
       <Route path="/solar-today" component={SolarToday} />
       <Route path="/horoscope" component={Horoscope} />
       <Route path="/compatibility" component={Compatibility} />
+      <Route path="/matrix" component={Matrix} />
       <Route path="/ask" component={Ask} />
       <Route path="/buy-energy" component={BuyEnergy} />
       <Route path="/subscribe" component={Subscribe} />

@@ -41,6 +41,18 @@ interface UserMeResponse {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
+
+  // Дип-линк с сайта: start=web_matrix_* открывает матрицу сразу
+  useEffect(() => {
+    try {
+      const sp = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param
+        || new URLSearchParams(window.location.search).get('tgWebAppStartParam');
+      if (sp && String(sp).startsWith('web_matrix') && !sessionStorage.getItem('astro_matrix_deeplink_done')) {
+        sessionStorage.setItem('astro_matrix_deeplink_done', '1');
+        navigate('/matrix');
+      }
+    } catch { /* noop */ }
+  }, []);
   const { user } = useAuth();
   const { orbs, tier, setOrbs, setMaxOrbs, setTier, setResetAt, setEnergy } = useEnergy();
   const { t, locale } = useTranslation();
@@ -62,6 +74,14 @@ export default function Dashboard() {
       description: locale === 'ru' ? 'Карты для друзей и партнёров' : 'Charts for friends and partners',
       energyCost: 20,
       path: '/natal-chart',
+      premiumOnly: false,
+    },
+    {
+      icon: Hexagon,
+      title: locale === 'ru' ? 'Матрица судьбы' : 'Matrix of Destiny',
+      description: locale === 'ru' ? '22 аркана по дате рождения' : '22 arcana from your birth date',
+      energyCost: 0,
+      path: '/matrix',
       premiumOnly: false,
     },
     {
@@ -207,7 +227,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {FEATURES.map((feature) => {
             // Free users: only natal chart is accessible
-            const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart';
+            const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart' && feature.path !== '/matrix';
             // Standard users: solar return is Premium-only
             const isPremiumLocked = feature.premiumOnly && tier !== 'premium';
             // Not enough orbs (for Standard and Premium)
