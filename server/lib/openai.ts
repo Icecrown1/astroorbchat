@@ -1246,12 +1246,20 @@ export async function generateSignHoroscope(
 ): Promise<SignDayHoroscope> {
   const todayMsk = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' }); // YYYY-MM-DD
 
-  const cached = signHoroscopeCache.get(signSlug);
+  // Кэш раздельный по локалям: до 24 GPT-вызовов в сутки (12 знаков × 2 языка)
+  const cacheKey = `${signSlug}:${locale}`;
+  const cached = signHoroscopeCache.get(cacheKey);
   if (cached && cached.date === todayMsk) {
     return cached.data;
   }
 
-  const dateRu = new Date().toLocaleDateString('ru-RU', {
+  const SIGN_EN: Record<string, string> = {
+    aries: 'Aries', taurus: 'Taurus', gemini: 'Gemini', cancer: 'Cancer',
+    leo: 'Leo', virgo: 'Virgo', libra: 'Libra', scorpio: 'Scorpio',
+    sagittarius: 'Sagittarius', capricorn: 'Capricorn', aquarius: 'Aquarius', pisces: 'Pisces',
+  };
+  const signName = locale === 'en' ? (SIGN_EN[signSlug] || signRu) : signRu;
+  const dateStr = new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -1259,8 +1267,8 @@ export async function generateSignHoroscope(
   });
 
   const promptText = loadPrompt('horoscope_sign', {
-    sign: signRu,
-    date: dateRu,
+    sign: signName,
+    date: dateStr,
   });
 
   const languageInstruction = locale === 'ru'
@@ -1298,6 +1306,6 @@ export async function generateSignHoroscope(
     lucky: Math.min(99, Math.max(1, parseInt(parsed.lucky, 10) || 7)),
   };
 
-  signHoroscopeCache.set(signSlug, { date: todayMsk, data });
+  signHoroscopeCache.set(cacheKey, { date: todayMsk, data });
   return data;
 }

@@ -4165,8 +4165,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ ok: false, error: 'Unknown sign' });
       }
 
+      const locale = String(req.query.locale || 'ru').toLowerCase() === 'en' ? 'en' : 'ru';
       const { generateSignHoroscope } = await import('./lib/openai.js');
-      const data = await generateSignHoroscope(slug, signRu, 'ru');
+      const data = await generateSignHoroscope(slug, signRu, locale);
 
       // Cacheable by CDN/proxies until next Moscow day (max 24h)
       res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
