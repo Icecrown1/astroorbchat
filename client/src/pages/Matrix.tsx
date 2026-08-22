@@ -53,19 +53,14 @@ export default function Matrix() {
   const { data, isLoading, isError, refetch } = useQuery<MatrixResponse>({
     queryKey: ['/api/matrix/me', locale],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/matrix/me?locale=${locale}`);
-      return res.json();
+      // apiRequest в этом проекте сам парсит JSON и бросает Error(message) на не-2xx
+      return (await apiRequest('GET', `/api/matrix/me?locale=${locale}`)) as MatrixResponse;
     },
   });
 
   const sectionMutation = useMutation({
     mutationFn: async (section: MatrixSectionId) => {
-      const res = await apiRequest('POST', '/api/matrix/section', { section, locale });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw Object.assign(new Error(err.error || 'error'), { code: err.error, status: res.status });
-      }
-      return res.json();
+      return await apiRequest('POST', '/api/matrix/section', { section, locale });
     },
     onMutate: (section) => setPendingSection(section),
     onSettled: () => setPendingSection(null),
@@ -79,13 +74,14 @@ export default function Matrix() {
       if (!wasFree && !resp.cached) decreaseOrbs(SECTION_COST);
     },
     onError: (e: any) => {
-      if (e.code === 'subscription_required') {
+      const code = e?.message || '';
+      if (code === 'subscription_required' || code === 'premium_required') {
         toast({
           title: ru ? 'Нужна подписка' : 'Subscription needed',
           description: ru ? 'Платные разделы матрицы доступны на Standard и Premium' : 'Paid matrix sections are available on Standard and Premium',
         });
         setLocation('/subscribe');
-      } else if (e.code === 'insufficient_orbs') {
+      } else if (code === 'insufficient_orbs') {
         toast({
           title: ru ? 'Не хватает звёзд' : 'Not enough stars',
           description: ru ? `Раздел стоит ${SECTION_COST} ⭐` : `A section costs ${SECTION_COST} ⭐`,
