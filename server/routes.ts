@@ -4152,6 +4152,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public generic daily horoscope per sun sign — consumed by the SEO website (ISR).
   // Cached in-memory per sign per Moscow day => max 12 OpenAI calls/day.
+  // ===== МАТРИЦА СУДЬБЫ =====
+  // Расчёт бесплатен для всех (включая Free) — это acquisition-крючок из SEO-воронки.
+  app.get("/api/matrix/me", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+      const { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS } = await import('@shared/matrix');
+      const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      const core = calcMatrixFromISO(birthISO);
+      if (!core) return res.status(400).json({ ok: false, error: 'Invalid birth date' });
+
+      const locale = String(req.query.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const { MATRIX_KB_VERSION } = await import('./lib/openai.js');
+      const cached = await storage.getMatrixReadings(userId, locale, birthISO, MATRIX_KB_VERSION);
+      const sections = MATRIX_SECTIONS.map((id: string) => ({
+        id,
+        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
+        content: cached.find((r: any) => r.sectionId === id)?.content ?? null,
+      }));
+
+      res.json({ ok: true, core, sections });
+    } catch (error: any) {
+      console.error('[MATRIX] /me error:', error);
+      res.status(500).json({ ok: false, error: 'Matrix calculation failed' });
+    }
+  });
+
+  app.post("/api/matrix/section", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+      const { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana } = await import('@shared/matrix');
+      const sectionId = String(req.body.section || '');
+      if (!(MATRIX_SECTIONS as readonly string[]).includes(sectionId)) {
+        return res.status(400).json({ ok: false, error: 'Unknown section' });
+      }
+      const locale = String(req.body.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const isFree = (FREE_MATRIX_SECTIONS as string[]).includes(sectionId);
+
+      const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      const core = calcMatrixFromISO(birthISO);
+      if (!core) return res.status(400).json({ ok: false, error: 'Invalid birth date' });
+
+      const { generateMatrixSection, MATRIX_KB_VERSION } = await import('./lib/openai.js');
+
+      // Кэш: повторное открытие купленной секции бесплатно
+      const existing = await storage.getMatrixReading(userId, sectionId, locale, birthISO, MATRIX_KB_VERSION);
+      if (existing) return res.json({ ok: true, section: sectionId, content: existing.content, cached: true });
+
+      // Платные секции: доступ и баланс проверяем ДО генерации, списываем ПОСЛЕ успеха
+      if (!isFree) {
+        const access = await canAccessFeature(storage, userId, 'matrix_section');
+        if (!access.allowed) {
+          return res.status(402).json({
+            ok: false,
+            error: access.requiresPremium ? 'premium_required' : access.requiresSubscription ? 'subscription_required' : 'insufficient_orbs',
+            cost: access.cost,
+          });
+        }
+      }
+
+      const content = await generateMatrixSection({
+        section: sectionId as any,
+        arcana: sectionArcana(core, sectionId as any),
+        name: user.name || 'друг',
+        gender: (user as any).gender || 'other',
+        birthDate: birthISO,
+        locale,
+      });
+
+      if (!isFree) {
+        const deduction = await deductOrbs(storage, userId, 'matrix_section');
+        if (!deduction.ok) {
+          return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
+        }
+      }
+
+      await storage.saveMatrixReading({ userId, sectionId, locale, birthDate: birthISO, kbVersion: MATRIX_KB_VERSION, content });
+      res.json({ ok: true, section: sectionId, content, cached: false });
+    } catch (error: any) {
+      console.error('[MATRIX] /section error:', error);
+      res.status(500).json({ ok: false, error: 'Matrix section generation failed' });
+    }
+  });
+
   app.get("/api/public/sign-horoscope/:sign", async (req, res) => {
     try {
       const SIGN_RU: Record<string, string> = {

@@ -1309,3 +1309,76 @@ export async function generateSignHoroscope(
   signHoroscopeCache.set(cacheKey, { date: todayMsk, data });
   return data;
 }
+
+// ===== Матрица судьбы: генерация разбора секции =====
+import { MATRIX_KB_VERSION, arcanaByN, type ArcanaKnowledge } from './matrixKb.js';
+import type { MatrixSectionId } from '@shared/matrix';
+
+const MATRIX_SECTION_TITLES: Record<string, { ru: string; en: string; posKey: keyof ArcanaKnowledge['pos'] }> = {
+  comfort: { ru: 'Зона комфорта (центр матрицы)', en: 'Comfort zone (matrix center)', posKey: 'personality' },
+  persona: { ru: 'Визитная карточка (как вас считывают)', en: 'Calling card (how people read you)', posKey: 'personality' },
+  karmic_tail: { ru: 'Кармический хвост', en: 'Karmic tail', posKey: 'karma' },
+  money: { ru: 'Денежный канал', en: 'Money channel', posKey: 'money' },
+  love: { ru: 'Канал отношений', en: 'Relationships channel', posKey: 'relationships' },
+  purpose: { ru: 'Предназначение (4 уровня)', en: 'Life purpose (4 levels)', posKey: 'spirit' },
+  rod: { ru: 'Родовой квадрат', en: 'Ancestral square', posKey: 'karma' },
+};
+
+export async function generateMatrixSection(params: {
+  section: MatrixSectionId;
+  arcana: number[];
+  name: string;
+  gender: string;
+  birthDate: string; // YYYY-MM-DD
+  locale: string;
+}): Promise<string> {
+  const { section, arcana, name, gender, birthDate, locale } = params;
+  const meta = MATRIX_SECTION_TITLES[section];
+
+  const knowledge = arcana
+    .map((n) => {
+      const a = arcanaByN(n);
+      return [
+        `Аркан ${a.n} «${a.name}» (${a.keywords.join(', ')})`,
+        `  В плюсе: ${a.plus}`,
+        `  В минусе: ${a.minus}`,
+        `  Задача: ${a.task}`,
+        `  В этой позиции: ${a.pos[meta.posKey]}`,
+      ].join('\n');
+    })
+    .join('\n\n');
+
+  const languageInstruction =
+    locale === 'en'
+      ? 'IMPORTANT: Respond STRICTLY in English (arcana names may be translated naturally).'
+      : 'ВАЖНО: Ответь СТРОГО на русском языке.';
+
+  const promptText = loadPrompt('matrix_section', {
+    name,
+    birthDate,
+    sectionTitle: locale === 'en' ? meta.en : meta.ru,
+    arcanaList: arcana.join(', '),
+    knowledge,
+    toneInstruction: personalizeTone(gender || 'other'),
+    languageInstruction,
+  });
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Ты — тёплый и практичный консультант по Матрице судьбы. Пишешь связные персональные разборы без эзотерических клише, строго по переданной базе знаний.',
+      },
+      { role: 'user', content: promptText },
+    ],
+    max_completion_tokens: 700,
+  });
+
+  const content = completion.choices[0]?.message?.content?.trim();
+  if (!content) throw new Error('Failed to generate matrix section');
+  return content;
+}
+
+export { MATRIX_KB_VERSION };

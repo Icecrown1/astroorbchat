@@ -24,6 +24,8 @@ export const ORB_COSTS = {
   
   // Medium priority (5 orbs)
   horoscope_weekly: 5,
+  matrix_section: 5,         // Секция разбора Матрицы судьбы (хвост/деньги/любовь/предназначение/род)
+  matrix_full: 25,           // Все платные секции матрицы разом (выгоднее на ~30%)
   
   // High priority (15-20 orbs)
   horoscope_monthly: 15,

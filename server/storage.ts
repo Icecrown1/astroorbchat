@@ -6,6 +6,7 @@ import {
   usageLogs,
   natalReadings,
   horoscopeReadings,
+  matrixReadings,
   compatibilityReadings,
   aiQuestions,
   natalCharts,
@@ -862,6 +863,43 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(payments.createdAt);
+  }
+
+  // ===== Матрица судьбы: кэш разборов секций =====
+  async getMatrixReading(userId: string, sectionId: string, locale: string, birthDate: string, kbVersion: number) {
+    const rows = await db
+      .select()
+      .from(matrixReadings)
+      .where(
+        and(
+          eq(matrixReadings.userId, userId),
+          eq(matrixReadings.sectionId, sectionId),
+          eq(matrixReadings.locale, locale),
+          eq(matrixReadings.birthDate, birthDate),
+          eq(matrixReadings.kbVersion, kbVersion),
+        )
+      )
+      .limit(1);
+    return rows[0];
+  }
+
+  async getMatrixReadings(userId: string, locale: string, birthDate: string, kbVersion: number) {
+    return db
+      .select()
+      .from(matrixReadings)
+      .where(
+        and(
+          eq(matrixReadings.userId, userId),
+          eq(matrixReadings.locale, locale),
+          eq(matrixReadings.birthDate, birthDate),
+          eq(matrixReadings.kbVersion, kbVersion),
+        )
+      );
+  }
+
+  async saveMatrixReading(data: { userId: string; sectionId: string; locale: string; birthDate: string; kbVersion: number; content: string }) {
+    const rows = await db.insert(matrixReadings).values(data).returning();
+    return rows[0];
   }
 }
 

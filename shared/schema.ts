@@ -237,6 +237,26 @@ export const natalReadingsRelations = relations(natalReadings, ({ one }) => ({
   }),
 }));
 
+export const matrixReadings = pgTable("matrix_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  sectionId: varchar("section_id", { length: 32 }).notNull(),
+  locale: varchar("locale", { length: 10 }).notNull().default('ru'),
+  birthDate: varchar("birth_date", { length: 10 }).notNull(), // YYYY-MM-DD на момент генерации
+  kbVersion: integer("kb_version").notNull().default(1),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userSectionIdx: index("matrix_readings_user_section_idx").on(table.userId, table.sectionId, table.locale),
+}));
+
+export const matrixReadingsRelations = relations(matrixReadings, ({ one }) => ({
+  user: one(users, {
+    fields: [matrixReadings.userId],
+    references: [users.id],
+  }),
+}));
+
 export const horoscopeReadings = pgTable("horoscope_readings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
