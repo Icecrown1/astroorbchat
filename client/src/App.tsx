@@ -19,6 +19,7 @@ import GuestNatalChartView from '@/pages/GuestNatalChartView';
 import SolarToday from '@/pages/SolarToday';
 import Horoscope from '@/pages/Horoscope';
 import Compatibility from '@/pages/Compatibility';
+import Matrix from '@/pages/Matrix';
 import Ask from '@/pages/Ask';
 import BuyEnergy from '@/pages/BuyEnergy';
 import Subscribe from '@/pages/Subscribe';
