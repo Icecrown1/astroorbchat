@@ -4160,7 +4160,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
 
-      const { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS } = await import('@shared/matrix');
       const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
       const core = calcMatrixFromISO(birthISO);
       if (!core) return res.status(400).json({ ok: false, error: 'Invalid birth date' });
@@ -4187,7 +4186,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
 
-      const { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana } = await import('@shared/matrix');
       const sectionId = String(req.body.section || '');
       if (!(MATRIX_SECTIONS as readonly string[]).includes(sectionId)) {
         return res.status(400).json({ ok: false, error: 'Unknown section' });
