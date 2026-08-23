@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { haptic } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -192,6 +193,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: async (data) => {
+      haptic.notify('success');
       // Validate amountTON is a positive integer string (nanotons) before sending to TON Connect.
       // If the TON exchange rate failed to load, amountTON can be "NaN"/"Infinity" which the
       // TON Connect SDK rejects with "Invalid 'payload' in message at index 0".
@@ -255,6 +257,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       if (data.confirmationUrl) openPaymentLink(data.confirmationUrl);
     },
     onError: (error: any) => {
@@ -276,6 +279,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       if (data.confirmationUrl) openPaymentLink(data.confirmationUrl);
     },
     onError: (error: any) => {
@@ -293,6 +297,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: locale === 'ru' ? 'Подписка отменена' : 'Subscription Canceled',
@@ -317,6 +322,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       toast({
         title: 'Dev Subscription Activated',
@@ -402,6 +408,7 @@ export default function Subscribe() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       console.log('[YooKassa] Subscription payment created, redirecting to:', data.confirmationUrl);
       // Clear idempotency key on success (ready for next payment)
       setYookassaIdempotencyKey(null);
@@ -676,6 +683,11 @@ export default function Subscribe() {
                       )}
                       <p className="text-sm text-chart-3 font-medium">
                         {locale === 'ru' ? 'Итого за' : 'Total for'} {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}: {totalPriceRub} ₽
+                        {selectedPeriod !== 'monthly' && (
+                          <span className="ml-1 text-muted-foreground">
+                            {locale === 'ru' ? `· ≈ ${Math.round(totalPriceRub / (periodConfig.months * 30))} ₽/день` : `· ≈ ${Math.round(totalPriceRub / (periodConfig.months * 30))} ₽/day`}
+                          </span>
+                        )}
                       </p>
                     </div>
 
