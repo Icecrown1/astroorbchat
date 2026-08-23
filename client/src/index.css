@@ -439,3 +439,19 @@
 
 /* Строки «Стоимость: N звёзд» — золотые в едином стиле */
 .text-primary:has(+ .cost-marker) { color: hsl(41 81% 68%); }
+
+/* Персональные анимации виньеток при касании карточки */
+.vg { transform-origin: 50% 50%; transition: transform .4s cubic-bezier(.22,.8,.3,1); }
+@keyframes vgSpin { to { transform: rotate(360deg); } }
+@keyframes vgBeat { 0%,100% { transform: scale(1); } 30% { transform: scale(1.14); } 55% { transform: scale(1.02); } 75% { transform: scale(1.1); } }
+@keyframes vgSwing { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-12deg); } 70% { transform: rotate(9deg); } }
+@keyframes vgPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes vgWobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(6deg) scale(1.05); } 60% { transform: rotate(-6deg); } }
+.vg-spin-slow { animation: vgSpin 2.4s linear infinite; }
+.vg-spin { animation: vgSpin 1.2s linear infinite; }
+.vg-beat { animation: vgBeat .9s ease-in-out infinite; }
+.vg-swing { animation: vgSwing 1s ease-in-out infinite; }
+.vg-pulse { animation: vgPulse .9s ease-in-out infinite; }
+.vg-wobble { animation: vgWobble 1s ease-in-out infinite; }
+.vg-turn45 { transform: rotate(45deg) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .vg, .vg-spin, .vg-spin-slow, .vg-beat, .vg-swing, .vg-pulse, .vg-wobble { animation: none !important; transform: none !important; } }

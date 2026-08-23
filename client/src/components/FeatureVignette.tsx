@@ -5,10 +5,20 @@ const ROSE = 'hsl(330 60% 70%)';
 
 export type VignetteKind = 'natal' | 'guest' | 'matrix' | 'solar' | 'horoscope' | 'compat' | 'oracle';
 
-export function FeatureVignette({ kind }: { kind: VignetteKind }) {
+const KIND_ANIM: Record<VignetteKind, string> = {
+  natal: 'vg-spin-slow',
+  guest: 'vg-pulse',
+  matrix: 'vg-turn45',
+  solar: 'vg-spin',
+  horoscope: 'vg-swing',
+  compat: 'vg-beat',
+  oracle: 'vg-wobble',
+};
+
+export function FeatureVignette({ kind, active = false }: { kind: VignetteKind; active?: boolean }) {
   const common = { fill: 'none', strokeWidth: 1.4, strokeLinecap: 'round' as const };
   return (
-    <svg viewBox="0 0 48 48" className="w-12 h-12 shrink-0" aria-hidden="true">
+    <svg viewBox="0 0 48 48" className={`w-12 h-12 shrink-0 vg ${active ? KIND_ANIM[kind] : ''}`} aria-hidden="true">
       {kind === 'natal' && (<g {...common}>
         <circle cx="24" cy="24" r="17" stroke={IRIS} />
         <circle cx="24" cy="24" r="10.5" stroke={IRIS} opacity="0.5" />

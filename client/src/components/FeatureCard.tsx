@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Lock } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
-import { motion } from 'framer-motion';
+import { useState, cloneElement, isValidElement } from 'react';
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -34,6 +34,7 @@ export function FeatureCard({
   art,
   locale = 'en',
 }: FeatureCardProps) {
+  const [pressed, setPressed] = useState(false);
   const isBlocked = locked || premiumOnly;
   
   return (
@@ -45,6 +46,10 @@ export function FeatureCard({
         className
       )}
       onClick={disabled ? undefined : () => { haptic.impact(isBlocked ? 'medium' : 'light'); onClick(); }}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
       {isBlocked && (
@@ -55,11 +60,7 @@ export function FeatureCard({
       
       <div className="flex items-start gap-4">
         {art ? (
-          <motion.div
-            className="shrink-0"
-            whileTap={{ rotate: 12, scale: 1.12 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 14 }}
-          >{art}</motion.div>
+          <div className="shrink-0">{isValidElement(art) ? cloneElement(art as any, { active: pressed }) : art}</div>
         ) : (
         <div className={cn(
           "p-3 rounded-lg",
