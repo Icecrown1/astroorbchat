@@ -16,6 +16,7 @@ interface FeatureCardProps {
   locked?: boolean;  // True when feature requires subscription upgrade
   premiumOnly?: boolean;  // True when feature requires Premium tier specifically
   className?: string;
+  art?: React.ReactNode;
   locale?: 'ru' | 'en';
 }
 
@@ -29,6 +30,7 @@ export function FeatureCard({
   locked = false,
   premiumOnly = false,
   className,
+  art,
   locale = 'en',
 }: FeatureCardProps) {
   const isBlocked = locked || premiumOnly;
@@ -51,6 +53,9 @@ export function FeatureCard({
       )}
       
       <div className="flex items-start gap-4">
+        {art ? (
+          <div className="shrink-0">{art}</div>
+        ) : (
         <div className={cn(
           "p-3 rounded-lg",
           "bg-primary/10"
@@ -60,6 +65,7 @@ export function FeatureCard({
             "text-primary"
           )} />
         </div>
+        )}
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-2">
