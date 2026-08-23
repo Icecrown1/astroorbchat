@@ -244,7 +244,7 @@ export default function Dashboard() {
                 title={feature.title}
                 description={feature.description}
                 energyCost={feature.energyCost}
-                onClick={() => navigate(feature.path)}
+                onClick={() => navigate(isLockedForFree || (feature.premiumOnly && tier !== 'premium') ? '/subscribe' : feature.path)}
                 disabled={isDisabled}
                 locked={isLockedForFree}
                 premiumOnly={isPremiumLocked}

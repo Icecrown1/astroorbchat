@@ -36,27 +36,27 @@ export function FeatureCard({
     <Card
       className={cn(
         'relative p-6 transition-all tap-scale',
-        isBlocked ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer hover-elevate active-elevate-2',
+        isBlocked ? 'cursor-pointer hover-elevate active-elevate-2 opacity-95' : 'cursor-pointer hover-elevate active-elevate-2',
         disabled && !isBlocked && 'opacity-60 cursor-not-allowed',
         className
       )}
-      onClick={isBlocked || disabled ? undefined : () => { haptic.impact('light'); onClick(); }}
+      onClick={disabled ? undefined : () => { haptic.impact(isBlocked ? 'medium' : 'light'); onClick(); }}
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
       {isBlocked && (
         <div className="absolute top-4 left-4">
-          <Lock className="w-5 h-5 text-muted-foreground" />
+          <Lock className="w-5 h-5 text-[hsl(41,81%,68%)]" />
         </div>
       )}
       
       <div className="flex items-start gap-4">
         <div className={cn(
           "p-3 rounded-lg",
-          isBlocked ? "bg-muted" : "bg-primary/10"
+          "bg-primary/10"
         )}>
           <Icon className={cn(
             "w-6 h-6",
-            isBlocked ? "text-muted-foreground" : "text-primary"
+            "text-primary"
           )} />
         </div>
         
@@ -64,7 +64,7 @@ export function FeatureCard({
           <div className="flex items-center justify-between gap-2 mb-2">
             <h3 className={cn(
               "text-lg font-semibold",
-              isBlocked ? "text-muted-foreground" : "text-card-foreground"
+              "text-card-foreground"
             )}>
               {title}
             </h3>
@@ -92,7 +92,7 @@ export function FeatureCard({
           
           <div className={cn(
             "flex items-center text-sm font-medium",
-            isBlocked ? "text-muted-foreground" : "text-primary"
+            "text-primary"
           )}>
             {premiumOnly
               ? (locale === 'ru' ? 'Только Премиум' : 'Premium only')
