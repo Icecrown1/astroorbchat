@@ -108,7 +108,7 @@ export default function GuestNatalCharts() {
           <TabsContent value="create" className="mt-6">
             <Card className="p-6">
               <div className="mb-6">
-                <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
+                <div className="inline-flex mb-4">
                   <FeatureVignette kind="guest" />
                 </div>
                 <h2 className="text-lg font-semibold mb-2">
