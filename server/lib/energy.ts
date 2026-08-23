@@ -281,7 +281,11 @@ export async function deductOrbs(
     subscriptionOrbs: newSubscriptionOrbs.toString(),
     referralOrbs: newReferralOrbs.toString(),
   });
-  await storage.createUsageLog({ userId, feature, cost });
+  try {
+    await storage.createUsageLog({ userId, feature, cost: String(cost) });
+  } catch (logErr) {
+    console.error('[ORBS] usage log failed (non-blocking):', logErr);
+  }
   
   console.log('[ORBS] Successfully deducted', cost, 'orbs for', feature);
   return { ok: true };

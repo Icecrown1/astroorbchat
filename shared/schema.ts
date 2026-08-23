@@ -179,7 +179,7 @@ export const usageLogs = pgTable("usage_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 255 }).notNull(),
   feature: varchar("feature", { length: 50 }).notNull(),
-  cost: integer("cost").notNull(),
+  cost: decimal("cost", { precision: 10, scale: 1 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdIdx: index("usage_logs_user_id_idx").on(table.userId),
@@ -446,8 +446,8 @@ export const insertPaymentSchema = createInsertSchema(payments, {
 
 export const insertUsageLogSchema = createInsertSchema(usageLogs, {
   userId: z.string(),
-  feature: z.enum(["natal", "solar", "horoscope", "compatibility", "ask", "natal_external", "important_date_detail", "natal_professional", "compatibility_professional", "weekly_plan", "monthly_plan"]),
-  cost: z.number().int().positive(),
+  feature: z.string(),
+  cost: z.union([z.string(), z.number()]).transform((v) => String(v)),
 }).omit({
   id: true,
   createdAt: true,
