@@ -8,7 +8,8 @@ import { Loader } from '@/components/Loader';
 import { HoroscopeThemes } from '@/components/HoroscopeThemes';
 import { WeeklyPlanModal } from '@/components/WeeklyPlanModal';
 import { MonthlyPlanModal } from '@/components/MonthlyPlanModal';
-import { ArrowLeft, Sparkles, Calendar, CalendarRange, Archive as ArchiveIcon } from 'lucide-react';
+import { ArrowLeft, MoonStar, Calendar, CalendarRange, Archive as ArchiveIcon } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -125,7 +126,7 @@ export default function Horoscope() {
               <Card className="p-8">
                 <div className="mb-6">
                   <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                    <Sparkles className="w-12 h-12 text-primary" />
+                    <MoonStar className="w-12 h-12 text-primary" />
                   </div>
                   <h2 className="text-xl font-semibold mb-2">{t.horoscope.generateTitle}</h2>
                   <p className="text-sm text-muted-foreground mb-6">
@@ -150,7 +151,7 @@ export default function Horoscope() {
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 mr-2" />
+                        <OrbIcon className="w-4 h-4 mr-2" />
                         {t.horoscope.generate}
                       </>
                     )}

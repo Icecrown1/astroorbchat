@@ -436,3 +436,6 @@
   background-position: center;
   border-radius: 24px;
 }
+
+/* Строки «Стоимость: N звёзд» — золотые в едином стиле */
+.text-primary:has(+ .cost-marker) { color: hsl(41 81% 68%); }

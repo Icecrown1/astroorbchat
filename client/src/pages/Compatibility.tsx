@@ -165,7 +165,7 @@ export default function Compatibility() {
           <Card className="p-6">
             <div className="mb-6">
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-5/20 to-chart-2/20 mb-4">
-                <Heart className="w-12 h-12 text-chart-5" />
+                <Heart className="w-12 h-12 text-[hsl(330,60%,70%)]" />
               </div>
               <h2 className="text-xl font-semibold mb-2">{t.compatibility.relationshipAnalysis}</h2>
               <p className="text-muted-foreground mb-4">
