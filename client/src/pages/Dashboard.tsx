@@ -20,7 +20,7 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Shield,
-  Hexagon,
+  Hexagon, MoonStar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -94,7 +94,7 @@ export default function Dashboard() {
       premiumOnly: true, // Solar return is Premium-only
     },
     {
-      icon: Sparkles,
+      icon: MoonStar,
       title: t.dashboard.horoscope,
       description: t.dashboard.horoscopeDesc,
       energyCost: 1,
