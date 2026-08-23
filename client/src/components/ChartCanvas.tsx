@@ -106,8 +106,13 @@ const ASPECT_COLORS: Record<string, string> = {
 export function ChartCanvas({ planets, aspects, angles, houses, className, onPlanetClick }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const planetPositionsRef = useRef<PlanetPosition[]>([]);
+  const lastDrawKeyRef = useRef<string>('');
 
   useEffect(() => {
+    if (!planets || planets.length === 0) return;
+    const drawKey = JSON.stringify([planets, aspects, angles]);
+    if (drawKey === lastDrawKeyRef.current) return; // те же данные — не мигаем
+    lastDrawKeyRef.current = drawKey;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -314,6 +319,21 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       const radius = planetRadius - (layer * 30);
       planetPositions.push({ planet, radius, layer });
     });
+
+    // 7.85. Звёздное небо внутри колеса (детерминированный псевдорандом)
+    let seed = 42;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    for (let st = 0; st < 90; st++) {
+      const a = rnd() * Math.PI * 2;
+      const rr = Math.sqrt(rnd()) * innerRadius * 0.97;
+      const sx = center + Math.cos(a) * rr;
+      const sy = center + Math.sin(a) * rr;
+      const size = rnd() < 0.85 ? 0.7 : 1.3;
+      ctx.fillStyle = `rgba(${rnd() < 0.3 ? '239,194,107' : '210,214,235'},${0.25 + rnd() * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // 7.9. Глубина: иris-свечение в сердце и виньетка по краю
     const heart = ctx.createRadialGradient(center, center, 0, center, center, innerRadius);
