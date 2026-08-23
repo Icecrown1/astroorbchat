@@ -168,10 +168,10 @@ export function MatrixOctagram({
       {/* Возрастные метки контура */}
       {core.ageDecades.map((p, i) => {
         const angle = Math.PI - (i * Math.PI) / 4; // A слева, по часовой
-        const x = C + Math.cos(angle) * (R_DIAMOND + 26) * (i % 2 === 0 ? 1 : 0.98);
-        const y = C - Math.sin(angle) * (R_DIAMOND + 26) * (i % 2 === 0 ? 1 : 0.98);
+        const x = C + Math.cos(angle) * (R_DIAMOND + 31) * (i % 2 === 0 ? 1 : 0.98);
+        const y = C - Math.sin(angle) * (R_DIAMOND + 31) * (i % 2 === 0 ? 1 : 0.98);
         return (
-          <text key={p.age} x={x} y={y} textAnchor="middle" fontSize={9} fill={INKMUTE} opacity={zone === 'all' ? 0.8 : 0.25}>
+          <text key={p.age} x={x} y={y} textAnchor="middle" fontSize={10} fontWeight={600} fill="hsl(229 14% 74%)" opacity={zone === 'all' ? 0.95 : 0.25}>
             {p.age}
           </text>
         );

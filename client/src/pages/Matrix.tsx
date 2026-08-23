@@ -147,7 +147,7 @@ export default function Matrix() {
               ))}
             </div>
 
-            <Card className="p-4 anim-fade-up">
+            <Card className="p-4 anim-fade-up wheel-nebula">
               <MatrixOctagram core={core} zone={zone} onNodeTap={(n) => { haptic.impact('light'); setTapped(n); }} activeNodeId={tapped?.id} />
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {ru ? 'Нажмите на любую точку матрицы' : 'Tap any point of the matrix'}
