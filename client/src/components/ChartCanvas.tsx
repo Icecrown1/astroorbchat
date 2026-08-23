@@ -75,24 +75,24 @@ const PLANET_SYMBOLS: Record<string, string> = {
 const THEME_COLORS = {
   // Пастельные оттенки для секторов зодиака (по 12 знакам)
   zodiacSectors: [
-    '#f2d7d7', // Овен - светло-красный
-    '#d8f0e1', // Телец - мятный
-    '#f5e0c9', // Близнецы - песочный
-    '#d0e6f5', // Рак - голубой
-    '#f5ead3', // Лев - золотистый
-    '#e7f4d5', // Дева - светло-зеленый
-    '#f6e7c7', // Весы - бежевый
-    '#d9f0f3', // Скорпион - бирюзовый
-    '#f2d2e0', // Стрелец - розовый
-    '#dcd3f2', // Козерог - лавандовый
-    '#e2e0f0', // Водолей - серо-лиловый
-    '#dfeaf2'  // Рыбы - небесный
+    '#231318', // Овен — глубокий красный
+    '#12211b', // Телец — тёмный мятный
+    '#241d12', // Близнецы — тёмный песочный
+    '#121c26', // Рак — глубокий синий
+    '#262012', // Лев — тёмное золото
+    '#17220f', // Дева — тёмная зелень
+    '#231e10', // Весы — тёмный беж
+    '#0f2226', // Скорпион — глубокая бирюза
+    '#241220', // Стрелец — тёмный розовый
+    '#1b1430', // Козерог — глубокая лаванда
+    '#191831', // Водолей — тёмный лиловый
+    '#131b2b'  // Рыбы — глубокое небо
   ],
-  zodiacSymbol: '#D4A642',      // Solar Gold для символов знаков
-  planetSymbol: '#D4A642',      // Solar Gold для планет
-  border: 'rgba(0, 0, 0, 0.25)',
-  centerGradientStart: '#D4A642', // Solar Gold центр
-  centerGradientEnd: 'rgba(212, 166, 66, 0)' // Solar Gold fade
+  zodiacSymbol: '#EFC26B',      // Solar Gold для символов знаков
+  planetSymbol: '#EFC26B',      // Solar Gold для планет
+  border: 'rgba(233, 236, 248, 0.16)',
+  centerGradientStart: 'rgba(142, 123, 255, 0.35)', // Iris glow центр
+  centerGradientEnd: 'rgba(142, 123, 255, 0)' // fade
 };
 
 const ASPECT_COLORS: Record<string, string> = {
@@ -170,7 +170,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
     ctx.stroke();
 
     // 4. Внутренний круг
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
     ctx.beginPath();
     ctx.arc(center, center, innerRadius, 0, 2 * Math.PI);
     ctx.fill();
@@ -231,7 +231,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         const ascY = center + Math.sin(ascAngle) * (houseLinesRadius + 15);
         
         // Background for better visibility
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
         const metrics = ctx.measureText('ASC');
         ctx.fillRect(ascX - metrics.width / 2 - 3, ascY - 7, metrics.width + 6, 14);
         
@@ -247,7 +247,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         const mcY = center + Math.sin(mcAngle) * (houseLinesRadius + 15);
         
         // Background for better visibility
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
         const metrics = ctx.measureText('MC');
         ctx.fillRect(mcX - metrics.width / 2 - 3, mcY - 7, metrics.width + 6, 14);
         
