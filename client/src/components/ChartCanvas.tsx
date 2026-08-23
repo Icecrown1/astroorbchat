@@ -88,7 +88,7 @@ const THEME_COLORS = {
     '#191831', // Водолей — тёмный лиловый
     '#131b2b'  // Рыбы — глубокое небо
   ],
-  zodiacSymbol: '#EFC26B',      // Solar Gold для символов знаков
+  zodiacSymbol: '#EFC26B', // fallback; реальный цвет — по стихии      // Solar Gold для символов знаков
   planetSymbol: '#EFC26B',      // Solar Gold для планет
   border: 'rgba(233, 236, 248, 0.16)',
   centerGradientStart: 'rgba(142, 123, 255, 0.35)', // Iris glow центр
@@ -190,7 +190,8 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       ctx.shadowBlur = 6;
       
       // Символ знака
-      ctx.fillStyle = THEME_COLORS.zodiacSymbol;
+      const ELEMENT_COLORS = ['#F08E7E', '#8FCE9F', '#9DB8F0', '#8E7BFF']; // огонь земля воздух вода
+      ctx.fillStyle = ELEMENT_COLORS[i % 4];
       ctx.font = 'bold 22px "Noto Sans Symbols2", "Symbola", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -312,6 +313,23 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       planetPositions.push({ planet, radius, layer });
     });
 
+    // 7.9. Глубина: иris-свечение в сердце и виньетка по краю
+    const heart = ctx.createRadialGradient(center, center, 0, center, center, innerRadius);
+    heart.addColorStop(0, 'rgba(142,123,255,0.20)');
+    heart.addColorStop(0.55, 'rgba(142,123,255,0.06)');
+    heart.addColorStop(1, 'rgba(142,123,255,0)');
+    ctx.fillStyle = heart;
+    ctx.beginPath();
+    ctx.arc(center, center, innerRadius, 0, 2 * Math.PI);
+    ctx.fill();
+    const vign = ctx.createRadialGradient(center, center, outerRadius * 0.82, center, center, outerRadius * 1.02);
+    vign.addColorStop(0, 'rgba(5,6,12,0)');
+    vign.addColorStop(1, 'rgba(5,6,12,0.55)');
+    ctx.fillStyle = vign;
+    ctx.beginPath();
+    ctx.arc(center, center, outerRadius * 1.02, 0, 2 * Math.PI);
+    ctx.fill();
+
     // 8. Рисуем планеты - символы с свечением
     planetPositions.forEach(({ planet, radius }) => {
       const angle = (planet.position - 90) * (Math.PI / 180);
@@ -347,7 +365,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       // Символ планеты
       const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 1);
       ctx.fillStyle = strokeColor;
-      ctx.font = `600 ${isSun ? 18 : 15}px "Noto Sans Symbols2", "Symbola", Arial, sans-serif`;
+      ctx.font = `700 ${isSun ? 19 : 16}px "Noto Sans Symbols2", "Symbola", Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(planetSymbol, x, y + 1);

@@ -84,7 +84,8 @@ export function MatrixOctagram({
         stroke={stroke}
         strokeWidth={w}
         strokeDasharray={dash}
-        opacity={dim(zones) ? 0.12 : 0.55}
+        opacity={dim(zones) ? 0.12 : 0.8}
+        style={dim(zones) ? undefined : { filter: `drop-shadow(0 0 5px ${stroke})` }}
         className="matrix-draw"
       />
     );
@@ -138,7 +139,7 @@ export function MatrixOctagram({
             role="button"
             aria-label={`${n.label.ru}: аркан ${n.value}`}
           >
-            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} style={{ filter: `drop-shadow(0 0 ${active ? 7 : 4}px ${strokeColor})` }} />
+            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} style={{ filter: `drop-shadow(0 0 ${active ? 12 : 8}px ${strokeColor}) drop-shadow(0 0 ${active ? 22 : 14}px ${strokeColor})` }} />
             <circle cx={n.x} cy={n.y} r={n.r + 4} fill="transparent" />
             <text
               x={n.x}

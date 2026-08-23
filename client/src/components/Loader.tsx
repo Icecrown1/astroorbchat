@@ -160,12 +160,15 @@ export function Loader({ className, size = 'md', withPhrases = false }: LoaderPr
         )}
         data-testid="loader-spinner"
       >
-        <svg viewBox="0 0 48 48" className={cn('w-full h-full animate-spin')} style={{ animationDuration: '2.6s' }} aria-hidden="true">
-          <circle cx="24" cy="24" r="9" fill="none" stroke="#EFC26B" strokeWidth="2" />
-          <g stroke="#EFC26B" strokeWidth="2" strokeLinecap="round">
-            {Array.from({ length: 8 }).map((_, i) => {
-              const a = (i * Math.PI) / 4;
-              return <line key={i} x1={24 + Math.cos(a) * 13} y1={24 + Math.sin(a) * 13} x2={24 + Math.cos(a) * 19} y2={24 + Math.sin(a) * 19} />;
+        <svg viewBox="0 0 48 48" className={cn('w-full h-full animate-spin')} style={{ animationDuration: '3.2s', filter: 'drop-shadow(0 0 10px rgba(239,194,107,0.6))' }} aria-hidden="true">
+          <circle cx="24" cy="24" r="9.5" fill="none" stroke="#EFC26B" strokeWidth="1.8" />
+          <circle cx="24" cy="24" r="6" fill="none" stroke="#EFC26B" strokeWidth="1" opacity="0.55" />
+          <circle cx="24" cy="24" r="2.2" fill="#EFC26B" />
+          <g stroke="#EFC26B" strokeWidth="1.8" strokeLinecap="round">
+            {Array.from({ length: 12 }).map((_, i) => {
+              const a = (i * Math.PI) / 6;
+              const long = i % 2 === 0;
+              return <line key={i} x1={24 + Math.cos(a) * 13} y1={24 + Math.sin(a) * 13} x2={24 + Math.cos(a) * (long ? 20 : 16.5)} y2={24 + Math.sin(a) * (long ? 20 : 16.5)} opacity={long ? 1 : 0.6} />;
             })}
           </g>
         </svg>
