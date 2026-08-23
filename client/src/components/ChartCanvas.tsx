@@ -391,7 +391,8 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
   };
 
   return (
-    <canvas
+    <div className="gradient-aura-wrap" style={{ background: 'radial-gradient(circle at 50% 42%, rgba(142,123,255,0.16), transparent 62%)', borderRadius: '50%' }}>
+      <canvas
       ref={canvasRef}
       width={400}
       height={400}
@@ -399,5 +400,6 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       className={cn('w-full h-auto cursor-pointer', className)}
       data-testid="canvas-natal-chart"
     />
+      </div>
   );
 }

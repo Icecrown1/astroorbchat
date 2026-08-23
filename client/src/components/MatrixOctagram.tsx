@@ -138,7 +138,7 @@ export function MatrixOctagram({
             role="button"
             aria-label={`${n.label.ru}: аркан ${n.value}`}
           >
-            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} />
+            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} style={{ filter: `drop-shadow(0 0 ${active ? 7 : 4}px ${strokeColor})` }} />
             <circle cx={n.x} cy={n.y} r={n.r + 4} fill="transparent" />
             <text
               x={n.x}
