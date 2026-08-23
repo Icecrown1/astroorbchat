@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Users, Copy, Share2, Gift, Crown, Star, Calendar } from 'lucide-react';
+import { ArrowLeft, Users, Copy, Share2, Gift, Crown, Calendar } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
+import { FeatureVignette } from '@/components/FeatureVignette';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/store/useAuth';
 import { hapticFeedback } from '@/lib/telegram';
@@ -57,7 +59,7 @@ export default function Referral() {
         return {
           referrerReward: locale === 'ru' ? '+10 звёзд + продление подписки' : '+10 stars + subscription extension',
           referredReward: '',
-          icon: Star,
+          icon: OrbIcon,
           color: 'text-primary',
           bgColor: 'bg-primary/10',
         };
@@ -217,7 +219,7 @@ export default function Referral() {
         <Card className="p-6 mb-6">
           <div className="text-center mb-6">
             <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-              <Users className="w-12 h-12 text-primary" />
+              <FeatureVignette kind="guest" />
             </div>
             <h2 className="text-xl font-semibold mb-2">{t.referral.step1}</h2>
             <p className="text-muted-foreground">
@@ -327,7 +329,7 @@ export default function Referral() {
                       data-testid={`button-claim-standard-${choice.id}`}
                     >
                       <span className="flex items-center gap-2 font-semibold">
-                        <Star className="w-4 h-4 text-primary" />
+                        <OrbIcon className="w-4 h-4 text-primary" />
                         {locale === 'ru' ? '7 дней Standard' : '7 days Standard'}
                       </span>
                       <span className="text-xs text-muted-foreground font-normal">

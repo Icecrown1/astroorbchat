@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, CreditCard, Check, Sparkles, Wallet, RefreshCw, TrendingUp, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, TrendingUp, RotateCcw } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
@@ -692,7 +693,7 @@ export default function Subscribe() {
 
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
-                        <Sparkles className="w-5 h-5 text-chart-3" />
+                        <OrbIcon className="w-5 h-5 text-[hsl(41,81%,68%)]" />
                         <span className="font-bold">{getOrbsDisplay(tier)}</span>
                       </div>
                       {getLocalizedFeatures(tier).map((feature, index) => (

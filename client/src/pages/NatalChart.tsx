@@ -109,7 +109,7 @@ export default function GuestNatalCharts() {
             <Card className="p-6">
               <div className="mb-6">
                 <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                  <Users className="w-8 h-8 text-primary" />
+                  <FeatureVignette kind="guest" />
                 </div>
                 <h2 className="text-lg font-semibold mb-2">
                   {locale === 'ru' ? 'Создать гостевую карту' : 'Create Guest Chart'}
