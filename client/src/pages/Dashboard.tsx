@@ -226,7 +226,7 @@ export default function Dashboard() {
 
         {/* Feature Cards */}
         <div className="grid gap-4 md:grid-cols-2 mb-6">
-          {FEATURES.map((feature) => {
+          {FEATURES.map((feature, fIdx) => {
             // Free users: only natal chart is accessible
             const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart' && feature.path !== '/matrix';
             // Standard users: solar return is Premium-only
@@ -239,6 +239,7 @@ export default function Dashboard() {
             return (
               <FeatureCard
                 key={feature.path}
+                className={`anim-fade-up anim-d${Math.min(fIdx + 1, 6)}`}
                 icon={feature.icon}
                 title={feature.title}
                 description={feature.description}

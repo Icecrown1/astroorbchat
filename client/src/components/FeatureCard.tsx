@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 import { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,12 +35,12 @@ export function FeatureCard({
   return (
     <Card
       className={cn(
-        'relative p-6 transition-all',
+        'relative p-6 transition-all tap-scale',
         isBlocked ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer hover-elevate active-elevate-2',
         disabled && !isBlocked && 'opacity-60 cursor-not-allowed',
         className
       )}
-      onClick={isBlocked || disabled ? undefined : onClick}
+      onClick={isBlocked || disabled ? undefined : () => { haptic.impact('light'); onClick(); }}
       data-testid={`card-feature-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
       {isBlocked && (

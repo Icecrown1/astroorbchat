@@ -1,3 +1,4 @@
+import { haptic } from '@/lib/haptics';
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
@@ -44,6 +45,7 @@ export default function Ask() {
       return response.data;
     },
     onSuccess: (data) => {
+      haptic.notify('success');
       setAnswer(data.answer);
       decreaseOrbs(0.5);
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
@@ -53,6 +55,7 @@ export default function Ask() {
       });
     },
     onError: (error: any) => {
+      haptic.notify('error');
       toast({
         title: t.ask.requestFailed,
         description: error.message || t.ask.tryAgain,
@@ -93,7 +96,7 @@ export default function Ask() {
             </p>
           </div>
 
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => { haptic.impact('medium'); mutation.mutate(data); })} className="space-y-4">
             <div>
               <Label htmlFor="question">{t.ask.yourQuestion}</Label>
               <Textarea
