@@ -27,6 +27,19 @@ import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo } from 'react';
 import type { User, Subscription } from '@shared/schema';
 
+// Фаза Луны без запросов: синодический цикл от эталонного новолуния
+function moonPhaseLine(locale: string): string {
+  const synodic = 29.530588853;
+  const ref = Date.UTC(2000, 0, 6, 18, 14); // новолуние 06.01.2000
+  const days = ((Date.now() - ref) / 86400000) % synodic;
+  const ru = ['Новолуние', 'Растущий серп', 'Первая четверть', 'Растущая Луна', 'Полнолуние', 'Убывающая Луна', 'Последняя четверть', 'Старый серп'];
+  const en = ['New Moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full Moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+  const idx = Math.floor(((days + synodic / 16) % synodic) / (synodic / 8));
+  const name = (locale === 'ru' ? ru : en)[idx];
+  return locale === 'ru' ? ('Сегодня: ' + name.toLowerCase()) : ('Today: ' + name);
+}
+
+
 interface UserMeResponse {
   ok: boolean;
   data: User & {
