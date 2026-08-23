@@ -26,6 +26,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo } from 'react';
 import type { User, Subscription } from '@shared/schema';
+import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
+
+const VIGNETTES: Record<string, VignetteKind> = {
+  '/my-natal-chart': 'natal',
+  '/guest-charts': 'guest',
+  '/matrix': 'matrix',
+  '/solar-return': 'solar',
+  '/horoscope': 'horoscope',
+  '/compatibility': 'compat',
+  '/ask': 'oracle',
+};
 
 // Фаза Луны без запросов: синодический цикл от эталонного новолуния
 function moonPhaseLine(locale: string): string {
@@ -252,6 +263,7 @@ export default function Dashboard() {
             return (
               <FeatureCard
                 key={feature.path}
+                art={VIGNETTES[feature.path] ? <FeatureVignette kind={VIGNETTES[feature.path]} /> : undefined}
                 className={`anim-fade-up anim-d${Math.min(fIdx + 1, 6)}`}
                 icon={feature.icon}
                 title={feature.title}
