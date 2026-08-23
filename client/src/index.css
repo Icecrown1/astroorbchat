@@ -142,129 +142,81 @@
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-
-  --opaque-button-border-intensity: 9;  /* In terms of percentages */
-
-  /* Backgrounds applied on top of other backgrounds when hovered/active */
+  --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 222 5% 12%;
+  /* Astro Orb — космический минимализм (унификация с сайтом astroorbi.com)
+     Фон #0B0D14, поверхности слоями, iris #8E7BFF, stellar #EFC26B */
+  --background: 231 29% 6%;
+  --foreground: 231 24% 93%;
+  --border: 233 22% 21%;
+  --card: 230 25% 10%;
+  --card-foreground: 231 24% 93%;
+  --card-border: 233 22% 17%;
+  --sidebar: 232 24% 12%;
+  --sidebar-foreground: 231 24% 93%;
+  --sidebar-border: 233 22% 19%;
+  --sidebar-primary: 252 100% 74%;
+  --sidebar-primary-foreground: 231 29% 6%;
+  --sidebar-accent: 232 22% 16%;
+  --sidebar-accent-foreground: 231 24% 93%;
+  --sidebar-ring: 252 100% 74%;
+  --popover: 232 24% 13%;
+  --popover-foreground: 231 24% 93%;
+  --popover-border: 233 22% 21%;
 
-  --foreground: 210 15% 96%;
+  /* AstroOrb Palette (dark) */
+  --solar-gold: 41 81% 68%;
+  --deep-amber: 38 55% 53%;
+  --pearl-white: 231 24% 93%;
+  --iridescent-blue: 217 60% 70%;
+  --soft-rose: 330 60% 70%;
+  --opal-violet: 252 100% 74%;
 
-  --border: 220 6% 20%;
+  --primary: 252 100% 74%;
+  --primary-foreground: 231 29% 6%;
+  --secondary: 232 22% 16%;
+  --secondary-foreground: 231 24% 93%;
+  --muted: 232 22% 14%;
+  --muted-foreground: 229 12% 66%;
+  --accent: 41 81% 68%;
+  --accent-foreground: 231 29% 6%;
+  --destructive: 351 78% 68%;
+  --destructive-foreground: 350 60% 10%;
+  --input: 233 22% 21%;
+  --ring: 252 100% 74%;
+  --chart-1: 252 100% 74%;
+  --chart-2: 41 81% 68%;
+  --chart-3: 217 60% 70%;
+  --chart-4: 330 60% 70%;
+  --chart-5: 160 55% 56%;
+  --success: 160 55% 56%;
+  --success-foreground: 160 60% 8%;
 
-  --card: 228 5% 15%;
+  --primary-border: 252 80% 62%;
+  --secondary-border: 233 22% 22%;
+  --muted-border: 233 22% 19%;
+  --accent-border: 41 60% 52%;
+  --destructive-border: 351 60% 52%;
+  --sidebar-primary-border: 252 80% 62%;
+  --sidebar-accent-border: 233 22% 22%;
 
-  --card-foreground: 210 15% 96%;
+  --gradient-primary: linear-gradient(135deg, hsl(252 100% 74%), hsl(258 78% 60%));
+  --gradient-cosmic: linear-gradient(160deg, hsl(231 29% 6%), hsl(248 32% 12%) 60%, hsl(255 38% 15%));
+  --gradient-mystical: linear-gradient(135deg, hsl(252 100% 74% / 0.16), hsl(41 81% 68% / 0.10));
+  --gradient-aura: radial-gradient(circle at 30% 20%, hsl(252 100% 74% / 0.22), transparent 60%);
+  --gradient-energy: linear-gradient(135deg, hsl(41 81% 68%), hsl(38 55% 53%));
+  --gradient-palette: linear-gradient(90deg, hsl(252 100% 74%), hsl(41 81% 68%));
 
-  --card-border: 226 6% 21%;
-
-  --sidebar: 230 6% 18%;
-
-  --sidebar-foreground: 210 15% 96%;
-
-  --sidebar-border: 228 6% 24%;
-
-  --sidebar-primary: 265 75% 62%;
-
-  --sidebar-primary-foreground: 265 20% 98%;
-
-  --sidebar-accent: 230 8% 22%;
-
-  --sidebar-accent-foreground: 210 15% 92%;
-
-  --sidebar-ring: 265 75% 62%;
-
-  --popover: 230 6% 20%;
-
-  --popover-foreground: 210 15% 96%;
-
-  --popover-border: 228 6% 26%;
-
-  /* AstroOrb Palette - Dark Mode */
-  --solar-gold: 41 64% 55%;
-  --deep-amber: 36 67% 37%;
-  --pearl-white: 60 10% 20%;
-  --iridescent-blue: 207 50% 60%;
-  --soft-rose: 348 45% 70%;
-  --opal-violet: 254 40% 68%;
-
-  --primary: 41 64% 55%;
-
-  --primary-foreground: 222 5% 12%;
-
-  --secondary: 228 8% 24%;
-
-  --secondary-foreground: 210 15% 92%;
-
-  --muted: 228 10% 22%;
-
-  --muted-foreground: 215 12% 68%;
-
-  --accent: 207 50% 60%;
-
-  --accent-foreground: 207 15% 90%;
-
-  --destructive: 0 72% 50%;
-
-  --destructive-foreground: 0 15% 98%;
-
-  --input: 228 8% 38%;
-  --ring: 41 64% 55%;
-  --chart-1: 41 64% 55%;
-  --chart-2: 207 50% 60%;
-  --chart-3: 348 45% 70%;
-  --chart-4: 254 40% 68%;
-  --chart-5: 36 67% 37%;
-
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.20);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.25);
-  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
-  --shadow: 0px 4px 6px -1px hsl(0 0% 0% / 0.25), 0px 2px 4px -2px hsl(0 0% 0% / 0.20);
-  --shadow-md: 0px 6px 8px -2px hsl(0 0% 0% / 0.30), 0px 2px 4px -2px hsl(0 0% 0% / 0.25);
-  --shadow-lg: 0px 10px 15px -3px hsl(0 0% 0% / 0.35), 0px 4px 6px -4px hsl(0 0% 0% / 0.30);
-  --shadow-xl: 0px 20px 25px -5px hsl(0 0% 0% / 0.40), 0px 8px 10px -6px hsl(0 0% 0% / 0.35);
-  --shadow-2xl: 0px 25px 50px -12px hsl(0 0% 0% / 0.50);
-
-  /* Gradient definitions - AstroOrb Dark Mode */
-  --gradient-primary: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--deep-amber)));
-  --gradient-palette: linear-gradient(135deg, hsl(var(--solar-gold)), hsl(var(--deep-amber)), hsl(var(--soft-rose)), hsl(var(--opal-violet)), hsl(var(--pearl-white)));
-  --gradient-aura: radial-gradient(circle, hsla(207 50% 60% / 0.18) 0%, hsla(254 40% 68% / 0.14) 40%, transparent 70%);
-  --gradient-cosmic: linear-gradient(135deg, hsl(var(--chart-1)), hsl(var(--chart-2)));
-  --gradient-energy: linear-gradient(135deg, hsl(var(--chart-3)), hsl(var(--chart-2)));
-  --gradient-mystical: linear-gradient(135deg, hsl(var(--chart-1)), hsl(var(--chart-5)));
-
-  /* Automatically computed borders - intensity can be controlled by the user by the --opaque-button-border-intensity setting */
-  
-  /* Fallback for older browsers */
-  --sidebar-primary-border: hsl(var(--sidebar-primary));
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --sidebar-accent-border: hsl(var(--sidebar-accent));
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --primary-border: hsl(var(--primary));
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --secondary-border: hsl(var(--secondary));
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --muted-border: hsl(var(--muted));
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --accent-border: hsl(var(--accent));
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --destructive-border: hsl(var(--destructive));
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,.35);
+  --shadow-xs: 0 1px 3px rgba(0,0,0,.40);
+  --shadow-sm: 0 2px 6px rgba(0,0,0,.42);
+  --shadow: 0 4px 12px rgba(0,0,0,.45);
+  --shadow-md: 0 6px 18px rgba(0,0,0,.48);
+  --shadow-lg: 0 10px 28px rgba(0,0,0,.50);
+  --shadow-xl: 0 16px 40px rgba(0,0,0,.52);
+  --shadow-2xl: 0 24px 56px rgba(0,0,0,.55);
 }
 
 @layer base {

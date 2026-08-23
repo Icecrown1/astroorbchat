@@ -16,11 +16,11 @@ export function initTelegram() {
   
   // Set header color to match Solar Gold design
   if (telegram.setHeaderColor) {
-    telegram.setHeaderColor('#D4A642'); // Solar Gold
+    telegram.setHeaderColor('#0B0D14'); // космический фон — без «шва» с приложением
   }
   
   if (telegram.setBackgroundColor) {
-    telegram.setBackgroundColor('#0a0a0a');
+    telegram.setBackgroundColor('#0B0D14');
   }
   
   return telegram;
