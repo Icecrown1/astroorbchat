@@ -12,6 +12,7 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
 import { MatrixOctagram, type MatrixZone, type OctagramNode } from '@/components/MatrixOctagram';
 import { arcanaMetaByN } from '@shared/matrixArcanaMeta';
+import { haptic } from '@/lib/haptics';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
 
 type SectionState = { id: MatrixSectionId; free: boolean; content: string | null };
@@ -70,10 +71,12 @@ export default function Matrix() {
           ? { ...old, sections: old.sections.map((s) => (s.id === section ? { ...s, content: resp.content } : s)) }
           : old,
       );
+      haptic.notify('success');
       const wasFree = data?.sections.find((s) => s.id === section)?.free;
       if (!wasFree && !resp.cached) decreaseOrbs(SECTION_COST);
     },
     onError: (e: any) => {
+      haptic.notify('error');
       const code = e?.message || '';
       if (code === 'subscription_required' || code === 'premium_required') {
         toast({
@@ -132,7 +135,7 @@ export default function Matrix() {
               {ZONES.map((z) => (
                 <button
                   key={z.id}
-                  onClick={() => setZone(z.id)}
+                  onClick={() => { haptic.select(); setZone(z.id); }}
                   aria-pressed={zone === z.id}
                   className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors ${
                     zone === z.id ? 'border-primary bg-primary/15 text-foreground' : 'border-border text-muted-foreground'
@@ -143,8 +146,8 @@ export default function Matrix() {
               ))}
             </div>
 
-            <Card className="p-4">
-              <MatrixOctagram core={core} zone={zone} onNodeTap={setTapped} activeNodeId={tapped?.id} />
+            <Card className="p-4 anim-fade-up">
+              <MatrixOctagram core={core} zone={zone} onNodeTap={(n) => { haptic.impact('light'); setTapped(n); }} activeNodeId={tapped?.id} />
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {ru ? 'Нажмите на любую точку матрицы' : 'Tap any point of the matrix'}
               </p>
@@ -155,11 +158,11 @@ export default function Matrix() {
               <h2 className="text-sm font-medium text-muted-foreground">
                 {ru ? 'Разбор по разделам' : 'Section readings'}
               </h2>
-              {data!.sections.map((s) => {
+              {data!.sections.map((s, idx) => {
                 const meta = SECTIONS_META[s.id];
                 const busy = pendingSection === s.id;
                 return (
-                  <Card key={s.id} className="p-4">
+                  <Card key={s.id} className={`p-4 tap-scale anim-fade-up anim-d${Math.min(idx + 1, 6)}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{ru ? meta.ru : meta.en}</p>
@@ -169,7 +172,7 @@ export default function Matrix() {
                         <Button
                           size="sm"
                           disabled={busy}
-                          onClick={() => sectionMutation.mutate(s.id)}
+                          onClick={() => { haptic.impact('medium'); sectionMutation.mutate(s.id); }}
                           data-testid={`button-matrix-${s.id}`}
                         >
                           {busy ? (
