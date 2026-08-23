@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { UserPlus, Sparkles } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -167,7 +168,7 @@ export function GuestChartForm() {
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-2" />
+                <OrbIcon className="w-4 h-4 mr-2" />
                 {locale === 'ru' ? 'Создать карту (20 звёзд)' : 'Create Chart (20 stars)'}
               </>
             )}
