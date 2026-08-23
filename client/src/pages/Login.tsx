@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/store/useAuth";
 import { Sparkles } from "lucide-react";
+import { OrbIcon } from '@/components/OrbIcon';
 import { Button } from "@/components/ui/button";
 import { getInitData, getReferralCode, getTelegramUser, getWebSourceFromStartParam } from "@/lib/telegram";
 
@@ -186,7 +187,7 @@ export default function Login() {
           <div className="space-y-4">
             <div className="flex justify-center">
               <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30 animate-pulse">
-                <Sparkles className="w-10 h-10 text-purple-300" />
+                <OrbIcon className="w-10 h-10 text-purple-300" />
               </div>
             </div>
             
@@ -234,7 +235,7 @@ export default function Login() {
         <div className="space-y-4">
           <div className="flex justify-center">
             <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30">
-              <Sparkles className="w-10 h-10 text-purple-300" />
+              <OrbIcon className="w-10 h-10 text-purple-300" />
             </div>
           </div>
           

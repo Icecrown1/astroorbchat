@@ -8,7 +8,8 @@ import { PlanetModal } from '@/components/PlanetModal';
 import { Loader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
 import { ImportantDatesList } from '@/components/ImportantDatesList';
-import { ArrowLeft, Users, Trash2, Sparkles, Calendar } from 'lucide-react';
+import { ArrowLeft, Users, Trash2, Calendar } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { translatePlanet, translateSign } from '@/lib/astroTranslations';
@@ -315,7 +316,7 @@ export default function GuestNatalChartView() {
                         className="w-full"
                         data-testid={`button-detailed-${planet.name}`}
                       >
-                        <Sparkles className="w-4 h-4 mr-2" />
+                        <OrbIcon className="w-4 h-4 mr-2" />
                         {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
                       </Button>
                     </div>

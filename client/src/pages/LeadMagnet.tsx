@@ -17,7 +17,8 @@ import {
   FormLabel, 
   FormMessage 
 } from '@/components/ui/form';
-import { Star, Sparkles, Moon, Sun, ArrowRight, Send, Briefcase, Heart, Activity, Wallet, Calendar } from 'lucide-react';
+import { Star, Moon, Sun, ArrowRight, Send, Briefcase, Heart, Activity, Wallet, Calendar } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 
 const leadFormSchema = z.object({
   name: z.string().min(2, 'Введите ваше имя'),
@@ -113,7 +114,7 @@ export default function LeadMagnet() {
           <div className="flex justify-center mb-4">
             <div className="relative">
               <Moon className="w-16 h-16 text-chart-1" />
-              <Sparkles className="w-6 h-6 text-chart-3 absolute -top-1 -right-1 animate-pulse" />
+              <OrbIcon className="w-6 h-6 text-chart-3 absolute -top-1 -right-1 animate-pulse" />
             </div>
           </div>
           <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-chart-1 via-chart-2 to-chart-3 bg-clip-text text-transparent mb-2">
@@ -254,7 +255,7 @@ export default function LeadMagnet() {
                       disabled={calculateMutation.isPending}
                       data-testid="button-calculate-horoscope"
                     >
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <OrbIcon className="w-4 h-4 mr-2" />
                       Рассчитать гороскоп
                     </Button>
                   </form>
@@ -354,7 +355,7 @@ export default function LeadMagnet() {
               {/* Monthly overview */}
               <Card className="p-6 backdrop-blur-sm bg-gradient-to-br from-chart-1/10 to-chart-2/10">
                 <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-chart-3" />
+                  <OrbIcon className="w-5 h-5 text-chart-3" />
                   Общий обзор месяца
                 </h3>
                 <p className="text-foreground/90 leading-relaxed">

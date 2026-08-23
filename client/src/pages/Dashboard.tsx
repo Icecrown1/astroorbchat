@@ -10,7 +10,6 @@ import { useEnergy } from '@/store/useEnergy';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest } from '@/lib/queryClient';
 import {
-  Sparkles,
   Moon,
   Sun,
   Heart,

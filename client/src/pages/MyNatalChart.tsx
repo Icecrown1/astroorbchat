@@ -8,7 +8,8 @@ import { PlanetModal } from '@/components/PlanetModal';
 import { Loader, FullPageLoader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
 import { ImportantDatesList } from '@/components/ImportantDatesList';
-import { ArrowLeft, Sparkles, RefreshCw, Calendar, Lock, Crown } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Calendar, Lock, Crown } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -248,7 +249,7 @@ export default function MyNatalChart() {
             </div>
           </div>
           <Card className="p-8 text-center">
-            <Sparkles className="w-16 h-16 mx-auto mb-4 text-primary" />
+            <OrbIcon className="w-16 h-16 mx-auto mb-4 text-primary" />
             <h3 className="text-xl font-semibold mb-2">
               {locale === 'ru' ? 'Создайте свою натальную карту' : 'Create Your Natal Chart'}
             </h3>
@@ -266,7 +267,7 @@ export default function MyNatalChart() {
               {createChartMutation.isPending ? (
                 <Loader className="mr-2" size="sm" />
               ) : (
-                <Sparkles className="w-5 h-5 mr-2" />
+                <OrbIcon className="w-5 h-5 mr-2" />
               )}
               {createChartMutation.isPending 
                 ? (locale === 'ru' ? 'Создаём...' : 'Creating...')
@@ -401,7 +402,7 @@ export default function MyNatalChart() {
                           className="w-full"
                           data-testid={`button-detailed-${planet.name}`}
                         >
-                          <Sparkles className="w-4 h-4 mr-2" />
+                          <OrbIcon className="w-4 h-4 mr-2" />
                           {locale === 'ru' ? 'Подробная трактовка' : 'Detailed Interpretation'}
                           {tier === 'standard' && (
                             <span className="ml-2 text-xs opacity-70">2 звезды</span>

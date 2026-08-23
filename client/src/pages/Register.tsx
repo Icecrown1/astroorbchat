@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest } from '@/lib/queryClient';
 import { Loader } from '@/components/Loader';
 import { CityAutocomplete } from '@/components/CityAutocomplete';
@@ -427,7 +428,7 @@ export default function Register() {
         <div className="mb-6">
           <div className="flex items-center justify-center mb-4">
             <div className="p-3 rounded-full bg-gradient-to-br from-primary to-chart-2">
-              <Sparkles className="w-8 h-8 text-white" />
+              <OrbIcon className="w-8 h-8 text-white" />
             </div>
           </div>
           <h1 className="text-2xl font-display font-bold text-center mb-2">
@@ -542,7 +543,7 @@ export default function Register() {
               </Button>
               <Button type="submit" className="flex-1" data-testid="button-complete-registration">
                 {locale === 'ru' ? 'Завершить' : 'Complete'}
-                <Sparkles className="w-4 h-4 ml-2" />
+                <OrbIcon className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </form>

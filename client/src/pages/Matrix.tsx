@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Lock } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -177,7 +177,7 @@ export default function Matrix() {
                           data-testid={`button-matrix-${s.id}`}
                         >
                           {busy ? (
-                            <Sparkles className="h-4 w-4 animate-pulse" />
+                            <OrbIcon className="h-4 w-4 animate-pulse" />
                           ) : s.free ? (
                             ru ? 'Открыть бесплатно' : 'Open free'
                           ) : (
