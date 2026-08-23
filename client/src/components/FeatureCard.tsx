@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Lock } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
+import { motion } from 'framer-motion';
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -54,7 +55,11 @@ export function FeatureCard({
       
       <div className="flex items-start gap-4">
         {art ? (
-          <div className="shrink-0">{art}</div>
+          <motion.div
+            className="shrink-0"
+            whileTap={{ rotate: 12, scale: 1.12 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 14 }}
+          >{art}</motion.div>
         ) : (
         <div className={cn(
           "p-3 rounded-lg",

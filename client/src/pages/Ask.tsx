@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader } from '@/components/Loader';
 import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { FeatureVignette } from '@/components/FeatureVignette';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -85,7 +86,7 @@ export default function Ask() {
         <Card className="p-6 mb-6">
           <div className="mb-6">
             <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-              <MessageCircle className="w-12 h-12 text-primary" />
+              <FeatureVignette kind="oracle" />
             </div>
             <h2 className="text-xl font-semibold mb-2">{t.ask.askYourQuestion}</h2>
             <p className="text-muted-foreground mb-4">

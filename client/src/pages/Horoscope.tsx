@@ -9,6 +9,7 @@ import { HoroscopeThemes } from '@/components/HoroscopeThemes';
 import { WeeklyPlanModal } from '@/components/WeeklyPlanModal';
 import { MonthlyPlanModal } from '@/components/MonthlyPlanModal';
 import { ArrowLeft, MoonStar, Calendar, CalendarRange, Archive as ArchiveIcon } from 'lucide-react';
+import { FeatureVignette } from '@/components/FeatureVignette';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -126,7 +127,7 @@ export default function Horoscope() {
               <Card className="p-8">
                 <div className="mb-6">
                   <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                    <MoonStar className="w-12 h-12 text-primary" />
+                    <FeatureVignette kind="horoscope" />
                   </div>
                   <h2 className="text-xl font-semibold mb-2">{t.horoscope.generateTitle}</h2>
                   <p className="text-sm text-muted-foreground mb-6">
@@ -164,7 +165,7 @@ export default function Horoscope() {
             {activeTab === 'week' && (
               <Card className="p-8">
                 <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                  <Calendar className="w-12 h-12 text-primary" />
+                  <FeatureVignette kind="horoscope" />
                 </div>
                 <h2 className="text-xl font-semibold mb-2">{t.horoscope.weeklyTitle}</h2>
                 <p className="text-sm text-muted-foreground mb-6">
@@ -189,7 +190,7 @@ export default function Horoscope() {
             {activeTab === 'month' && (
               <Card className="p-8">
                 <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-primary/20 to-chart-2/20 mb-4">
-                  <CalendarRange className="w-12 h-12 text-primary" />
+                  <FeatureVignette kind="horoscope" />
                 </div>
                 <h2 className="text-xl font-semibold mb-2">{t.horoscope.monthlyTitle}</h2>
                 <p className="text-sm text-muted-foreground mb-6">
