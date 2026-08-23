@@ -210,18 +210,21 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)'; // Purple/violet with transparency
       ctx.lineWidth = 1.5;
       
+      ctx.strokeStyle = 'rgba(239, 194, 107, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = 'round';
       houses.cusps.forEach((cuspDegree) => {
         const angle = (cuspDegree - 90) * (Math.PI / 180);
-        const innerX = center + Math.cos(angle) * innerRadius;
-        const innerY = center + Math.sin(angle) * innerRadius;
-        const outerX = center + Math.cos(angle) * houseLinesRadius;
-        const outerY = center + Math.sin(angle) * houseLinesRadius;
-        
+        const innerX = center + Math.cos(angle) * (innerRadius + 3);
+        const innerY = center + Math.sin(angle) * (innerRadius + 3);
+        const outerX = center + Math.cos(angle) * (houseLinesRadius - 4);
+        const outerY = center + Math.sin(angle) * (houseLinesRadius - 4);
         ctx.beginPath();
         ctx.moveTo(innerX, innerY);
         ctx.lineTo(outerX, outerY);
         ctx.stroke();
       });
+      ctx.lineCap = 'butt';
     }
 
     // 5.6. Маркеры ASC и MC (если есть данные)
@@ -307,7 +310,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
           if (placed.layer === layer) {
             const angleDiff = Math.abs(planet.position - placed.planet.position);
             const minAngleDiff = angleDiff > 180 ? 360 - angleDiff : angleDiff;
-            if (minAngleDiff < 15) { // Если ближе 15 градусов
+            if (minAngleDiff < 19) { // Если ближе 15 градусов
               tooClose = true;
               break;
             }
@@ -316,7 +319,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         if (tooClose) layer++;
       }
       
-      const radius = planetRadius - (layer * 30);
+      const radius = planetRadius - (layer * 34);
       planetPositions.push({ planet, radius, layer });
     });
 
@@ -434,7 +437,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
   };
 
   return (
-    <div className="gradient-aura-wrap wheel-enter" style={{ background: 'radial-gradient(circle at 50% 42%, rgba(142,123,255,0.16), transparent 62%)', borderRadius: '50%' }}>
+    <div className="gradient-aura-wrap wheel-enter" style={{ backgroundImage: "radial-gradient(circle at 50% 42%, rgba(142,123,255,0.12), transparent 62%), url('/nebula-bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '24px' }}>
       <canvas
       ref={canvasRef}
       width={400}
