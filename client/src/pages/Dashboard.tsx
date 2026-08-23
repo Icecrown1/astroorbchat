@@ -280,25 +280,25 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
+        <div className="grid grid-cols-3 gap-2 mt-8">
           <Button
-            variant="outline"
-            className="w-full"
+            variant="ghost"
+            className="h-auto flex-col gap-1.5 py-3 rounded-xl border border-border bg-card text-xs"
             onClick={() => navigate('/subscribe')}
             data-testid="button-subscribe"
           >
-            <CreditCard className="w-4 h-4 mr-2" />
+            <CreditCard className="w-4 h-4" />
             {tier === 'free' 
               ? (locale === 'ru' ? 'Оформить подписку' : 'Subscribe') 
               : t.nav.subscribe}
           </Button>
           <Button
-            variant="outline"
-            className="w-full relative"
+            variant="ghost"
+            className="relative h-auto flex-col gap-1.5 py-3 rounded-xl border border-border bg-card text-xs"
             onClick={() => navigate('/referral')}
             data-testid="button-referral"
           >
-            <Users className="w-4 h-4 mr-2" />
+            <Users className="w-4 h-4" />
             {t.nav.referral}
             {hasNewReferrals && (
               <Badge 
@@ -310,12 +310,12 @@ export default function Dashboard() {
             )}
           </Button>
           <Button
-            variant="outline"
-            className="w-full"
+            variant="ghost"
+            className="h-auto flex-col gap-1.5 py-3 rounded-xl border border-border bg-card text-xs"
             onClick={() => navigate('/payment-history')}
             data-testid="button-payment-history"
           >
-            <Receipt className="w-4 h-4 mr-2" />
+            <Receipt className="w-4 h-4" />
             {t.nav.paymentHistory}
           </Button>
           {user?.isAdmin && (
