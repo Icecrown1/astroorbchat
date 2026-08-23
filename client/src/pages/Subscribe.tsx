@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { haptic } from '@/lib/haptics';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -130,7 +131,7 @@ export default function Subscribe() {
   const wallet = useTonWallet();
   const walletConnected = !!wallet;
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('monthly');
+  const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('annual');
   const [pendingTonTier, setPendingTonTier] = useState<{ tier: SubscriptionTier; period: SubscriptionPeriod } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
@@ -843,6 +844,26 @@ export default function Subscribe() {
         )}
 
         <Card className="mt-6 p-4 bg-muted/50">
+        {/* Trust-блок: почему нам можно верить */}
+        <div className="mt-6 grid gap-2 anim-fade-up">
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <span className="mt-0.5 text-[hsl(41,81%,68%)]">✦</span>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {locale === 'ru'
+                ? 'Расчёты — Swiss Ephemeris, та же астрономия, что у NASA JPL. Никаких «примерно»: позиции планет с точностью до минуты дуги.'
+                : 'Calculations run on Swiss Ephemeris — the same astronomy as NASA JPL. No approximations: planet positions to the arc minute.'}
+            </p>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <span className="mt-0.5 text-[hsl(160,55%,56%)]">✓</span>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {locale === 'ru'
+                ? 'Отмена в один клик в любой момент. Никаких скрытых списаний: автопродление — только по вашему явному согласию.'
+                : 'Cancel anytime in one tap. No hidden charges: auto-renewal only with your explicit consent.'}
+            </p>
+          </div>
+        </div>
+
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' 
               ? 'Подписка оплачивается ежемесячно через TON блокчейн. Отмена в любое время. Энергия обновляется ежедневно в полночь.'
