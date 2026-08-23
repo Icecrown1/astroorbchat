@@ -30,9 +30,9 @@ import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette
 
 const VIGNETTES: Record<string, VignetteKind> = {
   '/my-natal-chart': 'natal',
-  '/guest-charts': 'guest',
+  '/natal-chart': 'guest',
   '/matrix': 'matrix',
-  '/solar-return': 'solar',
+  '/solar-today': 'solar',
   '/horoscope': 'horoscope',
   '/compatibility': 'compat',
   '/ask': 'oracle',
