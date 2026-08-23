@@ -372,12 +372,12 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       // Узел-«кнопка»: подложка + свечение (Солнце золотое и крупнее, Луна светлая, остальные iris)
       const isSun = planet.name === 'Sun';
       const isMoon = planet.name === 'Moon';
-      const nodeR = isSun ? 19 : isMoon ? 15 : 13;
+      const nodeR = isSun ? 16 : isMoon ? 15 : 13;
       const glowColor = isSun ? 'rgba(239, 194, 107, 0.85)' : isMoon ? 'rgba(232, 233, 240, 0.7)' : 'rgba(142, 123, 255, 0.75)';
       const strokeColor = isSun ? '#EFC26B' : isMoon ? '#E8E9F0' : '#8E7BFF';
 
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = isSun ? 24 : 11;
+      ctx.shadowBlur = isSun ? 15 : 10;
       ctx.fillStyle = 'rgba(20, 22, 35, 0.95)';
       ctx.beginPath();
       ctx.arc(x, y, nodeR, 0, 2 * Math.PI);
@@ -437,7 +437,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
   };
 
   return (
-    <div className="gradient-aura-wrap wheel-enter" style={{ backgroundImage: "radial-gradient(circle at 50% 42%, rgba(142,123,255,0.12), transparent 62%), url('/nebula-bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '24px' }}>
+    <div className={`gradient-aura-wrap ${typeof window !== 'undefined' && !sessionStorage.getItem('wheelShown') ? 'wheel-enter' : ''}`} onAnimationEnd={() => sessionStorage.setItem('wheelShown', '1')} style={{ backgroundImage: "radial-gradient(circle at 50% 42%, rgba(142,123,255,0.12), transparent 62%), url('/nebula-bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '24px' }}>
       <canvas
       ref={canvasRef}
       width={400}
