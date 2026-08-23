@@ -287,9 +287,7 @@ export default function Dashboard() {
             data-testid="button-subscribe"
           >
             <CreditCard className="w-4 h-4" />
-            {tier === 'free' 
-              ? (locale === 'ru' ? 'Оформить подписку' : 'Subscribe') 
-              : t.nav.subscribe}
+            {locale === 'ru' ? 'Подписка' : 'Subscribe'}
           </Button>
           <Button
             variant="ghost"
@@ -298,7 +296,7 @@ export default function Dashboard() {
             data-testid="button-referral"
           >
             <Users className="w-4 h-4" />
-            {t.nav.referral}
+            {locale === 'ru' ? 'Рефералы' : 'Referrals'}
             {hasNewReferrals && (
               <Badge 
                 className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
@@ -315,7 +313,7 @@ export default function Dashboard() {
             data-testid="button-payment-history"
           >
             <Receipt className="w-4 h-4" />
-            {t.nav.paymentHistory}
+            {locale === 'ru' ? 'Платежи' : 'Payments'}
           </Button>
           {user?.isAdmin && (
             <Button
