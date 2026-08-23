@@ -1,4 +1,5 @@
 import { haptic } from '@/lib/haptics';
+import { CostLine } from '@/components/CostLine';
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
@@ -92,9 +93,7 @@ export default function Ask() {
             <p className="text-muted-foreground mb-4">
               {t.ask.aiInsights}
             </p>
-            <p className="text-sm text-primary font-medium mb-6">
-              {t.ask.costOne}
-            </p>
+            <CostLine>{t.ask.costOne}</CostLine>
           </div>
 
           <form onSubmit={form.handleSubmit((data) => { haptic.impact('medium'); mutation.mutate(data); })} className="space-y-4">

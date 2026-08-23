@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
 import { ArrowLeft, Sun, Info, MapPin, Calendar } from 'lucide-react';
+import { FeatureVignette } from '@/components/FeatureVignette';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -158,7 +159,7 @@ export default function SolarToday() {
           <Card className="p-8">
             <div className="mb-6 text-center">
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-4/20 to-chart-2/20 mb-4">
-                <Sun className="w-12 h-12 text-chart-4" />
+                <FeatureVignette kind="solar" />
               </div>
               <h2 className="text-xl font-semibold mb-2">{t.solarToday.generateTitle}</h2>
               <p className="text-muted-foreground mb-6">

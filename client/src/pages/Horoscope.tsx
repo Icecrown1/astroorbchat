@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CostLine } from '@/components/CostLine';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -134,9 +135,7 @@ export default function Horoscope() {
                     {getPeriodTitle()}
                   </p>
 
-                  <p className="text-sm text-primary font-medium mb-6">
-                    {t.horoscope.costOne}
-                  </p>
+                  <CostLine>{t.horoscope.costOne}</CostLine>
 
                   <Button
                     onClick={() => mutation.mutate()}
@@ -171,9 +170,7 @@ export default function Horoscope() {
                 <p className="text-sm text-muted-foreground mb-6">
                   {t.horoscope.weeklyDescription || 'Получите подробный план на всю неделю с рекомендациями по каждому дню'}
                 </p>
-                <p className="text-sm text-primary font-medium mb-6">
-                  {t.horoscope.costWeekly}
-                </p>
+                <CostLine>{t.horoscope.costWeekly}</CostLine>
                 <Button
                   variant="default"
                   size="lg"
@@ -196,9 +193,7 @@ export default function Horoscope() {
                 <p className="text-sm text-muted-foreground mb-6">
                   {t.horoscope.monthlyDescription || 'Получите детальный прогноз на весь месяц с разбивкой по неделям'}
                 </p>
-                <p className="text-sm text-primary font-medium mb-6">
-                  {t.horoscope.costMonthly}
-                </p>
+                <CostLine>{t.horoscope.costMonthly}</CostLine>
                 <Button
                   variant="default"
                   size="lg"

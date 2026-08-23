@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { CostLine } from '@/components/CostLine';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -172,9 +173,9 @@ export default function Compatibility() {
               <p className="text-muted-foreground mb-4">
                 {t.compatibility.cosmicDynamics}
               </p>
-              <p className="text-sm text-primary font-medium mb-6" data-testid="text-cost">
-                {selectedGuestId ? t.compatibility.cost : t.compatibility.costWithChart}
-              </p>
+              <div className="mb-6" data-testid="text-cost">
+                <CostLine>{selectedGuestId ? t.compatibility.cost : t.compatibility.costWithChart}</CostLine>
+              </div>
             </div>
 
             {guestCharts?.data && guestCharts.data.length > 0 && (

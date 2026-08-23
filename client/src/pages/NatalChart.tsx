@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { GuestChartForm } from '@/components/GuestChartForm';
 import { ArrowLeft, Users, Trash2 } from 'lucide-react';
+import { FeatureVignette } from '@/components/FeatureVignette';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -126,7 +127,7 @@ export default function GuestNatalCharts() {
           <TabsContent value="saved" className="mt-6">
             {guestCharts.length === 0 ? (
               <Card className="p-8 text-center">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <div className="flex justify-center mb-4"><FeatureVignette kind="guest" /></div>
                 <p className="text-muted-foreground">
                   {locale === 'ru' 
                     ? 'У вас пока нет сохранённых гостевых карт' 
