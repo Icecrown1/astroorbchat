@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/store/useAuth";
-import { Sparkles } from "lucide-react";
 import { OrbIcon } from '@/components/OrbIcon';
 import { Button } from "@/components/ui/button";
 import { getInitData, getReferralCode, getTelegramUser, getWebSourceFromStartParam } from "@/lib/telegram";
