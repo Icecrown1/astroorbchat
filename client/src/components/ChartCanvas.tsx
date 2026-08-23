@@ -326,19 +326,31 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         sign: planet.sign
       });
 
-      // Свечение планеты
-      ctx.shadowColor = 'rgba(147, 51, 234, 0.6)';
-      ctx.shadowBlur = 8;
+      // Узел-«кнопка»: подложка + свечение (Солнце золотое и крупнее, Луна светлая, остальные iris)
+      const isSun = planet.name === 'Sun';
+      const isMoon = planet.name === 'Moon';
+      const nodeR = isSun ? 17 : isMoon ? 15 : 13;
+      const glowColor = isSun ? 'rgba(239, 194, 107, 0.85)' : isMoon ? 'rgba(232, 233, 240, 0.7)' : 'rgba(142, 123, 255, 0.75)';
+      const strokeColor = isSun ? '#EFC26B' : isMoon ? '#E8E9F0' : '#8E7BFF';
+
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = isSun ? 16 : 11;
+      ctx.fillStyle = 'rgba(20, 22, 35, 0.95)';
+      ctx.beginPath();
+      ctx.arc(x, y, nodeR, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = isSun ? 2 : 1.5;
+      ctx.stroke();
 
       // Символ планеты
       const planetSymbol = PLANET_SYMBOLS[planet.name] || planet.name.substring(0, 1);
-      ctx.fillStyle = THEME_COLORS.planetSymbol;
-      ctx.font = '600 20px "Noto Sans Symbols2", "Symbola", Arial, sans-serif';
+      ctx.fillStyle = strokeColor;
+      ctx.font = `600 ${isSun ? 18 : 15}px "Noto Sans Symbols2", "Symbola", Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(planetSymbol, x, y);
-      
-      ctx.shadowBlur = 0;
+      ctx.fillText(planetSymbol, x, y + 1);
     });
 
   }, [planets, aspects, angles, houses]);

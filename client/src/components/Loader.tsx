@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/LocaleContext';
-import sunIcon from '@assets/солнце_1760785218989.png';
 
 interface LoaderProps {
   className?: string;
@@ -161,12 +160,15 @@ export function Loader({ className, size = 'md', withPhrases = false }: LoaderPr
         )}
         data-testid="loader-spinner"
       >
-        <img 
-          src={sunIcon} 
-          alt="Loading" 
-          className="w-full h-full animate-spin"
-          style={{ animationDuration: '3s' }}
-        />
+        <svg viewBox="0 0 48 48" className={cn('w-full h-full animate-spin')} style={{ animationDuration: '2.6s' }} aria-hidden="true">
+          <circle cx="24" cy="24" r="9" fill="none" stroke="#EFC26B" strokeWidth="2" />
+          <g stroke="#EFC26B" strokeWidth="2" strokeLinecap="round">
+            {Array.from({ length: 8 }).map((_, i) => {
+              const a = (i * Math.PI) / 4;
+              return <line key={i} x1={24 + Math.cos(a) * 13} y1={24 + Math.sin(a) * 13} x2={24 + Math.cos(a) * 19} y2={24 + Math.sin(a) * 19} />;
+            })}
+          </g>
+        </svg>
       </div>
       {withPhrases && (
         <p 
