@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { haptic } from '@/lib/haptics';
-import { haptic } from '@/lib/haptics';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
