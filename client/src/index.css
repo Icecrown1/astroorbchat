@@ -421,3 +421,10 @@
 }
 .wheel-enter { animation: wheelEnter .7s cubic-bezier(.22,.8,.3,1) both; }
 @media (prefers-reduced-motion: reduce) { .wheel-enter { animation: none; } }
+
+@keyframes wheelFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.004); }
+}
+.wheel-idle { animation: wheelFloat 6.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .wheel-idle { animation: none; } }

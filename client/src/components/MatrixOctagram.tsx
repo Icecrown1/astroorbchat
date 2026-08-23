@@ -96,6 +96,11 @@ export function MatrixOctagram({
 
   return (
     <svg viewBox="0 0 400 400" role="img" aria-label="Октаграмма матрицы судьбы" className="w-full max-w-[420px] mx-auto select-none">
+      <defs>
+        <filter id="mxGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="3.2" />
+        </filter>
+      </defs>
       <style>{`
         .matrix-draw { stroke-dasharray: 500; stroke-dashoffset: 500; animation: matrixDraw 1.1s ease-out forwards; }
         @keyframes matrixDraw { to { stroke-dashoffset: 0; } }
@@ -142,8 +147,7 @@ export function MatrixOctagram({
             role="button"
             aria-label={`${n.label.ru}: аркан ${n.value}`}
           >
-            <circle cx={n.x} cy={n.y} r={n.r + (active ? 6 : 4)} fill="none" stroke={strokeColor} strokeWidth={active ? 5 : 3.5} opacity={0.10} />
-            <circle cx={n.x} cy={n.y} r={n.r + 2.5} fill="none" stroke={strokeColor} strokeWidth={2.5} opacity={0.22} />
+            <circle cx={n.x} cy={n.y} r={n.r + 1.5} fill="none" stroke={strokeColor} strokeWidth={active ? 6 : 4.5} opacity={active ? 0.75 : 0.55} filter="url(#mxGlow)" />
             <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} />
             <circle cx={n.x} cy={n.y} r={n.r + 4} fill="transparent" />
             <text
