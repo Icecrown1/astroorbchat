@@ -96,11 +96,11 @@ const THEME_COLORS = {
 };
 
 const ASPECT_COLORS: Record<string, string> = {
-  conjunction: '#D4A642', // Solar Gold
-  sextile: '#9BC3E3', // Iridescent Blue
-  square: '#ef4444', // red
-  trine: '#10b981', // green
-  opposition: '#9C6B1F', // Deep Amber
+  conjunction: '#EFC26B', // золото — слияние
+  sextile: '#8E7BFF',     // iris — гармония
+  trine: '#8E7BFF',       // iris — гармония
+  square: '#EFC26B',      // золото — напряжение
+  opposition: '#EFC26B',  // золото — напряжение
 };
 
 export function ChartCanvas({ planets, aspects, angles, houses, className, onPlanetClick }: ChartCanvasProps) {
@@ -170,7 +170,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
     ctx.stroke();
 
     // 4. Внутренний круг
-    ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
+    ctx.fillStyle = 'rgba(20, 22, 35, 0.65)';
     ctx.beginPath();
     ctx.arc(center, center, innerRadius, 0, 2 * Math.PI);
     ctx.fill();
@@ -232,12 +232,12 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         const ascY = center + Math.sin(ascAngle) * (houseLinesRadius + 15);
         
         // Background for better visibility
-        ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
+        ctx.fillStyle = 'rgba(20, 22, 35, 0.65)';
         const metrics = ctx.measureText('ASC');
         ctx.fillRect(ascX - metrics.width / 2 - 3, ascY - 7, metrics.width + 6, 14);
         
         // Text
-        ctx.fillStyle = '#8b5cf6'; // Violet
+        ctx.fillStyle = '#B9AEFF';
         ctx.fillText('ASC', ascX, ascY);
       }
       
@@ -248,12 +248,12 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         const mcY = center + Math.sin(mcAngle) * (houseLinesRadius + 15);
         
         // Background for better visibility
-        ctx.fillStyle = 'rgba(18, 20, 31, 0.92)';
+        ctx.fillStyle = 'rgba(20, 22, 35, 0.65)';
         const metrics = ctx.measureText('MC');
         ctx.fillRect(mcX - metrics.width / 2 - 3, mcY - 7, metrics.width + 6, 14);
         
         // Text
-        ctx.fillStyle = '#8b5cf6'; // Violet
+        ctx.fillStyle = '#B9AEFF';
         ctx.fillText('MC', mcX, mcY);
       }
     }
@@ -272,7 +272,8 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         const x2 = center + Math.cos(angle2) * (planetRadius - 10);
         const y2 = center + Math.sin(angle2) * (planetRadius - 10);
 
-        ctx.strokeStyle = ASPECT_COLORS[aspect.type] || '#999';
+        ctx.strokeStyle = ASPECT_COLORS[aspect.type] || 'rgba(155,160,181,0.5)';
+        ctx.globalAlpha = 0.55;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.globalAlpha = 0.5;
@@ -280,6 +281,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
       }
@@ -347,12 +349,12 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       // Узел-«кнопка»: подложка + свечение (Солнце золотое и крупнее, Луна светлая, остальные iris)
       const isSun = planet.name === 'Sun';
       const isMoon = planet.name === 'Moon';
-      const nodeR = isSun ? 17 : isMoon ? 15 : 13;
+      const nodeR = isSun ? 19 : isMoon ? 15 : 13;
       const glowColor = isSun ? 'rgba(239, 194, 107, 0.85)' : isMoon ? 'rgba(232, 233, 240, 0.7)' : 'rgba(142, 123, 255, 0.75)';
       const strokeColor = isSun ? '#EFC26B' : isMoon ? '#E8E9F0' : '#8E7BFF';
 
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = isSun ? 16 : 11;
+      ctx.shadowBlur = isSun ? 24 : 11;
       ctx.fillStyle = 'rgba(20, 22, 35, 0.95)';
       ctx.beginPath();
       ctx.arc(x, y, nodeR, 0, 2 * Math.PI);
@@ -412,7 +414,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
   };
 
   return (
-    <div className="gradient-aura-wrap" style={{ background: 'radial-gradient(circle at 50% 42%, rgba(142,123,255,0.16), transparent 62%)', borderRadius: '50%' }}>
+    <div className="gradient-aura-wrap wheel-enter" style={{ background: 'radial-gradient(circle at 50% 42%, rgba(142,123,255,0.16), transparent 62%)', borderRadius: '50%' }}>
       <canvas
       ref={canvasRef}
       width={400}
