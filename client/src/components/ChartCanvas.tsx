@@ -369,6 +369,9 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(planetSymbol, x, y + 1);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 0.9;
+      ctx.strokeText(planetSymbol, x, y + 1);
     });
 
   }, [planets, aspects, angles, houses]);

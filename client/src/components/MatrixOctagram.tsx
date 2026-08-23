@@ -75,8 +75,11 @@ export function MatrixOctagram({
     const p1 = byId(id1);
     const p2 = byId(id2);
     return (
+      <g key={`${id1}-${id2}`}>
+        {!dim(zones) && (
+          <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={w + 4} opacity={0.14} />
+        )}
       <line
-        key={`${id1}-${id2}`}
         x1={p1.x}
         y1={p1.y}
         x2={p2.x}
@@ -85,9 +88,9 @@ export function MatrixOctagram({
         strokeWidth={w}
         strokeDasharray={dash}
         opacity={dim(zones) ? 0.12 : 0.8}
-        style={dim(zones) ? undefined : { filter: `drop-shadow(0 0 5px ${stroke})` }}
         className="matrix-draw"
       />
+      </g>
     );
   };
 
@@ -139,7 +142,9 @@ export function MatrixOctagram({
             role="button"
             aria-label={`${n.label.ru}: аркан ${n.value}`}
           >
-            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} style={{ filter: `drop-shadow(0 0 ${active ? 12 : 8}px ${strokeColor}) drop-shadow(0 0 ${active ? 22 : 14}px ${strokeColor})` }} />
+            <circle cx={n.x} cy={n.y} r={n.r + (active ? 7 : 5)} fill="none" stroke={strokeColor} strokeWidth={active ? 7 : 5} opacity={0.16} />
+            <circle cx={n.x} cy={n.y} r={n.r + 2.5} fill="none" stroke={strokeColor} strokeWidth={3} opacity={0.32} />
+            <circle cx={n.x} cy={n.y} r={n.r} fill="hsl(232 20% 10%)" stroke={strokeColor} strokeWidth={active ? 3 : 2} />
             <circle cx={n.x} cy={n.y} r={n.r + 4} fill="transparent" />
             <text
               x={n.x}
