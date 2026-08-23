@@ -187,7 +187,7 @@ export default function Dashboard() {
               {user?.name ? t.auth.welcome.replace('{name}', user.name) : t.auth.welcomeDefault}
             </h1>
             <p className="text-muted-foreground">
-              {t.dashboard.subtitle}
+              {moonPhaseLine(locale)}
             </p>
           </div>
           <Button
