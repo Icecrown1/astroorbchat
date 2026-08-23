@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Lock, Sparkles, Star } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -181,7 +182,7 @@ export default function Matrix() {
                             ru ? 'Открыть бесплатно' : 'Open free'
                           ) : (
                             <span className="flex items-center gap-1">
-                              <Lock className="h-3.5 w-3.5" /> {SECTION_COST} <Star className="h-3.5 w-3.5 fill-current" />
+                              <Lock className="h-3.5 w-3.5" /> {SECTION_COST} <OrbIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </Button>

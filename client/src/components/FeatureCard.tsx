@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Lock } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -75,7 +76,7 @@ export function FeatureCard({
             )}
             {!premiumOnly && energyCost > 0 && (
               <Badge variant={locked ? "outline" : "secondary"} className="shrink-0">
-                <Sparkles className="w-3 h-3 mr-1" />
+                <OrbIcon className="w-3 h-3 mr-1 text-[hsl(41,81%,68%)]" />
                 {energyCost % 1 === 0 ? energyCost : energyCost.toFixed(1)}
               </Badge>
             )}
@@ -107,18 +108,3 @@ export function FeatureCard({
   );
 }
 
-function Sparkles({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" />
-    </svg>
-  );
-}

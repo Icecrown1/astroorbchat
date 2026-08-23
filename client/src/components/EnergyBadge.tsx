@@ -1,4 +1,5 @@
-import { Sparkles, Lock, Crown, Star } from 'lucide-react';
+import { Lock, Crown } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { useEnergy, SubscriptionTier } from '@/store/useEnergy';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
@@ -55,7 +56,7 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
         };
       case 'standard':
         return {
-          icon: Star,
+          icon: OrbIcon,
           value: orbs.toString(),
           label: locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`,
           gradient: 'from-chart-1 to-chart-3',
@@ -100,9 +101,6 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
           content.muted ? 'text-muted-foreground' : 'text-white'
         )}>
           {content.value}
-          {tier !== 'free' && (
-            <svg viewBox="0 0 16 16" className="w-4 h-4" aria-hidden="true"><path d="M8 0l1.6 4.9L14.9 3 11.4 6.9 16 8l-4.6 1.1 3.5 3.9-5.3-1.9L8 16l-1.6-4.9L1.1 13l3.5-3.9L0 8l4.6-1.1L1.1 3l5.3 1.9L8 0z" fill="currentColor" opacity="0.9"/></svg>
-          )}
         </span>
         <span className={cn(
           'text-xs font-medium text-center max-w-[180px]',
