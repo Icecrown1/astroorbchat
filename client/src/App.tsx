@@ -1,5 +1,4 @@
 import { Switch, Route, useLocation } from 'wouter';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
@@ -54,14 +53,6 @@ function Router() {
   }, [isAuthenticated, location, navigate]);
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.16, ease: 'easeOut' }}
-      >
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
@@ -87,8 +78,6 @@ function Router() {
       <Route path="/" component={isAuthenticated ? Dashboard : Login} />
       <Route component={NotFound} />
     </Switch>
-      </motion.div>
-    </AnimatePresence>
   );
 }
 
