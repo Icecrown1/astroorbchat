@@ -437,7 +437,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
   };
 
   return (
-    <div className={`gradient-aura-wrap ${typeof window !== 'undefined' && !sessionStorage.getItem('wheelShown') ? 'wheel-enter wheel-idle' : 'wheel-idle'}`} onAnimationEnd={() => sessionStorage.setItem('wheelShown', '1')} style={{ backgroundImage: "radial-gradient(circle at 50% 42%, rgba(142,123,255,0.12), transparent 62%), url('/nebula-bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '24px' }}>
+    <div className={`gradient-aura-wrap wheel-nebula ${typeof window !== 'undefined' && !sessionStorage.getItem('wheelShown') ? 'wheel-enter wheel-idle' : 'wheel-idle'}`} onAnimationEnd={() => sessionStorage.setItem('wheelShown', '1')} >
       <canvas
       ref={canvasRef}
       width={400}
