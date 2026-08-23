@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/Loader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Home, Zap, Eye, Star, Crown } from 'lucide-react';
+import { AlertCircle, TrendingUp, AlertTriangle, Lightbulb, Home, Zap, Eye, Star, Crown } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -248,7 +249,7 @@ export function PlanetModal({ planet, onClose, chartType = 'own', chartId }: Pla
               {/* Brief summary — free for everyone */}
               <div className="p-4 bg-muted/50 rounded-lg border">
                 <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                  <OrbIcon className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                   <p className="text-sm leading-relaxed">{briefData.summary}</p>
                 </div>
               </div>

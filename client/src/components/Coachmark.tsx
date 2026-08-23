@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { OrbIcon } from '@/components/OrbIcon';
 import { Button } from "@/components/ui/button";
 
 interface CoachmarkProps {
@@ -17,7 +18,7 @@ export function Coachmark({
   description,
   buttonText,
   onAction,
-  icon = <Sparkles className="w-6 h-6" />,
+  icon = <OrbIcon className="w-6 h-6" />,
 }: CoachmarkProps) {
   return (
     <AnimatePresence>

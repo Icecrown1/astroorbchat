@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Lock, Sparkles, Calendar, CheckCircle, XCircle, Lightbulb, Clock } from 'lucide-react';
+import { Lock, Calendar, CheckCircle, XCircle, Lightbulb, Clock } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { ImportantEvent, ImportantDateInterpretation, getImportantDateDetail, unlockImportantDate } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { translatePlanet, translateSign, translateSignPrepositional } from '@/lib/astroTranslations';
@@ -211,7 +212,7 @@ export function ImportantDateModal({ event, open, onClose }: ImportantDateModalP
               {/* What It Means */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <OrbIcon className="w-4 h-4 text-primary" />
                   <h3 className="font-semibold">{locale === 'ru' ? 'Что это значит' : 'What It Means'}</h3>
                 </div>
                 <ul className="space-y-2">

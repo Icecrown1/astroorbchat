@@ -10,7 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Moon, Sparkles, ArrowRight, Calendar, Zap } from 'lucide-react';
+import { Moon, ArrowRight, Calendar, Zap } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { cn } from '@/lib/utils';
 import { getImportantDates, getImportantDateInterpretation, ImportantEvent, InterpretationResponse } from '@/lib/importantDatesApi';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -185,7 +186,7 @@ export function ImportantDatesList({ externalChartId }: ImportantDatesListProps 
             >
             {isHighImportance && (
               <div className="absolute top-2 right-2">
-                <Sparkles className="w-4 h-4 text-primary" />
+                <OrbIcon className="w-4 h-4 text-primary" />
               </div>
             )}
 
@@ -229,7 +230,7 @@ export function ImportantDatesList({ externalChartId }: ImportantDatesListProps 
 
                 {isHighImportance && event.importance_reason && (
                   <div className="mt-2 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-primary" />
+                    <OrbIcon className="w-3 h-3 text-primary" />
                     <p className="text-xs text-primary font-medium">
                       {event.importance_reason === 'in_sun_sign' && (locale === 'ru' 
                         ? 'В вашем солнечном знаке' 
@@ -303,7 +304,7 @@ export function ImportantDatesList({ externalChartId }: ImportantDatesListProps 
             <>
               {interpretationResponse.cached && (
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <OrbIcon className="w-4 h-4 text-primary" />
                   <span className="text-sm font-medium text-muted-foreground">
                     {locale === 'ru' 
                       ? '✓ Бесплатно (из кэша, действует 7 дней)' 

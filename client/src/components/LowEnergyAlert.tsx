@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Sparkles, ShoppingCart, Crown } from 'lucide-react';
+import { ShoppingCart, Crown } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { useLocation } from 'wouter';
 import { useTranslation } from '@/contexts/LocaleContext';
 
@@ -14,7 +15,7 @@ export function LowEnergyAlert({ className }: LowEnergyAlertProps) {
 
   return (
     <Alert className={className} data-testid="alert-low-energy">
-      <Sparkles className="h-4 w-4" />
+      <OrbIcon className="h-4 w-4" />
       <AlertDescription className="space-y-3">
         <p className="text-sm">
           {t.energy.lowEnergyMessage}

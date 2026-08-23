@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, ShoppingBag, Sparkles, Check, Wallet, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Check, Wallet, RefreshCw } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
@@ -414,7 +415,7 @@ export default function BuyEnergy() {
 
                 <div className="text-center mb-4">
                   <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-chart-3/20 to-chart-2/20 mb-3">
-                    <Sparkles className="w-8 h-8 text-chart-3" />
+                    <OrbIcon className="w-8 h-8 text-chart-3" />
                   </div>
                   <h3 className="text-3xl font-bold mb-1">{pack.amount}</h3>
                   <p className="text-sm text-muted-foreground">{t.common.energy} {t.common.orbs}</p>
