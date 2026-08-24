@@ -1,7 +1,6 @@
 /** Line-art виньетки карточек фич: тонкий штрих + фирменные акценты (вместо иконок в квадратах). */
 const IRIS = 'hsl(252 100% 74%)';
 const GOLD = 'hsl(41 81% 68%)';
-const ROSE = 'hsl(330 60% 70%)';
 
 export type VignetteKind = 'natal' | 'guest' | 'matrix' | 'solar' | 'horoscope' | 'compat' | 'oracle';
 
@@ -48,7 +47,7 @@ export function FeatureVignette({ kind, active = false }: { kind: VignetteKind; 
         <path d="M14 15l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z" fill={GOLD} stroke="none" />
       </g>)}
       {kind === 'compat' && (<g {...common}>
-        <path d="M19 32c-5-4-9-7.4-9-11.6C10 17 12.6 15 15.4 15c1.9 0 3.1.9 3.6 2 .5-1.1 1.7-2 3.6-2 2.8 0 5.4 2 5.4 5.4 0 4.2-4 7.6-9 11.6z" stroke={ROSE} />
+        <path d="M19 32c-5-4-9-7.4-9-11.6C10 17 12.6 15 15.4 15c1.9 0 3.1.9 3.6 2 .5-1.1 1.7-2 3.6-2 2.8 0 5.4 2 5.4 5.4 0 4.2-4 7.6-9 11.6z" stroke={IRIS} />
         <path d="M32 30c-3.4-2.7-6-5-6-7.8 0-2.3 1.7-3.6 3.6-3.6 1.2 0 2 .6 2.4 1.3.4-.7 1.2-1.3 2.4-1.3 1.9 0 3.6 1.3 3.6 3.6 0 2.8-2.6 5.1-6 7.8z" stroke={GOLD} opacity="0.85" />
       </g>)}
       {kind === 'oracle' && (<g {...common}>
