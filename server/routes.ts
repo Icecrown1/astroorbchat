@@ -3667,6 +3667,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Telegram Stars (XTR) =====
+  app.post("/api/payments/stars/create-invoice", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.userId;
+      const { packId } = req.body || {};
+      const { STARS_ORB_PACKS, createStarsInvoiceLink } = await import("./lib/telegramStars");
+      const pack = STARS_ORB_PACKS[packId];
+      if (!pack) return res.status(400).json({ ok: false, error: "unknown_pack" });
+      const payload = JSON.stringify({ t: "orbs", u: userId, o: pack.orbs, p: packId });
+      const link = await createStarsInvoiceLink({
+        title: `${pack.orbs} звёзд Astro Orb`,
+        description: `Пакет из ${pack.orbs} звёзд для функций приложения`,
+        payload,
+        stars: pack.tgStars,
+      });
+      return res.json({ ok: true, link });
+    } catch (e: any) {
+      console.error("[STARS] create-invoice error:", e);
+      return res.status(500).json({ ok: false, error: "stars_invoice_failed" });
+    }
+  });
+
+  // Вебхук бота: pre_checkout + successful_payment (Stars)
+  app.post("/webhooks/telegram", async (req, res) => {
+    try {
+      const secret = req.headers["x-telegram-bot-api-secret-token"];
+      if (process.env.TELEGRAM_WEBHOOK_SECRET && secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+        return res.status(401).json({ ok: false });
+      }
+      const update = req.body || {};
+
+      if (update.pre_checkout_query) {
+        const { answerPreCheckout } = await import("./lib/telegramStars");
+        await answerPreCheckout(update.pre_checkout_query.id, true);
+        return res.json({ ok: true });
+      }
+
+      const sp = update.message?.successful_payment;
+      if (sp) {
+        const chargeId = sp.telegram_payment_charge_id;
+        // exactly-once: дедуп по журналу
+        try {
+          const { paymentEventLog } = await import("../shared/schema");
+          await db.insert(paymentEventLog).values({ provider: "stars", eventId: chargeId, eventType: "successful_payment", payload: update });
+        } catch (dupErr: any) {
+          if (dupErr?.code === "23505" || String(dupErr?.message || "").includes("duplicate")) {
+            return res.json({ ok: true, duplicate: true });
+          }
+          console.error("[STARS] event log error (non-blocking):", dupErr);
+        }
+        let payload: any = {};
+        try { payload = JSON.parse(sp.invoice_payload || "{}"); } catch { /* noop */ }
+        if (payload.t === "orbs" && payload.u && payload.o) {
+          const user = await storage.getUser(payload.u);
+          if (user) {
+            const current = parseFloat(user.referralOrbs || "0");
+            await storage.updateUser(payload.u, { referralOrbs: String(current + Number(payload.o)) } as any);
+            console.log(`[STARS] Credited ${payload.o} orbs to ${payload.u} (charge ${chargeId})`);
+          } else {
+            console.error("[STARS] user not found for payload", payload);
+          }
+        }
+        return res.json({ ok: true });
+      }
+
+      // /paysupport и прочие сообщения — вежливый ответ
+      const text = update.message?.text;
+      if (text && text.startsWith("/paysupport")) {
+        const chatId = update.message.chat?.id;
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (chatId && botToken) {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, text: "Поддержка по оплатам Astro Orb: опишите проблему, приложите дату и сумму — ответим и при необходимости вернём звёзды. Контакт: @AstroOrbSupport" }),
+          });
+        }
+      }
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error("[TG WEBHOOK] error:", e);
+      return res.status(200).json({ ok: true }); // не заставляем Telegram ретраить бесконечно
+    }
+  });
+
   // YooKassa webhook endpoint
   app.post("/webhooks/yookassa", async (req, res) => {
     try {
