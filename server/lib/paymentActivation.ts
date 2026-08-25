@@ -6,6 +6,84 @@
 import dayjs from 'dayjs';
 import { sendSupportAlert } from './support';
 
+export type SubscriptionSource = 'yookassa' | 'ton' | 'stars' | 'dodo' | 'dev' | 'admin';
+
+export interface ActivateSubscriptionParams {
+  userId: string;
+  tier: 'standard' | 'premium' | 'pro';
+  /** Длительность: месяцы (по умолчанию 1) ИЛИ дни (Stars — ровно 30) */
+  periodMonths?: number;
+  periodDays?: number;
+  source: SubscriptionSource;
+  meta?: {
+    autoRenew?: boolean;
+    paymentMethodId?: string | null;
+    amountRUB?: string | null;
+    starsChargeId?: string | null;
+    starsExpiresAt?: Date | null;
+    /** Продление: считать срок от текущей даты окончания, если она в будущем (по умолчанию true) */
+    extend?: boolean;
+  };
+}
+
+/**
+ * ЕДИНАЯ точка активации/продления подписки для всех провайдеров (ЮKassa, TON, Stars, Dodo, dev/admin).
+ * - срок: от max(now, currentPeriodEnd) при extend (продление/повторная оплата), иначе от now;
+ * - начисляет месячные орбы тира и сдвигает orbsResetAt на 30 дней;
+ * - реферальный бонус — только при первой активации (не при продлении активной подписки).
+ */
+export async function activateSubscriptionForUser(storage: any, p: ActivateSubscriptionParams) {
+  const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./energy');
+  const normalizedTier: 'pro' | 'standard' = (p.tier === 'premium' || p.tier === 'pro') ? 'pro' : 'standard';
+  const extend = p.meta?.extend !== false;
+  const now = new Date();
+
+  const existingSub = await storage.getSubscription(p.userId);
+  const wasActive = !!existingSub && existingSub.status === 'active' && new Date(existingSub.currentPeriodEnd) > now;
+  const base = extend && wasActive ? new Date(existingSub.currentPeriodEnd) : now;
+  const currentPeriodEnd = p.periodDays
+    ? dayjs(base).add(p.periodDays, 'day').toDate()
+    : dayjs(base).add(p.periodMonths || 1, 'month').toDate();
+
+  const data: any = {
+    tier: normalizedTier,
+    status: 'active',
+    currentPeriodEnd,
+    paymentProvider: p.source,
+    periodMonths: p.periodMonths || 1,
+  };
+  if (p.meta?.autoRenew !== undefined) data.autoRenew = p.meta.autoRenew;
+  if (p.meta?.paymentMethodId !== undefined) data.paymentMethodId = p.meta.paymentMethodId;
+  if (p.meta?.amountRUB !== undefined) data.amountRUB = p.meta.amountRUB;
+  if (p.meta?.starsChargeId !== undefined) data.starsChargeId = p.meta.starsChargeId;
+  if (p.meta?.starsExpiresAt !== undefined) data.starsExpiresAt = p.meta.starsExpiresAt;
+
+  if (existingSub) {
+    await storage.updateSubscription(existingSub.id, data);
+  } else {
+    await storage.createSubscription({ userId: p.userId, startedAt: now, ...data });
+  }
+
+  const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
+  const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
+  await storage.updateUser(p.userId, {
+    subscriptionOrbs: monthlyOrbs.toString(),
+    orbsResetAt: dayjs().add(30, 'days').toDate(),
+  });
+
+  if (!wasActive) {
+    try {
+      const { handleSubscriptionReferralBonus } = await import('./referral');
+      await handleSubscriptionReferralBonus(storage, p.userId);
+    } catch (refErr) {
+      console.error('[ACTIVATION] referral bonus failed (non-blocking):', refErr);
+    }
+  }
+
+  console.log(`[ACTIVATION] ${wasActive ? 'Extended' : 'Activated'} ${normalizedTier} via ${p.source} (user ${p.userId}) until ${currentPeriodEnd.toISOString()}, orbs ${monthlyOrbs}`);
+  return { tier: normalizedTier, currentPeriodEnd, renewed: wasActive, monthlyOrbs };
+}
+
 export interface ActivationResult {
   activated: boolean;
   alreadyDone: boolean;
@@ -43,45 +121,17 @@ export async function activateSucceededYookassaPayment(
     await creditPurchasedOrbs(storage, dbPayment.userId, dbPayment.energyAmount, 'yookassa');
 
   } else if (dbPayment.kind === 'subscription' && dbPayment.tier) {
-    const normalizedTier = (dbPayment.tier === 'premium' || dbPayment.tier === 'pro') ? 'pro' : 'standard';
-    const periodMonths = ykPayment.metadata?.periodMonths || 1;
+    const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
     const autoRenew = ykPayment.metadata?.autoRenew === true || ykPayment.metadata?.autoRenew === 'true';
     const paymentMethodId = ykPayment.payment_method?.saved ? ykPayment.payment_method.id : null;
-
-    const startedAt = new Date();
-    const currentPeriodEnd = dayjs(startedAt).add(periodMonths, 'month').toDate();
-
-    const existingSub = await storage.getSubscription(dbPayment.userId);
-    const subscriptionData = {
-      tier: normalizedTier,
-      status: 'active' as const,
-      currentPeriodEnd,
-      autoRenew,
-      paymentMethodId,
-      paymentProvider: 'yookassa' as const,
+    // Новая покупка: срок от сегодня (ЮKassa subscription — не продление; продление идёт через subscription_renewal)
+    await activateSubscriptionForUser(storage, {
+      userId: dbPayment.userId,
+      tier: dbPayment.tier as any,
       periodMonths,
-      amountRUB: dbPayment.amountRUB,
-    };
-
-    if (existingSub) {
-      await storage.updateSubscription(existingSub.id, subscriptionData);
-    } else {
-      await storage.createSubscription({ userId: dbPayment.userId, startedAt, ...subscriptionData });
-    }
-
-    const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
-    const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-    const user = await storage.getUser(dbPayment.userId);
-    if (user) {
-      await storage.updateUser(dbPayment.userId, {
-        subscriptionOrbs: monthlyOrbs.toString(),
-        orbsResetAt: dayjs().add(30, 'days').toDate(),
-      });
-    }
-
-    const { handleSubscriptionReferralBonus } = await import('./referral');
-    await handleSubscriptionReferralBonus(storage, dbPayment.userId);
-    console.log(`[ACTIVATION] Activated ${normalizedTier} subscription (user ${dbPayment.userId}, period ${periodMonths}mo, orbs ${monthlyOrbs})`);
+      source: 'yookassa',
+      meta: { autoRenew, paymentMethodId, amountRUB: dbPayment.amountRUB, extend: false },
+    });
 
   } else if (dbPayment.kind === 'subscription_upgrade') {
     const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;

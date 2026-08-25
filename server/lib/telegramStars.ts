@@ -26,6 +26,42 @@ export async function createStarsInvoiceLink(params: {
   return data.result as string;
 }
 
+/** Цены star-подписок (⭐ за 30 дней). Эквивалент 199/399 ₽ по ~1.06 ₽/⭐, округлено вверх. */
+export const STARS_SUB_PRICES: Record<'standard' | 'premium', number> = { standard: 200, premium: 400 };
+/** Telegram принимает только ровно 30 дней для подписок в Stars */
+export const STARS_SUB_PERIOD_SECONDS = 2592000;
+
+/**
+ * Инвойс на подписку за Stars: Telegram сам списывает каждые 30 дней и шлёт successful_payment
+ * с is_recurring=true, subscription_expiration_date. payload = {t:'sub', u, tier}
+ */
+export async function createStarsSubscriptionLink(params: {
+  tier: 'standard' | 'premium';
+  userId: string;
+}): Promise<string> {
+  const stars = STARS_SUB_PRICES[params.tier];
+  const title = params.tier === 'premium' ? 'Astro Orb Premium' : 'Astro Orb Standard';
+  const description = params.tier === 'premium'
+    ? 'Подписка Premium на 30 дней: 550 звёзд в месяц, все функции включая Соляр. Продлевается автоматически.'
+    : 'Подписка Standard на 30 дней: 250 звёзд в месяц, все функции кроме Соляра. Продлевается автоматически.';
+  const payload = JSON.stringify({ t: 'sub', u: params.userId, tier: params.tier });
+  const res = await fetch(`${API()}/createInvoiceLink`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: title.slice(0, 32),
+      description: description.slice(0, 255),
+      payload,
+      currency: 'XTR',
+      prices: [{ label: title.slice(0, 32), amount: stars }],
+      subscription_period: STARS_SUB_PERIOD_SECONDS,
+    }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(`createInvoiceLink(subscription) failed: ${JSON.stringify(data)}`);
+  return data.result as string;
+}
+
 export async function answerPreCheckout(preCheckoutQueryId: string, ok = true, error?: string) {
   await fetch(`${API()}/answerPreCheckoutQuery`, {
     method: 'POST',

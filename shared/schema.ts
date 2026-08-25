@@ -140,6 +140,9 @@ export const subscriptions = pgTable("subscriptions", {
   periodMonths: integer("period_months").notNull().default(1), // 1, 6, or 12 months
   amountRUB: decimal("amount_rub", { precision: 10, scale: 2 }), // Price for renewal
   lastRenewalNotification: timestamp("last_renewal_notification"), // Prevent duplicate notifications
+  // Telegram Stars subscriptions (30-day recurring, managed on Telegram side)
+  starsChargeId: varchar("stars_charge_id", { length: 128 }), // last telegram_payment_charge_id (for refund)
+  starsExpiresAt: timestamp("stars_expires_at"), // subscription_expiration_date from Telegram
 }, (table) => ({
   userIdIdx: index("subscriptions_user_id_idx").on(table.userId),
 }));

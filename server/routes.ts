@@ -31,7 +31,7 @@ import { geocodeCityWithFallback, getTimezoneFromCity } from "./lib/geocoding";
 import { searchCities } from "./lib/cities";
 import { handleTelegramLoginWidget } from "./lib/tgLoginVerify";
 import { createPayment as createYooKassaPayment, getPayment as getYooKassaPayment, checkPaymentStatus, verifyWebhookIP, parseWebhookPayload } from "./lib/yookassa";
-import { activateSucceededYookassaPayment, reconcileYookassaPayment } from "./lib/paymentActivation";
+import { activateSucceededYookassaPayment, reconcileYookassaPayment, activateSubscriptionForUser } from "./lib/paymentActivation";
 import { sendSupportAlert } from "./lib/support";
 import { getAllExchangeRates, forceRefreshAllRates, getCacheStatus } from "./lib/exchangeRates";
 import { nanoid } from "nanoid";
@@ -553,40 +553,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!tier || (tier !== 'standard' && tier !== 'pro' && tier !== 'premium')) {
         return res.status(400).json({ ok: false, error: "Invalid tier. Use 'standard', 'pro', or 'premium'" });
       }
-      const dbTier = tier === 'premium' ? 'pro' : tier;
-      
-      const startedAt = new Date();
-      const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
-      
-      const existingSub = await storage.getSubscription(userId);
-      
-      if (existingSub) {
-        await storage.updateSubscription(existingSub.id, {
-          tier: dbTier,
-          status: 'active',
-          currentPeriodEnd,
-        });
-      } else {
-        await storage.createSubscription({
-          userId,
-          tier: dbTier,
-          status: 'active',
-          startedAt,
-          currentPeriodEnd,
-        });
-      }
-      
-      // Credit subscription orbs using the new system
-      const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-      const orbsKey = dbTier === 'pro' ? 'premium' : dbTier;
-      const subscriptionOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS] || 250;
-      const user = await storage.getUser(userId);
-      if (user) {
-        await storage.updateUser(userId, {
-          subscriptionOrbs: subscriptionOrbs.toString(),
-          orbsResetAt: dayjs().add(30, 'days').toDate(),
-        });
-      }
+      const activated = await activateSubscriptionForUser(storage, {
+        userId,
+        tier: tier as any,
+        periodDays: 30,
+        source: 'dev',
+      });
+      const currentPeriodEnd = activated.currentPeriodEnd;
       
       res.json({ 
         ok: true, 
@@ -2958,9 +2931,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Process payment - credit energy
+      // Process payment - credit orbs or activate subscription
       if (payment.kind === "energy_pack" && payment.energyAmount) {
         await creditPurchasedOrbs(storage, userId, payment.energyAmount, 'ton');
+      } else if (payment.kind === "subscription" && payment.tier) {
+        // Раньше здесь подписка НЕ активировалась (только помечался платёж) — единая точка активации
+        await activateSubscriptionForUser(storage, {
+          userId,
+          tier: payment.tier as any,
+          periodMonths: 1,
+          source: 'ton',
+        });
       }
 
       // Update payment status with verified txHash
@@ -2979,6 +2960,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ok: true, 
         data: {
           status: 'succeeded',
+          kind: payment.kind,
+          tier: payment.tier,
           energyAmount: payment.energyAmount || 0,
           txHash: matchedTx.hash
         }
@@ -3134,42 +3117,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment.kind === "energy_pack" && payment.energyAmount) {
         await creditPurchasedOrbs(storage, payment.userId, payment.energyAmount, 'ton');
       } else if (payment.kind === "subscription" && payment.tier) {
-        const normalizedTier = (payment.tier === 'premium' || payment.tier === 'pro') ? 'pro' : 'standard';
-        
-        const startedAt = new Date();
-        const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
-
-        const existingSub = await storage.getSubscription(payment.userId);
-        
-        if (existingSub) {
-          await storage.updateSubscription(existingSub.id, {
-            tier: normalizedTier,
-            status: "active",
-            currentPeriodEnd,
-          });
-        } else {
-          await storage.createSubscription({
-            userId: payment.userId,
-            tier: normalizedTier,
-            status: "active",
-            startedAt,
-            currentPeriodEnd,
-          });
-        }
-
-        await handleSubscriptionReferralBonus(storage, payment.userId);
-        
-        // Credit subscription orbs using the new system
-        const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./lib/energy');
-        const orbsKey = normalizedTier === 'pro' ? 'premium' : 'standard';
-        const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-        const user = await storage.getUser(payment.userId);
-        if (user) {
-          await storage.updateUser(payment.userId, {
-            subscriptionOrbs: monthlyOrbs.toString(),
-            orbsResetAt: dayjs().add(30, 'days').toDate(),
-          });
-        }
+        await activateSubscriptionForUser(storage, {
+          userId: payment.userId,
+          tier: payment.tier as any,
+          periodMonths: 1,
+          source: 'ton',
+        });
       }
 
       res.json({ ok: true });
@@ -3764,6 +3717,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Star-подписка (30 дней, автопродление на стороне Telegram)
+  app.post("/api/payments/stars/create-subscription", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const tier = String(req.body?.tier || '');
+      if (tier !== 'standard' && tier !== 'premium') {
+        return res.status(400).json({ ok: false, error: "invalid_tier" });
+      }
+      // Уже активная star-подписка того же или высшего тира — не даём оформить вторую
+      const sub = await storage.getSubscription(userId);
+      if (sub && sub.status === 'active' && sub.paymentProvider === 'stars' && new Date(sub.currentPeriodEnd) > new Date()) {
+        const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : 1);
+        if (rank(sub.tier) >= rank(tier)) {
+          return res.status(409).json({ ok: false, error: "stars_subscription_active" });
+        }
+      }
+      const { createStarsSubscriptionLink, STARS_SUB_PRICES } = await import("./lib/telegramStars");
+      const link = await createStarsSubscriptionLink({ tier, userId });
+      return res.json({ ok: true, link, stars: STARS_SUB_PRICES[tier] });
+    } catch (e: any) {
+      console.error("[STARS] create-subscription error:", e);
+      return res.status(500).json({ ok: false, error: "stars_subscription_failed" });
+    }
+  });
+
   // Вебхук бота: pre_checkout + successful_payment (Stars)
   app.post("/webhooks/telegram", async (req, res) => {
     try {
@@ -3799,6 +3777,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await creditPurchasedOrbs(storage, payload.u, Number(payload.o), 'stars');
           } catch (creditErr) {
             console.error("[STARS] credit failed", payload, creditErr);
+          }
+        } else if (payload.t === "sub" && payload.u && (payload.tier === 'standard' || payload.tier === 'premium')) {
+          // Первая оплата и каждое автопродление приходят одинаково (is_recurring / is_first_recurring).
+          // Дедуп по charge_id уже прошёл выше → активируем/продлеваем через единую точку.
+          try {
+            const expiresAt = sp.subscription_expiration_date
+              ? new Date(Number(sp.subscription_expiration_date) * 1000)
+              : null;
+            const result = await activateSubscriptionForUser(storage, {
+              userId: payload.u,
+              tier: payload.tier,
+              periodDays: 30,
+              source: 'stars',
+              meta: { starsChargeId: chargeId, starsExpiresAt: expiresAt, autoRenew: true, extend: true },
+            });
+            console.log(`[STARS] subscription ${payload.tier} for ${payload.u}: recurring=${!!sp.is_recurring} first=${!!sp.is_first_recurring} renewed=${result.renewed}`);
+          } catch (subErr) {
+            console.error("[STARS] subscription activation failed", payload, subErr);
+            try {
+              const { sendSupportAlert } = await import("./lib/support");
+              await sendSupportAlert("Stars: подписка оплачена, активация упала", `user ${payload.u}, tier ${payload.tier}, charge ${chargeId}: ${String(subErr)}`);
+            } catch { /* noop */ }
           }
         }
         return res.json({ ok: true });
