@@ -252,6 +252,9 @@ export default function PaymentSuccess() {
   const tierLabel = tier === 'premium' ? 'Premium' : 'Standard';
   const monthlyOrbs = tier ? MONTHLY_ORBS[tier] : undefined;
   const periodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+  // Оплаченный тариф ниже текущего: включится после окончания текущего
+  const isScheduled = isSub && !!subscription?.scheduledTier && normalizeTier(subscription.tier) !== tier
+    && normalizeTier(subscription.scheduledTier) === tier;
   const fmtDate = (d: Date) => d.toLocaleDateString(ru ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const renderSuccess = () => (
@@ -279,13 +282,17 @@ export default function PaymentSuccess() {
       {isSub ? (
         <>
           <h1 className="ps-count text-3xl font-display font-bold leading-tight" data-testid="text-payment-title">
-            {tierLabel} {ru ? 'активирован' : 'is active'}
+            {tierLabel} {isScheduled ? (ru ? 'оплачен' : 'is paid') : (ru ? 'активирован' : 'is active')}
           </h1>
           <p className="ps-count text-muted-foreground mt-3" data-testid="text-payment-message">
-            {periodEnd
-              ? (ru ? `Доступ до ${fmtDate(periodEnd)}` : `Access until ${fmtDate(periodEnd)}`)
-              : (ru ? 'Все функции уже открыты' : 'All features are unlocked')}
-            {monthlyOrbs ? ` · ${monthlyOrbs} ${ru ? 'звёзд в месяц' : 'stars per month'}` : ''}
+            {isScheduled && periodEnd
+              ? (ru
+                ? `Включится ${fmtDate(periodEnd)}, когда закончится текущий тариф`
+                : `Starts on ${fmtDate(periodEnd)}, when your current plan ends`)
+              : periodEnd
+                ? (ru ? `Доступ до ${fmtDate(periodEnd)}` : `Access until ${fmtDate(periodEnd)}`)
+                : (ru ? 'Все функции уже открыты' : 'All features are unlocked')}
+            {!isScheduled && monthlyOrbs ? ` · ${monthlyOrbs} ${ru ? 'звёзд в месяц' : 'stars per month'}` : ''}
           </p>
         </>
       ) : (

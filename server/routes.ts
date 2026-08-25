@@ -3286,6 +3286,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Determine pricing based on kind and pack/tier (in RUB)
       let description: string;
+      let scheduleAfterCurrent = false;
+      let scheduledStart: Date | null = null;
       let amountRUB: string;
       let energyAmount: number | undefined;
       let tier: string | undefined;
@@ -3303,6 +3305,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (validated.kind === "subscription" && validated.tier) {
         const periodMonths = validated.periodMonths || 1;
         const normalizedTier = (validated.tier === 'premium' || validated.tier === 'pro') ? 'premium' : 'standard';
+
+        // Активная подписка выше тиром (Premium → покупка Standard): не понижаем сразу,
+        // а планируем старт после окончания текущей. Активация видит metadata.scheduleAfterCurrent.
+        const activeSub = await storage.getSubscription(userId);
+        const rank = (t: string | null | undefined) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
+        if (activeSub && activeSub.status === 'active' && new Date(activeSub.currentPeriodEnd) > new Date()
+            && rank(activeSub.tier) > rank(normalizedTier)) {
+          scheduleAfterCurrent = true;
+          scheduledStart = new Date(activeSub.currentPeriodEnd);
+        }
         
         const tierPrices = SUBSCRIPTION_PRICES_PER_MONTH[normalizedTier];
         const pricePerMonth = tierPrices[periodMonths as 1 | 6 | 12] || tierPrices[1];
@@ -3313,7 +3325,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         else if (periodMonths === 12) periodLabel = '12 месяцев';
         
         const tierLabel = normalizedTier === 'standard' ? 'Standard (250 звёзд/мес)' : 'Premium (550 звёзд/мес)';
-        description = `Подписка ${tierLabel} на ${periodLabel}`;
+        description = scheduleAfterCurrent && scheduledStart
+          ? `Подписка ${tierLabel} на ${periodLabel} (с ${dayjs(scheduledStart).format('DD.MM.YYYY')})`
+          : `Подписка ${tierLabel} на ${periodLabel}`;
         amountRUB = totalPrice.toFixed(2);
         tier = normalizedTier === 'premium' ? 'pro' : 'standard';
       } else if (validated.kind === "subscription_upgrade") {
@@ -3470,6 +3484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           energyAmount,
           periodMonths: validated.periodMonths || 1,
           autoRenew: validated.autoRenew || false,
+          scheduleAfterCurrent: scheduleAfterCurrent ? 'true' : 'false',
         },
       });
 

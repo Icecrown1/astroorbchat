@@ -23,6 +23,8 @@ export interface ActivateSubscriptionParams {
     starsExpiresAt?: Date | null;
     /** Продление: считать срок от текущей даты окончания, если она в будущем (по умолчанию true) */
     extend?: boolean;
+    /** Явная дата старта периода (запланированная подписка после текущей) */
+    startAt?: Date;
   };
 }
 
@@ -40,7 +42,7 @@ export async function activateSubscriptionForUser(storage: any, p: ActivateSubsc
 
   const existingSub = await storage.getSubscription(p.userId);
   const wasActive = !!existingSub && existingSub.status === 'active' && new Date(existingSub.currentPeriodEnd) > now;
-  const base = extend && wasActive ? new Date(existingSub.currentPeriodEnd) : now;
+  const base = p.meta?.startAt ? p.meta.startAt : (extend && wasActive ? new Date(existingSub.currentPeriodEnd) : now);
   const currentPeriodEnd = p.periodDays
     ? dayjs(base).add(p.periodDays, 'day').toDate()
     : dayjs(base).add(p.periodMonths || 1, 'month').toDate();
@@ -124,6 +126,22 @@ export async function activateSucceededYookassaPayment(
     const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
     const autoRenew = ykPayment.metadata?.autoRenew === true || ykPayment.metadata?.autoRenew === 'true';
     const paymentMethodId = ykPayment.payment_method?.saved ? ykPayment.payment_method.id : null;
+    if (ykPayment.metadata?.scheduleAfterCurrent === 'true' || ykPayment.metadata?.scheduleAfterCurrent === true) {
+      // Оплаченный даунгрейд: стартует после окончания текущей (см. applyScheduledSubscription в energy.ts)
+      const existingSub = await storage.getSubscription(dbPayment.userId);
+      if (existingSub && existingSub.status === 'active' && new Date(existingSub.currentPeriodEnd) > new Date()) {
+        await storage.updateSubscription(existingSub.id, {
+          scheduledTier: (dbPayment.tier === 'premium' || dbPayment.tier === 'pro') ? 'pro' : 'standard',
+          scheduledPeriodMonths: periodMonths,
+          scheduledAmountRUB: dbPayment.amountRUB,
+          autoRenew: false,
+        });
+        console.log(`[ACTIVATION] Scheduled ${dbPayment.tier} x${periodMonths}mo after ${existingSub.currentPeriodEnd} (user ${dbPayment.userId})`);
+        await storage.updateYookassaPayment(dbPayment.id, { status: 'completed', completedAt: new Date() });
+        return { activated: true, alreadyDone: false, message: 'Scheduled after current period' };
+      }
+      // Текущая уже закончилась — активируем сразу
+    }
     // Новая покупка: срок от сегодня (ЮKassa subscription — не продление; продление идёт через subscription_renewal)
     await activateSubscriptionForUser(storage, {
       userId: dbPayment.userId,

@@ -548,6 +548,13 @@ export default function Subscribe() {
                 <p className="text-sm text-muted-foreground">
                   {locale === 'ru' ? 'Активна до' : 'Active until'} {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
                 </p>
+                {(currentSubscription as any)?.scheduledTier && (
+                  <p className="text-xs text-[hsl(var(--solar-gold))] mt-1" data-testid="text-scheduled-subscription">
+                    {locale === 'ru'
+                      ? `Далее: ${(currentSubscription as any).scheduledTier === 'standard' ? 'Standard' : 'Premium'} на ${(currentSubscription as any).scheduledPeriodMonths} мес — оплачено`
+                      : `Next: ${(currentSubscription as any).scheduledTier === 'standard' ? 'Standard' : 'Premium'} for ${(currentSubscription as any).scheduledPeriodMonths} mo — paid`}
+                  </p>
+                )}
               </div>
               <Badge className="bg-chart-3">{locale === 'ru' ? 'Активна' : 'Active'}</Badge>
             </div>
@@ -839,12 +846,33 @@ export default function Subscribe() {
                           );
                         }
 
-                        // --- CASE 3: Premium user viewing Standard → disabled downgrade ---
+                        // --- CASE 3: Premium user viewing Standard → оплатить Standard со стартом после Premium ---
                         if (isHigherTierActive) {
+                          const startsAt = new Date(currentSubscription!.currentPeriodEnd).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US');
+                          const alreadyScheduled = !!(currentSubscription as any)?.scheduledTier;
                           return (
-                            <Button className="w-full" variant="outline" disabled data-testid={`button-downgrade-disabled-${tier.tier}`}>
-                              {locale === 'ru' ? 'Недоступно (понижение тарифа)' : 'Unavailable (downgrade)'}
-                            </Button>
+                            <div className="space-y-2">
+                              <div className="text-xs text-muted-foreground text-center px-1">
+                                {alreadyScheduled
+                                  ? (locale === 'ru' ? `Standard уже запланирован с ${startsAt}` : `Standard is already scheduled from ${startsAt}`)
+                                  : (locale === 'ru'
+                                    ? `Premium останется до ${startsAt}, затем включится Standard на ${periodConfig.labelRu}`
+                                    : `Premium stays until ${startsAt}, then Standard for ${periodConfig.labelEn} kicks in`)}
+                              </div>
+                              <Button
+                                className="w-full"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); haptic.impact('light'); setPendingYookassaTier(tier); setShowEmailDialog(true); }}
+                                disabled={yookassaMutation.isPending || alreadyScheduled}
+                                data-testid={`button-schedule-${tier.tier}`}
+                              >
+                                {yookassaMutation.isPending ? (
+                                  <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+                                ) : (
+                                  <><CreditCard className="w-4 h-4 mr-2" />{locale === 'ru' ? `Standard с ${startsAt} за ${totalPriceRub} ₽` : `Standard from ${startsAt} for ${totalPriceRub} ₽`}</>
+                                )}
+                              </Button>
+                            </div>
                           );
                         }
 

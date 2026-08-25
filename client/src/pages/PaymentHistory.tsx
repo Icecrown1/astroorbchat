@@ -37,7 +37,8 @@ export default function PaymentHistory() {
 
   const getPaymentLabel = (payment: Payment) => {
     if (payment.kind === "subscription") {
-      return `${payment.tier?.toUpperCase()} ${t.paymentHistory.subscription}`;
+      const tierName = payment.tier === 'standard' ? 'Standard' : 'Premium';
+      return `${tierName} ${t.paymentHistory.subscription}`;
     }
     if (payment.kind === "energy" || payment.kind === "energy_pack") {
       return `${payment.energyAmount} ${t.paymentHistory.energyOrbs}`;

@@ -124,6 +124,26 @@ export async function checkSubscriptionExpiry(storage: any, userId: string): Pro
   const periodEnd = new Date(subscription.currentPeriodEnd);
   
   if (now > periodEnd && subscription.status !== 'expired') {
+    // Оплаченная подписка «после текущей» — включаем её вместо истечения
+    if (subscription.scheduledTier && subscription.scheduledPeriodMonths) {
+      try {
+        const { activateSubscriptionForUser } = await import('./paymentActivation');
+        await activateSubscriptionForUser(storage, {
+          userId,
+          tier: subscription.scheduledTier,
+          periodMonths: subscription.scheduledPeriodMonths,
+          source: 'yookassa',
+          meta: { startAt: periodEnd, amountRUB: subscription.scheduledAmountRUB ?? null },
+        });
+        await storage.updateSubscription(subscription.id, {
+          scheduledTier: null, scheduledPeriodMonths: null, scheduledAmountRUB: null,
+        });
+        console.log('[SUBSCRIPTION] Applied scheduled subscription for user:', userId, subscription.scheduledTier);
+        return await storage.getSubscription(userId);
+      } catch (e) {
+        console.error('[SUBSCRIPTION] scheduled activation failed:', e);
+      }
+    }
     console.log('[SUBSCRIPTION] Marking as expired for user:', userId);
     await storage.updateSubscription(subscription.id, { status: 'expired' });
     return { ...subscription, status: 'expired' };
