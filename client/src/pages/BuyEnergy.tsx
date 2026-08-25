@@ -32,6 +32,37 @@ interface ExchangeRatesData {
 export default function BuyEnergy() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Оплата паков за Telegram Stars: инвойс с сервера -> нативное окно Telegram
+  const starsMutation = useMutation({
+    mutationFn: async (packId: string) => {
+      return await apiRequest('POST', '/api/payments/stars/create-invoice', { packId });
+    },
+    onSuccess: (data: any) => {
+      const link = data?.link;
+      const wa = (window as any)?.Telegram?.WebApp;
+      if (link && wa?.openInvoice) {
+        wa.openInvoice(link, (status: string) => {
+          if (status === 'paid') {
+            toast({ title: 'Оплачено ⭐', description: 'Звёзды зачислены на баланс' });
+            queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+          } else if (status === 'failed') {
+            toast({ title: 'Оплата не прошла', variant: 'destructive' });
+          }
+        });
+      } else if (link) {
+        window.open(link, '_blank'); // вне Telegram — открыть ссылку
+      }
+    },
+    onError: () => toast({ title: 'Не удалось создать счёт', variant: 'destructive' }),
+  });
+
+  const STARS_PACKS = [
+    { id: 's50', tg: 50, orbs: 65 },
+    { id: 's100', tg: 100, orbs: 140, hot: true },
+    { id: 's250', tg: 250, orbs: 375 },
+  ];
+
   const { t, locale } = useTranslation();
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
   const [tonConnectUI] = useTonConnectUI();
@@ -351,6 +382,27 @@ export default function BuyEnergy() {
             <h1 className="text-2xl font-display font-bold">{t.buyEnergy.title}</h1>
             <p className="text-muted-foreground">{t.buyEnergy.subtitle}</p>
           </div>
+
+        {/* Telegram Stars: покупка внутри Telegram */}
+        <Card className="p-4 mb-6 anim-fade-up">
+          <p className="font-medium mb-1">Купить за Telegram Stars ⭐</p>
+          <p className="text-xs text-muted-foreground mb-3">Оплата в один тап внутри Telegram, зачисление мгновенно</p>
+          <div className="grid grid-cols-3 gap-2">
+            {STARS_PACKS.map((p) => (
+              <Button
+                key={p.id}
+                variant={p.hot ? 'default' : 'outline'}
+                className="h-auto flex-col gap-0.5 py-3"
+                disabled={starsMutation.isPending}
+                onClick={() => starsMutation.mutate(p.id)}
+                data-testid={`button-stars-${p.id}`}
+              >
+                <span className="text-base font-semibold">{p.orbs}</span>
+                <span className="text-[11px] opacity-80">за {p.tg} ⭐</span>
+              </Button>
+            ))}
+          </div>
+        </Card>
           <Button
             variant="outline"
             size="sm"
