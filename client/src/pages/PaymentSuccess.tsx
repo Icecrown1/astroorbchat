@@ -117,11 +117,16 @@ export default function PaymentSuccess() {
   useEffect(() => {
     // Telegram Stars: оплата подтверждена самим Telegram, зачисление — вебхуком в течение секунд
     if (paymentType === 'stars') {
-      const orbs = Number(params.get('orbs')) || null;
-      succeed({ kind: 'energy_pack', energyAmount: orbs });
+      if (params.get('kind') === 'subscription') {
+        succeed({ kind: 'subscription', tier: params.get('tier') || 'standard' });
+      } else {
+        const orbs = Number(params.get('orbs')) || null;
+        succeed({ kind: 'energy_pack', energyAmount: orbs });
+      }
       const t1 = setTimeout(refreshEverything, 1500);
       const t2 = setTimeout(refreshEverything, 4000);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+      const t3 = setTimeout(refreshEverything, 8000);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
     if (!paymentId) {
       setStatus('failed');

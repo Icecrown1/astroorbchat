@@ -407,26 +407,36 @@ export default function BuyEnergy() {
           </div>
         </div>
 
-        {tier === 'free' ? (
-          /* Free: звёзды работают только внутри подписки */
-          <Card className="p-6 anim-fade-up anim-d1 text-center" data-testid="card-subscribe-first">
-            <div className="inline-flex p-3 rounded-full bg-muted mb-4">
-              <Lock className="w-6 h-6 text-muted-foreground" />
+        {tier === 'free' && (
+          /* Free: звёзды тратятся только внутри подписки — сначала тариф */
+          <Card className="p-5 mb-5 anim-fade-up anim-d1" data-testid="card-subscribe-first">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-full bg-muted shrink-0">
+                <Lock className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-display font-semibold leading-tight mb-1">
+                  {ru ? 'Сначала подписка' : 'Subscription first'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {ru
+                    ? 'Звёзды тратятся на функции внутри подписки: Standard — 250 в месяц, Premium — 550. Докупать имеет смысл, когда месячный запас закончился.'
+                    : 'Stars are spent on features inside a subscription: Standard — 250 a month, Premium — 550. Top-ups make sense once your monthly stars run out.'}
+                </p>
+              </div>
             </div>
-            <h2 className="text-lg font-display font-semibold mb-2">
-              {ru ? 'Сначала подписка' : 'Subscription first'}
-            </h2>
-            <p className="text-sm text-muted-foreground mb-5">
-              {ru
-                ? 'Звёзды тратятся на функции внутри подписки. Standard даёт 250 звёзд в месяц, Premium — 550. Докупать имеет смысл, когда месячный запас закончился.'
-                : 'Stars are spent on features inside a subscription. Standard gives 250 stars a month, Premium — 550. Top-ups make sense once your monthly stars run out.'}
-            </p>
-            <Button className="w-full" size="lg" onClick={() => navigate('/subscribe')} data-testid="button-go-subscribe">
-              {ru ? 'Выбрать подписку' : 'Choose a plan'}
-            </Button>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <Button className="h-10" onClick={() => { haptic.impact('light'); navigate('/subscribe'); }} data-testid="button-go-subscribe-stars">
+                <OrbIcon className="w-4 h-4 mr-1.5" />{ru ? 'От 200 ⭐' : 'From 200 ⭐'}
+              </Button>
+              <Button variant="outline" className="h-10" onClick={() => { haptic.impact('light'); navigate('/subscribe'); }} data-testid="button-go-subscribe">
+                <CreditCard className="w-4 h-4 mr-1.5" />{ru ? 'От 199 ₽' : 'From 199 ₽'}
+              </Button>
+            </div>
           </Card>
-        ) : (
-          <>
+        )}
+
+        <>
             {/* Паки — один прайс для всех способов оплаты */}
             <div className="space-y-4">
               {ENERGY_PACKS.map((pack, i) => (
@@ -528,8 +538,7 @@ export default function BuyEnergy() {
                 </div>
               )}
             </div>
-          </>
-        )}
+        </>
       </div>
 
       {pendingYookassaPack && (

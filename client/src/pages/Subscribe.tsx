@@ -289,6 +289,47 @@ export default function Subscribe() {
     },
   });
 
+  // Star-подписка: только месячный период (правило Telegram — ровно 30 дней)
+  const starsSubMutation = useMutation({
+    mutationFn: async (tier: 'standard' | 'premium') => {
+      const response = await apiRequest('POST', '/api/payments/stars/create-subscription', { tier });
+      if (!response.ok) {
+        if (response.error === 'stars_subscription_active') {
+          throw new Error(locale === 'ru'
+            ? 'У вас уже есть подписка за звёзды. Управление — в настройках Telegram → Мои звёзды.'
+            : 'You already have a Stars subscription. Manage it in Telegram settings → My Stars.');
+        }
+        throw new Error(response.error || t.errors.calculationFailed);
+      }
+      return response as { link: string; stars: number };
+    },
+    onSuccess: (data, tier) => {
+      const wa = (window as any)?.Telegram?.WebApp;
+      if (!wa?.openInvoice || !data?.link) {
+        toast({ title: t.common.error, description: locale === 'ru' ? 'Откройте приложение в Telegram' : 'Open the app in Telegram', variant: 'destructive' });
+        return;
+      }
+      haptic.impact('medium');
+      wa.openInvoice(data.link, (status: string) => {
+        if (status === 'paid') {
+          queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/payments/history'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/subscription/upgrade-preview'] });
+          navigate(`/payment-success?type=stars&kind=subscription&tier=${tier}`);
+        } else if (status === 'failed') {
+          haptic.notify('error');
+          toast({ title: locale === 'ru' ? 'Оплата не прошла' : 'Payment failed', variant: 'destructive' });
+        }
+      });
+    },
+    onError: (error: any) => {
+      haptic.notify('error');
+      toast({ title: t.common.error, description: error.message, variant: 'destructive' });
+    },
+  });
+  const insideTelegram = !!(window as any)?.Telegram?.WebApp?.initData;
+  const STARS_SUB_PRICES: Record<'standard' | 'premium', number> = { standard: 200, premium: 400 };
+
   const [showUpgradeEmailDialog, setShowUpgradeEmailDialog] = useState(false);
   const [showRenewalEmailDialog, setShowRenewalEmailDialog] = useState(false);
 
@@ -510,6 +551,29 @@ export default function Subscribe() {
               </div>
               <Badge className="bg-chart-3">{locale === 'ru' ? 'Активна' : 'Active'}</Badge>
             </div>
+            {currentSubscription.paymentProvider === 'stars' ? (
+              <div className="rounded-lg bg-background/40 p-3 text-sm" data-testid="stars-subscription-manage">
+                <p className="text-muted-foreground mb-2">
+                  {locale === 'ru'
+                    ? 'Оплачено звёздами Telegram, продлевается каждые 30 дней автоматически. Отмена и возврат — в настройках Telegram → Мои звёзды.'
+                    : 'Paid with Telegram Stars, renews every 30 days automatically. Cancel or refund in Telegram settings → My Stars.'}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    haptic.impact('light');
+                    const wa = (window as any)?.Telegram?.WebApp;
+                    try { (wa?.openTelegramLink || window.open)('tg://settings/stars'); } catch { /* noop */ }
+                  }}
+                  data-testid="button-manage-stars"
+                >
+                  <OrbIcon className="w-4 h-4 mr-2" />
+                  {locale === 'ru' ? 'Открыть настройки звёзд' : 'Open Stars settings'}
+                </Button>
+              </div>
+            ) : (
             <Button
               variant="outline"
               size="sm"
@@ -533,6 +597,7 @@ export default function Subscribe() {
                 locale === 'ru' ? 'Отменить подписку' : 'Cancel Subscription'
               )}
             </Button>
+            )}
           </Card>
         )}
 
@@ -784,8 +849,29 @@ export default function Subscribe() {
                         }
 
                         // --- CASE 4: No active sub or sub is canceled/expired → regular subscribe buttons ---
+                        const starsTier = tier.tier as 'standard' | 'premium';
                         return (
                           <>
+                            {insideTelegram && selectedPeriod === 'monthly' && (
+                              <Button
+                                className="w-full"
+                                variant={tier.popular ? 'default' : 'outline'}
+                                onClick={(e) => { e.stopPropagation(); setSelectedTier(tier.tier); starsSubMutation.mutate(starsTier); }}
+                                disabled={starsSubMutation.isPending}
+                                data-testid={`button-subscribe-stars-${tier.tier}`}
+                              >
+                                {starsSubMutation.isPending && selectedTier === tier.tier ? (
+                                  <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+                                ) : (
+                                  <><OrbIcon className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оформить за ${STARS_SUB_PRICES[starsTier]} ⭐` : `Subscribe for ${STARS_SUB_PRICES[starsTier]} ⭐`}</>
+                                )}
+                              </Button>
+                            )}
+                            {insideTelegram && selectedPeriod !== 'monthly' && (
+                              <p className="text-xs text-muted-foreground text-center" data-testid="text-stars-monthly-only">
+                                {locale === 'ru' ? 'Оплата звёздами доступна для месячного периода' : 'Stars payment is available for the monthly period'}
+                              </p>
+                            )}
                             <Button
                               className="w-full"
                               variant="outline"
