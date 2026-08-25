@@ -4,9 +4,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, Lock } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, Lock, Loader2 } from 'lucide-react';
 import { ORB_PACKS } from '@shared/orbPacks';
 import { useEnergy } from '@/store/useEnergy';
 import { haptic } from '@/lib/haptics';
@@ -465,7 +464,7 @@ export default function BuyEnergy() {
                       data-testid={`button-stars-${pack.id}`}
                     >
                       {starsMutation.isPending && selectedPack === pack.amount
-                        ? <Loader size="sm" />
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
                         : <>{ru ? 'Оплатить' : 'Pay'} {pack.stars} ⭐</>}
                     </Button>
                   )}
@@ -479,7 +478,7 @@ export default function BuyEnergy() {
                       data-testid={`button-buy-rubles-${pack.amount}`}
                     >
                       {yookassaMutation.isPending && selectedPack === pack.amount
-                        ? <Loader size="sm" />
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
                         : <><CreditCard className="w-4 h-4 mr-1.5" />{pack.rub} ₽</>}
                     </Button>
                     <Button
@@ -490,7 +489,7 @@ export default function BuyEnergy() {
                       data-testid={`button-buy-ton-${pack.amount}`}
                     >
                       {tonMutation.isPending && selectedPack === pack.amount
-                        ? <Loader size="sm" />
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
                         : <><Wallet className="w-4 h-4 mr-1.5" />{ratesLoading ? '…' : `${getTonPrice(pack.usdPrice)} TON`}</>}
                     </Button>
                   </div>
@@ -523,7 +522,7 @@ export default function BuyEnergy() {
                       disabled={checkPendingMutation.isPending}
                       data-testid="button-check-pending"
                     >
-                      {checkPendingMutation.isPending ? <Loader size="sm" /> : <><Check className="w-3 h-3 mr-1" />{ru ? 'Проверить TON' : 'Check TON'}</>}
+                      {checkPendingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />{ru ? 'Проверить TON' : 'Check TON'}</>}
                     </Button>
                   </div>
                 </div>

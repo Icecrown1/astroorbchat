@@ -2465,7 +2465,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tonPayments = await storage.getPaymentsByUserId(userId);
       
       // Get YooKassa payments
-      const yookassaPayments = await storage.getYookassaPaymentsByUserId(userId);
+      let yookassaPayments = await storage.getYookassaPaymentsByUserId(userId);
+
+      // Ленивая синхронизация: платёж, брошенный на странице ЮKassa, у нас навсегда «pending».
+      // Для pending старше 3 минут спрашиваем ЮKassa: canceled → canceled, succeeded → активируем.
+      const STALE_MS = 3 * 60 * 1000;
+      const stale = yookassaPayments.filter(
+        (p) => p.status === 'pending' && p.yookassaPaymentId && Date.now() - new Date(p.createdAt as any).getTime() > STALE_MS
+      );
+      if (stale.length > 0) {
+        for (const p of stale.slice(0, 5)) {
+          try {
+            const yk = await getYooKassaPayment(p.yookassaPaymentId!);
+            if (yk.status === 'succeeded' && yk.paid) {
+              await activateSucceededYookassaPayment(p, yk, storage);
+            } else if (yk.status === 'canceled') {
+              await storage.updateYookassaPayment(p.id, { status: 'canceled' });
+            }
+          } catch (syncErr) {
+            console.error('[HISTORY] yookassa sync failed (non-blocking):', p.id, syncErr);
+          }
+        }
+        yookassaPayments = await storage.getYookassaPaymentsByUserId(userId);
+      }
       
       // Transform YooKassa payments to unified format
       const yookassaFormatted = yookassaPayments.map(p => ({
@@ -2558,7 +2580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (pendingPayments.length === 0) {
-        return res.json({ ok: true, message: 'No pending payments', found: 0 });
+        return res.json({ ok: true, data: { found: 0, creditedEnergy: 0, message: 'No pending payments' } });
       }
 
       console.log(`[CHECK_PENDING] Found ${pendingPayments.length} pending payments for user ${userId}`);
@@ -3667,7 +3689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             // canceled, failed, etc
             await storage.updateYookassaPayment(dbPayment.id, {
-              status: 'failed',
+              status: ykPayment.status === 'canceled' ? 'canceled' : 'failed',
             });
             return res.json({
               ok: true,
