@@ -150,6 +150,31 @@ export default function Admin() {
   const stats = statsData?.data;
   const users = usersData?.data || [];
   const pendingPayments = pendingPaymentsData?.payments || [];
+
+  interface StarsPayment {
+    chargeId: string; userId: string | null; tgUserId: number | null; type: 'subscription' | 'orbs';
+    tier: string | null; orbs: number | null; stars: number | null; recurring: boolean; refunded: boolean; createdAt: string;
+  }
+  const { data: starsData, isLoading: starsLoading, refetch: refetchStars } = useQuery<{ ok: boolean; data: StarsPayment[] }>({
+    queryKey: ["/api/admin/stars/payments"],
+  });
+  const starsPayments = starsData?.data || [];
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const handleStarsRefund = async (p: StarsPayment) => {
+    if (!p.userId) return;
+    if (!confirm(`Вернуть ${p.stars} ⭐ пользователю ${p.userId} и откатить ${p.type === 'subscription' ? '30 дней подписки' : `${p.orbs} орбов`}?`)) return;
+    setRefundingId(p.chargeId);
+    try {
+      const r = await apiRequest("POST", "/api/admin/stars/refund", { userId: p.userId, chargeId: p.chargeId });
+      if (!r.ok) throw new Error(r.error || 'refund failed');
+      toast({ title: "Refund done", description: r.data?.rollback });
+      refetchStars();
+    } catch (e: any) {
+      toast({ title: "Refund failed", description: e.message, variant: "destructive" });
+    } finally {
+      setRefundingId(null);
+    }
+  };
   const webhookErrors = webhookErrorsData?.errors || [];
 
   return (
@@ -504,6 +529,54 @@ export default function Admin() {
                         <p className="text-sm text-destructive" data-testid={`text-error-message-${err.id}`}>
                           {err.errorMessage}
                         </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-stars-payments">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <CardTitle>Telegram Stars</CardTitle>
+                    <CardDescription className="mt-1">Оплаты звёздами из журнала (паки и подписки). Refund возвращает ⭐ и откатывает выдачу.</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => refetchStars()} disabled={starsLoading} data-testid="button-refresh-stars">
+                    <RefreshCw className={`h-4 w-4 mr-1 ${starsLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {starsLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : starsPayments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Пока нет оплат звёздами</p>
+                ) : (
+                  <div className="space-y-2">
+                    {starsPayments.map((p) => (
+                      <div key={p.chargeId} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm" data-testid={`stars-payment-${p.chargeId}`}>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{p.stars} ⭐</span>
+                            <Badge variant="secondary">{p.type === 'subscription' ? `Подписка ${p.tier}` : `${p.orbs} орбов`}</Badge>
+                            {p.recurring && <Badge variant="outline">recurring</Badge>}
+                            {p.refunded && <Badge variant="destructive">refunded</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mt-1">
+                            {new Date(p.createdAt).toLocaleString()} · user {p.userId || '?'} · tg {p.tgUserId || '?'} · {p.chargeId}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline" size="sm"
+                          disabled={p.refunded || !p.userId || refundingId === p.chargeId}
+                          onClick={() => handleStarsRefund(p)}
+                          data-testid={`button-stars-refund-${p.chargeId}`}
+                        >
+                          {refundingId === p.chargeId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refund'}
+                        </Button>
                       </div>
                     ))}
                   </div>

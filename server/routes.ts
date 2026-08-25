@@ -3931,6 +3931,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin: list all pending/non-completed YooKassa payments with user info
+  // Stars-платежи из журнала (successful_payment + refund), новые сверху
+  app.get("/api/admin/stars/payments", requireAdmin, async (req, res) => {
+    try {
+      const { paymentEventLog } = await import("../shared/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const rows = await db.select().from(paymentEventLog)
+        .where(eq(paymentEventLog.provider, 'stars'))
+        .orderBy(desc(paymentEventLog.createdAt))
+        .limit(200);
+      const refunded = new Set(
+        rows.filter((r: any) => r.eventType === 'refund').map((r: any) => r.payload?.chargeId)
+      );
+      const payments = rows
+        .filter((r: any) => r.eventType === 'successful_payment')
+        .map((r: any) => {
+          const sp = r.payload?.message?.successful_payment || {};
+          let inv: any = {};
+          try { inv = JSON.parse(sp.invoice_payload || '{}'); } catch { /* noop */ }
+          return {
+            chargeId: r.eventId,
+            userId: inv.u || null,
+            tgUserId: r.payload?.message?.from?.id || null,
+            type: inv.t === 'sub' ? 'subscription' : 'orbs',
+            tier: inv.tier || null,
+            orbs: inv.o ? Number(inv.o) : null,
+            stars: Number(sp.total_amount) || null,
+            recurring: !!sp.is_recurring,
+            refunded: refunded.has(r.eventId),
+            createdAt: r.createdAt,
+          };
+        });
+      res.json({ ok: true, data: payments });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Рефанд Stars: вернуть звёзды в Telegram и откатить выдачу (орбы пака / 30 дней подписки)
+  app.post("/api/admin/stars/refund", requireAdmin, async (req, res) => {
+    try {
+      const { userId, chargeId } = req.body || {};
+      if (!userId || !chargeId) return res.status(400).json({ ok: false, error: "userId and chargeId required" });
+      const { paymentEventLog } = await import("../shared/schema");
+      const { and, eq } = await import("drizzle-orm");
+
+      const [event] = await db.select().from(paymentEventLog)
+        .where(and(eq(paymentEventLog.provider, 'stars'), eq(paymentEventLog.eventId, String(chargeId))));
+      if (!event) return res.status(404).json({ ok: false, error: "charge not found in log" });
+      const [already] = await db.select().from(paymentEventLog)
+        .where(and(eq(paymentEventLog.provider, 'stars'), eq(paymentEventLog.eventId, `refund_${chargeId}`)));
+      if (already) return res.status(409).json({ ok: false, error: "already refunded" });
+
+      const sp = (event.payload as any)?.message?.successful_payment || {};
+      let inv: any = {};
+      try { inv = JSON.parse(sp.invoice_payload || '{}'); } catch { /* noop */ }
+      if (inv.u && inv.u !== userId) return res.status(400).json({ ok: false, error: "charge belongs to another user" });
+
+      const user = await storage.getUser(userId);
+      if (!user?.tgId) return res.status(404).json({ ok: false, error: "user not found" });
+
+      const { refundStarPayment } = await import("./lib/telegramStars");
+      const ok = await refundStarPayment(Number(user.tgId), String(chargeId));
+      if (!ok) return res.status(502).json({ ok: false, error: "Telegram refund failed (уже возвращён или charge неверный)" });
+
+      // Откат выдачи
+      let rollback = '';
+      if (inv.t === 'orbs' && inv.o) {
+        const current = parseFloat(user.referralOrbs || '0');
+        await storage.updateUser(userId, { referralOrbs: Math.max(0, current - Number(inv.o)).toString() });
+        rollback = `-${inv.o} orbs`;
+      } else if (inv.t === 'sub') {
+        const sub = await storage.getSubscription(userId);
+        if (sub) {
+          const newEnd = dayjs(sub.currentPeriodEnd).subtract(30, 'day').toDate();
+          const stillActive = newEnd > new Date();
+          await storage.updateSubscription(sub.id, {
+            currentPeriodEnd: newEnd,
+            status: stillActive ? 'active' : 'canceled',
+            autoRenew: false,
+          });
+          rollback = `-30 days (until ${newEnd.toISOString()}, ${stillActive ? 'active' : 'canceled'})`;
+        }
+      }
+
+      try {
+        await db.insert(paymentEventLog).values({
+          provider: 'stars', eventId: `refund_${chargeId}`, eventType: 'refund',
+          payload: { chargeId, userId, adminRollback: rollback, original: inv, at: new Date().toISOString() },
+        });
+      } catch (logErr) {
+        console.error('[STARS] refund log failed (non-blocking):', logErr);
+      }
+      console.log(`[STARS] Refunded ${chargeId} for ${userId}: ${rollback}`);
+      res.json({ ok: true, data: { rollback } });
+    } catch (error: any) {
+      console.error('[STARS] refund error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/admin/payments/pending", requireAdmin, async (req, res) => {
     try {
       const pendingPayments = await storage.getPendingYookassaPayments(0);
