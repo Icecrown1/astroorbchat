@@ -469,3 +469,20 @@
 .ps-spark { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; transform-origin: 50% 50%; animation: psBurst 1.15s cubic-bezier(.1,.7,.3,1) both; animation-delay: var(--dl); }
 .ps-count { animation: psCount .5s ease-out .35s both; }
 @media (prefers-reduced-motion: reduce) { .ps-ring, .ps-spark, .ps-count { animation: none !important; } .ps-spark { display: none; } }
+
+/* === Пилюля баланса: редкое «дыхание» — намёк, что тап = пополнить === */
+@keyframes pillBreath {
+  0%, 84%, 100% { box-shadow: 0 0 24px var(--pill-glow-rest); }
+  90%           { box-shadow: 0 0 34px 6px var(--pill-glow-peak); }
+  96%           { box-shadow: 0 0 26px 2px var(--pill-glow-rest); }
+}
+@keyframes pillPlusBreath {
+  0%, 84%, 100% { opacity: .45; transform: scale(1); }
+  90%           { opacity: 1;   transform: scale(1.12); }
+}
+.pill-breath { animation: pillBreath var(--pill-breath-period, 18s) ease-in-out 4s infinite; }
+.pill-breath .pill-plus { animation: pillPlusBreath var(--pill-breath-period, 18s) ease-in-out 4s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pill-breath, .pill-breath .pill-plus { animation: none !important; }
+  .pill-breath .pill-plus { opacity: .7; }
+}

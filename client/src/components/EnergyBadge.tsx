@@ -1,9 +1,10 @@
-import { Lock, Crown } from 'lucide-react';
+import { Lock, Crown, Plus } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { useEnergy, SubscriptionTier } from '@/store/useEnergy';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
 import { useState, useEffect } from 'react';
+import type React from 'react';
 import { useTranslation } from '@/contexts/LocaleContext';
 
 interface EnergyBadgeProps {
@@ -79,15 +80,29 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
   const content = getBadgeContent();
   const IconComponent = content.icon;
 
+  // «Дыхание» только у подписчиков: раз в ~18 с мягкая вспышка + «+» справа.
+  // При остатке < 20% — чаще (каждые 9 с): самое время пополнить.
+  const isSubscriber = tier === 'standard' || tier === 'premium';
+  const lowBalance = isSubscriber && maxOrbs > 0 && orbs / maxOrbs < 0.2;
+  const breathStyle = isSubscriber
+    ? ({
+        ['--pill-glow-rest' as any]: tier === 'premium' ? 'rgba(239,194,107,0.35)' : 'rgba(142,123,255,0.25)',
+        ['--pill-glow-peak' as any]: tier === 'premium' ? 'rgba(239,194,107,0.7)' : 'rgba(142,123,255,0.65)',
+        ['--pill-breath-period' as any]: lowBalance ? '9s' : '18s',
+      } as React.CSSProperties)
+    : undefined;
+
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-3 px-5 py-3 rounded-full border border-[hsl(252,60%,40%)] bg-[linear-gradient(135deg,hsl(252,45%,16%),hsl(232,30%,12%))] shadow-[0_0_24px_rgba(142,123,255,0.25)]',
+        'relative inline-flex items-center gap-3 px-5 py-3 rounded-full border border-[hsl(252,60%,40%)] bg-[linear-gradient(135deg,hsl(252,45%,16%),hsl(232,30%,12%))] shadow-[0_0_24px_rgba(142,123,255,0.25)]',
         `bg-gradient-to-r ${content.gradient}`,
         `shadow-lg ${content.shadowColor}`,
         content.muted && 'opacity-60',
+        isSubscriber && 'pill-breath pr-4',
         className
       )}
+      style={breathStyle}
       data-testid="badge-energy"
     >
       <IconComponent className={cn(
@@ -114,6 +129,20 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
           </span>
         )}
       </div>
+      {isSubscriber && (
+        <span
+          className={cn(
+            'pill-plus ml-1 flex items-center justify-center w-6 h-6 rounded-full border',
+            tier === 'premium'
+              ? 'border-[hsl(41,60%,42%)] text-[hsl(var(--solar-gold))]'
+              : 'border-white/40 text-white'
+          )}
+          aria-hidden="true"
+          data-testid="badge-energy-plus"
+        >
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+        </span>
+      )}
     </div>
   );
 }
