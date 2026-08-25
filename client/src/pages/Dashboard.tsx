@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo } from 'react';
 import type { User, Subscription } from '@shared/schema';
+import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
 
 const VIGNETTES: Record<string, VignetteKind> = {
@@ -225,7 +226,14 @@ export default function Dashboard() {
 
         {/* Energy Badge */}
         <div className="flex justify-center mb-8">
-          <EnergyBadge />
+          <button
+            className="mx-auto block tap-scale"
+            onClick={() => { haptic.impact('light'); navigate('/buy-energy'); }}
+            aria-label="Пополнить звёзды"
+            data-testid="button-balance-topup"
+          >
+            <EnergyBadge />
+          </button>
         </div>
 
         {/* Low Orbs Alert - only for Standard tier */}
