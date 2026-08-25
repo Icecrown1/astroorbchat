@@ -50,7 +50,12 @@ export default function PaymentHistory() {
     switch (status) {
       case "completed":
       case "confirmed":
+      case "succeeded":
         return "default";
+      case "waiting_for_capture":
+        return "secondary";
+      case "canceled":
+        return "outline";
       case "pending": {
         const isOld = Date.now() - new Date(createdAt).getTime() > ONE_DAY_MS;
         return isOld ? "destructive" : "secondary";
@@ -64,8 +69,13 @@ export default function PaymentHistory() {
 
   const getStatusLabel = (status: string, createdAt: string) => {
     switch (status) {
+      case "succeeded":
       case "completed":
         return t.paymentHistory.completed;
+      case "waiting_for_capture":
+        return t.paymentHistory.pending;
+      case "canceled":
+        return (t.paymentHistory as any).canceled ?? "Отменён";
       case "confirmed":
         return t.paymentHistory.confirmed;
       case "pending": {
@@ -87,7 +97,7 @@ export default function PaymentHistory() {
   };
 
   const isCompleted = (status: string) => {
-    return status === "completed" || status === "confirmed";
+    return status === "completed" || status === "confirmed" || status === "succeeded";
   };
 
   if (isLoading) {

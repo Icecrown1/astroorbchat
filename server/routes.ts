@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import { storage } from "./storage";
+import { db } from "./db";
 import { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana } from "../shared/matrix";
 import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
@@ -3682,6 +3683,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Parse webhook payload
+      // Exactly-once: журналируем событие, дубликаты (ретраи ЮKassa) отвечаем 200 без повторной обработки
+      try {
+        const { paymentEventLog } = await import("../shared/schema");
+        const evId = `${req.body?.event || 'evt'}:${req.body?.object?.id || JSON.stringify(req.body).slice(0, 64)}`;
+        await db.insert(paymentEventLog).values({ provider: 'yookassa', eventId: evId, eventType: req.body?.event, payload: req.body });
+      } catch (dupErr: any) {
+        if (String(dupErr?.message || dupErr).includes('duplicate') || dupErr?.code === '23505') {
+          console.log('[YooKassa Webhook] Duplicate event — acknowledged, skipped');
+          return res.status(200).json({ ok: true, duplicate: true });
+        }
+        console.error('[YooKassa Webhook] event log error (non-blocking):', dupErr);
+      }
+
       const payment = parseWebhookPayload(req.body);
       if (!payment) {
         console.error('[YooKassa Webhook] Invalid webhook payload');

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, index, jsonb, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -663,3 +663,16 @@ export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
 
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
+
+
+// Журнал платёжных событий: exactly-once обработка вебхуков (дедуп по UNIQUE)
+export const paymentEventLog = pgTable("payment_event_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: varchar("provider", { length: 20 }).notNull(),
+  eventId: varchar("event_id", { length: 128 }).notNull(),
+  eventType: varchar("event_type", { length: 64 }),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uq: uniqueIndex("payment_event_provider_event_uq").on(t.provider, t.eventId),
+}));
