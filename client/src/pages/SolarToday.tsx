@@ -19,7 +19,7 @@ export default function SolarToday() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
-  const { decreaseOrbs } = useEnergy();
+  const { decreaseOrbs, tier } = useEnergy();
   const [solarData, setSolarData] = useState<any>(null);
   const [isCached, setIsCached] = useState(false);
   
