@@ -51,8 +51,8 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
           icon: Crown,
           value: orbs.toString(),
           label: locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`,
-          gradient: 'from-yellow-500 to-amber-600',
-          shadowColor: 'shadow-yellow-500/30',
+          gradient: 'from-[hsl(41,50%,16%)] to-[hsl(38,40%,10%)] border border-[hsl(41,60%,42%)]',
+          shadowColor: 'shadow-[0_0_26px_rgba(239,194,107,0.35)]',
         };
       case 'standard':
         return {

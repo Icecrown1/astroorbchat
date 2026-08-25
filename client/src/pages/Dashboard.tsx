@@ -275,7 +275,7 @@ export default function Dashboard() {
                 icon={feature.icon}
                 title={feature.title}
                 description={feature.description}
-                energyCost={feature.energyCost}
+                energyCost={feature.path === '/solar-today' && tier === 'premium' ? 0 : feature.energyCost}
                 onClick={() => navigate(isLockedForFree || (feature.premiumOnly && tier !== 'premium') ? '/subscribe' : feature.path)}
                 disabled={isDisabled}
                 locked={isLockedForFree}

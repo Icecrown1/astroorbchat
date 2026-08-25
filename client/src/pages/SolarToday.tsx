@@ -184,7 +184,7 @@ export default function SolarToday() {
               </div>
 
               {/* Hint about caching */}
-              {!hasCachedSolar && (
+              {!hasCachedSolar && tier !== 'premium' && (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-left mb-6">
                   <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground">
