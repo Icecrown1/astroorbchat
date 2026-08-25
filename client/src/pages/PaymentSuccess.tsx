@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Loader } from '@/components/Loader';
 import { OrbIcon } from '@/components/OrbIcon';
-import { XCircle, AlertCircle, MessageCircle, Crown } from 'lucide-react';
+import { XCircle, AlertCircle, MessageCircle, Crown, X } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { haptic } from '@/lib/haptics';
 
@@ -139,8 +139,6 @@ export default function PaymentSuccess() {
   useEffect(() => {
     if (status === 'failed' || status === 'abandoned') {
       clearTimers();
-      const timer = setTimeout(() => navigate(retryPath()), 8000);
-      return () => clearTimeout(timer);
     }
   }, [status, navigate]);
 
@@ -186,7 +184,7 @@ export default function PaymentSuccess() {
         } else if (paymentStatus === 'abandoned') {
           clearTimers();
           setStatus('abandoned');
-          setMessage(ru ? 'Оплата не была завершена. Можно попробовать снова.' : 'Payment was not completed. You can try again.');
+          setMessage(ru ? 'Деньги не списаны. Можно закрыть это окно или выбрать пакет заново.' : 'Nothing was charged. You can close this or choose a pack again.');
         } else {
           clearTimers();
           setStatus('failed');
@@ -337,7 +335,18 @@ export default function PaymentSuccess() {
       </div>
 
       <div className="container max-w-md mx-auto">
-        <Card className="p-8 anim-fade-up" data-testid="card-payment-result">
+        <Card className="relative p-8 anim-fade-up" data-testid="card-payment-result">
+          {status !== 'checking' && (
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="absolute top-3 right-3 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label={ru ? 'Закрыть' : 'Close'}
+              data-testid="button-close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
           {status === 'success' ? renderSuccess() : (
             <div className="flex flex-col items-center text-center space-y-6">
               {getIcon()}
@@ -363,9 +372,14 @@ export default function PaymentSuccess() {
                   </Button>
                 )}
                 {status === 'abandoned' ? (
-                  <Button onClick={() => navigate(retryPath())} className="flex-1" data-testid="button-retry-payment">
-                    {ru ? 'Попробовать снова' : 'Try again'}
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={() => navigate('/dashboard')} className="flex-1" data-testid="button-close-abandoned">
+                      {ru ? 'Закрыть' : 'Close'}
+                    </Button>
+                    <Button onClick={() => navigate(retryPath())} className="flex-1" data-testid="button-retry-payment">
+                      {ru ? 'Выбрать заново' : 'Choose again'}
+                    </Button>
+                  </>
                 ) : (
                   <Button onClick={() => navigate('/dashboard')} className="flex-1" data-testid="button-go-dashboard">
                     {ru ? 'На главную' : 'Go to dashboard'}

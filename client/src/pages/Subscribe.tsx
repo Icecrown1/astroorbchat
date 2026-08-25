@@ -202,8 +202,8 @@ export default function Subscribe() {
         toast({
           title: t.common.error,
           description: locale === 'ru'
-            ? 'Не удалось получить курс TON. Попробуйте ещё раз через минуту.'
-            : 'Failed to fetch TON exchange rate. Please try again in a minute.',
+            ? 'Не удалось получить курс GRAM. Попробуйте ещё раз через минуту.'
+            : 'Failed to fetch GRAM exchange rate. Please try again in a minute.',
           variant: 'destructive',
         });
         return;
@@ -602,7 +602,7 @@ export default function Subscribe() {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-4 text-muted-foreground">
                     <span>1 USD = {getRateInfo()?.usdRub} ₽</span>
-                    <span>1 TON = ${getRateInfo()?.tonUsd}</span>
+                    <span>1 GRAM = ${getRateInfo()?.tonUsd}</span>
                   </div>
                   <Button 
                     variant="ghost" 
@@ -878,8 +878,8 @@ export default function Subscribe() {
 
           <p className="text-sm text-muted-foreground text-center">
             {locale === 'ru' 
-              ? 'Подписка оплачивается ежемесячно через TON блокчейн. Отмена в любое время. Энергия обновляется ежедневно в полночь.'
-              : 'Subscriptions are billed monthly via TON blockchain. Cancel anytime. Energy resets daily at midnight.'
+              ? 'Оплата картой (₽), в GRAM или Telegram Stars. Звёзды подписки начисляются раз в месяц, купленные отдельно — не сгорают. Отмена в любой момент.'
+              : 'Pay by card (₽), in GRAM or with Telegram Stars. Subscription stars are credited monthly; purchased stars never expire. Cancel anytime.'
             }
           </p>
         </Card>

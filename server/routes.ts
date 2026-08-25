@@ -2470,6 +2470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ленивая синхронизация: платёж, брошенный на странице ЮKassa, у нас навсегда «pending».
       // Для pending старше 3 минут спрашиваем ЮKassa: canceled → canceled, succeeded → активируем.
       const STALE_MS = 3 * 60 * 1000;
+      const ABANDON_MS = 15 * 60 * 1000;
       const stale = yookassaPayments.filter(
         (p) => p.status === 'pending' && p.yookassaPaymentId && Date.now() - new Date(p.createdAt as any).getTime() > STALE_MS
       );
@@ -2477,9 +2478,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const p of stale.slice(0, 5)) {
           try {
             const yk = await getYooKassaPayment(p.yookassaPaymentId!);
+            const ageMs = Date.now() - new Date(p.createdAt as any).getTime();
+            console.log(`[HISTORY] yookassa sync ${p.id}: yk=${yk.status} paid=${yk.paid} age=${Math.round(ageMs / 60000)}m`);
             if (yk.status === 'succeeded' && yk.paid) {
               await activateSucceededYookassaPayment(p, yk, storage);
-            } else if (yk.status === 'canceled') {
+            } else if (yk.status === 'canceled' || (yk.status === 'pending' && ageMs > ABANDON_MS)) {
+              // canceled — отменён ЮKassa; pending старше 15 мин — пользователь ушёл со страницы оплаты
               await storage.updateYookassaPayment(p.id, { status: 'canceled' });
             }
           } catch (syncErr) {
@@ -2632,10 +2636,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         ok: true,
-        message: `Checked ${pendingPayments.length} payments, found ${foundCount}`,
-        found: foundCount,
-        creditedEnergy,
-      });
+        data: {
+          found: foundCount,
+          creditedEnergy,
+          message: `Checked ${pendingPayments.length} payments, found ${foundCount}`,
+        },
+        });
     } catch (error: any) {
       console.error('[CHECK_PENDING] Error:', error);
       res.status(500).json({ ok: false, error: error.message });

@@ -210,7 +210,7 @@ export default function PaymentHistory() {
                       )}
                       {payment.paymentMethod === 'ton' && payment.amountTON && (
                         <span className="font-medium" data-testid={`text-amount-ton-${payment.id}`}>
-                          {parseFloat(payment.amountTON).toFixed(2)} TON
+                          {parseFloat(payment.amountTON).toFixed(2)} GRAM
                         </span>
                       )}
                     </div>
@@ -219,7 +219,7 @@ export default function PaymentHistory() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{t.paymentHistory.paymentMethod || 'Payment Method'}</span>
                     <Badge variant="outline" data-testid={`badge-method-${payment.id}`}>
-                      {payment.paymentMethod === 'ton' ? 'TON' : payment.paymentMethod === 'stars' ? 'Telegram Stars' : t.paymentHistory.bankCard || 'Bank Card'}
+                      {payment.paymentMethod === 'ton' ? 'GRAM (TON)' : payment.paymentMethod === 'stars' ? 'Telegram Stars' : t.paymentHistory.bankCard || 'Bank Card'}
                     </Badge>
                   </div>
                   

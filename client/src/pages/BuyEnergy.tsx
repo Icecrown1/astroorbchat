@@ -146,8 +146,8 @@ export default function BuyEnergy() {
           toast({
             title: t.common.error,
             description: locale === 'ru'
-              ? 'Не удалось получить курс TON. Попробуйте ещё раз через минуту.'
-              : 'Failed to fetch TON exchange rate. Please try again in a minute.',
+              ? 'Не удалось получить курс GRAM. Попробуйте ещё раз через минуту.'
+              : 'Failed to fetch GRAM exchange rate. Please try again in a minute.',
             variant: 'destructive',
           });
           return;
@@ -490,7 +490,7 @@ export default function BuyEnergy() {
                     >
                       {tonMutation.isPending && selectedPack === pack.amount
                         ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <><Wallet className="w-4 h-4 mr-1.5" />{ratesLoading ? '…' : `${getTonPrice(pack.usdPrice)} TON`}</>}
+                        : <><Wallet className="w-4 h-4 mr-1.5" />{ratesLoading ? '…' : `${getTonPrice(pack.usdPrice)} GRAM`}</>}
                     </Button>
                   </div>
                 </Card>
@@ -502,16 +502,16 @@ export default function BuyEnergy() {
               <p className="text-xs text-muted-foreground text-center px-2">
                 {insideTelegram
                   ? (ru
-                    ? 'Telegram Stars — в один тап, без ввода карты. Карта (₽) и TON — во внешнем окне, зачисление сразу после подтверждения.'
-                    : 'Telegram Stars — one tap, no card details. Card (₽) and TON open in an external window; stars arrive right after confirmation.')
+                    ? 'Telegram Stars — в один тап, без ввода карты. Карта (₽) и GRAM (сеть TON) — во внешнем окне, зачисление сразу после подтверждения.'
+                    : 'Telegram Stars — one tap, no card details. Card (₽) and GRAM (TON network) open in an external window; stars arrive right after confirmation.')
                   : (ru
-                    ? 'Карта (₽) и TON. Зачисление сразу после подтверждения оплаты.'
-                    : 'Card (₽) and TON. Stars arrive right after the payment is confirmed.')}
+                    ? 'Карта (₽) и GRAM (сеть TON). Зачисление сразу после подтверждения оплаты.'
+                    : 'Card (₽) and GRAM (TON network). Stars arrive right after the payment is confirmed.')}
               </p>
 
               {exchangeRatesData?.ok && (
                 <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                  <span>1 TON = ${exchangeRatesData.data.tonUsd.rate.toFixed(2)}</span>
+                  <span>1 GRAM = ${exchangeRatesData.data.tonUsd.rate.toFixed(2)}</span>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => refetchRates()} data-testid="button-refresh-rates">
                       <RefreshCw className="w-3 h-3 mr-1" />{ru ? 'Курс' : 'Rate'}
@@ -522,7 +522,7 @@ export default function BuyEnergy() {
                       disabled={checkPendingMutation.isPending}
                       data-testid="button-check-pending"
                     >
-                      {checkPendingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />{ru ? 'Проверить TON' : 'Check TON'}</>}
+                      {checkPendingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />{ru ? 'Проверить GRAM' : 'Check GRAM'}</>}
                     </Button>
                   </div>
                 </div>
