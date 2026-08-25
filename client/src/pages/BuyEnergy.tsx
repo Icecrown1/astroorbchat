@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, ShoppingBag, Check, Wallet, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, Lock } from 'lucide-react';
+import { ORB_PACKS } from '@shared/orbPacks';
+import { useEnergy } from '@/store/useEnergy';
+import { haptic } from '@/lib/haptics';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -15,12 +18,17 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 import { openPaymentLink } from '@/lib/telegram';
 
-// Base USD prices (fixed)
-const ENERGY_PACKS = [
-  { amount: 20, usdPrice: 1.99, popular: false },
-  { amount: 50, usdPrice: 4.99, popular: true },
-  { amount: 120, usdPrice: 8.99, popular: false },
-];
+// Единый прайс (shared/orbPacks.ts): одни и те же паки для Stars, карты и TON
+const ENERGY_PACKS = ORB_PACKS.map((p) => ({
+  id: p.id,
+  amount: p.orbs,
+  base: p.base,
+  stars: p.stars,
+  usdPrice: p.usd,
+  rub: p.rub,
+  popular: !!p.hot,
+}));
+type EnergyPack = typeof ENERGY_PACKS[number];
 
 // Exchange rates response type
 interface ExchangeRatesData {
@@ -38,39 +46,38 @@ export default function BuyEnergy() {
     mutationFn: async (packId: string) => {
       return await apiRequest('POST', '/api/payments/stars/create-invoice', { packId });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, packId) => {
       const link = data?.link;
+      const orbs = ENERGY_PACKS.find((p) => p.id === packId)?.amount ?? 0;
       const wa = (window as any)?.Telegram?.WebApp;
       if (link && wa?.openInvoice) {
         wa.openInvoice(link, (status: string) => {
           if (status === 'paid') {
-            toast({ title: 'Оплачено ⭐', description: 'Звёзды зачислены на баланс' });
             queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/payments/history'] });
+            navigate(`/payment-success?type=stars&orbs=${orbs}`);
           } else if (status === 'failed') {
-            toast({ title: 'Оплата не прошла', variant: 'destructive' });
+            haptic.notify('error');
+            toast({ title: locale === 'ru' ? 'Оплата не прошла' : 'Payment failed', variant: 'destructive' });
           }
         });
       } else if (link) {
         window.open(link, '_blank'); // вне Telegram — открыть ссылку
       }
     },
-    onError: () => toast({ title: 'Не удалось создать счёт', variant: 'destructive' }),
+    onError: () => toast({ title: locale === 'ru' ? 'Не удалось создать счёт' : 'Could not create invoice', variant: 'destructive' }),
   });
 
-  const STARS_PACKS = [
-    { id: 's50', tg: 50, orbs: 65 },
-    { id: 's100', tg: 100, orbs: 140, hot: true },
-    { id: 's250', tg: 250, orbs: 375 },
-  ];
-
   const { t, locale } = useTranslation();
+  const { tier } = useEnergy();
+  const insideTelegram = !!(window as any)?.Telegram?.WebApp?.initData;
   const [selectedPack, setSelectedPack] = useState<number | null>(null);
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
   const walletConnected = !!wallet;
-  const [pendingTonPurchase, setPendingTonPurchase] = useState<typeof ENERGY_PACKS[0] | null>(null);
+  const [pendingTonPurchase, setPendingTonPurchase] = useState<EnergyPack | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
-  const [pendingYookassaPack, setPendingYookassaPack] = useState<typeof ENERGY_PACKS[0] | null>(null);
+  const [pendingYookassaPack, setPendingYookassaPack] = useState<EnergyPack | null>(null);
   const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
 
 
@@ -95,7 +102,7 @@ export default function BuyEnergy() {
   });
 
   const tonMutation = useMutation({
-    mutationFn: async (pack: typeof ENERGY_PACKS[0]) => {
+    mutationFn: async (pack: EnergyPack) => {
       console.log('[TON_FRONTEND] Starting mutation for pack:', pack);
       console.log('[TON_FRONTEND] Wallet state:', wallet);
       
@@ -206,8 +213,8 @@ export default function BuyEnergy() {
         toast({
           title: locale === 'ru' ? 'Платежи найдены!' : 'Payments found!',
           description: locale === 'ru' 
-            ? `Начислено ${data.creditedEnergy} энергии`
-            : `Credited ${data.creditedEnergy} energy`,
+            ? `На баланс зачислено ${data.creditedEnergy} звёзд`
+            : `${data.creditedEnergy} stars added to your balance`,
         });
       } else {
         toast({
@@ -228,7 +235,7 @@ export default function BuyEnergy() {
   });
 
   const yookassaMutation = useMutation({
-    mutationFn: async ({ pack, email }: { pack: typeof ENERGY_PACKS[0], email: string | undefined }) => {
+    mutationFn: async ({ pack, email }: { pack: EnergyPack, email: string | undefined }) => {
       console.log('[YooKassa] ============ FRONTEND: Creating payment ============');
       console.log('[YooKassa] Pack:', pack);
       console.log('[YooKassa] Email:', email);
@@ -334,247 +341,198 @@ export default function BuyEnergy() {
     },
   });
 
-  // Calculate TON price from exchange rates
+  // TON — по курсу от USD
   const getTonPrice = (usdPrice: number) => {
     if (exchangeRatesData?.ok && exchangeRatesData.data?.tonUsd?.rate) {
       return (usdPrice / exchangeRatesData.data.tonUsd.rate).toFixed(2);
     }
-    return (usdPrice / 5.5).toFixed(2); // Fallback
+    return (usdPrice / 5.5).toFixed(2);
   };
 
-  // Calculate RUB price from exchange rates
-  const getRubPrice = (usdPrice: number) => {
-    if (exchangeRatesData?.ok && exchangeRatesData.data?.usdRub?.rate) {
-      return Math.round(usdPrice * exchangeRatesData.data.usdRub.rate);
+  const ru = locale === 'ru';
+
+  const startTon = async (pack: EnergyPack) => {
+    haptic.impact('light');
+    setSelectedPack(pack.amount);
+    if (!walletConnected) {
+      try {
+        setPendingTonPurchase(pack);
+        await tonConnectUI.openModal();
+      } catch (error: any) {
+        console.error('Failed to open wallet modal:', error);
+        setPendingTonPurchase(null);
+        toast({
+          title: ru ? 'Ошибка подключения' : 'Connection error',
+          description: ru ? 'Не удалось открыть окно кошелька. Попробуйте снова.' : 'Failed to open the wallet window. Try again.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      tonMutation.mutate(pack);
     }
-    return Math.round(usdPrice * 78.5); // Fallback
   };
 
-  // Get formatted rate info for display
-  const getRateInfo = () => {
-    if (!exchangeRatesData?.ok) return null;
-    const { usdRub, tonUsd } = exchangeRatesData.data;
-    return {
-      usdRub: usdRub.rate.toFixed(2),
-      tonUsd: tonUsd.rate.toFixed(2),
-      usdRubUpdated: new Date(usdRub.updatedAt).toLocaleDateString(),
-    };
+  const startCard = (pack: EnergyPack) => {
+    haptic.impact('light');
+    setSelectedPack(pack.amount);
+    setPendingYookassaPack(pack);
+    setShowEmailDialog(true);
   };
+
+  const startStars = (pack: EnergyPack) => {
+    haptic.impact('medium');
+    setSelectedPack(pack.amount);
+    starsMutation.mutate(pack.id);
+  };
+
+  const busy = (pack: EnergyPack) =>
+    selectedPack === pack.amount && (starsMutation.isPending || tonMutation.isPending || yookassaMutation.isPending);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
-      {/* Full Palette Gradient Background - AstroOrb */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-palette opacity-20" />
       </div>
-      
-      <div className="container max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/dashboard')}
-            data-testid="button-back"
-          >
+
+      <div className="container max-w-md mx-auto">
+        {/* Заголовок */}
+        <div className="flex items-start gap-3 mb-6 anim-fade-up">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} data-testid="button-back">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0 pt-1">
             <h1 className="text-2xl font-display font-bold">{t.buyEnergy.title}</h1>
-            <p className="text-muted-foreground">{t.buyEnergy.subtitle}</p>
+            <p className="text-muted-foreground text-sm">
+              {ru ? 'Не сгорают в конце месяца — тратятся после звёзд подписки' : 'Never expire — spent after your monthly stars run out'}
+            </p>
           </div>
-
-        {/* Telegram Stars: покупка внутри Telegram */}
-        <Card className="p-4 mb-6 anim-fade-up">
-          <p className="font-medium mb-1">Купить за Telegram Stars ⭐</p>
-          <p className="text-xs text-muted-foreground mb-3">Оплата в один тап внутри Telegram, зачисление мгновенно</p>
-          <div className="grid grid-cols-3 gap-2">
-            {STARS_PACKS.map((p) => (
-              <Button
-                key={p.id}
-                variant={p.hot ? 'default' : 'outline'}
-                className="h-auto flex-col gap-0.5 py-3"
-                disabled={starsMutation.isPending}
-                onClick={() => starsMutation.mutate(p.id)}
-                data-testid={`button-stars-${p.id}`}
-              >
-                <span className="text-base font-semibold">{p.orbs}</span>
-                <span className="text-[11px] opacity-80">за {p.tg} ⭐</span>
-              </Button>
-            ))}
-          </div>
-        </Card>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => checkPendingMutation.mutate()}
-            disabled={checkPendingMutation.isPending}
-            data-testid="button-check-pending"
-          >
-            {checkPendingMutation.isPending ? (
-              <Loader />
-            ) : (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                {locale === 'ru' ? 'Проверить' : 'Check'}
-              </>
-            )}
-          </Button>
         </div>
 
-        {ratesLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader />
-          </div>
+        {tier === 'free' ? (
+          /* Free: звёзды работают только внутри подписки */
+          <Card className="p-6 anim-fade-up anim-d1 text-center" data-testid="card-subscribe-first">
+            <div className="inline-flex p-3 rounded-full bg-muted mb-4">
+              <Lock className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-display font-semibold mb-2">
+              {ru ? 'Сначала подписка' : 'Subscription first'}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              {ru
+                ? 'Звёзды тратятся на функции внутри подписки. Standard даёт 250 звёзд в месяц, Premium — 550. Докупать имеет смысл, когда месячный запас закончился.'
+                : 'Stars are spent on features inside a subscription. Standard gives 250 stars a month, Premium — 550. Top-ups make sense once your monthly stars run out.'}
+            </p>
+            <Button className="w-full" size="lg" onClick={() => navigate('/subscribe')} data-testid="button-go-subscribe">
+              {ru ? 'Выбрать подписку' : 'Choose a plan'}
+            </Button>
+          </Card>
         ) : (
           <>
-            {/* Exchange rates info */}
-            {exchangeRatesData?.ok && (
-              <Card className="p-3 mb-4 bg-muted/50">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <span>1 USD = {getRateInfo()?.usdRub} ₽</span>
-                    <span>1 TON = ${getRateInfo()?.tonUsd}</span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => refetchRates()}
-                    className="h-7 px-2"
-                    data-testid="button-refresh-rates"
-                  >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    {locale === 'ru' ? 'Обновить' : 'Refresh'}
-                  </Button>
-                </div>
-              </Card>
-            )}
+            {/* Паки — один прайс для всех способов оплаты */}
+            <div className="space-y-4">
+              {ENERGY_PACKS.map((pack, i) => (
+                <Card
+                  key={pack.id}
+                  className={`relative p-5 anim-fade-up anim-d${i + 1} ${pack.popular ? 'ring-1 ring-[hsl(var(--solar-gold))]/60' : ''}`}
+                  data-testid={`card-energy-pack-${pack.amount}`}
+                >
+                  {pack.popular && (
+                    <Badge className="absolute -top-2.5 right-4 bg-[hsl(var(--solar-gold))] text-[hsl(38,40%,10%)] hover:bg-[hsl(var(--solar-gold))]">
+                      {ru ? 'Чаще всего берут' : 'Most popular'}
+                    </Badge>
+                  )}
 
-            <div className="grid gap-4 md:grid-cols-3">
-            {ENERGY_PACKS.map((pack, index) => (
-              <Card
-                key={pack.amount}
-                className={`p-6 cursor-pointer transition-all hover-elevate ${
-                  selectedPack === pack.amount ? 'ring-2 ring-primary' : ''
-                } ${pack.popular ? 'relative' : ''}`}
-                onClick={() => setSelectedPack(pack.amount)}
-                data-testid={`card-energy-pack-${pack.amount}`}
-              >
-                {pack.popular && (
-                  <Badge className="absolute -top-2 -right-2 bg-chart-4">
-                    {t.subscribe.mostPopular}
-                  </Badge>
-                )}
-
-                <div className="text-center mb-4">
-                  <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-chart-3/20 to-chart-2/20 mb-3">
-                    <OrbIcon className="w-8 h-8 text-chart-3" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-1">{pack.amount}</h3>
-                  <p className="text-sm text-muted-foreground">{t.common.energy} {t.common.orbs}</p>
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold">${pack.usdPrice}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ≈ {getTonPrice(pack.usdPrice)} TON
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {getRubPrice(pack.usdPrice)} ₽
+                  <div className="flex items-end justify-between gap-3 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-4xl font-display font-bold leading-none">{pack.amount}</span>
+                        <OrbIcon className="w-6 h-6 text-[hsl(var(--solar-gold))]" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {pack.base} <span className="text-[hsl(var(--solar-gold))]">+{pack.amount - pack.base} {ru ? 'бонус' : 'bonus'}</span>
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">
+                      ≈ {(pack.rub / pack.amount).toFixed(1).replace('.0', '')} ₽ / <OrbIcon className="w-3 h-3 inline -mt-0.5" />
                     </p>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setSelectedPack(pack.amount);
-                      if (!walletConnected) {
-                        try {
-                          console.log('Opening TON Connect modal for pack:', pack);
-                          setPendingTonPurchase(pack);
-                          await tonConnectUI.openModal();
-                          console.log('TON Connect modal opened, waiting for wallet connection...');
-                        } catch (error: any) {
-                          console.error('Failed to open wallet modal:', error);
-                          setPendingTonPurchase(null);
-                          toast({
-                            title: locale === 'ru' ? 'Ошибка подключения' : 'Connection Error',
-                            description: locale === 'ru'
-                              ? 'Не удалось открыть окно подключения кошелька. Попробуйте снова.'
-                              : 'Failed to open wallet connection modal. Try again.',
-                            variant: 'destructive',
-                          });
-                        }
-                      } else {
-                        tonMutation.mutate(pack);
-                      }
-                    }}
-                    disabled={tonMutation.isPending && selectedPack === pack.amount}
-                    data-testid={`button-buy-ton-${pack.amount}`}
-                  >
-                    {tonMutation.isPending && selectedPack === pack.amount ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        {t.buyEnergy.purchasing}
-                      </>
-                    ) : !walletConnected ? (
-                      <>
-                        <Wallet className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Подключить TON' : 'Connect TON'}
-                      </>
-                    ) : (
-                      <>
-                        <Wallet className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? 'Оплатить TON' : 'Pay with TON'}
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPack(pack.amount);
-                      setPendingYookassaPack(pack);
-                      setShowEmailDialog(true);
-                    }}
-                    disabled={yookassaMutation.isPending && selectedPack === pack.amount}
-                    data-testid={`button-buy-rubles-${pack.amount}`}
-                  >
-                    {yookassaMutation.isPending && selectedPack === pack.amount ? (
-                      <>
-                        <Loader className="mr-2" size="sm" />
-                        {t.buyEnergy.purchasing}
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingBag className="w-4 h-4 mr-2" />
-                        {locale === 'ru' ? `Оплатить ${getRubPrice(pack.usdPrice)} ₽` : `Pay ${getRubPrice(pack.usdPrice)} ₽`}
-                      </>
-                    )}
-                  </Button>
+                  {insideTelegram && (
+                    <Button
+                      className="w-full h-11 text-base"
+                      onClick={() => startStars(pack)}
+                      disabled={busy(pack)}
+                      data-testid={`button-stars-${pack.id}`}
+                    >
+                      {starsMutation.isPending && selectedPack === pack.amount
+                        ? <Loader size="sm" />
+                        : <>{ru ? 'Оплатить' : 'Pay'} {pack.stars} ⭐</>}
+                    </Button>
+                  )}
+
+                  <div className={`grid grid-cols-2 gap-2 ${insideTelegram ? 'mt-2' : ''}`}>
+                    <Button
+                      variant="outline"
+                      className="h-10"
+                      onClick={() => startCard(pack)}
+                      disabled={busy(pack)}
+                      data-testid={`button-buy-rubles-${pack.amount}`}
+                    >
+                      {yookassaMutation.isPending && selectedPack === pack.amount
+                        ? <Loader size="sm" />
+                        : <><CreditCard className="w-4 h-4 mr-1.5" />{pack.rub} ₽</>}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10"
+                      onClick={() => startTon(pack)}
+                      disabled={busy(pack) || ratesLoading}
+                      data-testid={`button-buy-ton-${pack.amount}`}
+                    >
+                      {tonMutation.isPending && selectedPack === pack.amount
+                        ? <Loader size="sm" />
+                        : <><Wallet className="w-4 h-4 mr-1.5" />{ratesLoading ? '…' : `${getTonPrice(pack.usdPrice)} TON`}</>}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Способы оплаты и проверка TON */}
+            <div className="mt-5 space-y-3 anim-fade-up anim-d4">
+              <p className="text-xs text-muted-foreground text-center px-2">
+                {insideTelegram
+                  ? (ru
+                    ? 'Telegram Stars — в один тап, без ввода карты. Карта (₽) и TON — во внешнем окне, зачисление сразу после подтверждения.'
+                    : 'Telegram Stars — one tap, no card details. Card (₽) and TON open in an external window; stars arrive right after confirmation.')
+                  : (ru
+                    ? 'Карта (₽) и TON. Зачисление сразу после подтверждения оплаты.'
+                    : 'Card (₽) and TON. Stars arrive right after the payment is confirmed.')}
+              </p>
+
+              {exchangeRatesData?.ok && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                  <span>1 TON = ${exchangeRatesData.data.tonUsd.rate.toFixed(2)}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => refetchRates()} data-testid="button-refresh-rates">
+                      <RefreshCw className="w-3 h-3 mr-1" />{ru ? 'Курс' : 'Rate'}
+                    </Button>
+                    <Button
+                      variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                      onClick={() => checkPendingMutation.mutate()}
+                      disabled={checkPendingMutation.isPending}
+                      data-testid="button-check-pending"
+                    >
+                      {checkPendingMutation.isPending ? <Loader size="sm" /> : <><Check className="w-3 h-3 mr-1" />{ru ? 'Проверить TON' : 'Check TON'}</>}
+                    </Button>
+                  </div>
                 </div>
-              </Card>
-            ))}
-          </div>
+              )}
+            </div>
           </>
         )}
-
-        <Card className="mt-6 p-4 bg-muted/50">
-          <p className="text-sm text-muted-foreground text-center">
-            {locale === 'ru' ? 
-              'Оплата через TON блокчейн или банковской картой (рубли). Энергия зачисляется мгновенно после подтверждения.' :
-              'Pay with TON blockchain or bank card (Rubles). Energy is added instantly after confirmation.'
-            }
-          </p>
-        </Card>
       </div>
 
-      {/* Email Receipt Dialog */}
       {pendingYookassaPack && (
         <EmailReceiptDialog
           open={showEmailDialog}
@@ -585,11 +543,8 @@ export default function BuyEnergy() {
               setPendingYookassaPack(null);
             }
           }}
-          amount={`${getRubPrice(pendingYookassaPack.usdPrice)} ₽`}
-          description={locale === 'ru' 
-            ? `Покупка ${pendingYookassaPack.amount} звёзд`
-            : `Purchase ${pendingYookassaPack.amount} stars`
-          }
+          amount={`${pendingYookassaPack.rub} ₽`}
+          description={ru ? `Покупка ${pendingYookassaPack.amount} звёзд` : `Purchase ${pendingYookassaPack.amount} stars`}
         />
       )}
     </div>

@@ -19,6 +19,7 @@ import {
   deductOrbs,
   getUserTier,
   checkAndResetOrbs,
+  creditPurchasedOrbs,
 } from "./lib/energy";
 import { getTonPrice, convertUSDToTON, verifyTonTransaction, findRecentTransaction, findUserTransaction, normalizeTonAddress } from "./lib/ton";
 import { calculateNatalChart, calculateSolarReturn, calculateBaZi } from "./lib/astrology";
@@ -36,6 +37,7 @@ import { getAllExchangeRates, forceRefreshAllRates, getCacheStatus } from "./lib
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
+import { ORB_PACKS, getOrbPack, getOrbPackByOrbs } from "@shared/orbPacks";
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 
@@ -2499,8 +2501,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: p.createdAt,
       }));
       
+      // Telegram Stars: берём из журнала событий (successful_payment), без отдельной таблицы
+      let starsFormatted: any[] = [];
+      try {
+        const { paymentEventLog } = await import("../shared/schema");
+        const { sql: dsql } = await import("drizzle-orm");
+        const rows = await db
+          .select()
+          .from(paymentEventLog)
+          .where(dsql`${paymentEventLog.provider} = 'stars' AND ${paymentEventLog.payload}->'message'->'successful_payment'->>'invoice_payload' LIKE ${'%"u":"' + userId + '"%'}`);
+        starsFormatted = rows.map((r: any) => {
+          const sp = r.payload?.message?.successful_payment || {};
+          let inv: any = {};
+          try { inv = JSON.parse(sp.invoice_payload || '{}'); } catch { /* noop */ }
+          return {
+            id: `stars_${r.eventId}`,
+            userId,
+            kind: 'energy_pack',
+            energyAmount: Number(inv.o) || null,
+            tier: null,
+            amountRUB: null,
+            amountTON: null,
+            amountStars: Number(sp.total_amount) || null,
+            userWalletAddress: null,
+            status: 'completed',
+            txHash: null,
+            yookassaPaymentId: null,
+            paymentMethod: 'stars' as const,
+            createdAt: r.createdAt,
+          };
+        });
+      } catch (starsErr) {
+        console.error('[HISTORY] stars lookup failed (non-blocking):', starsErr);
+      }
+
       // Combine and sort by createdAt (newest first)
-      const allPayments = [...tonFormatted, ...yookassaFormatted].sort(
+      const allPayments = [...tonFormatted, ...yookassaFormatted, ...starsFormatted].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       
@@ -2557,11 +2593,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           foundCount++;
           
           // Credit energy
-          const user = await storage.getUser(userId);
-          if (user && payment.energyAmount) {
-            await storage.updateUser(userId, {
-              purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
-            });
+          if (payment.energyAmount) {
+            await creditPurchasedOrbs(storage, userId, payment.energyAmount, 'ton');
             creditedEnergy += payment.energyAmount;
           }
 
@@ -2741,6 +2774,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const validated = createPaymentSchema.parse(req.body);
 
+      // Паки звёзд: цена берётся с сервера (shared/orbPacks), клиентский amountUSD игнорируется
+      if (validated.kind === "energy_pack") {
+        const orbPack = getOrbPackByOrbs(validated.energyAmount);
+        if (!orbPack) {
+          return res.status(400).json({ ok: false, error: "Invalid energy pack" });
+        }
+        validated.amountUSD = orbPack.usd;
+      }
+
       if (!process.env.TON_WALLET_ADDRESS) {
         return res.status(500).json({ 
           ok: false, 
@@ -2890,13 +2932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process payment - credit energy
       if (payment.kind === "energy_pack" && payment.energyAmount) {
-        const user = await storage.getUser(userId);
-        if (user) {
-          await storage.updateUser(userId, {
-            purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
-          });
-          console.log('[TON_CONFIRM] Energy credited:', payment.energyAmount, 'to user:', userId);
-        }
+        await creditPurchasedOrbs(storage, userId, payment.energyAmount, 'ton');
       }
 
       // Update payment status with verified txHash
@@ -3068,12 +3104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (payment.kind === "energy_pack" && payment.energyAmount) {
-        const user = await storage.getUser(payment.userId);
-        if (user) {
-          await storage.updateUser(payment.userId, {
-            purchasedEnergy: (user.purchasedEnergy || 0) + payment.energyAmount,
-          });
-        }
+        await creditPurchasedOrbs(storage, payment.userId, payment.energyAmount, 'ton');
       } else if (payment.kind === "subscription" && payment.tier) {
         const normalizedTier = (payment.tier === 'premium' || payment.tier === 'pro') ? 'pro' : 'standard';
         
@@ -3123,7 +3154,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const createYooKassaPaymentSchema = z.object({
     kind: z.enum(["energy_pack", "subscription", "subscription_upgrade", "subscription_renewal"]),
     pack: z.object({
-      energy: z.number().refine(val => [20, 50, 120].includes(val))
+      // Легаси: число орбов пака; источник правды — shared/orbPacks.ts
+      energy: z.number().refine(val => ORB_PACKS.some(p => p.orbs === val), { message: 'Invalid energy pack' })
     }).optional(),
     tier: z.enum(["standard", "pro", "premium"]).optional(),
     periodMonths: z.number().refine(val => [1, 6, 12].includes(val)).optional(), // Subscription period
@@ -3271,20 +3303,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let tier: string | undefined;
 
       if (validated.kind === "energy_pack" && validated.pack) {
-        const packConfig = {
-          20: { rub: "150.00", label: "20 Stars Pack" },
-          50: { rub: "300.00", label: "50 Stars Pack" },
-          120: { rub: "600.00", label: "120 Stars Pack" },
-        }[validated.pack.energy as 20 | 50 | 120];
-
-        if (!packConfig) {
+        const orbPack = getOrbPackByOrbs(validated.pack.energy);
+        if (!orbPack) {
           console.error('[YooKassa] Invalid pack:', validated.pack.energy);
           return res.status(400).json({ ok: false, error: "Invalid energy pack" });
         }
 
-        description = `Покупка ${validated.pack.energy} звёзд`;
-        amountRUB = packConfig.rub;
-        energyAmount = validated.pack.energy;
+        description = `Покупка ${orbPack.orbs} звёзд Astro Orb`;
+        amountRUB = orbPack.rub.toFixed(2);
+        energyAmount = orbPack.orbs;
       } else if (validated.kind === "subscription" && validated.tier) {
         const periodMonths = validated.periodMonths || 1;
         const normalizedTier = (validated.tier === 'premium' || validated.tier === 'pro') ? 'premium' : 'standard';
@@ -3421,7 +3448,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create YooKassa payment
       const baseUrl = process.env.SERVER_URL || `https://${req.headers.host}`;
-      const returnUrl = `${baseUrl}/payment-success?paymentId=${yookassaPayment.id}`;
+      // Возврат из ЮKassa — обратно в мини-апп внутри Telegram (t.me/<bot>?startapp=pay_<id>),
+      // а не в браузер, где нет сессии
+      const { buildMiniAppReturnUrl } = await import("./lib/telegramStars");
+      const returnUrl = await buildMiniAppReturnUrl(baseUrl, yookassaPayment.id);
 
       // Get user for receipt (email required by YooKassa for самозанятый по 54-ФЗ)
       const user = await storage.getUser(userId);
@@ -3589,6 +3619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: 'succeeded',
             energyAmount: dbPayment.energyAmount,
             tier: dbPayment.tier,
+            kind: dbPayment.kind,
           },
         });
       }
@@ -3619,6 +3650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ok: true,
               data: {
                 status: 'processing',
+                kind: dbPayment.kind,
                 message: 'Payment is being processed by bank',
               },
             });
@@ -3628,6 +3660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ok: true,
               data: {
                 status: 'abandoned',
+                kind: dbPayment.kind,
                 message: 'Payment was not completed',
               },
             });
@@ -3640,6 +3673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ok: true,
               data: {
                 status: 'failed',
+                kind: dbPayment.kind,
                 message: 'Payment was not completed',
               },
             });
@@ -3654,6 +3688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ok: true,
           data: {
             status: 'pending',
+            kind: dbPayment.kind,
             message: 'Payment is being created',
           },
         });
@@ -3672,15 +3707,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId;
       const { packId } = req.body || {};
-      const { STARS_ORB_PACKS, createStarsInvoiceLink } = await import("./lib/telegramStars");
-      const pack = STARS_ORB_PACKS[packId];
+      const { createStarsInvoiceLink } = await import("./lib/telegramStars");
+      const pack = getOrbPack(packId);
       if (!pack) return res.status(400).json({ ok: false, error: "unknown_pack" });
       const payload = JSON.stringify({ t: "orbs", u: userId, o: pack.orbs, p: packId });
       const link = await createStarsInvoiceLink({
         title: `${pack.orbs} звёзд Astro Orb`,
         description: `Пакет из ${pack.orbs} звёзд для функций приложения`,
         payload,
-        stars: pack.tgStars,
+        stars: pack.stars,
       });
       return res.json({ ok: true, link });
     } catch (e: any) {
@@ -3720,13 +3755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let payload: any = {};
         try { payload = JSON.parse(sp.invoice_payload || "{}"); } catch { /* noop */ }
         if (payload.t === "orbs" && payload.u && payload.o) {
-          const user = await storage.getUser(payload.u);
-          if (user) {
-            const current = parseFloat(user.referralOrbs || "0");
-            await storage.updateUser(payload.u, { referralOrbs: String(current + Number(payload.o)) } as any);
-            console.log(`[STARS] Credited ${payload.o} orbs to ${payload.u} (charge ${chargeId})`);
-          } else {
-            console.error("[STARS] user not found for payload", payload);
+          try {
+            await creditPurchasedOrbs(storage, payload.u, Number(payload.o), 'stars');
+          } catch (creditErr) {
+            console.error("[STARS] credit failed", payload, creditErr);
           }
         }
         return res.json({ ok: true });

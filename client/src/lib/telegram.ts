@@ -223,3 +223,20 @@ export function getReferralCode(): string | null {
   console.log('[Referral] No referral code found');
   return null;
 }
+
+/**
+ * Возврат из внешней оплаты (ЮKassa): return_url = t.me/<bot>?startapp=pay_<paymentId>.
+ * Возвращает id платежа один раз за сессию (чтобы не зациклить экран результата).
+ */
+export function consumePendingPaymentFromStartParam(): string | null {
+  const startParam = getStartParam();
+  if (!startParam || !startParam.startsWith('pay_')) return null;
+  const paymentId = startParam.slice(4);
+  if (!paymentId) return null;
+  try {
+    const key = `astro_pay_deeplink_${paymentId}`;
+    if (sessionStorage.getItem(key)) return null;
+    sessionStorage.setItem(key, '1');
+  } catch { /* noop */ }
+  return paymentId;
+}

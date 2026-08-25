@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Loader } from '@/components/Loader';
-import { CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
+import { OrbIcon } from '@/components/OrbIcon';
+import { XCircle, AlertCircle, MessageCircle, Crown } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { haptic } from '@/lib/haptics';
 
 const SUPPORT_USERNAME =
   (import.meta.env.VITE_SUPPORT_USERNAME || import.meta.env.VITE_BOT_USERNAME || 'AstroOrbBot').replace('@', '');
@@ -13,24 +16,73 @@ const SUPPORT_USERNAME =
 const AUTO_RETRY_MAX = 10;
 const AUTO_RETRY_INTERVAL_MS = 5000;
 
+type Status = 'checking' | 'success' | 'processing' | 'abandoned' | 'failed';
+
+interface SuccessInfo {
+  kind: string;
+  tier?: string | null;
+  orbs?: number | null;
+}
+
+const MONTHLY_ORBS: Record<string, number> = { standard: 250, premium: 550 };
+
+function normalizeTier(t?: string | null): 'standard' | 'premium' | null {
+  if (!t) return null;
+  return t === 'premium' || t === 'pro' ? 'premium' : 'standard';
+}
+
+/** Искры по кругу — вспышка при успехе */
+function Sparks({ gold }: { gold: boolean }) {
+  const sparks = Array.from({ length: 10 }, (_, i) => ({
+    a: `${i * 36 + (i % 2 ? 14 : 0)}deg`,
+    d: `${54 + (i % 3) * 16}px`,
+    dl: `${0.25 + (i % 4) * 0.06}s`,
+  }));
+  return (
+    <>
+      {sparks.map((s, i) => (
+        <span
+          key={i}
+          className="ps-spark"
+          style={{ ['--a' as any]: s.a, ['--d' as any]: s.d, ['--dl' as any]: s.dl }}
+          aria-hidden="true"
+        >
+          <OrbIcon className={`w-2 h-2 ${gold ? 'text-[hsl(var(--solar-gold))]' : 'text-primary'}`} />
+        </span>
+      ))}
+    </>
+  );
+}
+
 export default function PaymentSuccess() {
   const [, navigate] = useLocation();
   const { locale } = useTranslation();
+  const ru = locale === 'ru';
   const search = useSearch();
   const params = new URLSearchParams(search);
   const paymentId = params.get('paymentId');
   const paymentType = params.get('type') || 'yookassa';
 
-  const [status, setStatus] = useState<'checking' | 'success' | 'processing' | 'abandoned' | 'failed'>('checking');
+  const [status, setStatus] = useState<Status>('checking');
   const [message, setMessage] = useState('');
-  const [energyAmount, setEnergyAmount] = useState(0);
+  const [info, setInfo] = useState<SuccessInfo | null>(null);
+  const [kindHint, setKindHint] = useState<string | null>(null);
+  const retryPath = () => (kindHint && kindHint.startsWith('subscription') ? '/subscribe' : '/buy-energy');
   const [pollingAttempt, setPollingAttempt] = useState(0);
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [countdown, setCountdown] = useState(0);
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const autoRetryCountRef = useRef(0);
+  const celebratedRef = useRef(false);
+
+  // Свежие данные пользователя после активации — дата окончания подписки и баланс
+  const { data: me } = useQuery<any>({
+    queryKey: ['/api/user/me'],
+    enabled: status === 'success',
+  });
+  const subscription = me?.data?.subscription;
+  const balance: number | undefined = me?.data?.orbs;
 
   const clearTimers = () => {
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
@@ -39,10 +91,41 @@ export default function PaymentSuccess() {
     countdownTimerRef.current = null;
   };
 
+  const refreshEverything = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/payments/history'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/user/energy'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/subscription/upgrade-preview'] });
+  };
+
+  const succeed = (data: any) => {
+    clearTimers();
+    refreshEverything();
+    setInfo({
+      kind: data?.kind || (data?.tier ? 'subscription' : 'energy_pack'),
+      tier: data?.tier,
+      orbs: data?.energyAmount,
+    });
+    setStatus('success');
+    setMessage('');
+    if (!celebratedRef.current) {
+      celebratedRef.current = true;
+      haptic.notify('success');
+    }
+  };
+
   useEffect(() => {
+    // Telegram Stars: оплата подтверждена самим Telegram, зачисление — вебхуком в течение секунд
+    if (paymentType === 'stars') {
+      const orbs = Number(params.get('orbs')) || null;
+      succeed({ kind: 'energy_pack', energyAmount: orbs });
+      const t1 = setTimeout(refreshEverything, 1500);
+      const t2 = setTimeout(refreshEverything, 4000);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
     if (!paymentId) {
       setStatus('failed');
-      setMessage(locale === 'ru' ? 'Платёж не найден' : 'Payment not found');
+      setMessage(ru ? 'Платёж не найден' : 'Payment not found');
       return;
     }
     if (paymentType === 'ton') {
@@ -54,13 +137,9 @@ export default function PaymentSuccess() {
   }, [paymentId]);
 
   useEffect(() => {
-    if (status === 'success') {
+    if (status === 'failed' || status === 'abandoned') {
       clearTimers();
-      const timer = setTimeout(() => navigate('/dashboard'), 2000);
-      return () => clearTimeout(timer);
-    } else if (status === 'failed' || status === 'abandoned') {
-      clearTimers();
-      const timer = setTimeout(() => navigate('/buy-energy'), 5000);
+      const timer = setTimeout(() => navigate(retryPath()), 8000);
       return () => clearTimeout(timer);
     }
   }, [status, navigate]);
@@ -69,7 +148,6 @@ export default function PaymentSuccess() {
     clearTimers();
     let secs = Math.round(AUTO_RETRY_INTERVAL_MS / 1000);
     setCountdown(secs);
-
     countdownTimerRef.current = setInterval(() => {
       secs -= 1;
       setCountdown(secs);
@@ -78,121 +156,70 @@ export default function PaymentSuccess() {
         countdownTimerRef.current = null;
       }
     }, 1000);
-
-    retryTimerRef.current = setTimeout(() => {
-      checkYooKassaPayment(attempt);
-    }, AUTO_RETRY_INTERVAL_MS);
+    retryTimerRef.current = setTimeout(() => checkYooKassaPayment(attempt), AUTO_RETRY_INTERVAL_MS);
   };
 
   const checkYooKassaPayment = async (attempt: number) => {
     try {
       const response = await apiRequest('POST', '/api/payments/yookassa/check-status', { paymentId });
-
       if (response.ok && response.data) {
-        const { status: paymentStatus, energyAmount: amount } = response.data;
-
+        const { status: paymentStatus } = response.data;
+        if (response.data.kind) setKindHint(response.data.kind);
         if (paymentStatus === 'succeeded') {
-          clearTimers();
-          queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-          setStatus('success');
-          setEnergyAmount(amount || 0);
-          setMessage(
-            locale === 'ru'
-              ? `Платёж успешно обработан! Начислено ${amount} звёзд.`
-              : `Payment successful! Credited ${amount} stars.`
-          );
-        } else if (paymentStatus === 'processing') {
+          succeed(response.data);
+        } else if (paymentStatus === 'processing' || paymentStatus === 'pending') {
           const nextAttempt = attempt + 1;
-          autoRetryCountRef.current = nextAttempt;
           setAutoRetryCount(nextAttempt);
           setStatus('processing');
-
           if (nextAttempt < AUTO_RETRY_MAX) {
-            setMessage(
-              locale === 'ru'
-                ? `Банк обрабатывает платёж. Проверяем автоматически (${nextAttempt}/${AUTO_RETRY_MAX})...`
-                : `Bank is processing payment. Checking automatically (${nextAttempt}/${AUTO_RETRY_MAX})...`
-            );
+            setMessage(ru
+              ? `Банк подтверждает платёж. Проверяем автоматически (${nextAttempt}/${AUTO_RETRY_MAX})`
+              : `The bank is confirming the payment. Checking automatically (${nextAttempt}/${AUTO_RETRY_MAX})`);
             scheduleAutoRetry(nextAttempt);
           } else {
             clearTimers();
             setStatus('failed');
-            setMessage(
-              locale === 'ru'
-                ? 'Банк долго не подтверждает платёж. Деньги не потеряны — обычно они зачисляются в течение часа. Если подписка не активируется, напишите в поддержку.'
-                : 'The bank is taking too long to confirm. Your money is safe — it usually posts within an hour. If your subscription is not activated, please contact support.'
-            );
+            setMessage(ru
+              ? 'Банк долго не подтверждает платёж. Деньги не потеряны — обычно зачисление занимает до часа. Если подписка не появится, напишите в поддержку.'
+              : 'The bank is taking too long to confirm. Your money is safe — it usually posts within an hour. If the subscription does not appear, contact support.');
           }
         } else if (paymentStatus === 'abandoned') {
           clearTimers();
           setStatus('abandoned');
-          setMessage(
-            locale === 'ru'
-              ? 'Платёж не был завершён. Возвращаемся на страницу покупки...'
-              : 'Payment was not completed. Returning to purchase page...'
-          );
+          setMessage(ru ? 'Оплата не была завершена. Можно попробовать снова.' : 'Payment was not completed. You can try again.');
         } else {
           clearTimers();
           setStatus('failed');
-          setMessage(locale === 'ru' ? 'Платёж не был завершён.' : 'Payment was not completed.');
+          setMessage(ru ? 'Банк отклонил платёж. Деньги не списаны.' : 'The bank declined the payment. Nothing was charged.');
         }
       } else {
         clearTimers();
         setStatus('failed');
-        setMessage(response.error || (locale === 'ru' ? 'Ошибка проверки платежа' : 'Failed to check payment'));
+        setMessage(response.error || (ru ? 'Не удалось проверить платёж' : 'Failed to check payment'));
       }
     } catch (error: any) {
       console.error('Payment check error:', error);
       clearTimers();
       setStatus('failed');
-      setMessage(locale === 'ru' ? 'Ошибка проверки платежа' : 'Failed to check payment');
+      setMessage(ru ? 'Не удалось проверить платёж' : 'Failed to check payment');
     }
   };
 
   const handleManualRetry = () => {
     clearTimers();
-    autoRetryCountRef.current = 0;
     setAutoRetryCount(0);
     setCountdown(0);
     setStatus('checking');
-    if (paymentType === 'ton') {
-      startTonPolling();
-    } else {
-      checkYooKassaPayment(0);
-    }
+    if (paymentType === 'ton') startTonPolling(); else checkYooKassaPayment(0);
   };
 
   const checkTonPayment = async () => {
     try {
-      console.log(`[TON] Checking blockchain for payment ${paymentId}...`);
-      
-      const response = await apiRequest('POST', '/api/payments/ton/confirm', {
-        paymentId,
-      });
-
-      if (response.ok && response.data) {
-        const { status: paymentStatus, energyAmount: amount } = response.data;
-        
-        if (paymentStatus === 'succeeded') {
-          console.log('[TON] ✅ Transaction found and confirmed!');
-          queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
-          setStatus('success');
-          setEnergyAmount(amount || 0);
-          setMessage(locale === 'ru' 
-            ? `Транзакция найдена! Начислено ${amount} звёзд.`
-            : `Transaction found! Credited ${amount} stars.`
-          );
-          return true;
-        } else if (paymentStatus === 'processing') {
-          console.log('[TON] Transaction still processing...');
-          return false; // Continue polling
-        } else {
-          console.log('[TON] Transaction failed or unknown status:', paymentStatus);
-          return false;
-        }
+      const response = await apiRequest('POST', '/api/payments/ton/confirm', { paymentId });
+      if (response.ok && response.data?.status === 'succeeded') {
+        succeed(response.data);
+        return true;
       }
-
-      console.log('[TON] Invalid response from server');
       return false;
     } catch (error: any) {
       console.error('[TON] Check error:', error);
@@ -202,72 +229,101 @@ export default function PaymentSuccess() {
 
   const startTonPolling = async () => {
     setStatus('processing');
-    setMessage(locale === 'ru' 
-      ? 'Ищем вашу транзакцию на блокчейне. Это может занять до минуты...'
-      : 'Searching for your transaction on blockchain. This may take up to a minute...'
-    );
-
-    const maxRetries = 15; // 15 attempts = 45 seconds of searching
-    const retryDelay = 3000; // 3 seconds between attempts
-
+    setMessage(ru ? 'Ищем транзакцию в блокчейне — до минуты' : 'Looking for the transaction on the blockchain — up to a minute');
+    const maxRetries = 15;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       setPollingAttempt(attempt);
-      console.log(`[TON] Polling attempt ${attempt}/${maxRetries}...`);
-
-      const found = await checkTonPayment();
-      if (found) {
-        return;
-      }
-
-      // Update message every 5 attempts
-      if (attempt === 5 || attempt === 10) {
-        setMessage(locale === 'ru'
-          ? `Проверка ${attempt}/${maxRetries}. Транзакции на блокчейне могут занять время...`
-          : `Check ${attempt}/${maxRetries}. Blockchain transactions can take time...`
-        );
-      }
-
-      // If not last attempt, wait before retry
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
+      if (await checkTonPayment()) return;
+      if (attempt < maxRetries) await new Promise((r) => setTimeout(r, 3000));
     }
-
-    // All retries failed
     setStatus('failed');
-    setMessage(locale === 'ru' 
-      ? 'Транзакция не найдена на блокчейне. Проверьте баланс через несколько минут или нажмите "Проверить снова".'
-      : 'Transaction not found on blockchain. Check your balance in a few minutes or click "Check Again".'
-    );
+    setMessage(ru
+      ? 'Транзакция пока не найдена. Проверьте баланс через несколько минут или нажмите «Проверить снова».'
+      : 'Transaction not found yet. Check your balance in a few minutes or tap "Check again".');
   };
 
+  // ---------- Успех ----------
+  const isSub = info?.kind === 'subscription' || info?.kind === 'subscription_upgrade' || info?.kind === 'subscription_renewal';
+  const tier = normalizeTier(info?.tier);
+  const gold = tier === 'premium';
+  const tierLabel = tier === 'premium' ? 'Premium' : 'Standard';
+  const monthlyOrbs = tier ? MONTHLY_ORBS[tier] : undefined;
+  const periodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+  const fmtDate = (d: Date) => d.toLocaleDateString(ru ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const renderSuccess = () => (
+    <div className="flex flex-col items-center text-center">
+      <div className="relative mb-7">
+        <Sparks gold={gold} />
+        <div
+          className={`ps-ring relative w-28 h-28 rounded-full flex items-center justify-center border ${
+            gold
+              ? 'bg-gradient-to-br from-[hsl(41,50%,16%)] to-[hsl(38,40%,10%)] border-[hsl(41,60%,42%)]'
+              : 'bg-gradient-to-br from-primary/25 to-primary/5 border-primary/40'
+          }`}
+          style={{ ['--ps-glow' as any]: gold ? 'rgba(239,194,107,0.35)' : 'rgba(142,123,255,0.4)' }}
+        >
+          {isSub && gold
+            ? <Crown className="w-11 h-11 text-[hsl(var(--solar-gold))]" strokeWidth={1.6} />
+            : <OrbIcon className={`w-12 h-12 ${gold ? 'text-[hsl(var(--solar-gold))]' : 'text-primary'}`} />}
+        </div>
+      </div>
+
+      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-2">
+        {ru ? 'Оплата прошла' : 'Payment complete'}
+      </p>
+
+      {isSub ? (
+        <>
+          <h1 className="ps-count text-3xl font-display font-bold leading-tight" data-testid="text-payment-title">
+            {tierLabel} {ru ? 'активирован' : 'is active'}
+          </h1>
+          <p className="ps-count text-muted-foreground mt-3" data-testid="text-payment-message">
+            {periodEnd
+              ? (ru ? `Доступ до ${fmtDate(periodEnd)}` : `Access until ${fmtDate(periodEnd)}`)
+              : (ru ? 'Все функции уже открыты' : 'All features are unlocked')}
+            {monthlyOrbs ? ` · ${monthlyOrbs} ${ru ? 'звёзд в месяц' : 'stars per month'}` : ''}
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="ps-count text-3xl font-display font-bold leading-tight flex items-center justify-center gap-2" data-testid="text-payment-title">
+            <span>+{info?.orbs ?? ''}</span>
+            <OrbIcon className="w-7 h-7 text-[hsl(var(--solar-gold))]" />
+          </h1>
+          <p className="ps-count text-muted-foreground mt-3" data-testid="text-payment-message">
+            {ru ? 'Звёзды на балансе' : 'Stars added to your balance'}
+            {typeof balance === 'number' ? ` · ${ru ? 'теперь' : 'now'} ${balance}` : ''}
+          </p>
+        </>
+      )}
+
+      <Button
+        onClick={() => { haptic.impact('light'); navigate('/dashboard'); }}
+        className="w-full mt-8"
+        size="lg"
+        data-testid="button-go-dashboard"
+      >
+        {isSub ? (ru ? 'Открыть приложение' : 'Open the app') : (ru ? 'К гороскопам' : 'Back to the app')}
+      </Button>
+    </div>
+  );
+
+  // ---------- Остальные состояния ----------
   const getIcon = () => {
     switch (status) {
-      case 'success':
-        return <CheckCircle className="w-16 h-16 text-green-500" />;
-      case 'processing':
-        return <AlertCircle className="w-16 h-16 text-yellow-500" />;
-      case 'abandoned':
-        return <XCircle className="w-16 h-16 text-orange-500" />;
-      case 'failed':
-        return <XCircle className="w-16 h-16 text-red-500" />;
-      default:
-        return <Loader size="lg" />;
+      case 'processing': return <AlertCircle className="w-14 h-14 text-[hsl(var(--solar-gold))]" strokeWidth={1.6} />;
+      case 'abandoned': return <XCircle className="w-14 h-14 text-orange-400" strokeWidth={1.6} />;
+      case 'failed': return <XCircle className="w-14 h-14 text-destructive" strokeWidth={1.6} />;
+      default: return <Loader size="lg" />;
     }
   };
-
   const getTitle = () => {
     switch (status) {
-      case 'success':
-        return locale === 'ru' ? 'Оплата успешна!' : 'Payment Successful!';
-      case 'processing':
-        return locale === 'ru' ? 'Платёж обрабатывается' : 'Payment Processing';
-      case 'abandoned':
-        return locale === 'ru' ? 'Платёж не завершён' : 'Payment Not Completed';
-      case 'failed':
-        return locale === 'ru' ? 'Платёж не подтверждён' : 'Payment Not Confirmed';
-      default:
-        return locale === 'ru' ? 'Проверяем платёж...' : 'Checking payment...';
+      case 'processing': return ru ? 'Платёж обрабатывается' : 'Payment processing';
+      case 'abandoned': return ru ? 'Оплата не завершена' : 'Payment not completed';
+      case 'failed': return ru ? 'Платёж не подтверждён' : 'Payment not confirmed';
+      default: return ru ? 'Проверяем платёж…' : 'Checking payment…';
     }
   };
 
@@ -281,79 +337,52 @@ export default function PaymentSuccess() {
       </div>
 
       <div className="container max-w-md mx-auto">
-        <Card className="p-8" data-testid="card-payment-result">
-          <div className="flex flex-col items-center text-center space-y-6">
-            {getIcon()}
-
-            <h1 className="text-2xl font-display font-bold" data-testid="text-payment-title">
-              {getTitle()}
-            </h1>
-
-            {message && (
-              <p className="text-muted-foreground" data-testid="text-payment-message">
-                {message}
-              </p>
-            )}
-
-            {status === 'processing' && paymentType === 'yookassa' && autoRetryCount > 0 && countdown > 0 && (
-              <p className="text-sm text-muted-foreground" data-testid="text-retry-countdown">
-                {locale === 'ru'
-                  ? `Следующая проверка через ${countdown} сек...`
-                  : `Next check in ${countdown}s...`}
-              </p>
-            )}
-
-            {status === 'processing' && paymentType === 'ton' && pollingAttempt > 0 && (
-              <p className="text-sm text-muted-foreground" data-testid="text-ton-attempt">
-                {locale === 'ru' ? 'Попытка' : 'Attempt'} {pollingAttempt}/15
-              </p>
-            )}
-
-            {status === 'success' && energyAmount > 0 && (
-              <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                <p className="text-sm text-muted-foreground">
-                  {locale === 'ru' ? 'Зачислено энергии' : 'Energy Credited'}
+        <Card className="p-8 anim-fade-up" data-testid="card-payment-result">
+          {status === 'success' ? renderSuccess() : (
+            <div className="flex flex-col items-center text-center space-y-6">
+              {getIcon()}
+              <h1 className="text-2xl font-display font-bold" data-testid="text-payment-title">{getTitle()}</h1>
+              {message && (
+                <p className="text-muted-foreground" data-testid="text-payment-message">{message}</p>
+              )}
+              {status === 'processing' && paymentType === 'yookassa' && autoRetryCount > 0 && countdown > 0 && (
+                <p className="text-sm text-muted-foreground" data-testid="text-retry-countdown">
+                  {ru ? `Следующая проверка через ${countdown} с` : `Next check in ${countdown}s`}
                 </p>
-                <p className="text-3xl font-bold text-green-500">+{energyAmount}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 w-full pt-4">
-              {(status === 'processing' || status === 'failed') && (
-                <Button
-                  variant="outline"
-                  onClick={handleManualRetry}
-                  className="flex-1"
-                  data-testid="button-retry-check"
-                >
-                  {locale === 'ru' ? 'Проверить снова' : 'Check Again'}
-                </Button>
+              )}
+              {status === 'processing' && paymentType === 'ton' && pollingAttempt > 0 && (
+                <p className="text-sm text-muted-foreground" data-testid="text-ton-attempt">
+                  {ru ? 'Попытка' : 'Attempt'} {pollingAttempt}/15
+                </p>
               )}
 
-              <Button
-                onClick={() => navigate('/dashboard')}
-                className="flex-1"
-                data-testid="button-go-dashboard"
-              >
-                {locale === 'ru' ? 'На главную' : 'Go to Dashboard'}
-              </Button>
-            </div>
+              <div className="flex gap-3 w-full pt-2">
+                {(status === 'processing' || status === 'failed') && (
+                  <Button variant="outline" onClick={handleManualRetry} className="flex-1" data-testid="button-retry-check">
+                    {ru ? 'Проверить снова' : 'Check again'}
+                  </Button>
+                )}
+                {status === 'abandoned' ? (
+                  <Button onClick={() => navigate(retryPath())} className="flex-1" data-testid="button-retry-payment">
+                    {ru ? 'Попробовать снова' : 'Try again'}
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate('/dashboard')} className="flex-1" data-testid="button-go-dashboard">
+                    {ru ? 'На главную' : 'Go to dashboard'}
+                  </Button>
+                )}
+              </div>
 
-            {showSupportButton && (
-              <a
-                href={supportUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full"
-                data-testid="link-support"
-              >
-                <Button variant="ghost" className="w-full gap-2">
-                  <MessageCircle className="w-4 h-4" />
-                  {locale === 'ru' ? 'Связаться с поддержкой' : 'Contact Support'}
-                </Button>
-              </a>
-            )}
-          </div>
+              {showSupportButton && (
+                <a href={supportUrl} target="_blank" rel="noopener noreferrer" className="w-full" data-testid="link-support">
+                  <Button variant="ghost" className="w-full gap-2">
+                    <MessageCircle className="w-4 h-4" />
+                    {ru ? 'Написать в поддержку' : 'Contact support'}
+                  </Button>
+                </a>
+              )}
+            </div>
+          )}
         </Card>
       </div>
     </div>

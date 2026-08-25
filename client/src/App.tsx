@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
-import { initTelegram } from '@/lib/telegram';
+import { initTelegram, consumePendingPaymentFromStartParam } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
 import NotFound from '@/pages/not-found';
@@ -40,6 +40,24 @@ function Router() {
 
   useEffect(() => {
     initTelegram();
+  }, []);
+
+  // Возврат из ЮKassa в мини-апп: startapp=pay_<id> → экран результата платежа
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const paymentId = consumePendingPaymentFromStartParam();
+    if (paymentId) navigate(`/payment-success?paymentId=${paymentId}`);
+  }, [isAuthenticated]);
+
+  // Возврат в приложение (после оплаты во внешнем окне, из фона) — обновить баланс и подписку
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments/history'] });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   useEffect(() => {

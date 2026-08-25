@@ -14,9 +14,10 @@ interface Payment {
   energyAmount?: number | null;
   amountRUB: number | null;
   amountTON: string | null;
+  amountStars?: number | null;
   txHash: string | null;
   yookassaPaymentId: string | null;
-  paymentMethod: 'ton' | 'yookassa';
+  paymentMethod: 'ton' | 'yookassa' | 'stars';
   status: string;
   createdAt: string;
 }
@@ -202,6 +203,11 @@ export default function PaymentHistory() {
                           {payment.amountRUB} ₽
                         </span>
                       )}
+                      {payment.paymentMethod === 'stars' && payment.amountStars && (
+                        <span className="font-medium" data-testid={`text-amount-stars-${payment.id}`}>
+                          {payment.amountStars} ⭐
+                        </span>
+                      )}
                       {payment.paymentMethod === 'ton' && payment.amountTON && (
                         <span className="font-medium" data-testid={`text-amount-ton-${payment.id}`}>
                           {parseFloat(payment.amountTON).toFixed(2)} TON
@@ -213,7 +219,7 @@ export default function PaymentHistory() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{t.paymentHistory.paymentMethod || 'Payment Method'}</span>
                     <Badge variant="outline" data-testid={`badge-method-${payment.id}`}>
-                      {payment.paymentMethod === 'ton' ? 'TON' : t.paymentHistory.bankCard || 'Bank Card'}
+                      {payment.paymentMethod === 'ton' ? 'TON' : payment.paymentMethod === 'stars' ? 'Telegram Stars' : t.paymentHistory.bankCard || 'Bank Card'}
                     </Badge>
                   </div>
                   

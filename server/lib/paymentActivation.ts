@@ -39,13 +39,8 @@ export async function activateSucceededYookassaPayment(
   const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./energy');
 
   if (dbPayment.kind === 'energy_pack' && dbPayment.energyAmount) {
-    const user = await storage.getUser(dbPayment.userId);
-    if (user) {
-      const oldEnergy = user.purchasedEnergy || 0;
-      const newEnergy = oldEnergy + dbPayment.energyAmount;
-      await storage.updateUser(dbPayment.userId, { purchasedEnergy: newEnergy });
-      console.log(`[ACTIVATION] Credited energy ${oldEnergy}→${newEnergy} (user ${dbPayment.userId})`);
-    }
+    const { creditPurchasedOrbs } = await import('./energy');
+    await creditPurchasedOrbs(storage, dbPayment.userId, dbPayment.energyAmount, 'yookassa');
 
   } else if (dbPayment.kind === 'subscription' && dbPayment.tier) {
     const normalizedTier = (dbPayment.tier === 'premium' || dbPayment.tier === 'pro') ? 'pro' : 'standard';

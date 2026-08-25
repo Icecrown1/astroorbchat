@@ -455,3 +455,17 @@
 .vg-wobble { animation: vgWobble 1s ease-in-out infinite; }
 .vg-turn45 { transform: rotate(45deg) scale(1.08); }
 @media (prefers-reduced-motion: reduce) { .vg, .vg-spin, .vg-spin-slow, .vg-beat, .vg-swing, .vg-pulse, .vg-wobble { animation: none !important; transform: none !important; } }
+
+/* === Экран результата оплаты: вспышка звёзд вокруг орба === */
+@keyframes psRing { from { transform: scale(.6); opacity: 0; } 60% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
+@keyframes psGlow { 0%,100% { box-shadow: 0 0 40px 6px var(--ps-glow); } 50% { box-shadow: 0 0 64px 14px var(--ps-glow); } }
+@keyframes psBurst {
+  0%   { transform: rotate(var(--a)) translateY(0) scale(.2); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1); opacity: 0; }
+}
+@keyframes psCount { from { opacity: 0; transform: translateY(8px) scale(.94); } to { opacity: 1; transform: none; } }
+.ps-ring { animation: psRing .55s cubic-bezier(.2,.9,.3,1.2) both, psGlow 2.8s ease-in-out .6s infinite; }
+.ps-spark { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; transform-origin: 50% 50%; animation: psBurst 1.15s cubic-bezier(.1,.7,.3,1) both; animation-delay: var(--dl); }
+.ps-count { animation: psCount .5s ease-out .35s both; }
+@media (prefers-reduced-motion: reduce) { .ps-ring, .ps-spark, .ps-count { animation: none !important; } .ps-spark { display: none; } }

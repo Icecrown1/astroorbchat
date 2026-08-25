@@ -351,3 +351,24 @@ export async function getUserOrbs(storage: any, userId: string): Promise<{
     tier,
   };
 }
+
+/**
+ * Зачисление КУПЛЕННЫХ звёзд (Telegram Stars / карта / TON) — единая точка для всех провайдеров.
+ * Идут в пул referralOrbs (бонусные орбы, не сгорают при месячном сбросе), в списании учитываются
+ * вместе с subscriptionOrbs. Легаси-поле purchasedEnergy больше не используется — оно не входило
+ * в баланс орбов, и покупка за карту/TON фактически ничего не давала.
+ */
+export async function creditPurchasedOrbs(
+  storage: any,
+  userId: string,
+  orbs: number,
+  source: 'stars' | 'yookassa' | 'ton'
+): Promise<number> {
+  const user = await storage.getUser(userId);
+  if (!user) throw new Error(`creditPurchasedOrbs: user ${userId} not found`);
+  const current = parseFloat(user.referralOrbs || '0');
+  const next = current + Number(orbs);
+  await storage.updateUser(userId, { referralOrbs: next.toString() });
+  console.log(`[ORBS] +${orbs} purchased orbs via ${source} for ${userId}: ${current} → ${next}`);
+  return next;
+}

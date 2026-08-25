@@ -44,9 +44,37 @@ export async function refundStarPayment(userId: number, telegramPaymentChargeId:
   return !!data.ok;
 }
 
-/** Паки орбов за Telegram Stars: серверный прайс (1⭐TG ≈ 1.3 орба, бонус за объём). */
-export const STARS_ORB_PACKS: Record<string, { tgStars: number; orbs: number }> = {
-  s50: { tgStars: 50, orbs: 65 },
-  s100: { tgStars: 100, orbs: 140 },
-  s250: { tgStars: 250, orbs: 375 },
-};
+/** Паки орбов: единый прайс в shared/orbPacks.ts (Stars/карта/TON). Реэкспорт для совместимости. */
+import { ORB_PACKS } from '@shared/orbPacks';
+export const STARS_ORB_PACKS: Record<string, { tgStars: number; orbs: number }> = Object.fromEntries(
+  ORB_PACKS.map((p) => [p.id, { tgStars: p.stars, orbs: p.orbs }])
+);
+
+let cachedBotUsername: string | null = process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_BOT_USERNAME || null;
+
+/** Username бота (без @) — из Secrets, либо один раз через getMe. */
+export async function getBotUsername(): Promise<string | null> {
+  if (cachedBotUsername) return cachedBotUsername.replace('@', '');
+  try {
+    const res = await fetch(`${API()}/getMe`);
+    const data = await res.json();
+    if (data?.ok && data.result?.username) {
+      cachedBotUsername = data.result.username;
+      return cachedBotUsername;
+    }
+  } catch (e) {
+    console.error('[TG] getMe failed:', e);
+  }
+  return null;
+}
+
+/**
+ * Ссылка возврата после внешней оплаты (ЮKassa): открывает мини-апп ПРЯМО в Telegram
+ * со стартовым параметром pay_<id> — клиент по нему уходит на экран результата платежа.
+ * Фолбэк — обычный URL приложения (если бот недоступен).
+ */
+export async function buildMiniAppReturnUrl(baseUrl: string, paymentId: string): Promise<string> {
+  const username = await getBotUsername();
+  if (username) return `https://t.me/${username}?startapp=pay_${paymentId}`;
+  return `${baseUrl}/payment-success?paymentId=${paymentId}`;
+}
