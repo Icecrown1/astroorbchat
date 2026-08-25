@@ -249,6 +249,7 @@ export default function Subscribe() {
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription_upgrade',
         idempotencyKey,
+        periodMonths: PERIOD_CONFIG[selectedPeriod].months,
         customerEmail: email || null,
         autoRenew: false,
       });
@@ -271,6 +272,7 @@ export default function Subscribe() {
       const response = await apiRequest('POST', '/api/payments/yookassa/create', {
         kind: 'subscription_renewal',
         idempotencyKey,
+        periodMonths: PERIOD_CONFIG[selectedPeriod].months,
         customerEmail: email || null,
         autoRenew: false,
       });
@@ -728,8 +730,8 @@ export default function Subscribe() {
                                 <>
                                   <RotateCcw className="w-4 h-4 mr-2" />
                                   {locale === 'ru'
-                                    ? `Продлить +30 дней за ${upgradePreview?.renewalPrice ?? (tier.tier === 'standard' ? 199 : 399)} ₽`
-                                    : `Renew +30 days for ${upgradePreview?.renewalPrice ?? (tier.tier === 'standard' ? 199 : 399)} ₽`}
+                                    ? `Продлить на ${periodConfig.labelRu} за ${totalPriceRub} ₽`
+                                    : `Renew for ${periodConfig.labelEn} — ${totalPriceRub} ₽`}
                                 </>
                               )}
                             </Button>
@@ -741,9 +743,13 @@ export default function Subscribe() {
                           return (
                             <div className="space-y-2">
                               <div className="text-xs text-muted-foreground text-center px-1">
-                                {locale === 'ru'
-                                  ? `Доплата за ${upgradePreview.remainingDays} оставшихся дней. Дата окончания не меняется. +${upgradePreview.upgradeStarsBonus} звёзд сразу.`
-                                  : `Prorated charge for ${upgradePreview.remainingDays} remaining days. Expiry unchanged. +${upgradePreview.upgradeStarsBonus} stars immediately.`}
+                                {selectedPeriod === 'monthly'
+                                  ? (locale === 'ru'
+                                    ? `Доплата за ${upgradePreview.remainingDays} оставшихся дней. Дата окончания не меняется. +${upgradePreview.upgradeStarsBonus} звёзд сразу.`
+                                    : `Prorated charge for ${upgradePreview.remainingDays} remaining days. Expiry unchanged. +${upgradePreview.upgradeStarsBonus} stars immediately.`)
+                                  : (locale === 'ru'
+                                    ? `Premium на ${periodConfig.labelRu} (${totalPriceRub} ₽) + доплата ${upgradePreview.upgradePrice} ₽ за ${upgradePreview.remainingDays} дн. текущего периода. Срок продлится от текущей даты окончания.`
+                                    : `Premium for ${periodConfig.labelEn} (${totalPriceRub} ₽) + ${upgradePreview.upgradePrice} ₽ prorated for the ${upgradePreview.remainingDays} days left. Term extends from your current expiry.`)}
                               </div>
                               <Button
                                 className="w-full"
@@ -756,9 +762,11 @@ export default function Subscribe() {
                                 ) : (
                                   <>
                                     <TrendingUp className="w-4 h-4 mr-2" />
-                                    {locale === 'ru'
-                                      ? `Апгрейд за ${upgradePreview.upgradePrice} ₽`
-                                      : `Upgrade for ${upgradePreview.upgradePrice} ₽`}
+                                    {selectedPeriod === 'monthly'
+                                      ? (locale === 'ru' ? `Апгрейд за ${upgradePreview.upgradePrice} ₽` : `Upgrade for ${upgradePreview.upgradePrice} ₽`)
+                                      : (locale === 'ru'
+                                        ? `Перейти на Premium за ${(upgradePreview.upgradePrice ?? 0) + totalPriceRub} ₽`
+                                        : `Go Premium for ${(upgradePreview.upgradePrice ?? 0) + totalPriceRub} ₽`)}
                                   </>
                                 )}
                               </Button>
@@ -911,10 +919,14 @@ export default function Subscribe() {
         onConfirm={(email) => {
           upgradeMutation.mutate({ email });
         }}
-        amount={`${upgradePreview?.upgradePrice ?? '...'} ₽`}
-        description={locale === 'ru'
-          ? `Апгрейд до Премиум (доплата за ${upgradePreview?.remainingDays ?? '...'} дн.)`
-          : `Upgrade to Premium (prorated for ${upgradePreview?.remainingDays ?? '...'} days)`}
+        amount={`${(upgradePreview?.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : calculatePeriodPriceRub(SUBSCRIPTION_TIERS[1], selectedPeriod))} ₽`}
+        description={selectedPeriod === 'monthly'
+          ? (locale === 'ru'
+            ? `Апгрейд до Премиум (доплата за ${upgradePreview?.remainingDays ?? '...'} дн.)`
+            : `Upgrade to Premium (prorated for ${upgradePreview?.remainingDays ?? '...'} days)`)
+          : (locale === 'ru'
+            ? `Премиум на ${PERIOD_CONFIG[selectedPeriod].labelRu} + доплата за ${upgradePreview?.remainingDays ?? '...'} дн.`
+            : `Premium for ${PERIOD_CONFIG[selectedPeriod].labelEn} + prorated ${upgradePreview?.remainingDays ?? '...'} days`)}
       />
 
       {/* Email Receipt Dialog — renewal same tier */}
@@ -924,10 +936,10 @@ export default function Subscribe() {
         onConfirm={(email) => {
           renewalMutation.mutate({ email });
         }}
-        amount={`${upgradePreview?.renewalPrice ?? (currentSubscription?.tier === 'standard' ? 199 : 399)} ₽`}
+        amount={`${calculatePeriodPriceRub(SUBSCRIPTION_TIERS[currentSubscription?.tier === 'standard' ? 0 : 1], selectedPeriod)} ₽`}
         description={locale === 'ru'
-          ? `Продление подписки +30 дней`
-          : `Subscription renewal +30 days`}
+          ? `Продление подписки на ${PERIOD_CONFIG[selectedPeriod].labelRu}`
+          : `Subscription renewal for ${PERIOD_CONFIG[selectedPeriod].labelEn}`}
       />
     </div>
   );

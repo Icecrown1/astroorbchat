@@ -3179,6 +3179,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // YooKassa payment endpoints
+  // Цены подписок за месяц по периоду (₽). Клиент показывает те же цифры (Subscribe.tsx → pricesRub)
+  const SUBSCRIPTION_PRICES_PER_MONTH: Record<'standard' | 'premium', Record<number, number>> = {
+    standard: { 1: 199, 6: 159, 12: 99 },
+    premium:  { 1: 399, 6: 359, 12: 179 },
+  };
+  const PERIOD_LABEL_RU: Record<number, string> = { 1: '1 месяц', 6: '6 месяцев', 12: '12 месяцев' };
+
   const createYooKassaPaymentSchema = z.object({
     kind: z.enum(["energy_pack", "subscription", "subscription_upgrade", "subscription_renewal"]),
     pack: z.object({
@@ -3344,12 +3351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const periodMonths = validated.periodMonths || 1;
         const normalizedTier = (validated.tier === 'premium' || validated.tier === 'pro') ? 'premium' : 'standard';
         
-        const subscriptionPricesPerMonth: Record<string, Record<number, number>> = {
-          standard: { 1: 199, 6: 159, 12: 99 },
-          premium:  { 1: 399, 6: 359, 12: 179 },
-        };
-        
-        const tierPrices = subscriptionPricesPerMonth[normalizedTier];
+        const tierPrices = SUBSCRIPTION_PRICES_PER_MONTH[normalizedTier];
         const pricePerMonth = tierPrices[periodMonths as 1 | 6 | 12] || tierPrices[1];
         const totalPrice = pricePerMonth * periodMonths;
         
@@ -3362,27 +3364,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountRUB = totalPrice.toFixed(2);
         tier = normalizedTier === 'premium' ? 'pro' : 'standard';
       } else if (validated.kind === "subscription_upgrade") {
-        // Standard → Premium prorated upgrade: user pays difference for remaining days
+        // Standard → Premium. periodMonths=1: только доплата за оставшиеся дни (срок не меняется).
+        // periodMonths=6/12: доплата за оставшиеся дни + N месяцев Premium, срок продлевается от текущей даты окончания.
         const sub = await storage.getSubscription(userId);
         if (!sub || sub.status !== 'active' || sub.tier !== 'standard') {
           return res.status(400).json({ ok: false, error: "No active Standard subscription to upgrade" });
         }
+        const periodMonths = validated.periodMonths || 1;
         const remainingMs = Math.max(0, new Date(sub.currentPeriodEnd).getTime() - Date.now());
         const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
         const dailyDelta = (399 - 199) / 30;
         const upgradePrice = Math.max(1, Math.ceil(remainingDays * dailyDelta));
-        description = `Апгрейд до Premium (доплата за ${remainingDays} дн.)`;
-        amountRUB = upgradePrice.toFixed(2);
+        if (periodMonths === 1) {
+          description = `Апгрейд до Premium (доплата за ${remainingDays} дн.)`;
+          amountRUB = upgradePrice.toFixed(2);
+        } else {
+          const extension = SUBSCRIPTION_PRICES_PER_MONTH.premium[periodMonths] * periodMonths;
+          description = `Апгрейд до Premium (доплата за ${remainingDays} дн.) + Premium на ${PERIOD_LABEL_RU[periodMonths]}`;
+          amountRUB = (upgradePrice + extension).toFixed(2);
+        }
         tier = 'pro';
       } else if (validated.kind === "subscription_renewal") {
-        // Same-tier renewal: extend subscription by 30 days at monthly price
+        // Продление того же тарифа на 1/6/12 месяцев по цене выбранного периода, от текущей даты окончания
         const sub = await storage.getSubscription(userId);
         if (!sub || sub.status !== 'active') {
           return res.status(400).json({ ok: false, error: "No active subscription to renew" });
         }
-        const renewalPrice = sub.tier === 'standard' ? 199 : 399;
+        const periodMonths = validated.periodMonths || 1;
+        const priceKey = sub.tier === 'standard' ? 'standard' : 'premium';
+        const renewalPrice = SUBSCRIPTION_PRICES_PER_MONTH[priceKey][periodMonths] * periodMonths;
         const tierName = sub.tier === 'standard' ? 'Standard' : 'Premium';
-        description = `Продление подписки ${tierName} (+30 дней)`;
+        description = `Продление подписки ${tierName} на ${PERIOD_LABEL_RU[periodMonths]}`;
         amountRUB = renewalPrice.toFixed(2);
         tier = sub.tier === 'standard' ? 'standard' : 'pro';
       } else {

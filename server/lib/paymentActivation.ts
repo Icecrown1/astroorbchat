@@ -84,13 +84,18 @@ export async function activateSucceededYookassaPayment(
     console.log(`[ACTIVATION] Activated ${normalizedTier} subscription (user ${dbPayment.userId}, period ${periodMonths}mo, orbs ${monthlyOrbs})`);
 
   } else if (dbPayment.kind === 'subscription_upgrade') {
+    const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
     const existingSub = await storage.getSubscription(dbPayment.userId);
     if (existingSub) {
-      await storage.updateSubscription(existingSub.id, {
-        tier: 'pro',
-        status: 'active',
-        paymentProvider: 'yookassa',
-      });
+      const update: any = { tier: 'pro', status: 'active', paymentProvider: 'yookassa' };
+      if (periodMonths > 1) {
+        // Апгрейд + продление: N месяцев Premium от текущей даты окончания
+        const base = new Date(existingSub.currentPeriodEnd) > new Date() ? new Date(existingSub.currentPeriodEnd) : new Date();
+        update.currentPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
+        update.periodMonths = periodMonths;
+        update.amountRUB = dbPayment.amountRUB;
+      }
+      await storage.updateSubscription(existingSub.id, update);
     }
     const user = await storage.getUser(dbPayment.userId);
     if (user) {
@@ -100,19 +105,22 @@ export async function activateSucceededYookassaPayment(
         subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
       });
     }
-    console.log(`[ACTIVATION] Upgraded to Premium (user ${dbPayment.userId})`);
+    console.log(`[ACTIVATION] Upgraded to Premium (user ${dbPayment.userId}, +${periodMonths > 1 ? periodMonths + 'mo' : '0'})`);
 
   } else if (dbPayment.kind === 'subscription_renewal') {
+    const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
     const existingSub = await storage.getSubscription(dbPayment.userId);
     if (existingSub) {
       const base = new Date(existingSub.currentPeriodEnd) > new Date()
         ? new Date(existingSub.currentPeriodEnd)
         : new Date();
-      const newPeriodEnd = dayjs(base).add(30, 'days').toDate();
+      const newPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
       await storage.updateSubscription(existingSub.id, {
         status: 'active',
         currentPeriodEnd: newPeriodEnd,
         paymentProvider: 'yookassa',
+        periodMonths,
+        amountRUB: dbPayment.amountRUB,
       });
       const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
       const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
