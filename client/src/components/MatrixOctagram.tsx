@@ -93,8 +93,8 @@ export function MatrixOctagram({
           <>
             <line
               x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-              stroke={stroke} strokeWidth={w + 9} strokeLinecap="round"
-              filter="url(#mxGlow)"
+              stroke={stroke} strokeWidth={w + 11} strokeLinecap="round"
+              filter="url(#mxLineGlow)"
               className={`mx-breath mx-breath-${b.variant}`}
               style={{ animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s` }}
             />
@@ -122,6 +122,11 @@ export function MatrixOctagram({
         <filter id="mxGlow" x="-80%" y="-80%" width="260%" height="260%">
           <feGaussianBlur stdDeviation="3.2" />
         </filter>
+        {/* Для линий регион фильтра задаём в userSpace: у горизонтальных/вертикальных линий bbox нулевой высоты/ширины,
+            и процентный регион схлопывается — свечение просто не рисуется */}
+        <filter id="mxLineGlow" filterUnits="userSpaceOnUse" x="0" y="0" width="400" height="400">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
       </defs>
       <style>{`
         .matrix-draw { stroke-dasharray: 500; stroke-dashoffset: 500; animation: matrixDraw 1.1s ease-out forwards; }
@@ -129,10 +134,10 @@ export function MatrixOctagram({
         .mx-breath { opacity: 0; animation-name: mxBreath0; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
         .mx-breath-1 { animation-name: mxBreath1; }
         .mx-breath-2 { animation-name: mxBreath2; }
-        @keyframes mxBreath0 { 0%,100% { opacity: .03 } 23% { opacity: .22 } 41% { opacity: .07 } 58% { opacity: .30 } 79% { opacity: .05 } }
-        @keyframes mxBreath1 { 0%,100% { opacity: .04 } 17% { opacity: .12 } 36% { opacity: .28 } 52% { opacity: .06 } 71% { opacity: .18 } 88% { opacity: .09 } }
-        @keyframes mxBreath2 { 0%,100% { opacity: .02 } 31% { opacity: .26 } 47% { opacity: .10 } 63% { opacity: .16 } 84% { opacity: .32 } }
-        @media (prefers-reduced-motion: reduce) { .mx-breath { animation: none !important; opacity: .08; } }
+        @keyframes mxBreath0 { 0%,100% { opacity: .08 } 23% { opacity: .55 } 41% { opacity: .18 } 58% { opacity: .75 } 79% { opacity: .12 } }
+        @keyframes mxBreath1 { 0%,100% { opacity: .10 } 17% { opacity: .30 } 36% { opacity: .70 } 52% { opacity: .15 } 71% { opacity: .45 } 88% { opacity: .22 } }
+        @keyframes mxBreath2 { 0%,100% { opacity: .06 } 31% { opacity: .65 } 47% { opacity: .25 } 63% { opacity: .40 } 84% { opacity: .80 } }
+        @media (prefers-reduced-motion: reduce) { .mx-breath { animation: none !important; opacity: .2; } }
         .matrix-node { cursor: pointer; transition: opacity .25s ease; }
         .matrix-node-active circle:first-of-type { animation: matrixPulse 1.6s ease-in-out infinite; }
         @keyframes matrixPulse { 0%,100% { stroke-width: 2 } 50% { stroke-width: 4 } }
