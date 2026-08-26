@@ -132,7 +132,7 @@ export default function Matrix() {
         ) : (
           <>
             {/* Фильтры зон */}
-            <div className="mb-3 flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 mx-no-scrollbar">
               {ZONES.map((z) => (
                 <button
                   key={z.id}

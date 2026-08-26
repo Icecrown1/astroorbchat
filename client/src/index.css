@@ -486,3 +486,7 @@
   .pill-breath, .pill-breath .pill-plus { animation: none !important; }
   .pill-breath .pill-plus { opacity: .7; }
 }
+
+/* Горизонтальный ряд фильтров без видимой полосы прокрутки */
+.mx-no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.mx-no-scrollbar::-webkit-scrollbar { display: none; }

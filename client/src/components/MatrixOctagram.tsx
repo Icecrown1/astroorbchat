@@ -134,9 +134,10 @@ export function MatrixOctagram({
         .mx-breath { opacity: 0; animation-name: mxBreath0; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
         .mx-breath-1 { animation-name: mxBreath1; }
         .mx-breath-2 { animation-name: mxBreath2; }
-        @keyframes mxBreath0 { 0%,100% { opacity: .08 } 23% { opacity: .55 } 41% { opacity: .18 } 58% { opacity: .75 } 79% { opacity: .12 } }
-        @keyframes mxBreath1 { 0%,100% { opacity: .10 } 17% { opacity: .30 } 36% { opacity: .70 } 52% { opacity: .15 } 71% { opacity: .45 } 88% { opacity: .22 } }
-        @keyframes mxBreath2 { 0%,100% { opacity: .06 } 31% { opacity: .65 } 47% { opacity: .25 } 63% { opacity: .40 } 84% { opacity: .80 } }
+        /* Цикл 23–44 с, но сам «вдох» короткий (~3–4 с): длинный покой, один-два быстрых плавных подъёма */
+        @keyframes mxBreath0 { 0%,100% { opacity: .08 } 20% { opacity: .08 } 26% { opacity: .70 } 33% { opacity: .08 } 72% { opacity: .08 } 77% { opacity: .40 } 83% { opacity: .08 } }
+        @keyframes mxBreath1 { 0%,100% { opacity: .08 } 44% { opacity: .08 } 51% { opacity: .75 } 58% { opacity: .08 } }
+        @keyframes mxBreath2 { 0%,100% { opacity: .08 } 8% { opacity: .08 } 13% { opacity: .45 } 19% { opacity: .08 } 60% { opacity: .08 } 66% { opacity: .80 } 74% { opacity: .08 } }
         @media (prefers-reduced-motion: reduce) { .mx-breath { animation: none !important; opacity: .2; } }
         .matrix-node { cursor: pointer; transition: opacity .25s ease; }
         .matrix-node-active circle:first-of-type { animation: matrixPulse 1.6s ease-in-out infinite; }
