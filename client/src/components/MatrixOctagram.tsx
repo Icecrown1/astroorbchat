@@ -74,11 +74,11 @@ export function MatrixOctagram({
   // «Дыхание» линий: каждая линия живёт в своём ритме — длительности взаимно простые,
   // фазы разные, кривая с несколькими неравными пиками → переливается хаотично, но плавно.
   let breathIdx = 0;
-  const BREATH_DURATIONS = [7.3, 9.1, 11.7, 8.3, 10.9, 6.7, 12.5, 9.7, 7.9, 11.1, 8.9, 10.3, 7.1, 12.1];
+  const BREATH_DURATIONS = [26, 33, 41, 29, 38, 23, 44, 35, 27, 39, 31, 37, 25, 43];
   const breathParams = () => {
     const i = breathIdx++;
     const dur = BREATH_DURATIONS[i % BREATH_DURATIONS.length];
-    const delay = -((i * 3.37) % dur); // отрицательная задержка = старт с разных фаз
+    const delay = -((i * 11.37) % dur); // отрицательная задержка = старт с разных фаз
     const variant = i % 3; // три разных кривых
     return { dur, delay, variant };
   };
