@@ -71,13 +71,35 @@ export function MatrixOctagram({
   const dim = (zones: MatrixZone[]) => zone !== 'all' && !zones.includes(zone);
   const nodeOpacity = (n: OctagramNode) => (dim(n.zones) ? 0.22 : 1);
 
+  // «Дыхание» линий: каждая линия живёт в своём ритме — длительности взаимно простые,
+  // фазы разные, кривая с несколькими неравными пиками → переливается хаотично, но плавно.
+  let breathIdx = 0;
+  const BREATH_DURATIONS = [7.3, 9.1, 11.7, 8.3, 10.9, 6.7, 12.5, 9.7, 7.9, 11.1, 8.9, 10.3, 7.1, 12.1];
+  const breathParams = () => {
+    const i = breathIdx++;
+    const dur = BREATH_DURATIONS[i % BREATH_DURATIONS.length];
+    const delay = -((i * 3.37) % dur); // отрицательная задержка = старт с разных фаз
+    const variant = i % 3; // три разных кривых
+    return { dur, delay, variant };
+  };
+
   const line = (id1: string, id2: string, stroke: string, zones: MatrixZone[], w = 1.4, dash?: string) => {
     const p1 = byId(id1);
     const p2 = byId(id2);
+    const b = breathParams();
     return (
       <g key={`${id1}-${id2}`}>
         {!dim(zones) && (
-          <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={w + 4} opacity={0.14} />
+          <>
+            <line
+              x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+              stroke={stroke} strokeWidth={w + 9} strokeLinecap="round"
+              filter="url(#mxGlow)"
+              className={`mx-breath mx-breath-${b.variant}`}
+              style={{ animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s` }}
+            />
+            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={stroke} strokeWidth={w + 4} opacity={0.14} />
+          </>
         )}
       <line
         x1={p1.x}
@@ -104,6 +126,13 @@ export function MatrixOctagram({
       <style>{`
         .matrix-draw { stroke-dasharray: 500; stroke-dashoffset: 500; animation: matrixDraw 1.1s ease-out forwards; }
         @keyframes matrixDraw { to { stroke-dashoffset: 0; } }
+        .mx-breath { opacity: 0; animation-name: mxBreath0; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+        .mx-breath-1 { animation-name: mxBreath1; }
+        .mx-breath-2 { animation-name: mxBreath2; }
+        @keyframes mxBreath0 { 0%,100% { opacity: .03 } 23% { opacity: .22 } 41% { opacity: .07 } 58% { opacity: .30 } 79% { opacity: .05 } }
+        @keyframes mxBreath1 { 0%,100% { opacity: .04 } 17% { opacity: .12 } 36% { opacity: .28 } 52% { opacity: .06 } 71% { opacity: .18 } 88% { opacity: .09 } }
+        @keyframes mxBreath2 { 0%,100% { opacity: .02 } 31% { opacity: .26 } 47% { opacity: .10 } 63% { opacity: .16 } 84% { opacity: .32 } }
+        @media (prefers-reduced-motion: reduce) { .mx-breath { animation: none !important; opacity: .08; } }
         .matrix-node { cursor: pointer; transition: opacity .25s ease; }
         .matrix-node-active circle:first-of-type { animation: matrixPulse 1.6s ease-in-out infinite; }
         @keyframes matrixPulse { 0%,100% { stroke-width: 2 } 50% { stroke-width: 4 } }
