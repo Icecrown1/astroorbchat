@@ -164,6 +164,8 @@ export const payments = pgTable("payments", {
   kind: varchar("kind", { length: 50 }).notNull(),
   tier: varchar("tier", { length: 20 }),
   energyAmount: integer("energy_amount"),
+  periodMonths: integer("period_months"), // подписка: 1/6/12
+  mode: varchar("mode", { length: 20 }), // подписка: new | renew | upgrade
   amountUSD: decimal("amount_usd", { precision: 10, scale: 2 }).notNull(),
   amountTON: decimal("amount_ton", { precision: 18, scale: 9 }).notNull(),
   txHash: varchar("tx_hash", { length: 255 }).notNull().unique(),

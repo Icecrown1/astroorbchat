@@ -2760,7 +2760,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     kind: z.enum(["energy_pack", "subscription"]),
     tier: z.enum(["standard", "pro", "premium"]).optional(),
     energyAmount: z.number().optional(),
-    amountUSD: z.number(),
+    amountUSD: z.number().optional().default(0), // цена считается на сервере
+    months: z.number().optional(),
+    mode: z.enum(["new", "renew", "upgrade"]).optional(),
     userWalletAddress: z.string().optional(), // TON wallet address of sender
   });
 
@@ -2777,12 +2779,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = createPaymentSchema.parse(req.body);
 
       // Паки звёзд: цена берётся с сервера (shared/orbPacks), клиентский amountUSD игнорируется
+      let subMonths: PeriodMonths = 1;
+      let subMode: 'new' | 'renew' | 'upgrade' = 'new';
       if (validated.kind === "energy_pack") {
         const orbPack = getOrbPackByOrbs(validated.energyAmount);
         if (!orbPack) {
           return res.status(400).json({ ok: false, error: "Invalid energy pack" });
         }
         validated.amountUSD = orbPack.usd;
+      } else {
+        // Подписка: цена в ₽ из shared/subscriptionPrices → USD по курсу ЦБ (клиентский amountUSD не используется)
+        if (!validated.tier) return res.status(400).json({ ok: false, error: "tier required" });
+        if (![1, 6, 12].includes(validated.months || 1)) return res.status(400).json({ ok: false, error: "invalid_period" });
+        subMonths = (validated.months || 1) as PeriodMonths;
+        subMode = validated.mode || 'new';
+        const paidTier = normalizePaidTier(validated.tier);
+        const sub = await storage.getSubscription(userId);
+        const subActive = !!sub && sub.status === 'active' && new Date(sub.currentPeriodEnd) > new Date();
+        let rub = 0;
+        if (subMode === 'renew') {
+          if (!subActive) return res.status(400).json({ ok: false, error: "no_active_subscription" });
+          rub = subscriptionRub(normalizePaidTier(sub!.tier), subMonths);
+        } else if (subMode === 'upgrade') {
+          if (!subActive || sub!.tier !== 'standard') return res.status(400).json({ ok: false, error: "no_standard_to_upgrade" });
+          const remainingDays = Math.ceil(Math.max(0, new Date(sub!.currentPeriodEnd).getTime() - Date.now()) / 86400000);
+          rub = upgradeRub(remainingDays) + (subMonths > 1 ? subscriptionRub('premium', subMonths) : 0);
+        } else {
+          rub = subscriptionRub(paidTier, subMonths);
+        }
+        const { getUsdRubRate } = await import('./lib/exchangeRates');
+        const usdRub = (await getUsdRubRate()).rate;
+        validated.amountUSD = Math.round((rub / usdRub) * 100) / 100;
       }
 
       if (!process.env.TON_WALLET_ADDRESS) {
@@ -2826,6 +2853,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kind: validated.kind,
         tier: normalizedPaymentTier,
         energyAmount: validated.energyAmount || null,
+        periodMonths: validated.kind === 'subscription' ? subMonths : null,
+        mode: validated.kind === 'subscription' ? subMode : null,
         amountUSD: validated.amountUSD.toString(),
         amountTON: (parseFloat(amountTON) / 1_000_000_000).toString(),
         txHash: `pending_${Date.now()}`,
@@ -2936,13 +2965,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment.kind === "energy_pack" && payment.energyAmount) {
         await creditPurchasedOrbs(storage, userId, payment.energyAmount, 'ton');
       } else if (payment.kind === "subscription" && payment.tier) {
-        // Раньше здесь подписка НЕ активировалась (только помечался платёж) — единая точка активации
-        await activateSubscriptionForUser(storage, {
-          userId,
-          tier: payment.tier as any,
-          periodMonths: 1,
-          source: 'ton',
-        });
+        const { applySubscriptionUpgrade, applySubscriptionRenewal } = await import("./lib/paymentActivation");
+        const months = payment.periodMonths || 1;
+        const rubStr = null;
+        if (payment.mode === 'upgrade') {
+          await applySubscriptionUpgrade(storage, userId, months, 'ton', { amountRUB: rubStr });
+        } else if (payment.mode === 'renew') {
+          await applySubscriptionRenewal(storage, userId, months, 'ton', { amountRUB: rubStr });
+        } else {
+          const cur = await storage.getSubscription(userId);
+          const curActive = !!cur && cur.status === 'active' && new Date(cur.currentPeriodEnd) > new Date();
+          const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
+          if (curActive && rank(cur!.tier) > rank(payment.tier)) {
+            await storage.updateSubscription(cur!.id, {
+              scheduledTier: payment.tier, scheduledPeriodMonths: months, scheduledAmountRUB: null, autoRenew: false,
+            });
+          } else {
+            await activateSubscriptionForUser(storage, {
+              userId: userId, tier: payment.tier as any, periodMonths: months, source: 'ton', meta: { extend: true },
+            });
+          }
+        }
       }
 
       // Update payment status with verified txHash
@@ -3118,12 +3161,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment.kind === "energy_pack" && payment.energyAmount) {
         await creditPurchasedOrbs(storage, payment.userId, payment.energyAmount, 'ton');
       } else if (payment.kind === "subscription" && payment.tier) {
-        await activateSubscriptionForUser(storage, {
-          userId: payment.userId,
-          tier: payment.tier as any,
-          periodMonths: 1,
-          source: 'ton',
-        });
+        const { applySubscriptionUpgrade, applySubscriptionRenewal } = await import("./lib/paymentActivation");
+        const months = payment.periodMonths || 1;
+        const rubStr = null;
+        if (payment.mode === 'upgrade') {
+          await applySubscriptionUpgrade(storage, payment.userId, months, 'ton', { amountRUB: rubStr });
+        } else if (payment.mode === 'renew') {
+          await applySubscriptionRenewal(storage, payment.userId, months, 'ton', { amountRUB: rubStr });
+        } else {
+          const cur = await storage.getSubscription(payment.userId);
+          const curActive = !!cur && cur.status === 'active' && new Date(cur.currentPeriodEnd) > new Date();
+          const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
+          if (curActive && rank(cur!.tier) > rank(payment.tier)) {
+            await storage.updateSubscription(cur!.id, {
+              scheduledTier: payment.tier, scheduledPeriodMonths: months, scheduledAmountRUB: null, autoRenew: false,
+            });
+          } else {
+            await activateSubscriptionForUser(storage, {
+              userId: payment.userId, tier: payment.tier as any, periodMonths: months, source: 'ton', meta: { extend: true },
+            });
+          }
+        }
       }
 
       res.json({ ok: true });

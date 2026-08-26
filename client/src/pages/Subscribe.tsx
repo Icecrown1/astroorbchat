@@ -133,7 +133,7 @@ export default function Subscribe() {
   const walletConnected = !!wallet;
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('annual');
-  const [pendingTonTier, setPendingTonTier] = useState<{ tier: SubscriptionTier; period: SubscriptionPeriod } | null>(null);
+  const [pendingTonTier, setPendingTonTier] = useState<{ tier: SubscriptionTier; period: SubscriptionPeriod; mode?: 'new' | 'renew' | 'upgrade' } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
   const [yookassaIdempotencyKey, setYookassaIdempotencyKey] = useState<string | null>(null);
@@ -177,17 +177,17 @@ export default function Subscribe() {
   });
   const upgradePreview = upgradePreviewData?.data;
 
+  type TonSubArgs = { tier: SubscriptionTier; period: SubscriptionPeriod; mode?: 'new' | 'renew' | 'upgrade' };
   const mutation = useMutation({
-    mutationFn: async ({ tier, period }: { tier: SubscriptionTier; period: SubscriptionPeriod }) => {
+    mutationFn: async ({ tier, period, mode }: TonSubArgs) => {
       const periodConfig = PERIOD_CONFIG[period];
-      const totalPriceRub = calculatePeriodPriceRub(tier, period);
-      const totalPriceUsd = totalPriceRub / (exchangeRatesData?.data?.usdRub?.rate || 78.5);
+      // Цена считается на сервере (₽ → USD по ЦБ → GRAM); здесь только тариф, период и режим
       const response = await apiRequest('POST', '/api/payments/ton/create', {
         kind: 'subscription',
         tier: tier.tier,
-        amountUSD: totalPriceUsd,
         period: period,
         months: periodConfig.months,
+        mode: mode || 'new',
       });
       if (!response.ok) throw new Error(response.error || t.errors.calculationFailed);
       return response.data;
@@ -331,6 +331,34 @@ export default function Subscribe() {
   const insideTelegram = !!(window as any)?.Telegram?.WebApp?.initData;
   // Stars = ceil(₽); месячная новая — 200/400 recurring
   const starsPrice = (rub: number) => Math.max(1, Math.ceil(rub));
+  const gramLabel = (rub: number) => {
+    const rate = exchangeRatesData?.data?.usdRub?.rate || 84;
+    const ton = exchangeRatesData?.data?.tonUsd?.rate;
+    return ton ? `${((rub / rate) / ton).toFixed(2)} GRAM` : 'GRAM';
+  };
+  const GramButton = ({ label, tier, mode, disabled, testId }: { label: string; tier: SubscriptionTier; mode: 'new' | 'renew' | 'upgrade'; disabled?: boolean; testId: string }) => (
+    <Button
+      className="w-full"
+      variant="outline"
+      onClick={(e) => {
+        e.stopPropagation();
+        haptic.impact('light');
+        setSelectedTier(tier.tier);
+        if (!walletConnected) {
+          setPendingTonTier({ tier, period: selectedPeriod, mode });
+          tonConnectUI.openModal();
+        } else {
+          mutation.mutate({ tier, period: selectedPeriod, mode });
+        }
+      }}
+      disabled={disabled || mutation.isPending}
+      data-testid={testId}
+    >
+      {mutation.isPending && selectedTier === tier.tier
+        ? <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+        : <><Wallet className="w-4 h-4 mr-2" />{label}</>}
+    </Button>
+  );
   const StarsButton = ({ label, args, primary, disabled, testId }: { label: string; args: StarsSubArgs; primary?: boolean; disabled?: boolean; testId: string }) => (
     <Button
       className="w-full"
@@ -812,6 +840,11 @@ export default function Subscribe() {
                                 label={locale === 'ru' ? `Продлить за ${starsPrice(totalPriceRub)} ⭐` : `Renew for ${starsPrice(totalPriceRub)} ⭐`}
                               />
                             )}
+                            <GramButton
+                              testId={`button-renew-ton-${tier.tier}`}
+                              tier={tier} mode="renew"
+                              label={locale === 'ru' ? `Продлить за ${gramLabel(totalPriceRub)}` : `Renew for ${gramLabel(totalPriceRub)}`}
+                            />
                             <Button
                               className="w-full"
                               variant="outline"
@@ -855,6 +888,13 @@ export default function Subscribe() {
                                   ? `Апгрейд за ${starsPrice((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))} ⭐`
                                   : `Upgrade for ${starsPrice((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))} ⭐`}
                               />
+                              <GramButton
+                                testId={`button-upgrade-ton-${tier.tier}`}
+                                tier={tier} mode="upgrade"
+                                label={locale === 'ru'
+                                  ? `Апгрейд за ${gramLabel((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))}`
+                                  : `Upgrade for ${gramLabel((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))}`}
+                              />
                               <Button
                                 className="w-full"
                                 variant="outline"
@@ -897,6 +937,11 @@ export default function Subscribe() {
                                 disabled={alreadyScheduled}
                                 args={{ tier: tier.tier as 'standard' | 'premium', periodMonths: PERIOD_CONFIG[selectedPeriod].months, mode: 'new' }}
                                 label={locale === 'ru' ? `Standard с ${startsAt} за ${starsPrice(totalPriceRub)} ⭐` : `Standard from ${startsAt} for ${starsPrice(totalPriceRub)} ⭐`}
+                              />
+                              <GramButton
+                                testId={`button-schedule-ton-${tier.tier}`}
+                                tier={tier} mode="new" disabled={alreadyScheduled}
+                                label={locale === 'ru' ? `Standard с ${startsAt} за ${gramLabel(totalPriceRub)}` : `Standard from ${startsAt} for ${gramLabel(totalPriceRub)}`}
                               />
                               <Button
                                 className="w-full"
@@ -949,7 +994,7 @@ export default function Subscribe() {
                               ) : !walletConnected ? (
                                 <><Wallet className="w-4 h-4 mr-2" />{locale === 'ru' ? 'Подключить кошелек' : 'Connect Wallet'}</>
                               ) : (
-                                <><CreditCard className="w-4 h-4 mr-2" />{t.subscribe.subscribeWith}</>
+                                <><Wallet className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оплатить ${gramLabel(totalPriceRub)}` : `Pay ${gramLabel(totalPriceRub)}`}</>
                               )}
                             </Button>
                             <Button
