@@ -26,8 +26,9 @@ export async function createStarsInvoiceLink(params: {
   return data.result as string;
 }
 
-/** Цены star-подписок (⭐ за 30 дней). Эквивалент 199/399 ₽ по ~1.06 ₽/⭐, округлено вверх. */
-export const STARS_SUB_PRICES: Record<'standard' | 'premium', number> = { standard: 200, premium: 400 };
+/** Цены месячных star-подписок — из shared/subscriptionPrices (реэкспорт) */
+export { STARS_SUB_PRICES } from '@shared/subscriptionPrices';
+import { STARS_SUB_PRICES as _SUB } from '@shared/subscriptionPrices';
 /** Telegram принимает только ровно 30 дней для подписок в Stars */
 export const STARS_SUB_PERIOD_SECONDS = 2592000;
 
@@ -39,7 +40,7 @@ export async function createStarsSubscriptionLink(params: {
   tier: 'standard' | 'premium';
   userId: string;
 }): Promise<string> {
-  const stars = STARS_SUB_PRICES[params.tier];
+  const stars = _SUB[params.tier];
   const title = params.tier === 'premium' ? 'Astro Orb Premium' : 'Astro Orb Standard';
   const description = params.tier === 'premium'
     ? 'Подписка Premium на 30 дней: 550 звёзд в месяц, все функции включая Соляр. Продлевается автоматически.'

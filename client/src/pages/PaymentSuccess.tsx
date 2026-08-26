@@ -282,7 +282,11 @@ export default function PaymentSuccess() {
       {isSub ? (
         <>
           <h1 className="ps-count text-3xl font-display font-bold leading-tight" data-testid="text-payment-title">
-            {tierLabel} {isScheduled ? (ru ? 'оплачен' : 'is paid') : (ru ? 'активирован' : 'is active')}
+            {tierLabel} {isScheduled
+              ? (ru ? 'оплачен' : 'is paid')
+              : params.get('mode') === 'renew'
+                ? (ru ? 'продлён' : 'renewed')
+                : (ru ? 'активирован' : 'is active')}
           </h1>
           <p className="ps-count text-muted-foreground mt-3" data-testid="text-payment-message">
             {isScheduled && periodEnd

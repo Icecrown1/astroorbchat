@@ -38,6 +38,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
 import { ORB_PACKS, getOrbPack, getOrbPackByOrbs } from "@shared/orbPacks";
+import { SUBSCRIPTION_PRICES_PER_MONTH, PERIOD_LABEL_RU, STARS_SUB_PRICES, subscriptionRub, upgradeRub, starsForRub, normalizePaidTier, type PeriodMonths } from "@shared/subscriptionPrices";
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 
@@ -3132,12 +3133,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // YooKassa payment endpoints
-  // Цены подписок за месяц по периоду (₽). Клиент показывает те же цифры (Subscribe.tsx → pricesRub)
-  const SUBSCRIPTION_PRICES_PER_MONTH: Record<'standard' | 'premium', Record<number, number>> = {
-    standard: { 1: 199, 6: 159, 12: 99 },
-    premium:  { 1: 399, 6: 359, 12: 179 },
-  };
-  const PERIOD_LABEL_RU: Record<number, string> = { 1: '1 месяц', 6: '6 месяцев', 12: '12 месяцев' };
 
   const createYooKassaPaymentSchema = z.object({
     kind: z.enum(["energy_pack", "subscription", "subscription_upgrade", "subscription_renewal"]),
@@ -3316,7 +3311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           scheduledStart = new Date(activeSub.currentPeriodEnd);
         }
         
-        const tierPrices = SUBSCRIPTION_PRICES_PER_MONTH[normalizedTier];
+        const tierPrices = SUBSCRIPTION_PRICES_PER_MONTH[normalizedTier] as Record<number, number>;
         const pricePerMonth = tierPrices[periodMonths as 1 | 6 | 12] || tierPrices[1];
         const totalPrice = pricePerMonth * periodMonths;
         
@@ -3340,14 +3335,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const periodMonths = validated.periodMonths || 1;
         const remainingMs = Math.max(0, new Date(sub.currentPeriodEnd).getTime() - Date.now());
         const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
-        const dailyDelta = (399 - 199) / 30;
-        const upgradePrice = Math.max(1, Math.ceil(remainingDays * dailyDelta));
+        const upgradePrice = upgradeRub(remainingDays);
         if (periodMonths === 1) {
           description = `Апгрейд до Premium (доплата за ${remainingDays} дн.)`;
           amountRUB = upgradePrice.toFixed(2);
         } else {
-          const extension = SUBSCRIPTION_PRICES_PER_MONTH.premium[periodMonths] * periodMonths;
-          description = `Апгрейд до Premium (доплата за ${remainingDays} дн.) + Premium на ${PERIOD_LABEL_RU[periodMonths]}`;
+          const extension = subscriptionRub('premium', periodMonths as PeriodMonths);
+          description = `Апгрейд до Premium (доплата за ${remainingDays} дн.) + Premium на ${PERIOD_LABEL_RU[periodMonths as PeriodMonths]}`;
           amountRUB = (upgradePrice + extension).toFixed(2);
         }
         tier = 'pro';
@@ -3358,10 +3352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ ok: false, error: "No active subscription to renew" });
         }
         const periodMonths = validated.periodMonths || 1;
-        const priceKey = sub.tier === 'standard' ? 'standard' : 'premium';
-        const renewalPrice = SUBSCRIPTION_PRICES_PER_MONTH[priceKey][periodMonths] * periodMonths;
+        const renewalPrice = subscriptionRub(normalizePaidTier(sub.tier), periodMonths as PeriodMonths);
         const tierName = sub.tier === 'standard' ? 'Standard' : 'Premium';
-        description = `Продление подписки ${tierName} на ${PERIOD_LABEL_RU[periodMonths]}`;
+        description = `Продление подписки ${tierName} на ${PERIOD_LABEL_RU[periodMonths as PeriodMonths]}`;
         amountRUB = renewalPrice.toFixed(2);
         tier = sub.tier === 'standard' ? 'standard' : 'pro';
       } else {
@@ -3733,24 +3726,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Star-подписка (30 дней, автопродление на стороне Telegram)
+  // Подписка за Stars. mode=new (1 мес → recurring 30 дней; 6/12 → разовый инвойс),
+  // mode=renew (продление на N мес), mode=upgrade (Standard→Premium: доплата + N мес). Цена = ceil(₽).
   app.post("/api/payments/stars/create-subscription", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
       const tier = String(req.body?.tier || '');
-      if (tier !== 'standard' && tier !== 'premium') {
-        return res.status(400).json({ ok: false, error: "invalid_tier" });
-      }
-      // Уже активная star-подписка того же или высшего тира — не даём оформить вторую
+      const periodMonths = Number(req.body?.periodMonths) || 1;
+      const mode = String(req.body?.mode || 'new');
+      if (tier !== 'standard' && tier !== 'premium') return res.status(400).json({ ok: false, error: "invalid_tier" });
+      if (![1, 6, 12].includes(periodMonths)) return res.status(400).json({ ok: false, error: "invalid_period" });
+      if (!['new', 'renew', 'upgrade'].includes(mode)) return res.status(400).json({ ok: false, error: "invalid_mode" });
+      const months = periodMonths as PeriodMonths;
+
+      const { createStarsSubscriptionLink, createStarsInvoiceLink } = await import("./lib/telegramStars");
       const sub = await storage.getSubscription(userId);
-      if (sub && sub.status === 'active' && sub.paymentProvider === 'stars' && new Date(sub.currentPeriodEnd) > new Date()) {
-        const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : 1);
-        if (rank(sub.tier) >= rank(tier)) {
+      const subActive = !!sub && sub.status === 'active' && new Date(sub.currentPeriodEnd) > new Date();
+      const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
+
+      // Новая месячная — recurring (Telegram продлевает сам)
+      if (mode === 'new' && months === 1) {
+        if (subActive && sub!.paymentProvider === 'stars' && rank(sub!.tier) >= rank(tier)) {
           return res.status(409).json({ ok: false, error: "stars_subscription_active" });
         }
+        const link = await createStarsSubscriptionLink({ tier, userId });
+        return res.json({ ok: true, link, stars: STARS_SUB_PRICES[tier], recurring: true });
       }
-      const { createStarsSubscriptionLink, STARS_SUB_PRICES } = await import("./lib/telegramStars");
-      const link = await createStarsSubscriptionLink({ tier, userId });
-      return res.json({ ok: true, link, stars: STARS_SUB_PRICES[tier] });
+
+      let rub = 0;
+      let title = '';
+      let description = '';
+      let ext: PeriodMonths | 0 = months;
+      if (mode === 'new') {
+        rub = subscriptionRub(tier, months);
+        title = `Astro Orb ${tier === 'premium' ? 'Premium' : 'Standard'} — ${PERIOD_LABEL_RU[months]}`;
+        description = subActive && rank(sub!.tier) > rank(tier)
+          ? `Подписка ${tier === 'premium' ? 'Premium' : 'Standard'} на ${PERIOD_LABEL_RU[months]}, стартует после окончания текущей`
+          : `Подписка ${tier === 'premium' ? 'Premium' : 'Standard'} на ${PERIOD_LABEL_RU[months]}`;
+      } else if (mode === 'renew') {
+        if (!subActive) return res.status(400).json({ ok: false, error: "no_active_subscription" });
+        const curTier = normalizePaidTier(sub!.tier);
+        rub = subscriptionRub(curTier, months);
+        title = `Продление ${curTier === 'premium' ? 'Premium' : 'Standard'} — ${PERIOD_LABEL_RU[months]}`;
+        description = `Подписка продлится на ${PERIOD_LABEL_RU[months]} от текущей даты окончания`;
+      } else {
+        if (!subActive || sub!.tier !== 'standard') return res.status(400).json({ ok: false, error: "no_standard_to_upgrade" });
+        const remainingDays = Math.ceil(Math.max(0, new Date(sub!.currentPeriodEnd).getTime() - Date.now()) / 86400000);
+        rub = upgradeRub(remainingDays) + (months > 1 ? subscriptionRub('premium', months) : 0);
+        ext = months > 1 ? months : 0;
+        title = months > 1 ? `Premium: апгрейд + ${PERIOD_LABEL_RU[months]}` : 'Апгрейд до Premium';
+        description = months > 1
+          ? `Доплата за ${remainingDays} дн. текущего периода + Premium на ${PERIOD_LABEL_RU[months]}`
+          : `Доплата за ${remainingDays} оставшихся дней, дата окончания не меняется`;
+      }
+      const stars = starsForRub(rub);
+      const payload = JSON.stringify({ t: 'subonce', u: userId, tier, m: months, mode, ext, rub });
+      const link = await createStarsInvoiceLink({ title, description, payload, stars });
+      return res.json({ ok: true, link, stars, recurring: false });
     } catch (e: any) {
       console.error("[STARS] create-subscription error:", e);
       return res.status(500).json({ ok: false, error: "stars_subscription_failed" });
@@ -3792,6 +3824,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await creditPurchasedOrbs(storage, payload.u, Number(payload.o), 'stars');
           } catch (creditErr) {
             console.error("[STARS] credit failed", payload, creditErr);
+          }
+        } else if (payload.t === "subonce" && payload.u && (payload.tier === 'standard' || payload.tier === 'premium')) {
+          // Разовая оплата подписки звёздами: новая на 6/12 мес, продление, апгрейд
+          try {
+            const { applySubscriptionUpgrade, applySubscriptionRenewal } = await import("./lib/paymentActivation");
+            const months = Number(payload.m) || 1;
+            const rubStr = payload.rub ? Number(payload.rub).toFixed(2) : null;
+            if (payload.mode === 'upgrade') {
+              await applySubscriptionUpgrade(storage, payload.u, months, 'stars', { amountRUB: rubStr, starsChargeId: chargeId });
+            } else if (payload.mode === 'renew') {
+              await applySubscriptionRenewal(storage, payload.u, months, 'stars', { amountRUB: rubStr, starsChargeId: chargeId });
+            } else {
+              const cur = await storage.getSubscription(payload.u);
+              const curActive = !!cur && cur.status === 'active' && new Date(cur.currentPeriodEnd) > new Date();
+              const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
+              if (curActive && rank(cur!.tier) > rank(payload.tier)) {
+                // Оплаченный даунгрейд — после текущей
+                await storage.updateSubscription(cur!.id, {
+                  scheduledTier: payload.tier === 'premium' ? 'pro' : 'standard',
+                  scheduledPeriodMonths: months, scheduledAmountRUB: rubStr, autoRenew: false,
+                });
+                console.log(`[STARS] Scheduled ${payload.tier} x${months}mo after ${cur!.currentPeriodEnd} (user ${payload.u})`);
+              } else {
+                await activateSubscriptionForUser(storage, {
+                  userId: payload.u, tier: payload.tier, periodMonths: months, source: 'stars',
+                  meta: { starsChargeId: chargeId, amountRUB: rubStr, autoRenew: false, extend: true },
+                });
+              }
+            }
+          } catch (subErr) {
+            console.error("[STARS] subonce activation failed", payload, subErr);
+            try {
+              const { sendSupportAlert } = await import("./lib/support");
+              await sendSupportAlert("Stars: разовая подписка оплачена, активация упала", `user ${payload.u}, ${JSON.stringify(payload)}, charge ${chargeId}: ${String(subErr)}`);
+            } catch { /* noop */ }
           }
         } else if (payload.t === "sub" && payload.u && (payload.tier === 'standard' || payload.tier === 'premium')) {
           // Первая оплата и каждое автопродление приходят одинаково (is_recurring / is_first_recurring).
@@ -3968,7 +4035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             chargeId: r.eventId,
             userId: inv.u || null,
             tgUserId: r.payload?.message?.from?.id || null,
-            type: inv.t === 'sub' ? 'subscription' : 'orbs',
+            type: (inv.t === 'sub' || inv.t === 'subonce') ? 'subscription' : 'orbs',
+            months: inv.t === 'subonce' ? Number(inv.m) || 1 : (inv.t === 'sub' ? 1 : null),
             tier: inv.tier || null,
             orbs: inv.o ? Number(inv.o) : null,
             stars: Number(sp.total_amount) || null,
@@ -4016,17 +4084,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const current = parseFloat(user.referralOrbs || '0');
         await storage.updateUser(userId, { referralOrbs: Math.max(0, current - Number(inv.o)).toString() });
         rollback = `-${inv.o} orbs`;
-      } else if (inv.t === 'sub') {
+      } else if (inv.t === 'subonce' && inv.mode === 'upgrade') {
+        // Откат апгрейда: тир обратно Standard, −300 бонусных орбов, минус продление (если было)
         const sub = await storage.getSubscription(userId);
         if (sub) {
-          const newEnd = dayjs(sub.currentPeriodEnd).subtract(30, 'day').toDate();
-          const stillActive = newEnd > new Date();
-          await storage.updateSubscription(sub.id, {
-            currentPeriodEnd: newEnd,
-            status: stillActive ? 'active' : 'canceled',
-            autoRenew: false,
-          });
-          rollback = `-30 days (until ${newEnd.toISOString()}, ${stillActive ? 'active' : 'canceled'})`;
+          const upd: any = { tier: 'standard', autoRenew: false };
+          if (inv.ext) upd.currentPeriodEnd = dayjs(sub.currentPeriodEnd).subtract(Number(inv.ext), 'month').toDate();
+          await storage.updateSubscription(sub.id, upd);
+          const cur = parseFloat(user.subscriptionOrbs || '0');
+          await storage.updateUser(userId, { subscriptionOrbs: Math.max(0, cur - 300).toString() });
+          rollback = `tier→standard, -300 orbs${inv.ext ? `, -${inv.ext}mo` : ''}`;
+        }
+      } else if (inv.t === 'sub' || inv.t === 'subonce') {
+        const sub = await storage.getSubscription(userId);
+        if (sub) {
+          if (sub.scheduledTier && inv.t === 'subonce' && inv.mode === 'new') {
+            // Оплаченный, но ещё не стартовавший тариф — просто снимаем план
+            await storage.updateSubscription(sub.id, { scheduledTier: null, scheduledPeriodMonths: null, scheduledAmountRUB: null });
+            rollback = 'scheduled plan removed';
+          } else {
+            const newEnd = inv.t === 'sub'
+              ? dayjs(sub.currentPeriodEnd).subtract(30, 'day').toDate()
+              : dayjs(sub.currentPeriodEnd).subtract(Number(inv.m) || 1, 'month').toDate();
+            const stillActive = newEnd > new Date();
+            await storage.updateSubscription(sub.id, {
+              currentPeriodEnd: newEnd,
+              status: stillActive ? 'active' : 'canceled',
+              autoRenew: false,
+            });
+            rollback = `-${inv.t === 'sub' ? '30 days' : (inv.m || 1) + 'mo'} (until ${newEnd.toISOString()}, ${stillActive ? 'active' : 'canceled'})`;
+          }
         }
       }
 

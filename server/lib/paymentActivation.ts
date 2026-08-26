@@ -86,6 +86,48 @@ export async function activateSubscriptionForUser(storage: any, p: ActivateSubsc
   return { tier: normalizedTier, currentPeriodEnd, renewed: wasActive, monthlyOrbs };
 }
 
+/** Standard → Premium: тир сразу, +300 бонусных орбов; при periodMonths>1 — ещё N мес Premium от даты окончания */
+export async function applySubscriptionUpgrade(storage: any, userId: string, periodMonths: number, source: SubscriptionSource, meta?: { amountRUB?: string | null; starsChargeId?: string | null }) {
+  const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./energy');
+  const existingSub = await storage.getSubscription(userId);
+  if (!existingSub) throw new Error(`applySubscriptionUpgrade: no subscription for ${userId}`);
+  const update: any = { tier: 'pro', status: 'active', paymentProvider: source };
+  if (meta?.starsChargeId) update.starsChargeId = meta.starsChargeId;
+  if (periodMonths > 1) {
+    const base = new Date(existingSub.currentPeriodEnd) > new Date() ? new Date(existingSub.currentPeriodEnd) : new Date();
+    update.currentPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
+    update.periodMonths = periodMonths;
+    if (meta?.amountRUB !== undefined) update.amountRUB = meta.amountRUB;
+  }
+  await storage.updateSubscription(existingSub.id, update);
+  const user = await storage.getUser(userId);
+  if (user) {
+    const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
+    const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard'];
+    await storage.updateUser(userId, { subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString() });
+  }
+  console.log(`[ACTIVATION] Upgraded to Premium via ${source} (user ${userId}, +${periodMonths > 1 ? periodMonths + 'mo' : '0'})`);
+  return { currentPeriodEnd: update.currentPeriodEnd || existingSub.currentPeriodEnd };
+}
+
+/** Продление того же тира на N месяцев от max(now, currentPeriodEnd); месячные орбы обновляются */
+export async function applySubscriptionRenewal(storage: any, userId: string, periodMonths: number, source: SubscriptionSource, meta?: { amountRUB?: string | null; starsChargeId?: string | null }) {
+  const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./energy');
+  const existingSub = await storage.getSubscription(userId);
+  if (!existingSub) throw new Error(`applySubscriptionRenewal: no subscription for ${userId}`);
+  const base = new Date(existingSub.currentPeriodEnd) > new Date() ? new Date(existingSub.currentPeriodEnd) : new Date();
+  const newPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
+  const update: any = { status: 'active', currentPeriodEnd: newPeriodEnd, paymentProvider: source, periodMonths };
+  if (meta?.amountRUB !== undefined) update.amountRUB = meta.amountRUB;
+  if (meta?.starsChargeId) update.starsChargeId = meta.starsChargeId;
+  await storage.updateSubscription(existingSub.id, update);
+  const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
+  const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
+  await storage.updateUser(userId, { subscriptionOrbs: monthlyOrbs.toString(), orbsResetAt: dayjs().add(30, 'days').toDate() });
+  console.log(`[ACTIVATION] Renewed via ${source} (user ${userId} until ${newPeriodEnd.toISOString()})`);
+  return { currentPeriodEnd: newPeriodEnd };
+}
+
 export interface ActivationResult {
   activated: boolean;
   alreadyDone: boolean;
@@ -153,51 +195,11 @@ export async function activateSucceededYookassaPayment(
 
   } else if (dbPayment.kind === 'subscription_upgrade') {
     const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
-    const existingSub = await storage.getSubscription(dbPayment.userId);
-    if (existingSub) {
-      const update: any = { tier: 'pro', status: 'active', paymentProvider: 'yookassa' };
-      if (periodMonths > 1) {
-        // Апгрейд + продление: N месяцев Premium от текущей даты окончания
-        const base = new Date(existingSub.currentPeriodEnd) > new Date() ? new Date(existingSub.currentPeriodEnd) : new Date();
-        update.currentPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
-        update.periodMonths = periodMonths;
-        update.amountRUB = dbPayment.amountRUB;
-      }
-      await storage.updateSubscription(existingSub.id, update);
-    }
-    const user = await storage.getUser(dbPayment.userId);
-    if (user) {
-      const currentOrbs = parseFloat(user.subscriptionOrbs || '0');
-      const bonusOrbs = SUBSCRIPTION_MONTHLY_ORBS['premium'] - SUBSCRIPTION_MONTHLY_ORBS['standard'];
-      await storage.updateUser(dbPayment.userId, {
-        subscriptionOrbs: Math.max(0, currentOrbs + bonusOrbs).toString(),
-      });
-    }
-    console.log(`[ACTIVATION] Upgraded to Premium (user ${dbPayment.userId}, +${periodMonths > 1 ? periodMonths + 'mo' : '0'})`);
+    await applySubscriptionUpgrade(storage, dbPayment.userId, periodMonths, 'yookassa', { amountRUB: dbPayment.amountRUB });
 
   } else if (dbPayment.kind === 'subscription_renewal') {
     const periodMonths = Number(ykPayment.metadata?.periodMonths) || 1;
-    const existingSub = await storage.getSubscription(dbPayment.userId);
-    if (existingSub) {
-      const base = new Date(existingSub.currentPeriodEnd) > new Date()
-        ? new Date(existingSub.currentPeriodEnd)
-        : new Date();
-      const newPeriodEnd = dayjs(base).add(periodMonths, 'month').toDate();
-      await storage.updateSubscription(existingSub.id, {
-        status: 'active',
-        currentPeriodEnd: newPeriodEnd,
-        paymentProvider: 'yookassa',
-        periodMonths,
-        amountRUB: dbPayment.amountRUB,
-      });
-      const orbsKey = existingSub.tier === 'pro' ? 'premium' : 'standard';
-      const monthlyOrbs = SUBSCRIPTION_MONTHLY_ORBS[orbsKey as keyof typeof SUBSCRIPTION_MONTHLY_ORBS];
-      await storage.updateUser(dbPayment.userId, {
-        subscriptionOrbs: monthlyOrbs.toString(),
-        orbsResetAt: dayjs().add(30, 'days').toDate(),
-      });
-      console.log(`[ACTIVATION] Renewed subscription (user ${dbPayment.userId} until ${newPeriodEnd})`);
-    }
+    await applySubscriptionRenewal(storage, dbPayment.userId, periodMonths, 'yookassa', { amountRUB: dbPayment.amountRUB });
 
   } else {
     console.warn(`[ACTIVATION] Unknown payment kind: ${dbPayment.kind} (payment ${dbPayment.id})`);

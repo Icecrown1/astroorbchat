@@ -290,9 +290,10 @@ export default function Subscribe() {
   });
 
   // Star-подписка: только месячный период (правило Telegram — ровно 30 дней)
+  type StarsSubArgs = { tier: 'standard' | 'premium'; periodMonths: number; mode: 'new' | 'renew' | 'upgrade' };
   const starsSubMutation = useMutation({
-    mutationFn: async (tier: 'standard' | 'premium') => {
-      const response = await apiRequest('POST', '/api/payments/stars/create-subscription', { tier });
+    mutationFn: async ({ tier, periodMonths, mode }: StarsSubArgs) => {
+      const response = await apiRequest('POST', '/api/payments/stars/create-subscription', { tier, periodMonths, mode });
       if (!response.ok) {
         if (response.error === 'stars_subscription_active') {
           throw new Error(locale === 'ru'
@@ -303,7 +304,7 @@ export default function Subscribe() {
       }
       return response as { link: string; stars: number };
     },
-    onSuccess: (data, tier) => {
+    onSuccess: (data, { tier, mode }) => {
       const wa = (window as any)?.Telegram?.WebApp;
       if (!wa?.openInvoice || !data?.link) {
         toast({ title: t.common.error, description: locale === 'ru' ? 'Откройте приложение в Telegram' : 'Open the app in Telegram', variant: 'destructive' });
@@ -315,7 +316,7 @@ export default function Subscribe() {
           queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
           queryClient.invalidateQueries({ queryKey: ['/api/payments/history'] });
           queryClient.invalidateQueries({ queryKey: ['/api/subscription/upgrade-preview'] });
-          navigate(`/payment-success?type=stars&kind=subscription&tier=${tier}`);
+          navigate(`/payment-success?type=stars&kind=subscription&tier=${tier}&mode=${mode}`);
         } else if (status === 'failed') {
           haptic.notify('error');
           toast({ title: locale === 'ru' ? 'Оплата не прошла' : 'Payment failed', variant: 'destructive' });
@@ -328,7 +329,21 @@ export default function Subscribe() {
     },
   });
   const insideTelegram = !!(window as any)?.Telegram?.WebApp?.initData;
-  const STARS_SUB_PRICES: Record<'standard' | 'premium', number> = { standard: 200, premium: 400 };
+  // Stars = ceil(₽); месячная новая — 200/400 recurring
+  const starsPrice = (rub: number) => Math.max(1, Math.ceil(rub));
+  const StarsButton = ({ label, args, primary, disabled, testId }: { label: string; args: StarsSubArgs; primary?: boolean; disabled?: boolean; testId: string }) => (
+    <Button
+      className="w-full"
+      variant={primary ? 'default' : 'outline'}
+      onClick={(e) => { e.stopPropagation(); setSelectedTier(args.tier); starsSubMutation.mutate(args); }}
+      disabled={disabled || starsSubMutation.isPending}
+      data-testid={testId}
+    >
+      {starsSubMutation.isPending && selectedTier === args.tier
+        ? <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
+        : <><OrbIcon className="w-4 h-4 mr-2" />{label}</>}
+    </Button>
+  );
 
   const [showUpgradeEmailDialog, setShowUpgradeEmailDialog] = useState(false);
   const [showRenewalEmailDialog, setShowRenewalEmailDialog] = useState(false);
@@ -789,6 +804,14 @@ export default function Subscribe() {
                         // --- CASE 1: This is the current active tier → show Renewal button ---
                         if (isCurrentTier) {
                           return (
+                            <div className="space-y-2">
+                            {!(currentSubscription?.paymentProvider === 'stars' && selectedPeriod === 'monthly') && (
+                              <StarsButton
+                                testId={`button-renew-stars-${tier.tier}`}
+                                args={{ tier: tier.tier as 'standard' | 'premium', periodMonths: PERIOD_CONFIG[selectedPeriod].months, mode: 'renew' }}
+                                label={locale === 'ru' ? `Продлить за ${starsPrice(totalPriceRub)} ⭐` : `Renew for ${starsPrice(totalPriceRub)} ⭐`}
+                              />
+                            )}
                             <Button
                               className="w-full"
                               variant="outline"
@@ -807,6 +830,7 @@ export default function Subscribe() {
                                 </>
                               )}
                             </Button>
+                            </div>
                           );
                         }
 
@@ -823,8 +847,17 @@ export default function Subscribe() {
                                     ? `Premium на ${periodConfig.labelRu} (${totalPriceRub} ₽) + доплата ${upgradePreview.upgradePrice} ₽ за ${upgradePreview.remainingDays} дн. текущего периода. Срок продлится от текущей даты окончания.`
                                     : `Premium for ${periodConfig.labelEn} (${totalPriceRub} ₽) + ${upgradePreview.upgradePrice} ₽ prorated for the ${upgradePreview.remainingDays} days left. Term extends from your current expiry.`)}
                               </div>
+                              <StarsButton
+                                primary
+                                testId={`button-upgrade-stars-${tier.tier}`}
+                                args={{ tier: 'premium', periodMonths: PERIOD_CONFIG[selectedPeriod].months, mode: 'upgrade' }}
+                                label={locale === 'ru'
+                                  ? `Апгрейд за ${starsPrice((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))} ⭐`
+                                  : `Upgrade for ${starsPrice((upgradePreview.upgradePrice ?? 0) + (selectedPeriod === 'monthly' ? 0 : totalPriceRub))} ⭐`}
+                              />
                               <Button
                                 className="w-full"
+                                variant="outline"
                                 onClick={(e) => { e.stopPropagation(); setShowUpgradeEmailDialog(true); }}
                                 disabled={upgradeMutation.isPending}
                                 data-testid={`button-upgrade-${tier.tier}`}
@@ -859,6 +892,12 @@ export default function Subscribe() {
                                     ? `Premium останется до ${startsAt}, затем включится Standard на ${periodConfig.labelRu}`
                                     : `Premium stays until ${startsAt}, then Standard for ${periodConfig.labelEn} kicks in`)}
                               </div>
+                              <StarsButton
+                                testId={`button-schedule-stars-${tier.tier}`}
+                                disabled={alreadyScheduled}
+                                args={{ tier: tier.tier as 'standard' | 'premium', periodMonths: PERIOD_CONFIG[selectedPeriod].months, mode: 'new' }}
+                                label={locale === 'ru' ? `Standard с ${startsAt} за ${starsPrice(totalPriceRub)} ⭐` : `Standard from ${startsAt} for ${starsPrice(totalPriceRub)} ⭐`}
+                              />
                               <Button
                                 className="w-full"
                                 variant="outline"
@@ -880,25 +919,15 @@ export default function Subscribe() {
                         const starsTier = tier.tier as 'standard' | 'premium';
                         return (
                           <>
-                            {insideTelegram && selectedPeriod === 'monthly' && (
-                              <Button
-                                className="w-full"
-                                variant={tier.popular ? 'default' : 'outline'}
-                                onClick={(e) => { e.stopPropagation(); setSelectedTier(tier.tier); starsSubMutation.mutate(starsTier); }}
-                                disabled={starsSubMutation.isPending}
-                                data-testid={`button-subscribe-stars-${tier.tier}`}
-                              >
-                                {starsSubMutation.isPending && selectedTier === tier.tier ? (
-                                  <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
-                                ) : (
-                                  <><OrbIcon className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оформить за ${STARS_SUB_PRICES[starsTier]} ⭐` : `Subscribe for ${STARS_SUB_PRICES[starsTier]} ⭐`}</>
-                                )}
-                              </Button>
-                            )}
-                            {insideTelegram && selectedPeriod !== 'monthly' && (
-                              <p className="text-xs text-muted-foreground text-center" data-testid="text-stars-monthly-only">
-                                {locale === 'ru' ? 'Оплата звёздами доступна для месячного периода' : 'Stars payment is available for the monthly period'}
-                              </p>
+                            {insideTelegram && (
+                              <StarsButton
+                                primary={!!tier.popular}
+                                testId={`button-subscribe-stars-${tier.tier}`}
+                                args={{ tier: starsTier, periodMonths: PERIOD_CONFIG[selectedPeriod].months, mode: 'new' }}
+                                label={selectedPeriod === 'monthly'
+                                  ? (locale === 'ru' ? `Оформить за ${starsTier === 'premium' ? 400 : 200} ⭐/мес` : `Subscribe for ${starsTier === 'premium' ? 400 : 200} ⭐/mo`)
+                                  : (locale === 'ru' ? `Оформить за ${starsPrice(totalPriceRub)} ⭐` : `Subscribe for ${starsPrice(totalPriceRub)} ⭐`)}
+                              />
                             )}
                             <Button
                               className="w-full"
