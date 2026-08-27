@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/store/useAuth";
-import { OrbIcon } from '@/components/OrbIcon';
+import { Loader } from '@/components/Loader';
 import { Button } from "@/components/ui/button";
 import { getInitData, getReferralCode, getTelegramUser, getWebSourceFromStartParam } from "@/lib/telegram";
 
@@ -184,18 +184,12 @@ export default function Login() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
         <div className="max-w-md w-full space-y-8 text-center">
           <div className="space-y-4">
-            <div className="flex justify-center">
-              <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30 animate-pulse">
-                <OrbIcon className="w-10 h-10 text-purple-300" />
-              </div>
-            </div>
-            
-            <h1 className="text-4xl font-bold text-white font-syne">
-              Astro Orb
+            <div className="flex justify-center"><Loader size="lg" /></div>
+            <h1 className="text-3xl font-bold text-white font-display leading-tight">
+              Ваша карта уже на небе. Построим её за минуту
             </h1>
-            
-            <p className="text-lg text-purple-200">
-              AI-Powered Astrology Readings
+            <p className="text-purple-200">
+              Swiss Ephemeris — та же астрономия, что у NASA
             </p>
           </div>
 
@@ -232,18 +226,12 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-violet-900 to-indigo-900 p-4">
       <div className="max-w-md w-full space-y-8 text-center">
         <div className="space-y-4">
-          <div className="flex justify-center">
-            <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-500/30">
-              <OrbIcon className="w-10 h-10 text-purple-300" />
-            </div>
-          </div>
-          
-          <h1 className="text-4xl font-bold text-white font-syne">
-            Astro Orb
+          <div className="flex justify-center"><Loader size="lg" /></div>
+          <h1 className="text-3xl font-bold text-white font-display leading-tight">
+            Ваша карта уже на небе. Построим её за минуту
           </h1>
-          
-          <p className="text-lg text-purple-200">
-            AI-Powered Astrology Readings
+          <p className="text-purple-200">
+            Swiss Ephemeris — та же астрономия, что у NASA
           </p>
         </div>
 
@@ -268,7 +256,7 @@ export default function Login() {
               // Show Telegram Login Widget (default behavior)
               <>
                 <p className="text-white mb-6">
-                  Sign in with your Telegram account to access your personalized astrology dashboard
+                  Войдите через Telegram — и карта построится по вашей дате рождения
                 </p>
                 
                 <div 
@@ -283,7 +271,7 @@ export default function Login() {
           <p className="text-sm text-purple-300">
             {allowWithoutTelegram 
               ? "Для модерации: можно создать профиль без Telegram" 
-              : "By signing in, you agree to use Telegram authentication for secure access"}
+              : "Вход только через Telegram — без паролей и почты"}
           </p>
         </div>
       </div>
