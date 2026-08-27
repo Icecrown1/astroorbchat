@@ -80,7 +80,7 @@ export default function Register() {
     
     const checkTelegramContext = async () => {
       // Check if registration without Telegram is allowed
-      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true' || import.meta.env.DEV;
       
       if (!isMounted) return;
       
@@ -366,7 +366,7 @@ export default function Register() {
 
     try {
       const initData = getInitData();
-      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
+      const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true' || import.meta.env.DEV;
       if (!allowWithoutTelegram && (!initData || initData.length === 0)) {
         toast({
           title: t.common.error,

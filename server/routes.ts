@@ -75,8 +75,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? req.body.signupSource.slice(0, 64)
         : null;
 
-      // Check if test auth is allowed
-      const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true';
+      // Check if test auth is allowed (dev workspace или явный флаг; прод — только с initData)
+      const allowTestAuth = process.env.ALLOW_TEST_AUTH === 'true' || process.env.NODE_ENV === 'development';
       const hasInitData = initData && initData.length > 0;
 
       if (!hasInitData && !allowTestAuth) {

@@ -312,6 +312,24 @@ export default function Settings() {
           </a>
         </Card>
 
+        {import.meta.env.DEV && (
+          <Card className="p-4 border-dashed" data-testid="card-dev-tools">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Dev</p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                try { sessionStorage.removeItem('onb_hello'); sessionStorage.removeItem('onb_form'); } catch { /* noop */ }
+                navigate('/register');
+              }}
+              data-testid="button-dev-onboarding"
+            >
+              Пройти онбординг заново
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">Создаст нового тестового пользователя (только в dev)</p>
+          </Card>
+        )}
+
       </div>
     </div>
   );
