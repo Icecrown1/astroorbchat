@@ -490,3 +490,10 @@
 /* Горизонтальный ряд фильтров без видимой полосы прокрутки */
 .mx-no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .mx-no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* === Онбординг: переходы шагов и фразы сцены === */
+@keyframes onbIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+.onb-step { animation: onbIn .32s cubic-bezier(.22,.8,.3,1) both; }
+@keyframes onbPhrase { 0% { opacity: 0; transform: translateY(6px); } 15%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.onb-phrase { animation: onbPhrase 1.2s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) { .onb-step, .onb-phrase { animation: none !important; opacity: 1; } }

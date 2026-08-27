@@ -1,29 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import { ArrowRight } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
+import { haptic } from '@/lib/haptics';
 import { apiRequest } from '@/lib/queryClient';
 import { Loader } from '@/components/Loader';
 import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { useAuth } from '@/store/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
-import { getInitData, getReferralCode, getLeadIdFromStartParam, getWebSourceFromStartParam } from '@/lib/telegram';
+import { getInitData, getReferralCode, getLeadIdFromStartParam, getWebSourceFromStartParam, getStartParam } from '@/lib/telegram';
 interface LeadData {
   id: string;
   name: string;
@@ -33,9 +23,47 @@ interface LeadData {
   birthPlace: string | null;
 }
 
+type Gender = 'male' | 'female' | 'other';
+type TimeMode = 'exact' | 'approx' | 'unknown';
+
+interface OnbForm {
+  name: string;
+  gender: Gender;
+  birthdayDate: string;
+  timeMode: TimeMode;
+  birthTime: string;
+  birthPlace: string;
+}
+
+const EMPTY_FORM: OnbForm = { name: '', gender: 'other', birthdayDate: '', timeMode: 'exact', birthTime: '', birthPlace: '' };
+const FORM_KEY = 'onb_form';
+const HELLO_KEY = 'onb_hello';
+const UNKNOWN_TIME = '12:00'; // текущий дефолт сервера
+const APPROX_CHIPS: { key: string; time: string; ru: string; en: string }[] = [
+  { key: 'morning', time: '09:00', ru: 'Утро', en: 'Morning' },
+  { key: 'day', time: '14:00', ru: 'День', en: 'Afternoon' },
+  { key: 'evening', time: '20:00', ru: 'Вечер', en: 'Evening' },
+  { key: 'night', time: '02:00', ru: 'Ночь', en: 'Night' },
+];
+
+function loadForm(): OnbForm {
+  try {
+    const raw = sessionStorage.getItem(FORM_KEY);
+    if (raw) return { ...EMPTY_FORM, ...JSON.parse(raw) };
+  } catch { /* noop */ }
+  return EMPTY_FORM;
+}
+
 export default function Register() {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<any>({});
+  // 0 = приветствие, 1..3 = шаги, 4 = сцена «строим карту»
+  const [step, setStep] = useState<number>(() => {
+    try { return sessionStorage.getItem(HELLO_KEY) ? 1 : 0; } catch { return 0; }
+  });
+  const [form, setForm] = useState<OnbForm>(loadForm);
+  const [errors, setErrors] = useState<Partial<Record<keyof OnbForm, string>>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [whyTimeOpen, setWhyTimeOpen] = useState(false);
+  const [stepKey, setStepKey] = useState(0); // перезапуск анимации шага
   const [isCheckingTelegram, setIsCheckingTelegram] = useState(true);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
@@ -257,80 +285,92 @@ export default function Register() {
     }
   }, [isCheckingTelegram, locale, toast]);
 
-  const step1Schema = useMemo(() => z.object({
-    name: z.string().min(1, locale === 'ru' ? 'Имя обязательно' : 'Name is required'),
-    gender: z.enum(['male', 'female', 'other']),
-  }), [locale]);
 
-  const step2Schema = useMemo(() => z.object({
-    birthdayDate: z.string().min(1, locale === 'ru' ? 'Дата рождения обязательна' : 'Birth date is required'),
-    birthTime: z.string()
-      .min(1, locale === 'ru' ? 'Время рождения обязательно' : 'Birth time is required')
-      .regex(/^\d{2}:\d{2}$/, locale === 'ru' ? 'Формат: ЧЧ:ММ' : 'Format: HH:MM'),
-    birthPlace: z.string().min(1, locale === 'ru' ? 'Место рождения обязательно' : 'Birth place is required'),
-  }), [locale]);
+  // Черновик формы живёт в сессии — прерывание на шаге 2 не теряет введённое на шаге 1
+  useEffect(() => {
+    try { sessionStorage.setItem(FORM_KEY, JSON.stringify(form)); } catch { /* noop */ }
+  }, [form]);
 
-
-  const step1Form = useForm({
-    resolver: zodResolver(step1Schema),
-    defaultValues: {
-      name: '',
-      gender: 'other' as const,
-    },
-  });
-
-  const step2Form = useForm({
-    resolver: zodResolver(step2Schema),
-    defaultValues: {
-      birthdayDate: '',
-      birthTime: '',
-      birthPlace: '',
-    },
-  });
-
-
-  // Pre-fill forms when lead data is loaded
+  // Pre-fill when lead data is loaded
   useEffect(() => {
     if (leadData) {
-      console.log('[Registration] Pre-filling forms with lead data:', leadData);
-      
-      // Step 1: name and gender
-      step1Form.setValue('name', leadData.name);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (step1Form as any).setValue('gender', leadData.gender);
-      
-      // Step 2: birth date, time, place
-      step2Form.setValue('birthdayDate', leadData.birthDate);
-      step2Form.setValue('birthTime', leadData.birthTime || '');
-      step2Form.setValue('birthPlace', leadData.birthPlace || '');
-      
+      console.log('[Registration] Pre-filling form with lead data:', leadData);
+      setForm((f) => ({
+        ...f,
+        name: leadData.name || f.name,
+        gender: (leadData.gender as Gender) || f.gender,
+        birthdayDate: leadData.birthDate || f.birthdayDate,
+        birthTime: leadData.birthTime || f.birthTime,
+        timeMode: leadData.birthTime ? 'exact' : f.timeMode,
+        birthPlace: leadData.birthPlace || f.birthPlace,
+      }));
     }
-  }, [leadData, step1Form, step2Form]);
+  }, [leadData]);
 
-  const handleStep1 = (data: any) => {
-    setFormData({ ...formData, ...data });
-    setStep(2);
+  const ru = locale === 'ru';
+  const set = <K extends keyof OnbForm>(key: K, value: OnbForm[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  const handleStep2 = async (data: any) => {
+  const goTo = (next: number) => {
+    haptic.select();
+    setStep(next);
+    setStepKey((k) => k + 1);
+    window.scrollTo({ top: 0 });
+  };
+
+  const validateStep = (n: number): boolean => {
+    const e: Partial<Record<keyof OnbForm, string>> = {};
+    if (n === 1 && !form.name.trim()) e.name = ru ? 'Как к вам обращаться?' : 'How should we call you?';
+    if (n === 2) {
+      if (!form.birthdayDate) e.birthdayDate = ru ? 'Без даты карту не построить' : 'We need the date to build the chart';
+      else {
+        const d = new Date(form.birthdayDate);
+        if (isNaN(d.getTime()) || d > new Date()) e.birthdayDate = ru ? 'Проверьте дату' : 'Check the date';
+      }
+      if (form.timeMode !== 'unknown' && !/^\d{2}:\d{2}$/.test(form.birthTime)) {
+        e.birthTime = form.timeMode === 'exact'
+          ? (ru ? 'Укажите время или выберите «Примерно»' : 'Enter the time or pick "Roughly"')
+          : (ru ? 'Выберите время суток' : 'Pick a time of day');
+      }
+    }
+    if (n === 3 && !form.birthPlace.trim()) e.birthPlace = ru ? 'Нужен город — от него зависят дома карты' : 'We need the city — it sets the chart houses';
+    setErrors(e);
+    if (Object.keys(e).length) haptic.notify('error');
+    return Object.keys(e).length === 0;
+  };
+
+  const handleNext = () => {
+    if (!validateStep(step)) return;
+    goTo(step + 1);
+  };
+
+  // ---------- Сабмит: контракт /api/auth/telegram не меняется ----------
+  const submit = async () => {
+    if (!validateStep(3)) return;
+    haptic.impact('medium');
+    setSubmitError(null);
+    setStep(4);
+    const startedAt = Date.now();
+    const MIN_SCENE_MS = 2500;
+
     const finalData = {
-      ...formData,
-      ...data,
+      name: form.name.trim(),
+      gender: form.gender,
+      birthdayDate: form.birthdayDate,
+      birthTime: form.timeMode === 'unknown' ? UNKNOWN_TIME : form.birthTime,
+      birthPlace: form.birthPlace,
       ...(referralCode && { referralCode }),
     };
 
     try {
       const initData = getInitData();
-      // Check if registration without Telegram is allowed
       const allowWithoutTelegram = import.meta.env.VITE_ALLOW_REGISTRATION_WITHOUT_TELEGRAM === 'true';
-      
-      // Must have valid Telegram initData to register through Mini App (unless override is enabled)
       if (!allowWithoutTelegram && (!initData || initData.length === 0)) {
         toast({
           title: t.common.error,
-          description: locale === 'ru' 
-            ? 'Регистрация доступна только через Telegram Mini App' 
-            : 'Registration is only available through Telegram Mini App',
+          description: ru ? 'Регистрация доступна только через Telegram Mini App' : 'Registration is only available through Telegram Mini App',
           variant: 'destructive',
         });
         navigate('/login');
@@ -340,10 +380,10 @@ export default function Register() {
       const response = await fetch('/api/auth/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          initData: initData || '', // Allow empty initData if override is enabled
+        body: JSON.stringify({
+          initData: initData || '',
           signupSource: getWebSourceFromStartParam() || undefined,
-          ...finalData 
+          ...finalData,
         }),
         credentials: 'include',
       });
@@ -351,204 +391,321 @@ export default function Register() {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new Error(locale === 'ru' 
-          ? `Сервер вернул не-JSON ответ: ${text.substring(0, 100)}` 
-          : `Server returned non-JSON response: ${text.substring(0, 100)}`);
+        throw new Error(ru ? `Сервер вернул не-JSON ответ: ${text.substring(0, 100)}` : `Server returned non-JSON response: ${text.substring(0, 100)}`);
       }
-
       const result = await response.json();
-      console.log('Registration result:', result);
-
       if (!response.ok) {
-        throw new Error(result.error || (locale === 'ru' 
-          ? `Запрос не удался со статусом ${response.status}` 
-          : `Request failed with status ${response.status}`));
+        throw new Error(result.error || (ru ? `Запрос не удался со статусом ${response.status}` : `Request failed with status ${response.status}`));
+      }
+      if (!(result.ok && result.data)) {
+        throw new Error(result.error || (ru ? 'Регистрация не удалась' : 'Registration failed'));
       }
 
-      if (result.ok && result.data) {
-        console.log('Setting auth with user:', result.data.user);
-        console.log('Token:', result.data.token);
-        setAuth(result.data.user, result.data.token);
-        
-        // Wait a bit for auth to be saved
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Mark lead as converted if registration came from lead magnet
-        if (leadId && result.data.token) {
-          try {
-            await fetch(`/api/lead/${leadId}/convert`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${result.data.token}`
-              },
-            });
-            console.log('[Registration] Lead converted successfully:', leadId);
-          } catch (err) {
-            console.error('[Registration] Failed to convert lead:', err);
-          }
+      setAuth(result.data.user, result.data.token);
+      await new Promise((r) => setTimeout(r, 100));
+
+      if (leadId && result.data.token) {
+        try {
+          await fetch(`/api/lead/${leadId}/convert`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${result.data.token}` },
+          });
+        } catch (err) {
+          console.error('[Registration] Failed to convert lead:', err);
         }
-        
-        toast({
-          title: t.auth.welcomeDefault,
-          description: t.dashboard.subtitle,
-        });
-        navigate('/dashboard');
+      }
+
+      // Сцена идёт минимум 2.5 с, даже если сервер ответил быстрее
+      const left = MIN_SCENE_MS - (Date.now() - startedAt);
+      if (left > 0) await new Promise((r) => setTimeout(r, left));
+
+      try { sessionStorage.removeItem(FORM_KEY); } catch { /* noop */ }
+      haptic.notify('success');
+      // Дип-линк с сайта web_matrix_* — сразу в матрицу (как делает Dashboard), иначе первый экран — своя карта
+      const sp = getStartParam();
+      if (sp && String(sp).startsWith('web_matrix')) {
+        try { sessionStorage.setItem('astro_matrix_deeplink_done', '1'); } catch { /* noop */ }
+        navigate('/matrix');
       } else {
-        throw new Error(result.error || (locale === 'ru' ? 'Регистрация не удалась' : 'Registration failed'));
+        navigate('/my-natal-chart');
       }
     } catch (error: any) {
-      toast({
-        title: t.common.error,
-        description: error.message || t.errors.invalidInput,
-        variant: 'destructive',
-      });
+      haptic.notify('error');
+      setSubmitError(error?.message || t.errors.invalidInput);
+      setStep(3);
+      setStepKey((k) => k + 1);
     }
   };
 
-  const progress = (step / 2) * 100;
+  // Клавиатура не должна перекрывать поле
+  const focusScroll = (e: React.FocusEvent<HTMLElement>) => {
+    setTimeout(() => e.target?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 250);
+  };
 
-  // Show loading while checking Telegram context
+  // ---------- Экраны ----------
   if (isCheckingTelegram) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader />
-          <p className="mt-4 text-muted-foreground">
-            {locale === 'ru' ? 'Проверка контекста Telegram...' : 'Checking Telegram context...'}
-          </p>
+          <p className="mt-4 text-muted-foreground">{ru ? 'Проверка контекста Telegram...' : 'Checking Telegram context...'}</p>
         </div>
       </div>
     );
   }
 
+  // H1 — приветствие
+  if (step === 0) {
+    return (
+      <div className="min-h-screen bg-background wheel-nebula !rounded-none flex flex-col items-center justify-center p-6 text-center">
+        <div className="anim-fade-up">
+          <Loader size="lg" />
+        </div>
+        <h1 className="anim-fade-up anim-d1 font-display font-bold text-3xl leading-tight mt-8 max-w-sm">
+          {ru ? 'Ваша карта уже на небе. Построим её за минуту' : 'Your chart is already in the sky. Let\u2019s build it in a minute'}
+        </h1>
+        <p className="anim-fade-up anim-d2 text-muted-foreground mt-4 max-w-xs">
+          {ru ? 'Swiss Ephemeris — та же астрономия, что у NASA' : 'Swiss Ephemeris — the same astronomy NASA uses'}
+        </p>
+        <Button
+          size="lg"
+          className="anim-fade-up anim-d3 mt-10 w-full max-w-xs h-12 text-base tap-scale"
+          onClick={() => { haptic.impact('light'); try { sessionStorage.setItem(HELLO_KEY, '1'); } catch { /* noop */ } goTo(1); }}
+          data-testid="button-onb-start"
+        >
+          {ru ? 'Начать' : 'Start'}
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    );
+  }
+
+  // H3 — сцена «строим карту»
+  if (step === 4) {
+    return <BuildingScene ru={ru} />;
+  }
+
+  const segBtn = (active: boolean) =>
+    `flex-1 h-10 rounded-lg text-sm transition-colors ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`;
+  const chipBtn = (active: boolean) =>
+    `h-9 px-3 rounded-full text-sm border transition-colors ${active ? 'border-primary bg-primary/15 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`;
+  const errText = (msg?: string) => msg ? <p className="text-sm text-destructive mt-1.5" role="alert">{msg}</p> : null;
+
+  const titles: Record<number, [string, string]> = {
+    1: ru ? ['Как к вам обращаться', 'Так карта будет говорить с вами лично'] : ['How should we call you', 'So the chart speaks to you personally'],
+    2: ru ? ['Момент рождения', 'Дата обязательна, время — как получится'] : ['Moment of birth', 'Date is required, time — as best you can'],
+    3: ru ? ['Место рождения', 'Город задаёт горизонт и дома карты'] : ['Place of birth', 'The city sets the horizon and houses'],
+  };
+
   return (
-    <div className="min-h-screen bg-background p-4 flex items-center justify-center">
-      <Card className="w-full max-w-md p-6">
-        <div className="mb-6">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 rounded-full bg-gradient-to-br from-primary to-chart-2">
-              <OrbIcon className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-display font-bold text-center mb-2">
-            {t.auth.welcomeDefault}
-          </h1>
-          <p className="text-center text-muted-foreground">
-            {t.common.next} {step} {t.common.back} 2
-          </p>
+    <div className="min-h-screen bg-background p-4 pb-28">
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-palette opacity-20" />
+      </div>
+
+      <div className="container max-w-md mx-auto pt-4">
+        {/* Прогресс-доты */}
+        <div className="flex items-center justify-center gap-2 mb-8" aria-label={`${ru ? 'Шаг' : 'Step'} ${step} / 3`}>
+          {[1, 2, 3].map((n) => (
+            <span
+              key={n}
+              className={`h-1.5 rounded-full transition-all duration-300 ${n === step ? 'w-8 bg-primary' : n < step ? 'w-3 bg-primary/50' : 'w-3 bg-muted'}`}
+            />
+          ))}
         </div>
 
-        <Progress value={progress} className="mb-6" />
+        <div key={stepKey} className="onb-step">
+          <h1 className="text-2xl font-display font-bold">{titles[step][0]}</h1>
+          <p className="text-muted-foreground text-sm mt-1 mb-6">{titles[step][1]}</p>
 
-        {step === 1 && (
-          <form onSubmit={step1Form.handleSubmit(handleStep1)} className="space-y-4">
-            <div>
-              <Label htmlFor="name">{t.auth.firstName}</Label>
-              <Input
-                id="name"
-                {...step1Form.register('name')}
-                placeholder={t.auth.firstName}
-                data-testid="input-name"
-              />
-              {step1Form.formState.errors.name && (
-                <p className="text-sm text-destructive mt-1">
-                  {step1Form.formState.errors.name.message}
+          {/* Шаг 1 */}
+          {step === 1 && (
+            <div className="space-y-5">
+              <div>
+                <Label htmlFor="name">{ru ? 'Имя' : 'Name'}</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  onFocus={focusScroll}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleNext(); }}
+                  placeholder={ru ? 'Например, Алексей' : 'e.g. Alex'}
+                  autoComplete="given-name"
+                  className="mt-1.5 h-11"
+                  data-testid="input-name"
+                />
+                {errText(errors.name)}
+              </div>
+              <div>
+                <Label>{ru ? 'Пол' : 'Gender'}</Label>
+                <div className="flex gap-1.5 mt-1.5 p-1 rounded-xl bg-muted/50" role="radiogroup">
+                  {(['female', 'male', 'other'] as Gender[]).map((g) => (
+                    <button
+                      key={g} type="button" role="radio" aria-checked={form.gender === g}
+                      className={segBtn(form.gender === g)}
+                      onClick={() => { haptic.select(); set('gender', g); }}
+                      data-testid={`gender-${g}`}
+                    >
+                      {g === 'female' ? (ru ? 'Женский' : 'Female') : g === 'male' ? (ru ? 'Мужской' : 'Male') : (ru ? 'Другое' : 'Other')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Шаг 2 */}
+          {step === 2 && (
+            <div className="space-y-5">
+              <div>
+                <Label htmlFor="birthdayDate">{ru ? 'Дата рождения' : 'Date of birth'}</Label>
+                <Input
+                  id="birthdayDate" type="date" max={new Date().toISOString().slice(0, 10)}
+                  value={form.birthdayDate}
+                  onChange={(e) => set('birthdayDate', e.target.value)}
+                  onFocus={focusScroll}
+                  className="mt-1.5 h-11"
+                  data-testid="input-birthday"
+                />
+                {errText(errors.birthdayDate)}
+              </div>
+
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <Label>{ru ? 'Время рождения' : 'Time of birth'}</Label>
+                  <button type="button" className="text-xs text-primary underline-offset-2 hover:underline" onClick={() => setWhyTimeOpen(true)} data-testid="link-why-time">
+                    {ru ? 'зачем время?' : 'why time?'}
+                  </button>
+                </div>
+                <div className="flex gap-1.5 mt-1.5 p-1 rounded-xl bg-muted/50" role="tablist">
+                  {(['exact', 'approx', 'unknown'] as TimeMode[]).map((m) => (
+                    <button
+                      key={m} type="button" role="tab" aria-selected={form.timeMode === m}
+                      className={segBtn(form.timeMode === m)}
+                      onClick={() => { haptic.select(); set('timeMode', m); if (m === 'approx') set('birthTime', ''); }}
+                      data-testid={`timemode-${m}`}
+                    >
+                      {m === 'exact' ? (ru ? 'Знаю точно' : 'Exactly') : m === 'approx' ? (ru ? 'Примерно' : 'Roughly') : (ru ? 'Не знаю' : "Don't know")}
+                    </button>
+                  ))}
+                </div>
+
+                {form.timeMode === 'exact' && (
+                  <Input
+                    type="time" value={form.birthTime}
+                    onChange={(e) => set('birthTime', e.target.value)}
+                    onFocus={focusScroll}
+                    className="mt-2 h-11"
+                    data-testid="input-birthtime"
+                  />
+                )}
+                {form.timeMode === 'approx' && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {APPROX_CHIPS.map((c) => (
+                      <button key={c.key} type="button" className={chipBtn(form.birthTime === c.time)} onClick={() => { haptic.select(); set('birthTime', c.time); }} data-testid={`chip-${c.key}`}>
+                        {ru ? c.ru : c.en} {c.time}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {form.timeMode === 'unknown' && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {ru
+                      ? 'Ничего страшного: карта будет точной по планетам, а асцендент уточним позже в настройках.'
+                      : 'No problem: the planets will be exact, and we can refine the ascendant later in settings.'}
+                  </p>
+                )}
+                {errText(errors.birthTime)}
+              </div>
+            </div>
+          )}
+
+          {/* Шаг 3 */}
+          {step === 3 && (
+            <div className="space-y-5">
+              <div>
+                <Label>{ru ? 'Город рождения' : 'City of birth'}</Label>
+                <div className="mt-1.5" onFocusCapture={focusScroll}>
+                  <CityAutocomplete
+                    value={form.birthPlace}
+                    onChange={(v) => set('birthPlace', v)}
+                    placeholder={ru ? 'Город, страна' : 'City, country'}
+                    locale={locale}
+                  />
+                </div>
+                {errText(errors.birthPlace)}
+                <p className="text-xs text-muted-foreground mt-2">
+                  {ru ? 'Не находит ваш город? Попробуйте ближайший крупный — разница в минуты дуги.' : 'Can\u2019t find your town? Try the nearest big city — the difference is arc-minutes.'}
                 </p>
+              </div>
+              {submitError && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm" role="alert" data-testid="text-submit-error">
+                  <p className="font-medium">{ru ? 'Не получилось построить карту' : 'Could not build the chart'}</p>
+                  <p className="text-muted-foreground mt-1">{submitError}</p>
+                </div>
               )}
             </div>
+          )}
+        </div>
+      </div>
 
-            <div>
-              <Label htmlFor="gender">{t.auth.gender}</Label>
-              <Select
-                onValueChange={(value) => step1Form.setValue('gender', value as any)}
-                defaultValue="other"
-              >
-                <SelectTrigger id="gender" data-testid="select-gender">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">{locale === 'ru' ? 'Мужской' : 'Male'}</SelectItem>
-                  <SelectItem value="female">{locale === 'ru' ? 'Женский' : 'Female'}</SelectItem>
-                  <SelectItem value="other">{locale === 'ru' ? 'Другое' : 'Other'}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button type="submit" className="w-full" data-testid="button-next-step1">
-              {t.common.next}
+      {/* Нижняя панель действий */}
+      <div className="fixed bottom-0 inset-x-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent">
+        <div className="container max-w-md mx-auto flex items-center gap-3">
+          {step > 1 && (
+            <button type="button" className="text-sm text-muted-foreground px-2 py-3" onClick={() => goTo(step - 1)} data-testid="button-back">
+              {ru ? 'Назад' : 'Back'}
+            </button>
+          )}
+          {step < 3 ? (
+            <Button className="flex-1 h-12 text-base tap-scale" onClick={handleNext} data-testid={`button-next-step${step}`}>
+              {ru ? 'Дальше' : 'Next'}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          </form>
-        )}
+          ) : (
+            <Button className="flex-1 h-12 text-base tap-scale" onClick={submit} data-testid="button-complete-registration">
+              {submitError ? (ru ? 'Попробовать ещё раз' : 'Try again') : (ru ? 'Построить мою карту' : 'Build my chart')}
+              <OrbIcon className="w-4 h-4 ml-2" />
+            </Button>
+          )}
+        </div>
+      </div>
 
-        {step === 2 && (
-          <form onSubmit={step2Form.handleSubmit(handleStep2)} className="space-y-4">
-            <div>
-              <Label htmlFor="birthdayDate">{t.auth.birthDate}</Label>
-              <Input
-                id="birthdayDate"
-                type="date"
-                {...step2Form.register('birthdayDate')}
-                data-testid="input-birthday"
-              />
-              {step2Form.formState.errors.birthdayDate && (
-                <p className="text-sm text-destructive mt-1">
-                  {step2Form.formState.errors.birthdayDate.message}
-                </p>
-              )}
-            </div>
+      <Drawer open={whyTimeOpen} onOpenChange={setWhyTimeOpen}>
+        <DrawerContent>
+          <DrawerHeader className="text-left">
+            <DrawerTitle>{ru ? 'Зачем время рождения' : 'Why the time of birth'}</DrawerTitle>
+            <DrawerDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground pt-1">
+                <p>{ru ? 'Время определяет асцендент — знак, восходивший на горизонте, — и разбивку карты на 12 домов.' : 'Time sets the ascendant — the sign rising on the horizon — and the split of the chart into 12 houses.'}</p>
+                <p>{ru ? 'Асцендент меняется примерно каждые два часа, так что «утро» и «вечер» уже дают разные карты.' : 'The ascendant changes roughly every two hours, so "morning" and "evening" already give different charts.'}</p>
+                <p>{ru ? 'Положения планет от времени почти не зависят: без него карта всё равно будет точной по планетам.' : 'Planet positions barely depend on time: without it the chart is still exact for the planets.'}</p>
+              </div>
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="p-4 pt-0">
+            <Button variant="outline" className="w-full" onClick={() => setWhyTimeOpen(false)}>{ru ? 'Понятно' : 'Got it'}</Button>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </div>
+  );
+}
 
-            <div>
-              <Label htmlFor="birthTime">{t.auth.birthTime}</Label>
-              <Input
-                id="birthTime"
-                type="time"
-                {...step2Form.register('birthTime')}
-                placeholder="HH:mm"
-                data-testid="input-birthtime"
-              />
-              {step2Form.formState.errors.birthTime && (
-                <p className="text-sm text-destructive mt-1">
-                  {step2Form.formState.errors.birthTime.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="birthPlace">{t.auth.birthPlace}</Label>
-              <CityAutocomplete
-                value={step2Form.watch('birthPlace') || ''}
-                onChange={(value) => step2Form.setValue('birthPlace', value)}
-                placeholder={locale === 'ru' ? 'Город, Страна' : 'City, Country'}
-                locale={locale}
-              />
-              {step2Form.formState.errors.birthPlace && (
-                <p className="text-sm text-destructive mt-1">
-                  {step2Form.formState.errors.birthPlace.message}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStep(1)}
-                className="flex-1"
-                data-testid="button-back-step2"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t.common.back}
-              </Button>
-              <Button type="submit" className="flex-1" data-testid="button-complete-registration">
-                {locale === 'ru' ? 'Завершить' : 'Complete'}
-                <OrbIcon className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </form>
-        )}
-      </Card>
+/** Полноэкранная сцена, пока идёт регистрация + расчёт */
+function BuildingScene({ ru }: { ru: boolean }) {
+  const phrases = ru
+    ? ['Сверяемся с эфемеридами…', 'Расставляем планеты по домам…', 'Рисуем ваш космический отпечаток…']
+    : ['Checking the ephemerides…', 'Placing the planets in houses…', 'Drawing your cosmic fingerprint…'];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((x) => (x + 1) % phrases.length), 1200);
+    return () => clearInterval(id);
+  }, [phrases.length]);
+  return (
+    <div className="min-h-screen bg-background wheel-nebula !rounded-none flex flex-col items-center justify-center p-6 text-center" data-testid="onb-building-scene">
+      <Loader size="lg" />
+      <p key={i} className="onb-phrase mt-8 text-lg font-display text-foreground/90" aria-live="polite">{phrases[i]}</p>
     </div>
   );
 }
