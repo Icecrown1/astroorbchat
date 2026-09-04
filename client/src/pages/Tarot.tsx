@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Sparkles, Loader2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Sparkles, RotateCcw, X, ZoomIn } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { Loader } from '@/components/Loader';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -66,7 +66,7 @@ function CardFace({ cardId, reversed }: { cardId: string; reversed: boolean }) {
   );
 }
 
-function FlipCard({ drawn, delayMs, positionLabel }: { drawn: DrawnTarotCard; delayMs: number; positionLabel: string }) {
+function FlipCard({ drawn, delayMs, positionLabel, onOpen }: { drawn: DrawnTarotCard; delayMs: number; positionLabel: string; onOpen: () => void }) {
   const [flipped, setFlipped] = useState(false);
   // авто-переворот с каскадной задержкой
   useEffect(() => {
@@ -75,12 +75,17 @@ function FlipCard({ drawn, delayMs, positionLabel }: { drawn: DrawnTarotCard; de
   }, [delayMs]);
   return (
     <div className="flex flex-col items-center gap-1.5 tarot-deal" style={{ animationDelay: `${delayMs * 0.6}ms` }}>
-      <div className={`tarot-flip w-[92px] h-[150px] ${flipped ? 'is-flipped' : ''}`}>
+      <button
+        type="button"
+        className={`tarot-flip w-[92px] h-[150px] ${flipped ? 'is-flipped' : ''}`}
+        onClick={() => { if (flipped) { haptic.impact('light'); onOpen(); } }}
+        aria-label={positionLabel}
+      >
         <div className="tarot-flip-inner">
           <div className="tarot-face"><CardBack /></div>
           <div className="tarot-face tarot-face--front"><CardFace cardId={drawn.cardId} reversed={drawn.reversed} /></div>
         </div>
-      </div>
+      </button>
       <p className="text-[11px] text-muted-foreground text-center leading-tight max-w-[100px]">
         {positionLabel}{drawn.reversed ? ' ↺' : ''}
       </p>
@@ -96,6 +101,8 @@ export default function Tarot() {
 
   const [question, setQuestion] = useState('');
   const [reading, setReading] = useState<TarotReading | null>(null);
+  const [lightbox, setLightbox] = useState<{ cardId: string; reversed: boolean; positionLabel: string } | null>(null);
+  const [zoomed, setZoomed] = useState(false);
 
   const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
     queryKey: [`/api/tarot/status?locale=${locale}`],
@@ -198,6 +205,11 @@ export default function Tarot() {
                   drawn={c}
                   delayMs={i * 350}
                   positionLabel={ru ? spreadDef.positions[c.position][0] : spreadDef.positions[c.position][1]}
+                  onOpen={() => setLightbox({
+                    cardId: c.cardId,
+                    reversed: c.reversed,
+                    positionLabel: ru ? spreadDef.positions[c.position][0] : spreadDef.positions[c.position][1],
+                  })}
                 />
               ))}
             </div>
@@ -314,6 +326,54 @@ export default function Tarot() {
           </div>
         )}
       </div>
+
+      {/* Лайтбокс: тап по карте — рассмотреть крупно; тап по картинке — зум ×2 со скроллом */}
+      {lightbox && (() => {
+        const card = getTarotCard(lightbox.cardId);
+        if (!card) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col"
+            onClick={() => { setLightbox(null); setZoomed(false); }}
+            data-testid="tarot-lightbox"
+          >
+            <div className="flex items-center justify-between p-4 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div>
+                <p className="font-display font-semibold">{card.nameEn}</p>
+                <p className="text-xs text-muted-foreground">
+                  {lightbox.positionLabel}{lightbox.reversed ? (ru ? ' · перевёрнутая' : ' · reversed') : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="p-2 rounded-full bg-muted/60 text-foreground"
+                onClick={() => { setLightbox(null); setZoomed(false); }}
+                aria-label={ru ? 'Закрыть' : 'Close'}
+                data-testid="button-close-lightbox"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className={`flex-1 min-h-0 ${zoomed ? 'overflow-auto' : 'overflow-hidden flex items-center justify-center'}`} onClick={(e) => e.stopPropagation()}>
+              <img
+                src={`/tarot/${card.id}.webp`}
+                alt={card.nameEn}
+                onClick={() => { haptic.impact('light'); setZoomed((z) => !z); }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                className={zoomed
+                  ? `w-[190%] max-w-none mx-auto ${lightbox.reversed ? 'rotate-180' : ''}`
+                  : `max-h-full max-w-full object-contain px-4 ${lightbox.reversed ? 'rotate-180' : ''}`}
+                style={{ cursor: zoomed ? 'zoom-out' : 'zoom-in' }}
+              />
+            </div>
+            <p className="text-center text-[11px] text-muted-foreground p-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {zoomed
+                ? (ru ? 'Двигайте пальцем · тап — уменьшить' : 'Drag to pan · tap to zoom out')
+                : (ru ? 'Тап по карте — приблизить' : 'Tap the card to zoom in')}
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -145,6 +145,22 @@ export function drawCards(count: number, opts?: { allowReversed?: boolean; rng?:
   }));
 }
 
+/** Полярность для расклада Да/Нет. Реверс инвертирует; ambiguous → «не однозначно» (редкие карты). */
+const YESNO_NEGATIVE = new Set([
+  'devil', 'tower', 'death', 'moon',
+  'five-of-wands', 'ten-of-wands', 'five-of-cups', 'four-of-cups', 'seven-of-cups', 'eight-of-cups',
+  'two-of-swords', 'three-of-swords', 'five-of-swords', 'seven-of-swords', 'eight-of-swords', 'nine-of-swords', 'ten-of-swords',
+  'four-of-pentacles', 'five-of-pentacles',
+]);
+const YESNO_AMBIGUOUS = new Set(['high-priestess', 'hermit', 'hanged-man', 'justice', 'wheel-of-fortune', 'two-of-pentacles', 'seven-of-pentacles', 'knight-of-swords']);
+
+export function yesNoVerdict(cardId: string, reversed: boolean): 'yes' | 'no' | 'maybe' {
+  if (YESNO_AMBIGUOUS.has(cardId)) return 'maybe';
+  const negative = YESNO_NEGATIVE.has(cardId);
+  const effectiveNegative = reversed ? !negative : negative;
+  return effectiveNegative ? 'no' : 'yes';
+}
+
 export function getTarotCard(id: string): TarotCard | undefined {
   return TAROT_DECK.find((c) => c.id === id);
 }

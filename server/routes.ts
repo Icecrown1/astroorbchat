@@ -4630,8 +4630,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const drawn = drawCards(spread.cards, { allowReversed: spreadId === 'daily' ? false : allowReversed });
+      // Да/Нет: вердикт детерминирован полярностью карты (GPT его только объясняет — иначе вечное «не однозначно»)
+      const { yesNoVerdict } = await import('@shared/tarot');
+      const forcedVerdict = spreadId === 'yesno' ? yesNoVerdict(drawn[0].cardId, drawn[0].reversed) : undefined;
       const { generateTarotReading } = await import('./lib/openai.js');
       const interpretation = await generateTarotReading({
+        forcedVerdict,
         spread: spreadId,
         question: spreadId === 'daily' ? null : question,
         name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
@@ -4658,6 +4662,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
         }
       }
+
+      if (forcedVerdict) interpretation.verdict = forcedVerdict;
 
       const saved = await storage.saveTarotReading({
         userId, spread: spreadId, question, locale, cards: drawn, interpretation, day,

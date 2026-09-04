@@ -1386,6 +1386,8 @@ export { MATRIX_KB_VERSION };
 // ============ ТАРО ============
 export interface TarotInterpretationInput {
   spread: 'daily' | 'yesno' | 'three' | 'celtic';
+  /** Да/Нет: вердикт уже вычислен по карте — GPT объясняет, а не решает */
+  forcedVerdict?: 'yes' | 'no' | 'maybe';
   question?: string | null;
   name: string;
   gender: string;
@@ -1419,8 +1421,8 @@ export async function generateTarotReading(input: TarotInterpretationInput): Pro
       ? 'Это «Карта дня»: одна карта как фокус и настроение дня. intro 1 предложение, текст карты 2-3 абзаца, advice — на сегодня.'
       : 'This is a "Card of the day": one card as the focus of the day. One-sentence intro, 2-3 paragraphs for the card, advice for today.',
     yesno: ru
-      ? 'Это расклад «Да/Нет». Дай поле verdict: "yes" | "no" | "maybe" по духу карты (прямая позитивная → yes и т.п.), а в тексте объясни оттенки: при каких условиях да, что может помешать.'
-      : 'This is a Yes/No spread. Provide verdict: "yes" | "no" | "maybe" by the card\'s spirit, and explain nuances in the text.',
+      ? `Это расклад «Да/Нет». Вердикт по карте УЖЕ определён: «${input.forcedVerdict}». Твоя задача — уверенно обосновать именно этот ответ через образ карты и вопрос человека: почему ${input.forcedVerdict === 'yes' ? 'да' : input.forcedVerdict === 'no' ? 'нет' : 'ответ неоднозначен'}, и одно условие, при котором ответ мог бы измениться. В поле verdict верни ровно «${input.forcedVerdict}». Не переспорь вердикт.`
+      : `A Yes/No spread. The verdict is ALREADY determined by the card: "${input.forcedVerdict}". Confidently justify exactly this answer through the card's imagery and the question, plus one condition that could change it. Return exactly "${input.forcedVerdict}" in the verdict field.`,
     three: ru
       ? 'Это расклад из 3 карт НА ВОПРОС: карты — не прошлое/настоящее/будущее, а три грани ответа. Сам реши по выпавшим картам, какую грань вопроса освещает каждая (корень ситуации, скрытый фактор, ресурс, препятствие, вероятное развитие — что уместно), и назови эту грань в title карты после её имени.'
       : 'A 3-card spread ABOUT THE QUESTION: the cards are not past/present/future but three facets of the answer. Decide from the drawn cards which facet each illuminates (the root, a hidden factor, a resource, an obstacle, the likely direction — whichever fits) and name that facet in the card title after its name.',
