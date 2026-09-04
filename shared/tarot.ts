@@ -109,7 +109,8 @@ export const TAROT_SPREADS: Record<TarotSpreadId, TarotSpreadDef> = {
   yesno: { id: 'yesno', cards: 1, free: false, positions: [['Ответ', 'The answer']] },
   three: {
     id: 'three', cards: 3, free: false,
-    positions: [['Прошлое', 'Past'], ['Настоящее', 'Present'], ['Будущее', 'Future']],
+    // Не таймлайн: три карты — три грани ответа на заданный вопрос
+    positions: [['Первая карта', 'First card'], ['Вторая карта', 'Second card'], ['Третья карта', 'Third card']],
   },
   celtic: {
     id: 'celtic', cards: 10, free: false,

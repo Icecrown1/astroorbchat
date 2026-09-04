@@ -103,12 +103,14 @@ export default function Tarot() {
   const dailyDone = statusData?.data?.dailyDone ?? false;
   const costs = statusData?.data?.costs ?? { yesno: 1, three: 3, celtic: 10 };
 
+  const [questionError, setQuestionError] = useState(false);
+
   const drawMutation = useMutation({
     mutationFn: async (spread: TarotSpreadId) => {
       const response = await apiRequest('POST', '/api/tarot/draw', {
         spread,
         locale,
-        question: question.trim() || undefined,
+        question: spread === 'daily' ? undefined : question.trim(),
       });
       if (!response.ok) {
         const err: any = new Error(response.error || 'failed');
@@ -148,7 +150,7 @@ export default function Tarot() {
   const spreads: Array<{ id: TarotSpreadId; title: string; desc: string; cost: number | null; needsQuestion: boolean }> = [
     { id: 'daily', title: ru ? 'Карта дня' : 'Card of the day', desc: ru ? 'Фокус и настроение на сегодня' : 'Focus and mood for today', cost: null, needsQuestion: false },
     { id: 'yesno', title: ru ? 'Да / Нет' : 'Yes / No', desc: ru ? 'Один вопрос — один ответ' : 'One question — one answer', cost: costs.yesno, needsQuestion: true },
-    { id: 'three', title: ru ? 'Три карты' : 'Three cards', desc: ru ? 'Прошлое · Настоящее · Будущее' : 'Past · Present · Future', cost: costs.three, needsQuestion: true },
+    { id: 'three', title: ru ? 'Три карты' : 'Three cards', desc: ru ? 'Объёмный ответ на ваш вопрос' : 'A rounded answer to your question', cost: costs.three, needsQuestion: true },
     { id: 'celtic', title: ru ? 'Кельтский крест' : 'Celtic Cross', desc: ru ? 'Глубокий разбор из 10 карт' : 'A deep 10-card reading', cost: costs.celtic, needsQuestion: true },
   ];
 
@@ -239,13 +241,19 @@ export default function Tarot() {
           <div className="space-y-4">
             <div className="anim-fade-up">
               <Input
+                id="tarot-question"
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder={ru ? 'Ваш вопрос картам (необязательно)' : 'Your question for the cards (optional)'}
+                onChange={(e) => { setQuestion(e.target.value); if (questionError) setQuestionError(false); }}
+                placeholder={ru ? 'Ваш вопрос картам' : 'Your question for the cards'}
                 maxLength={300}
-                className="h-11"
+                className={`h-11 ${questionError ? 'border-destructive' : ''}`}
                 data-testid="input-question"
               />
+              <p className={`text-xs mt-1.5 ${questionError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {questionError
+                  ? (ru ? 'Сначала задайте вопрос — расклады отвечают на него' : 'Ask a question first — the spreads answer it')
+                  : (ru ? 'Для раскладов нужен вопрос. Карта дня — без вопроса.' : 'Spreads need a question. The daily card needs none.')}
+              </p>
             </div>
 
             {spreads.map((s, i) => {
@@ -254,7 +262,16 @@ export default function Tarot() {
                 <Card
                   key={s.id}
                   className={`p-4 hover-elevate cursor-pointer anim-fade-up anim-d${i + 1}`}
-                  onClick={() => { haptic.impact('light'); drawMutation.mutate(s.id); }}
+                  onClick={() => {
+                    if (s.needsQuestion && !question.trim()) {
+                      haptic.notify('warning');
+                      setQuestionError(true);
+                      document.getElementById('tarot-question')?.focus();
+                      return;
+                    }
+                    haptic.impact('light');
+                    drawMutation.mutate(s.id);
+                  }}
                   data-testid={`spread-${s.id}`}
                 >
                   <div className="flex items-center gap-3">

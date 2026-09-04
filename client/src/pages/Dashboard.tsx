@@ -267,7 +267,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {FEATURES.map((feature, fIdx) => {
             // Free users: only natal chart is accessible
-            const isLockedForFree = tier === 'free' && feature.path !== '/my-natal-chart' && feature.path !== '/matrix';
+            const isLockedForFree = tier === 'free' && !['/my-natal-chart', '/matrix', '/tarot'].includes(feature.path);
             // Standard users: solar return is Premium-only
             const isPremiumLocked = feature.premiumOnly && tier !== 'premium';
             // Not enough orbs (for Standard and Premium)

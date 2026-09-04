@@ -4602,6 +4602,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const locale = String(req.body.locale || 'ru') === 'en' ? 'en' : 'ru';
       const question = typeof req.body.question === 'string' ? req.body.question.slice(0, 300).trim() || null : null;
+      // Карта дня — без вопроса; все остальные расклады отвечают НА вопрос
+      if (spreadId !== 'daily' && !question) {
+        return res.status(400).json({ ok: false, error: 'question_required' });
+      }
       const allowReversed = req.body.allowReversed !== false;
 
       const tz = user.timezone || 'Europe/Moscow';
@@ -4629,7 +4633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { generateTarotReading } = await import('./lib/openai.js');
       const interpretation = await generateTarotReading({
         spread: spreadId,
-        question,
+        question: spreadId === 'daily' ? null : question,
         name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
         gender: (user as any).gender || 'other',
         locale,

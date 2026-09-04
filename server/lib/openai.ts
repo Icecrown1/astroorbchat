@@ -1422,8 +1422,8 @@ export async function generateTarotReading(input: TarotInterpretationInput): Pro
       ? 'Это расклад «Да/Нет». Дай поле verdict: "yes" | "no" | "maybe" по духу карты (прямая позитивная → yes и т.п.), а в тексте объясни оттенки: при каких условиях да, что может помешать.'
       : 'This is a Yes/No spread. Provide verdict: "yes" | "no" | "maybe" by the card\'s spirit, and explain nuances in the text.',
     three: ru
-      ? 'Это расклад из 3 карт: Прошлое / Настоящее / Будущее. Свяжи их в одну историю движения.'
-      : 'A 3-card Past / Present / Future spread. Weave them into one moving story.',
+      ? 'Это расклад из 3 карт НА ВОПРОС: карты — не прошлое/настоящее/будущее, а три грани ответа. Сам реши по выпавшим картам, какую грань вопроса освещает каждая (корень ситуации, скрытый фактор, ресурс, препятствие, вероятное развитие — что уместно), и назови эту грань в title карты после её имени.'
+      : 'A 3-card spread ABOUT THE QUESTION: the cards are not past/present/future but three facets of the answer. Decide from the drawn cards which facet each illuminates (the root, a hidden factor, a resource, an obstacle, the likely direction — whichever fits) and name that facet in the card title after its name.',
     celtic: ru
       ? 'Это Кельтский крест из 10 позиций. Разбор каждой позиции короче (2-3 предложения), синтез — развёрнутый.'
       : 'A 10-position Celtic Cross. Keep each position brief (2-3 sentences); make the synthesis substantial.',
@@ -1434,11 +1434,13 @@ export async function generateTarotReading(input: TarotInterpretationInput): Pro
 Названия карт пиши на английском, при первом упоминании добавь русское название в скобках — например «The Fool (Шут)», дальше используй английское.
 ЖЁСТКИЕ ЗАПРЕТЫ: не предсказывай болезни, смерть, диагнозы, беременность и точные даты; не давай медицинских/юридических/финансовых гарантий; не обещай «100% сбудется»; не пугай — «тяжёлые» карты (Смерть, Башня, 10 Мечей) трактуй как процесс трансформации; про здоровье и чужую волю — мягко возвращай фокус на самого человека.
 Перевёрнутая карта = энергия заблокирована, направлена внутрь, на спаде или высвобождается — не «плохо».
-Запрещены клише («вас ждут перемены», «всё будет хорошо») — говори конкретно, через образы карты и вопрос человека. Возвращай только валидный JSON.`
+КОНКРЕТИКА ОБЯЗАТЕЛЬНА: каждый разбор карты строится из трёх ходов — (1) живой образ карты в одном предложении, (2) как именно этот образ отвечает на вопрос человека — с деталями ИЗ ЕГО вопроса (если спросил про деньги и море — говори про деньги и море, а не «твои цели»), (3) один конкретный шаг или пример поведения на этой неделе. Слова «возможно», «может быть», «вероятно» — максимум одно на весь ответ: карты говорят утверждениями. advice — 2-3 конкретных действия, а не пожелания.
+Запрещены клише («вас ждут перемены», «всё будет хорошо», «внутренняя работа», «сфокусируйся на себе») — говори конкретно, через образы карты и вопрос человека. Возвращай только валидный JSON.`
     : `You are a warm, empathetic Tarot guide in the Astro Orb app. Tarot is a mirror for self-reflection, not fortune-telling.
 HARD RULES: never predict illness, death, diagnoses, pregnancy or exact dates; no medical/legal/financial guarantees; never promise certainty; never frighten — treat "heavy" cards (Death, The Tower, Ten of Swords) as transformation; on health or other people's will, gently return focus to the person themselves.
 A reversed card = energy blocked, turned inward, waning or releasing — not "bad".
-No clichés — be specific, through the card's imagery and the person's question. Return only valid JSON.`;
+SPECIFICITY IS MANDATORY: every card reading has three moves — (1) the card's living image in one sentence, (2) how exactly that image answers THIS question, using the person's own details (if they asked about money and the sea — talk about money and the sea, not "your goals"), (3) one concrete step or behavioral example for this week. Hedging words ("perhaps", "maybe", "possibly") — at most one in the whole reply: the cards speak in statements. advice = 2-3 concrete actions, not wishes.
+No clichés ("changes await you", "everything will be fine", "inner work") — be specific, through the card's imagery and the person's question. Return only valid JSON.`;
 
   const cardsBlock = input.cards.map((c, i) =>
     `${i + 1}. ${ru ? 'Позиция' : 'Position'} «${c.position}»: ${c.name}${c.reversed ? (ru ? ' (перевёрнутая)' : ' (reversed)') : ''}. ${ru ? 'Ключи прямой' : 'Upright keys'}: ${c.keywordsUpright}. ${ru ? 'Ключи перевёрнутой' : 'Reversed keys'}: ${c.keywordsReversed}.`
@@ -1468,7 +1470,7 @@ ${ru ? 'Верни JSON' : 'Return JSON'}: {
       { role: 'user', content: userPrompt },
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.85,
+    temperature: 0.8,
     max_completion_tokens: input.spread === 'celtic' ? 4000 : 2200,
   });
 
