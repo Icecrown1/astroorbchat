@@ -4637,7 +4637,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const card = getTarotCard(d.cardId)!;
           const pos = spread.positions[d.position];
           return {
-            name: locale === 'ru' ? card.nameRu : card.nameEn,
+            // Имена карт всегда английские (единая колода/типографика); RU-локали даём русское имя в скобках для текста
+            name: locale === 'ru' ? `${card.nameEn} (${card.nameRu})` : card.nameEn,
             position: locale === 'ru' ? pos[0] : pos[1],
             reversed: d.reversed,
             keywordsUpright: locale === 'ru' ? card.kw[0] : card.kw[2],

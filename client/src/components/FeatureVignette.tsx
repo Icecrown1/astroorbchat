@@ -2,7 +2,7 @@
 const IRIS = 'hsl(252 100% 74%)';
 const GOLD = 'hsl(41 81% 68%)';
 
-export type VignetteKind = 'natal' | 'guest' | 'matrix' | 'solar' | 'horoscope' | 'compat' | 'oracle';
+export type VignetteKind = 'natal' | 'guest' | 'matrix' | 'solar' | 'horoscope' | 'compat' | 'oracle' | 'tarot';
 
 const KIND_ANIM: Record<VignetteKind, string> = {
   natal: 'vg-spin-slow',
@@ -12,6 +12,7 @@ const KIND_ANIM: Record<VignetteKind, string> = {
   horoscope: 'vg-swing',
   compat: 'vg-beat',
   oracle: 'vg-wobble',
+  tarot: 'vg-swing',
 };
 
 export function FeatureVignette({ kind, active = false }: { kind: VignetteKind; active?: boolean }) {
@@ -49,6 +50,12 @@ export function FeatureVignette({ kind, active = false }: { kind: VignetteKind; 
       {kind === 'compat' && (<g {...common}>
         <path d="M19 32c-5-4-9-7.4-9-11.6C10 17 12.6 15 15.4 15c1.9 0 3.1.9 3.6 2 .5-1.1 1.7-2 3.6-2 2.8 0 5.4 2 5.4 5.4 0 4.2-4 7.6-9 11.6z" stroke={IRIS} />
         <path d="M32 30c-3.4-2.7-6-5-6-7.8 0-2.3 1.7-3.6 3.6-3.6 1.2 0 2 .6 2.4 1.3.4-.7 1.2-1.3 2.4-1.3 1.9 0 3.6 1.3 3.6 3.6 0 2.8-2.6 5.1-6 7.8z" stroke={GOLD} opacity="0.85" />
+      </g>)}
+      {kind === 'tarot' && (<g {...common}>
+        <rect x="9" y="13" width="14" height="22" rx="2" stroke={IRIS} opacity="0.45" transform="rotate(-12 16 24)" />
+        <rect x="25" y="13" width="14" height="22" rx="2" stroke={IRIS} opacity="0.45" transform="rotate(12 32 24)" />
+        <rect x="17" y="11" width="14" height="23" rx="2" stroke={GOLD} />
+        <path d="M24 18l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z" fill={GOLD} stroke="none" />
       </g>)}
       {kind === 'oracle' && (<g {...common}>
         <path d="M10 14h24a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H22l-7 6v-6h-5a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3z" stroke={IRIS} />

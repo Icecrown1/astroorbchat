@@ -20,6 +20,7 @@ import SolarToday from '@/pages/SolarToday';
 import Horoscope from '@/pages/Horoscope';
 import Compatibility from '@/pages/Compatibility';
 import Matrix from '@/pages/Matrix';
+import Tarot from '@/pages/Tarot';
 import Ask from '@/pages/Ask';
 import BuyEnergy from '@/pages/BuyEnergy';
 import Subscribe from '@/pages/Subscribe';
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/horoscope" component={Horoscope} />
       <Route path="/compatibility" component={Compatibility} />
       <Route path="/matrix" component={Matrix} />
+      <Route path="/tarot" component={Tarot} />
       <Route path="/ask" component={Ask} />
       <Route path="/buy-energy" component={BuyEnergy} />
       <Route path="/subscribe" component={Subscribe} />

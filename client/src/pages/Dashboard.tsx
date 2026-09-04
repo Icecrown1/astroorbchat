@@ -19,8 +19,7 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Shield,
-  Hexagon, MoonStar,
-} from 'lucide-react';
+  Hexagon, MoonStar, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo } from 'react';
@@ -32,6 +31,7 @@ const VIGNETTES: Record<string, VignetteKind> = {
   '/my-natal-chart': 'natal',
   '/natal-chart': 'guest',
   '/matrix': 'matrix',
+  '/tarot': 'tarot',
   '/solar-today': 'solar',
   '/horoscope': 'horoscope',
   '/compatibility': 'compat',
@@ -107,6 +107,14 @@ export default function Dashboard() {
       description: locale === 'ru' ? '22 аркана по дате рождения' : '22 arcana from your birth date',
       energyCost: 0,
       path: '/matrix',
+      premiumOnly: false,
+    },
+    {
+      icon: Sparkles,
+      title: locale === 'ru' ? 'Карты Таро' : 'Tarot Cards',
+      description: locale === 'ru' ? 'Карта дня бесплатно · расклады' : 'Free daily card · spreads',
+      energyCost: 0,
+      path: '/tarot',
       premiumOnly: false,
     },
     {

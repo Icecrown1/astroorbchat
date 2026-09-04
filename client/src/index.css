@@ -497,3 +497,16 @@
 @keyframes onbPhrase { 0% { opacity: 0; transform: translateY(6px); } 15%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 .onb-phrase { animation: onbPhrase 1.2s ease-in-out both; }
 @media (prefers-reduced-motion: reduce) { .onb-step, .onb-phrase { animation: none !important; opacity: 1; } }
+
+/* === Таро: 3D-флип карт === */
+.tarot-flip { perspective: 1000px; }
+.tarot-flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.3,.7,.3,1); }
+.tarot-flip.is-flipped .tarot-flip-inner { transform: rotateY(180deg); }
+.tarot-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 0.75rem; overflow: hidden; }
+.tarot-face--front { transform: rotateY(180deg); }
+@keyframes tarotDeal { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+.tarot-deal { animation: tarotDeal .45s cubic-bezier(.2,.8,.3,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .tarot-flip-inner { transition: none; }
+  .tarot-deal { animation: none; }
+}
