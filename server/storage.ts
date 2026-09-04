@@ -7,6 +7,7 @@ import {
   natalReadings,
   horoscopeReadings,
   matrixReadings,
+  tarotReadings,
   compatibilityReadings,
   aiQuestions,
   natalCharts,
@@ -895,6 +896,39 @@ export class DatabaseStorage implements IStorage {
           eq(matrixReadings.kbVersion, kbVersion),
         )
       );
+  }
+
+  // ---- Таро
+  async getTarotDailyReading(userId: string, day: string, locale: string) {
+    const rows = await db
+      .select()
+      .from(tarotReadings)
+      .where(and(eq(tarotReadings.userId, userId), eq(tarotReadings.day, day), eq(tarotReadings.spread, 'daily'), eq(tarotReadings.locale, locale)))
+      .limit(1);
+    return rows[0];
+  }
+
+  async getTarotReadings(userId: string, limit = 20) {
+    return db
+      .select()
+      .from(tarotReadings)
+      .where(eq(tarotReadings.userId, userId))
+      .orderBy(desc(tarotReadings.createdAt))
+      .limit(limit);
+  }
+
+  async getTarotReadingById(id: string, userId: string) {
+    const rows = await db
+      .select()
+      .from(tarotReadings)
+      .where(and(eq(tarotReadings.id, id), eq(tarotReadings.userId, userId)))
+      .limit(1);
+    return rows[0];
+  }
+
+  async saveTarotReading(data: { userId: string; spread: string; question?: string | null; locale: string; cards: unknown; interpretation: unknown; day: string }) {
+    const rows = await db.insert(tarotReadings).values(data as any).returning();
+    return rows[0];
   }
 
   async saveMatrixReading(data: { userId: string; sectionId: string; locale: string; birthDate: string; kbVersion: number; content: string }) {

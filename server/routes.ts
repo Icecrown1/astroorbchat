@@ -4586,6 +4586,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cached in-memory per sign per Moscow day => max 12 OpenAI calls/day.
   // ===== МАТРИЦА СУДЬБЫ =====
   // Расчёт бесплатен для всех (включая Free) — это acquisition-крючок из SEO-воронки.
+  // ============ ТАРО ============
+  // Карта дня — бесплатно, одна на календарный день (по timezone пользователя), повтор возвращает ту же
+  // Платные расклады — через canAccessFeature/deductOrbs как остальные фичи
+  app.post("/api/tarot/draw", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+      const { TAROT_SPREADS, drawCards, getTarotCard } = await import('@shared/tarot');
+      const spreadId = String(req.body.spread || '') as keyof typeof TAROT_SPREADS;
+      const spread = TAROT_SPREADS[spreadId];
+      if (!spread) return res.status(400).json({ ok: false, error: 'Unknown spread' });
+
+      const locale = String(req.body.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const question = typeof req.body.question === 'string' ? req.body.question.slice(0, 300).trim() || null : null;
+      const allowReversed = req.body.allowReversed !== false;
+
+      const tz = user.timezone || 'Europe/Moscow';
+      const day = dayjs().tz(tz).format('YYYY-MM-DD');
+
+      // Карта дня: кэш на день
+      if (spreadId === 'daily') {
+        const existing = await storage.getTarotDailyReading(userId, day, locale);
+        if (existing) {
+          return res.json({ ok: true, data: { ...existing, cached: true } });
+        }
+      } else {
+        const featureKey = `tarot_${spreadId}` as any;
+        const access = await canAccessFeature(storage, userId, featureKey);
+        if (!access.allowed) {
+          return res.status(402).json({
+            ok: false,
+            error: access.requiresPremium ? 'premium_required' : access.requiresSubscription ? 'subscription_required' : 'insufficient_orbs',
+            cost: access.cost,
+          });
+        }
+      }
+
+      const drawn = drawCards(spread.cards, { allowReversed: spreadId === 'daily' ? false : allowReversed });
+      const { generateTarotReading } = await import('./lib/openai.js');
+      const interpretation = await generateTarotReading({
+        spread: spreadId,
+        question,
+        name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
+        gender: (user as any).gender || 'other',
+        locale,
+        cards: drawn.map((d) => {
+          const card = getTarotCard(d.cardId)!;
+          const pos = spread.positions[d.position];
+          return {
+            name: locale === 'ru' ? card.nameRu : card.nameEn,
+            position: locale === 'ru' ? pos[0] : pos[1],
+            reversed: d.reversed,
+            keywordsUpright: locale === 'ru' ? card.kw[0] : card.kw[2],
+            keywordsReversed: locale === 'ru' ? card.kw[1] : card.kw[3],
+          };
+        }),
+      });
+
+      // Списание ПОСЛЕ успешной генерации
+      if (spreadId !== 'daily') {
+        const deduction = await deductOrbs(storage, userId, `tarot_${spreadId}` as any);
+        if (!deduction.ok) {
+          return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
+        }
+      }
+
+      const saved = await storage.saveTarotReading({
+        userId, spread: spreadId, question, locale, cards: drawn, interpretation, day,
+      });
+      res.json({ ok: true, data: { ...saved, cached: false } });
+    } catch (error: any) {
+      console.error('[TAROT] /draw error:', error);
+      res.status(500).json({ ok: false, error: 'Tarot reading failed' });
+    }
+  });
+
+  // Статус: сделана ли карта дня, цены раскладов
+  app.get("/api/tarot/status", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+      const locale = String(req.query.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const tz = user.timezone || 'Europe/Moscow';
+      const day = dayjs().tz(tz).format('YYYY-MM-DD');
+      const daily = await storage.getTarotDailyReading(userId, day, locale);
+      res.json({
+        ok: true,
+        data: {
+          dailyDone: !!daily,
+          dailyReadingId: daily?.id || null,
+          costs: { yesno: ORB_COSTS.tarot_yesno, three: ORB_COSTS.tarot_three, celtic: ORB_COSTS.tarot_celtic },
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // История раскладов
+  app.get("/api/tarot/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const rows = await storage.getTarotReadings(userId, 30);
+      res.json({ ok: true, data: rows });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/matrix/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

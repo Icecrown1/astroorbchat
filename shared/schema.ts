@@ -674,6 +674,24 @@ export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 
 
+// Расклады Таро: история и кэш (карта дня — одна на календарный день)
+export const tarotReadings = pgTable("tarot_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  spread: varchar("spread", { length: 20 }).notNull(), // daily | yesno | three | celtic
+  question: text("question"),
+  locale: varchar("locale", { length: 5 }).notNull().default('ru'),
+  /** [{cardId, position, reversed}] */
+  cards: jsonb("cards").notNull(),
+  /** {intro, cards:[{title,text}], synthesis, advice} */
+  interpretation: jsonb("interpretation").notNull(),
+  /** YYYY-MM-DD дня расклада (для лимита карты дня) */
+  day: varchar("day", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  userDayIdx: index("tarot_readings_user_day_idx").on(t.userId, t.day),
+}));
+
 // Журнал платёжных событий: exactly-once обработка вебхуков (дедуп по UNIQUE)
 export const paymentEventLog = pgTable("payment_event_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -22,6 +22,11 @@ export const ORB_COSTS = {
   house_influence: 2,        // House influence interpretation
   important_date: 3,         // Important date interpretation
   
+  // Tarot
+  tarot_yesno: 1,            // Да/Нет — одна карта
+  tarot_three: 3,            // 3 карты: прошлое/настоящее/будущее
+  tarot_celtic: 10,          // Кельтский крест (10 карт)
+
   // Medium priority (5 orbs)
   horoscope_weekly: 5,
   matrix_section: 5,         // Секция разбора Матрицы судьбы (хвост/деньги/любовь/предназначение/род)

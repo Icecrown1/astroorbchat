@@ -1382,3 +1382,103 @@ export async function generateMatrixSection(params: {
 }
 
 export { MATRIX_KB_VERSION };
+
+// ============ ТАРО ============
+export interface TarotInterpretationInput {
+  spread: 'daily' | 'yesno' | 'three' | 'celtic';
+  question?: string | null;
+  name: string;
+  gender: string;
+  locale: 'ru' | 'en';
+  cards: Array<{
+    name: string;
+    position: string;
+    reversed: boolean;
+    keywordsUpright: string;
+    keywordsReversed: string;
+  }>;
+}
+
+export interface TarotInterpretationResult {
+  intro: string;
+  cards: Array<{ title: string; text: string }>;
+  synthesis: string;
+  advice: string;
+  /** только для yesno: yes | no | maybe */
+  verdict?: string;
+}
+
+export async function generateTarotReading(input: TarotInterpretationInput): Promise<TarotInterpretationResult> {
+  const ru = input.locale !== 'en';
+  const languageInstruction = ru
+    ? 'ВАЖНО: Ответь СТРОГО на русском языке, обращение на «ты».'
+    : 'IMPORTANT: Respond STRICTLY in English, address the person as "you".';
+
+  const spreadNote: Record<string, string> = {
+    daily: ru
+      ? 'Это «Карта дня»: одна карта как фокус и настроение дня. intro 1 предложение, текст карты 2-3 абзаца, advice — на сегодня.'
+      : 'This is a "Card of the day": one card as the focus of the day. One-sentence intro, 2-3 paragraphs for the card, advice for today.',
+    yesno: ru
+      ? 'Это расклад «Да/Нет». Дай поле verdict: "yes" | "no" | "maybe" по духу карты (прямая позитивная → yes и т.п.), а в тексте объясни оттенки: при каких условиях да, что может помешать.'
+      : 'This is a Yes/No spread. Provide verdict: "yes" | "no" | "maybe" by the card\'s spirit, and explain nuances in the text.',
+    three: ru
+      ? 'Это расклад из 3 карт: Прошлое / Настоящее / Будущее. Свяжи их в одну историю движения.'
+      : 'A 3-card Past / Present / Future spread. Weave them into one moving story.',
+    celtic: ru
+      ? 'Это Кельтский крест из 10 позиций. Разбор каждой позиции короче (2-3 предложения), синтез — развёрнутый.'
+      : 'A 10-position Celtic Cross. Keep each position brief (2-3 sentences); make the synthesis substantial.',
+  };
+
+  const systemMessage = ru
+    ? `Ты — тёплый, эмпатичный проводник по картам Таро в приложении Astro Orb. Таро — зеркало для саморефлексии, а не предсказание судьбы.
+ЖЁСТКИЕ ЗАПРЕТЫ: не предсказывай болезни, смерть, диагнозы, беременность и точные даты; не давай медицинских/юридических/финансовых гарантий; не обещай «100% сбудется»; не пугай — «тяжёлые» карты (Смерть, Башня, 10 Мечей) трактуй как процесс трансформации; про здоровье и чужую волю — мягко возвращай фокус на самого человека.
+Перевёрнутая карта = энергия заблокирована, направлена внутрь, на спаде или высвобождается — не «плохо».
+Запрещены клише («вас ждут перемены», «всё будет хорошо») — говори конкретно, через образы карты и вопрос человека. Возвращай только валидный JSON.`
+    : `You are a warm, empathetic Tarot guide in the Astro Orb app. Tarot is a mirror for self-reflection, not fortune-telling.
+HARD RULES: never predict illness, death, diagnoses, pregnancy or exact dates; no medical/legal/financial guarantees; never promise certainty; never frighten — treat "heavy" cards (Death, The Tower, Ten of Swords) as transformation; on health or other people's will, gently return focus to the person themselves.
+A reversed card = energy blocked, turned inward, waning or releasing — not "bad".
+No clichés — be specific, through the card's imagery and the person's question. Return only valid JSON.`;
+
+  const cardsBlock = input.cards.map((c, i) =>
+    `${i + 1}. ${ru ? 'Позиция' : 'Position'} «${c.position}»: ${c.name}${c.reversed ? (ru ? ' (перевёрнутая)' : ' (reversed)') : ''}. ${ru ? 'Ключи прямой' : 'Upright keys'}: ${c.keywordsUpright}. ${ru ? 'Ключи перевёрнутой' : 'Reversed keys'}: ${c.keywordsReversed}.`
+  ).join('\n');
+
+  const userPrompt = `${languageInstruction}
+
+${spreadNote[input.spread]}
+
+${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}).
+${input.question ? `${ru ? 'Вопрос' : 'Question'}: «${input.question}»` : (ru ? 'Вопрос не задан — читай про общее состояние и ближайший фокус.' : 'No question — read the general state and near focus.')}
+
+${ru ? 'Выпавшие карты' : 'Cards drawn'}:
+${cardsBlock}
+
+${ru ? 'Верни JSON' : 'Return JSON'}: {
+  "intro": string,
+  "cards": [{ "title": string, "text": string }] (${ru ? 'ровно' : 'exactly'} ${input.cards.length}),
+  "synthesis": string,
+  "advice": string${input.spread === 'yesno' ? ',\n  "verdict": "yes" | "no" | "maybe"' : ''}
+}`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userPrompt },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.85,
+    max_completion_tokens: input.spread === 'celtic' ? 4000 : 2200,
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) throw new Error('Failed to generate tarot reading');
+  const result = JSON.parse(content);
+  return {
+    intro: result.intro || '',
+    cards: Array.isArray(result.cards) ? result.cards.slice(0, input.cards.length) : [],
+    synthesis: result.synthesis || '',
+    advice: result.advice || '',
+    verdict: result.verdict,
+  };
+}
