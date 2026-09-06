@@ -145,6 +145,64 @@ export function drawCards(count: number, opts?: { allowReversed?: boolean; rng?:
   }));
 }
 
+/** Астрологические соответствия (система Золотой Зари).
+ *  Масти ↔ стихии и тройки знаков; старшие арканы ↔ планета или знак. */
+export const SUIT_ASTRO: Record<Exclude<TarotSuit, 'major'>, { ru: string; en: string }> = {
+  wands: { ru: 'стихия Огня — Овен, Лев, Стрелец', en: 'the element of Fire — Aries, Leo, Sagittarius' },
+  cups: { ru: 'стихия Воды — Рак, Скорпион, Рыбы', en: 'the element of Water — Cancer, Scorpio, Pisces' },
+  swords: { ru: 'стихия Воздуха — Близнецы, Весы, Водолей', en: 'the element of Air — Gemini, Libra, Aquarius' },
+  pentacles: { ru: 'стихия Земли — Телец, Дева, Козерог', en: 'the element of Earth — Taurus, Virgo, Capricorn' },
+};
+
+export const MAJOR_ASTRO: Record<string, { ru: string; en: string }> = {
+  fool: { ru: 'Уран, стихия Воздуха', en: 'Uranus, the element of Air' },
+  magician: { ru: 'Меркурий', en: 'Mercury' },
+  'high-priestess': { ru: 'Луна', en: 'the Moon' },
+  empress: { ru: 'Венера', en: 'Venus' },
+  emperor: { ru: 'Овен', en: 'Aries' },
+  hierophant: { ru: 'Телец', en: 'Taurus' },
+  lovers: { ru: 'Близнецы', en: 'Gemini' },
+  chariot: { ru: 'Рак', en: 'Cancer' },
+  strength: { ru: 'Лев', en: 'Leo' },
+  hermit: { ru: 'Дева', en: 'Virgo' },
+  'wheel-of-fortune': { ru: 'Юпитер', en: 'Jupiter' },
+  justice: { ru: 'Весы', en: 'Libra' },
+  'hanged-man': { ru: 'Нептун, стихия Воды', en: 'Neptune, the element of Water' },
+  death: { ru: 'Скорпион', en: 'Scorpio' },
+  temperance: { ru: 'Стрелец', en: 'Sagittarius' },
+  devil: { ru: 'Козерог', en: 'Capricorn' },
+  tower: { ru: 'Марс', en: 'Mars' },
+  star: { ru: 'Водолей', en: 'Aquarius' },
+  moon: { ru: 'Рыбы', en: 'Pisces' },
+  sun: { ru: 'Солнце', en: 'the Sun' },
+  judgement: { ru: 'Плутон, стихия Огня', en: 'Pluto, the element of Fire' },
+  world: { ru: 'Сатурн', en: 'Saturn' },
+};
+
+export function getCardAstro(card: TarotCard, locale: 'ru' | 'en'): string {
+  if (card.suit === 'major') {
+    const a = MAJOR_ASTRO[card.id];
+    return a ? a[locale] : '';
+  }
+  return SUIT_ASTRO[card.suit][locale];
+}
+
+/** Знак Солнца по дате (тропический зодиак) — фолбэк, когда натальной карты ещё нет */
+export function sunSignFromDate(date: Date, locale: 'ru' | 'en'): string {
+  const m = date.getUTCMonth() + 1, d = date.getUTCDate();
+  const signs: [number, number, string, string][] = [
+    [3, 21, 'Овен', 'Aries'], [4, 20, 'Телец', 'Taurus'], [5, 21, 'Близнецы', 'Gemini'],
+    [6, 21, 'Рак', 'Cancer'], [7, 23, 'Лев', 'Leo'], [8, 23, 'Дева', 'Virgo'],
+    [9, 23, 'Весы', 'Libra'], [10, 23, 'Скорпион', 'Scorpio'], [11, 22, 'Стрелец', 'Sagittarius'],
+    [12, 22, 'Козерог', 'Capricorn'], [1, 20, 'Водолей', 'Aquarius'], [2, 19, 'Рыбы', 'Pisces'],
+  ];
+  const key = m * 100 + d;
+  for (let i = signs.length - 1; i >= 0; i--) {
+    if (key >= signs[i][0] * 100 + signs[i][1]) return locale === 'ru' ? signs[i][2] : signs[i][3];
+  }
+  return locale === 'ru' ? 'Козерог' : 'Capricorn';
+}
+
 /** Полярность для расклада Да/Нет. Реверс инвертирует; ambiguous → «не однозначно» (редкие карты). */
 const YESNO_NEGATIVE = new Set([
   'devil', 'tower', 'death', 'moon',

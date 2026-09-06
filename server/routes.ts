@@ -4631,11 +4631,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const drawn = drawCards(spread.cards, { allowReversed: spreadId === 'daily' ? false : allowReversed });
       // Да/Нет: вердикт детерминирован полярностью карты (GPT его только объясняет — иначе вечное «не однозначно»)
-      const { yesNoVerdict } = await import('@shared/tarot');
+      const { yesNoVerdict, getCardAstro, sunSignFromDate } = await import('@shared/tarot');
       const forcedVerdict = spreadId === 'yesno' ? yesNoVerdict(drawn[0].cardId, drawn[0].reversed) : undefined;
+      // Астро-профиль: из натальной карты (если построена), иначе Солнце по дате рождения
+      let astroProfile: { sunSign?: string; moonSign?: string; ascendant?: string } = {};
+      try {
+        const natal = await storage.getNatalChart(userId);
+        const chartData: any = natal?.data;
+        if (chartData?.planets?.Sun?.sign) {
+          astroProfile = {
+            sunSign: chartData.planets.Sun.sign,
+            moonSign: chartData.planets?.Moon?.sign,
+            ascendant: chartData.angles?.Ascendant?.sign,
+          };
+        }
+      } catch { /* noop */ }
+      if (!astroProfile.sunSign && user.birthdayDate) {
+        try { astroProfile.sunSign = sunSignFromDate(new Date(user.birthdayDate), locale); } catch { /* noop */ }
+      }
+
       const { generateTarotReading } = await import('./lib/openai.js');
       const interpretation = await generateTarotReading({
         forcedVerdict,
+        astroProfile,
         spread: spreadId,
         question: spreadId === 'daily' ? null : question,
         name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
@@ -4651,6 +4669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             reversed: d.reversed,
             keywordsUpright: locale === 'ru' ? card.kw[0] : card.kw[2],
             keywordsReversed: locale === 'ru' ? card.kw[1] : card.kw[3],
+            astro: getCardAstro(card, locale),
           };
         }),
       });

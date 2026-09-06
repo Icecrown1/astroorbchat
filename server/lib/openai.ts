@@ -1388,6 +1388,8 @@ export interface TarotInterpretationInput {
   spread: 'daily' | 'yesno' | 'three' | 'celtic';
   /** Да/Нет: вердикт уже вычислен по карте — GPT объясняет, а не решает */
   forcedVerdict?: 'yes' | 'no' | 'maybe';
+  /** Натальный профиль для персонализации: связь стихий карт со знаками человека */
+  astroProfile?: { sunSign?: string; moonSign?: string; ascendant?: string };
   question?: string | null;
   name: string;
   gender: string;
@@ -1398,6 +1400,8 @@ export interface TarotInterpretationInput {
     reversed: boolean;
     keywordsUpright: string;
     keywordsReversed: string;
+    /** Астрологическое соответствие карты (стихия/планета/знак) */
+    astro?: string;
   }>;
 }
 
@@ -1436,23 +1440,34 @@ export async function generateTarotReading(input: TarotInterpretationInput): Pro
 Названия карт пиши на английском, при первом упоминании добавь русское название в скобках — например «The Fool (Шут)», дальше используй английское.
 ЖЁСТКИЕ ЗАПРЕТЫ: не предсказывай болезни, смерть, диагнозы, беременность и точные даты; не давай медицинских/юридических/финансовых гарантий; не обещай «100% сбудется»; не пугай — «тяжёлые» карты (Смерть, Башня, 10 Мечей) трактуй как процесс трансформации; про здоровье и чужую волю — мягко возвращай фокус на самого человека.
 Перевёрнутая карта = энергия заблокирована, направлена внутрь, на спаде или высвобождается — не «плохо».
+АСТРОЛОГИЯ: каждая карта несёт стихию, планету или знак (указано в данных), а у человека есть натальный профиль. Построй 1–2 астро-моста НА ВЕСЬ расклад (не в каждой карте!): где стихия/знак карты резонирует или спорит с его Солнцем, Луной или асцендентом — скажи об этом прямо («The Chariot — карта Рака, твоего солнечного знака: это твоя родная стихия…» или «Мечи — Воздух, а твоё Солнце в Воде: этот холодный расчёт тебе непривычен — тем важнее…»). Мост должен менять совет, а не быть справкой.
+ИНДИВИДУАЛЬНОСТЬ: обратись к человеку по имени один раз в intro и один раз в advice (не чаще); учитывай род глаголов по полу; если вопрос содержит детали — верни их в тексте дословно хотя бы раз. Ответ должен читаться так, будто написан только для этого человека и не подошёл бы никому другому.
 КОНКРЕТИКА ОБЯЗАТЕЛЬНА: каждый разбор карты строится из трёх ходов — (1) живой образ карты в одном предложении, (2) как именно этот образ отвечает на вопрос человека — с деталями ИЗ ЕГО вопроса (если спросил про деньги и море — говори про деньги и море, а не «твои цели»), (3) один конкретный шаг или пример поведения на этой неделе. Слова «возможно», «может быть», «вероятно» — максимум одно на весь ответ: карты говорят утверждениями. advice — 2-3 конкретных действия, а не пожелания.
 Запрещены клише («вас ждут перемены», «всё будет хорошо», «внутренняя работа», «сфокусируйся на себе») — говори конкретно, через образы карты и вопрос человека. Возвращай только валидный JSON.`
     : `You are a warm, empathetic Tarot guide in the Astro Orb app. Tarot is a mirror for self-reflection, not fortune-telling.
 HARD RULES: never predict illness, death, diagnoses, pregnancy or exact dates; no medical/legal/financial guarantees; never promise certainty; never frighten — treat "heavy" cards (Death, The Tower, Ten of Swords) as transformation; on health or other people's will, gently return focus to the person themselves.
 A reversed card = energy blocked, turned inward, waning or releasing — not "bad".
+ASTROLOGY: every card carries an element, planet or sign (provided in the data), and the person has a natal profile. Build 1–2 astro-bridges for the WHOLE reading (not per card!): where the card's element/sign resonates or clashes with their Sun, Moon or ascendant — say it plainly ("The Chariot is the card of Cancer, your Sun sign: this is home turf…" or "Swords are Air while your Sun is in Water: this cold calculus is not your native mode — which is exactly why…"). The bridge must change the advice, not decorate it.
+INDIVIDUALITY: address the person by name once in the intro and once in the advice (no more); if the question contains specifics, quote them back verbatim at least once. The reply should read as written for this one person and no one else.
 SPECIFICITY IS MANDATORY: every card reading has three moves — (1) the card's living image in one sentence, (2) how exactly that image answers THIS question, using the person's own details (if they asked about money and the sea — talk about money and the sea, not "your goals"), (3) one concrete step or behavioral example for this week. Hedging words ("perhaps", "maybe", "possibly") — at most one in the whole reply: the cards speak in statements. advice = 2-3 concrete actions, not wishes.
 No clichés ("changes await you", "everything will be fine", "inner work") — be specific, through the card's imagery and the person's question. Return only valid JSON.`;
 
   const cardsBlock = input.cards.map((c, i) =>
-    `${i + 1}. ${ru ? 'Позиция' : 'Position'} «${c.position}»: ${c.name}${c.reversed ? (ru ? ' (перевёрнутая)' : ' (reversed)') : ''}. ${ru ? 'Ключи прямой' : 'Upright keys'}: ${c.keywordsUpright}. ${ru ? 'Ключи перевёрнутой' : 'Reversed keys'}: ${c.keywordsReversed}.`
+    `${i + 1}. ${ru ? 'Позиция' : 'Position'} «${c.position}»: ${c.name}${c.reversed ? (ru ? ' (перевёрнутая)' : ' (reversed)') : ''}. ${ru ? 'Ключи прямой' : 'Upright keys'}: ${c.keywordsUpright}. ${ru ? 'Ключи перевёрнутой' : 'Reversed keys'}: ${c.keywordsReversed}.${c.astro ? ` ${ru ? 'Астрология карты' : 'Card astrology'}: ${c.astro}.` : ''}`
   ).join('\n');
+
+  const ap = input.astroProfile;
+  const astroLine = ap?.sunSign
+    ? (ru
+      ? `Натальный профиль: Солнце в знаке ${ap.sunSign}${ap.moonSign ? `, Луна в знаке ${ap.moonSign}` : ''}${ap.ascendant ? `, асцендент ${ap.ascendant}` : ''}.`
+      : `Natal profile: Sun in ${ap.sunSign}${ap.moonSign ? `, Moon in ${ap.moonSign}` : ''}${ap.ascendant ? `, ascendant ${ap.ascendant}` : ''}.`)
+    : '';
 
   const userPrompt = `${languageInstruction}
 
 ${spreadNote[input.spread]}
 
-${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}).
+${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}). ${astroLine}
 ${input.question ? `${ru ? 'Вопрос' : 'Question'}: «${input.question}»` : (ru ? 'Вопрос не задан — читай про общее состояние и ближайший фокус.' : 'No question — read the general state and near focus.')}
 
 ${ru ? 'Выпавшие карты' : 'Cards drawn'}:
