@@ -35,8 +35,8 @@ interface TarotReading {
 /** Рубашка: фирменная восьмиконечная звезда на тёмном */
 function CardBack() {
   return (
-    <div className="w-full h-full bg-[linear-gradient(150deg,hsl(252,40%,14%),hsl(232,32%,9%))] border border-[hsl(252,50%,32%)] rounded-xl flex items-center justify-center">
-      <OrbIcon className="w-8 h-8 text-primary/70" />
+    <div className="w-full h-full rounded-xl overflow-hidden bg-[#0B0D14]">
+      <img src="/brand/tarot-back.svg" alt="" className="w-full h-full object-cover" draggable={false} />
     </div>
   );
 }
