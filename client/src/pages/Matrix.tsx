@@ -55,7 +55,7 @@ export default function Matrix() {
   const [cardZoom, setCardZoom] = useState<string | null>(null); // id карты Таро в лайтбоксе
   // Режим «для другого человека»
   const [guestMode, setGuestMode] = useState(false);
-  const [guest, setGuest] = useState<{ id: string; name: string; birthDate: string; core: MatrixCore } | null>(null);
+  const [guest, setGuest] = useState<{ id: string; name: string; birthDate: string; core: MatrixCore; sections?: SectionState[] } | null>(null);
   const [gName, setGName] = useState('');
   const [gDate, setGDate] = useState('');
   const [pendingSection, setPendingSection] = useState<string | null>(null);
@@ -70,11 +70,17 @@ export default function Matrix() {
 
   const sectionMutation = useMutation({
     mutationFn: async (section: MatrixSectionId) => {
-      return await apiRequest('POST', '/api/matrix/section', { section, locale });
+      return await apiRequest('POST', '/api/matrix/section', { section, locale, guestId: guestMode && guest ? guest.id : undefined });
     },
     onMutate: (section) => setPendingSection(section),
     onSettled: () => setPendingSection(null),
     onSuccess: (resp, section) => {
+      if (guestMode) {
+        setGuest((g) => g ? {
+          ...g,
+          sections: (g.sections || []).map((x) => (x.id === section ? { ...x, content: resp.content } : x)),
+        } : g);
+      }
       queryClient.setQueryData<MatrixResponse>(['/api/matrix/me', locale], (old) =>
         old
           ? { ...old, sections: old.sections.map((s) => (s.id === section ? { ...s, content: resp.content } : s)) }
@@ -110,7 +116,7 @@ export default function Matrix() {
     sessionStorage.removeItem('astro_pending_matrix');
   }, []);
 
-  const core = data?.core;
+  const core = guestMode ? guest?.core : data?.core; // гостевой режим рисует матрицу гостя
   const { data: guestsData } = useQuery<{ ok: boolean; data: Array<{ id: string; name: string; birthDate: string }> }>({
     queryKey: ['/api/matrix/guests'],
     enabled: guestMode,
@@ -138,7 +144,7 @@ export default function Matrix() {
 
   const openGuest = async (id: string) => {
     try {
-      const resp = await apiRequest('GET', `/api/matrix/guest/${id}`);
+      const resp = await apiRequest('GET', `/api/matrix/guest/${id}?locale=${locale}`);
       if (resp.ok) { haptic.select(); setGuest(resp.data); }
     } catch { /* noop */ }
   };
@@ -315,13 +321,13 @@ export default function Matrix() {
               </Button>
             </Card>
 
-            {!guestMode && (<>
+            {(<>
             {/* Секции разбора */}
             <div className="mt-6 space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">
                 {ru ? 'Разбор по разделам' : 'Section readings'}
               </h2>
-              {data!.sections.map((s, idx) => {
+              {(guestMode ? (guest?.sections || []) : (data?.sections || [])).map((s, idx) => {
                 const meta = SECTIONS_META[s.id];
                 const busy = pendingSection === s.id;
                 return (

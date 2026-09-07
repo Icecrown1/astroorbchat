@@ -4944,7 +4944,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deduction.ok) return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
 
       const saved = await storage.createGuestMatrix({ userId, name, birthDate });
-      res.json({ ok: true, data: { id: saved.id, name, birthDate, core } });
+      const sections = MATRIX_SECTIONS.map((id: string) => ({
+        id,
+        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
+        content: null,
+      }));
+      res.json({ ok: true, data: { id: saved.id, name, birthDate, core, sections } });
     } catch (error: any) {
       console.error('[MATRIX] guest error:', error);
       res.status(500).json({ ok: false, error: error.message });
@@ -4958,7 +4963,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const row = rows.find((r: any) => r.id === req.params.id);
       if (!row) return res.status(404).json({ ok: false, error: 'not_found' });
       const core = calcMatrixFromISO(row.birthDate);
-      res.json({ ok: true, data: { id: row.id, name: row.name, birthDate: row.birthDate, core } });
+      const locale = String(req.query.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const { MATRIX_KB_VERSION } = await import('./lib/openai.js');
+      const cached = await storage.getMatrixReadings((req as any).userId, locale, row.birthDate, MATRIX_KB_VERSION);
+      const sections = MATRIX_SECTIONS.map((id: string) => ({
+        id,
+        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
+        content: cached.find((r: any) => r.sectionId === id)?.content ?? null,
+      }));
+      res.json({ ok: true, data: { id: row.id, name: row.name, birthDate: row.birthDate, core, sections } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
     }
@@ -4971,13 +4984,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
 
       const sectionId = String(req.body.section || '');
+      const guestId = req.body.guestId ? String(req.body.guestId) : null;
       if (!(MATRIX_SECTIONS as readonly string[]).includes(sectionId)) {
         return res.status(400).json({ ok: false, error: 'Unknown section' });
       }
       const locale = String(req.body.locale || 'ru') === 'en' ? 'en' : 'ru';
       const isFree = (FREE_MATRIX_SECTIONS as string[]).includes(sectionId);
 
-      const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      // Для гостевой матрицы берём дату/имя гостя; кэш разборов ключуется по birthDate — работает и для гостей
+      let birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      let subjectName = user.name || 'друг';
+      let subjectGender = (user as any).gender || 'other';
+      if (guestId) {
+        const guests = await storage.getGuestMatrices(userId);
+        const g = guests.find((x: any) => x.id === guestId);
+        if (!g) return res.status(404).json({ ok: false, error: 'guest_not_found' });
+        birthISO = g.birthDate;
+        subjectName = g.name;
+        subjectGender = 'other';
+      }
       const core = calcMatrixFromISO(birthISO);
       if (!core) return res.status(400).json({ ok: false, error: 'Invalid birth date' });
 
@@ -5002,8 +5027,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const content = await generateMatrixSection({
         section: sectionId as any,
         arcana: sectionArcana(core, sectionId as any),
-        name: user.name || 'друг',
-        gender: (user as any).gender || 'other',
+        name: subjectName,
+        gender: subjectGender,
         birthDate: birthISO,
         locale,
       });
