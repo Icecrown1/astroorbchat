@@ -155,6 +155,16 @@ export default function Dashboard() {
     queryKey: ['/api/user/me'],
   });
 
+  // Синхронизируем стор с сервером: isAdmin/поля могли измениться после логина,
+  // а Telegram держит localStorage мини-аппа между перезапусками
+  const { updateUser } = useAuth();
+  useEffect(() => {
+    const fresh = (data as any)?.data;
+    if (fresh?.id && user && fresh.id === user.id && fresh.isAdmin !== (user as any).isAdmin) {
+      updateUser({ ...(user as any), isAdmin: fresh.isAdmin });
+    }
+  }, [data]);
+
   const { data: referralData } = useQuery<{
     ok: boolean;
     data: {
@@ -331,7 +341,7 @@ export default function Dashboard() {
             <Receipt className="w-4 h-4" />
             {locale === 'ru' ? 'Платежи' : 'Payments'}
           </Button>
-          {(user?.isAdmin || import.meta.env.DEV) && (
+          {(((data as any)?.data?.isAdmin ?? user?.isAdmin) || import.meta.env.DEV) && (
             <Button
               variant="outline"
               className="w-full"
