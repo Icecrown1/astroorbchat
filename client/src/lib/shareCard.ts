@@ -142,14 +142,20 @@ export function makeCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingC
 /** Отправка: Telegram-карточка либо скачивание файла (dev-браузер) */
 export async function sendShareImage(canvas: HTMLCanvasElement, caption: string, locale: string): Promise<'shared' | 'downloaded' | 'failed'> {
   const dataUrl = canvas.toDataURL('image/png');
+  const wa = (window as any).Telegram?.WebApp;
+  let url: string | null = null;
   try {
     const resp = await apiRequest('POST', '/api/share/image', { image: dataUrl, caption, locale });
-    const wa = (window as any).Telegram?.WebApp;
+    url = resp?.data?.url || null;
     if (resp.ok && resp.data?.preparedMessageId && wa?.shareMessage) {
       wa.shareMessage(resp.data.preparedMessageId);
       return 'shared';
     }
   } catch { /* фолбэк ниже */ }
+  // Телефон в Telegram: сохранение в галерею через нативный downloadFile (Bot API 7.10+)
+  if (url && wa?.downloadFile) {
+    try { wa.downloadFile({ url, file_name: 'astroorbi.png' }); return 'downloaded'; } catch { /* дальше */ }
+  }
   try {
     const a = document.createElement('a');
     a.href = dataUrl; a.download = 'astroorbi.png'; a.click();

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Sparkles, RotateCcw, X, Share2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, RotateCcw, X, Share2, Copy } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { Loader } from '@/components/Loader';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -189,7 +189,17 @@ export default function Tarot() {
       const spread = shown.length === 1 ? [0] : shown.length === 2 ? [-160, 160] : [-250, 0, 250];
       const rot = shown.length === 1 ? [0] : shown.length === 2 ? [-6, 6] : [-9, 0, 9];
       for (let i = 0; i < shown.length; i++) {
-        await drawTarotCard(ctx, shown[i].cardId, SHARE_W / 2 + spread[i], cy + (i === 1 && shown.length === 3 ? -24 : 0), cw, rot[i], shown[i].reversed);
+        const cyi = cy + (i === 1 && shown.length === 3 ? -24 : 0);
+        await drawTarotCard(ctx, shown[i].cardId, SHARE_W / 2 + spread[i], cyi, cw, rot[i], shown[i].reversed);
+        // Позиция и имя карты под каждой
+        const posLabel = ru ? spreadDef.positions[shown[i].position][0] : spreadDef.positions[shown[i].position][1];
+        const cname = getTarotCard(shown[i].cardId)?.nameEn || '';
+        ctx.fillStyle = shareColors.MUTED;
+        ctx.font = '24px Inter, sans-serif';
+        ctx.fillText(posLabel + (shown[i].reversed ? ' ↺' : ''), SHARE_W / 2 + spread[i], cyi + cw * 0.75 + 46);
+        ctx.fillStyle = shareColors.INK;
+        ctx.font = '26px Prata, serif';
+        drawWrappedText(ctx, cname, SHARE_W / 2 + spread[i], cyi + cw * 0.75 + 84, cw + 60, 30, 2);
       }
       if (reading.cards.length > 3) {
         ctx.fillStyle = shareColors.GOLD;
@@ -203,9 +213,10 @@ export default function Tarot() {
       if (reading.spread === 'yesno' && reading.interpretation.verdict) {
         const v = reading.interpretation.verdict;
         ctx.fillText(v === 'yes' ? (ru ? 'Скорее да' : 'Leaning yes') : v === 'no' ? (ru ? 'Скорее нет' : 'Leaning no') : (ru ? 'Не всё однозначно' : 'It depends'), SHARE_W / 2, 1020);
-      } else {
-        const names = shown.map((c) => getTarotCard(c.cardId)?.nameEn).filter(Boolean).join(' · ');
-        drawWrappedText(ctx, names, SHARE_W / 2, 1020, 900, 42, 2);
+      } else if (reading.interpretation.synthesis) {
+        ctx.fillStyle = shareColors.INK;
+        ctx.font = '30px Inter, sans-serif';
+        drawWrappedText(ctx, reading.interpretation.synthesis, SHARE_W / 2, 1075, 920, 42, 3);
       }
 
       await drawFooter(ctx, ru ? 'Вытяни свою карту — бесплатно в AstroOrbi' : 'Draw your own card — free in AstroOrbi');
@@ -304,6 +315,36 @@ export default function Tarot() {
                 ? 'Расклад носит информационно-развлекательный характер и не заменяет консультацию врача, юриста или психолога.'
                 : 'This reading is for reflection and entertainment; it is not medical, legal or psychological advice.'}
             </p>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              onClick={async () => {
+                if (!reading || !spreadDef) return;
+                const it = reading.interpretation;
+                const parts = [
+                  reading.question ? `«${reading.question}»` : '',
+                  it.intro,
+                  ...it.cards.map((c) => `${c.title}\n${c.text}`),
+                  `${ru ? 'Общая картина' : 'The bigger picture'}\n${it.synthesis}`,
+                  `${ru ? 'Совет' : 'Advice'}\n${it.advice}`,
+                  '',
+                  ru ? 'Расклад сделан в AstroOrbi ✨' : 'Reading made in AstroOrbi ✨',
+                ].filter(Boolean).join('\n\n');
+                try {
+                  await navigator.clipboard.writeText(parts);
+                  haptic.notify('success');
+                  toast({ title: ru ? 'Разбор скопирован' : 'Reading copied' });
+                } catch {
+                  toast({ title: ru ? 'Не удалось скопировать' : 'Copy failed', variant: 'destructive' });
+                }
+              }}
+              data-testid="button-copy-reading"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              {ru ? 'Скопировать разбор' : 'Copy the reading'}
+            </Button>
 
             <div className="flex gap-2">
               <Button className="flex-1" onClick={shareReading} disabled={sharing} data-testid="button-share-reading">

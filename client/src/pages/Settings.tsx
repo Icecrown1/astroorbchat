@@ -290,27 +290,6 @@ export default function Settings() {
           </form>
         </Card>
 
-        <Card className="p-6 mt-4">
-          <h3 className="text-lg font-semibold mb-1">
-            {locale === 'ru' ? 'Поддержка' : 'Support'}
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            {locale === 'ru'
-              ? 'Возникли вопросы или проблемы с платежом? Напишите нам.'
-              : 'Have questions or a payment issue? Get in touch.'}
-          </p>
-          <a
-            href={`https://t.me/${SUPPORT_USERNAME}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="link-support-settings"
-          >
-            <Button variant="outline" className="gap-2">
-              <MessageCircle className="w-4 h-4" />
-              {locale === 'ru' ? 'Связаться с поддержкой' : 'Contact Support'}
-            </Button>
-          </a>
-        </Card>
         <Card className="p-4" data-testid="card-support">
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
             {locale === 'ru' ? 'Поддержка' : 'Support'}
