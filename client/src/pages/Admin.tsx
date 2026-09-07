@@ -68,6 +68,32 @@ export default function Admin() {
   const [subscriptionTier, setSubscriptionTier] = useState("");
   const [subscriptionDays, setSubscriptionDays] = useState("30");
   const [userQuery, setUserQuery] = useState("");
+
+  interface StarsPayment {
+    chargeId: string; userId: string | null; tgUserId: number | null; type: 'subscription' | 'orbs';
+    tier: string | null; orbs: number | null; stars: number | null; recurring: boolean; refunded: boolean; createdAt: string;
+  }
+  const { data: starsData, isLoading: starsLoading, refetch: refetchStars } = useQuery<{ ok: boolean; data: StarsPayment[] }>({
+    queryKey: ["/api/admin/stars/payments"],
+  });
+  const starsPayments = starsData?.data || [];
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const handleStarsRefund = async (p: StarsPayment) => {
+    if (!p.userId) return;
+    if (!confirm(`Вернуть ${p.stars} ⭐ пользователю ${p.userId} и откатить ${p.type === 'subscription' ? '30 дней подписки' : `${p.orbs} орбов`}?`)) return;
+    setRefundingId(p.chargeId);
+    try {
+      const r = await apiRequest("POST", "/api/admin/stars/refund", { userId: p.userId, chargeId: p.chargeId });
+      if (!r.ok) throw new Error(r.error || 'refund failed');
+      toast({ title: "Refund done", description: r.data?.rollback });
+      refetchStars();
+    } catch (e: any) {
+      toast({ title: "Refund failed", description: e.message, variant: "destructive" });
+    } finally {
+      setRefundingId(null);
+    }
+  };
+
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [activatingId, setActivatingId] = useState<string | null>(null);
 
@@ -161,30 +187,6 @@ export default function Admin() {
     : allUsers;
   const pendingPayments = pendingPaymentsData?.payments || [];
 
-  interface StarsPayment {
-    chargeId: string; userId: string | null; tgUserId: number | null; type: 'subscription' | 'orbs';
-    tier: string | null; orbs: number | null; stars: number | null; recurring: boolean; refunded: boolean; createdAt: string;
-  }
-  const { data: starsData, isLoading: starsLoading, refetch: refetchStars } = useQuery<{ ok: boolean; data: StarsPayment[] }>({
-    queryKey: ["/api/admin/stars/payments"],
-  });
-  const starsPayments = starsData?.data || [];
-  const [refundingId, setRefundingId] = useState<string | null>(null);
-  const handleStarsRefund = async (p: StarsPayment) => {
-    if (!p.userId) return;
-    if (!confirm(`Вернуть ${p.stars} ⭐ пользователю ${p.userId} и откатить ${p.type === 'subscription' ? '30 дней подписки' : `${p.orbs} орбов`}?`)) return;
-    setRefundingId(p.chargeId);
-    try {
-      const r = await apiRequest("POST", "/api/admin/stars/refund", { userId: p.userId, chargeId: p.chargeId });
-      if (!r.ok) throw new Error(r.error || 'refund failed');
-      toast({ title: "Refund done", description: r.data?.rollback });
-      refetchStars();
-    } catch (e: any) {
-      toast({ title: "Refund failed", description: e.message, variant: "destructive" });
-    } finally {
-      setRefundingId(null);
-    }
-  };
   const webhookErrors = webhookErrorsData?.errors || [];
 
   return (
