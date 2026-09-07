@@ -554,10 +554,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!tier || (tier !== 'standard' && tier !== 'pro' && tier !== 'premium')) {
         return res.status(400).json({ ok: false, error: "Invalid tier. Use 'standard', 'pro', or 'premium'" });
       }
+      const months = [1, 6, 12].includes(Number(req.body?.months)) ? Number(req.body.months) : 1;
       const activated = await activateSubscriptionForUser(storage, {
         userId,
         tier: tier as any,
-        periodDays: 30,
+        periodMonths: months,
         source: 'dev',
       });
       const currentPeriodEnd = activated.currentPeriodEnd;

@@ -402,8 +402,8 @@ export default function Subscribe() {
   });
 
   const devSubscribeMutation = useMutation({
-    mutationFn: async (tier: 'standard' | 'pro') => {
-      const response = await apiRequest('POST', '/api/dev/subscribe', { tier });
+    mutationFn: async ({ tier, months }: { tier: 'standard' | 'pro'; months: number }) => {
+      const response = await apiRequest('POST', '/api/dev/subscribe', { tier, months });
       if (!response.ok) throw new Error(response.error || 'Failed to activate dev subscription');
       return response.data;
     },
@@ -1027,7 +1027,7 @@ export default function Subscribe() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          devSubscribeMutation.mutate(tier.tier as 'standard' | 'pro');
+                          devSubscribeMutation.mutate({ tier: tier.tier as 'standard' | 'pro', months: PERIOD_CONFIG[selectedPeriod].months });
                         }}
                         disabled={devSubscribeMutation.isPending}
                         data-testid={`button-dev-subscribe-${tier.tier}`}
