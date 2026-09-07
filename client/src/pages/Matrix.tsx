@@ -213,6 +213,25 @@ export default function Matrix() {
           </div>
         </div>
 
+        <div className="mb-4 flex gap-1.5 p-1 rounded-xl bg-muted/50">
+          <button
+            type="button"
+            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${!guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+            onClick={() => { haptic.select(); setGuestMode(false); }}
+            data-testid="matrix-tab-my"
+          >
+            {ru ? 'Моя матрица' : 'My matrix'}
+          </button>
+          <button
+            type="button"
+            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+            onClick={() => { haptic.select(); setGuestMode(true); setTapped(null); }}
+            data-testid="matrix-tab-guest"
+          >
+            {ru ? 'Для другого' : 'For someone else'}
+          </button>
+        </div>
+
         {isError ? (
           <Card className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
