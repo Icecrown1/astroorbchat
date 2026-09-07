@@ -37,3 +37,15 @@ export const ARCANA_META: ArcanaMeta[] = [
 ];
 
 export const arcanaMetaByN = (n: number): ArcanaMeta => ARCANA_META[n - 1];
+
+/** Изображение старшего аркана из колоды Таро приложения (/tarot/<id>.webp).
+ *  Марсельский порядок матрицы: 8 = Справедливость (justice), 11 = Сила (strength). */
+const MAJOR_CARD_BY_N: Record<number, string> = {
+  1: 'magician', 2: 'high-priestess', 3: 'empress', 4: 'emperor', 5: 'hierophant',
+  6: 'lovers', 7: 'chariot', 8: 'justice', 9: 'hermit', 10: 'wheel-of-fortune',
+  11: 'strength', 12: 'hanged-man', 13: 'death', 14: 'temperance', 15: 'devil',
+  16: 'tower', 17: 'star', 18: 'moon', 19: 'sun', 20: 'judgement', 21: 'world', 22: 'fool',
+};
+export function arcanaCardId(n: number): string | null {
+  return MAJOR_CARD_BY_N[n] || null;
+}

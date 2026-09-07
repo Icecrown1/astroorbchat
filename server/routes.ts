@@ -4822,6 +4822,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Гостевые матрицы: список
+  app.get("/api/matrix/guests", requireAuth, async (req, res) => {
+    try {
+      const rows = await storage.getGuestMatrices((req as any).userId);
+      res.json({ ok: true, data: rows });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Гостевая матрица: расчёт (платно), сохранение в историю
+  app.post("/api/matrix/guest", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const name = String(req.body?.name || '').trim().slice(0, 60);
+      const birthDate = String(req.body?.birthDate || '').trim();
+      if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+        return res.status(400).json({ ok: false, error: 'name_and_date_required' });
+      }
+      const core = calcMatrixFromISO(birthDate);
+      if (!core) return res.status(400).json({ ok: false, error: 'invalid_date' });
+
+      const access = await canAccessFeature(storage, userId, 'matrix_guest' as any);
+      if (!access.allowed) {
+        return res.status(402).json({
+          ok: false,
+          error: access.requiresSubscription ? 'subscription_required' : 'insufficient_orbs',
+          cost: access.cost,
+        });
+      }
+      const deduction = await deductOrbs(storage, userId, 'matrix_guest' as any);
+      if (!deduction.ok) return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
+
+      const saved = await storage.createGuestMatrix({ userId, name, birthDate });
+      res.json({ ok: true, data: { id: saved.id, name, birthDate, core } });
+    } catch (error: any) {
+      console.error('[MATRIX] guest error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Гостевая матрица: пересчёт сохранённой (бесплатно — уже оплачена)
+  app.get("/api/matrix/guest/:id", requireAuth, async (req, res) => {
+    try {
+      const rows = await storage.getGuestMatrices((req as any).userId);
+      const row = rows.find((r: any) => r.id === req.params.id);
+      if (!row) return res.status(404).json({ ok: false, error: 'not_found' });
+      const core = calcMatrixFromISO(row.birthDate);
+      res.json({ ok: true, data: { id: row.id, name: row.name, birthDate: row.birthDate, core } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/matrix/section", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

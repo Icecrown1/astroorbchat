@@ -5,14 +5,15 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Lock } from 'lucide-react';
+import { ArrowLeft, Lock, Users, Plus, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
 import { MatrixOctagram, type MatrixZone, type OctagramNode } from '@/components/MatrixOctagram';
-import { arcanaMetaByN } from '@shared/matrixArcanaMeta';
+import { arcanaMetaByN, arcanaCardId } from '@shared/matrixArcanaMeta';
 import { haptic } from '@/lib/haptics';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
 
@@ -50,6 +51,12 @@ export default function Matrix() {
 
   const [zone, setZone] = useState<MatrixZone>('all');
   const [tapped, setTapped] = useState<OctagramNode | null>(null);
+  const [cardZoom, setCardZoom] = useState<string | null>(null); // id карты Таро в лайтбоксе
+  // Режим «для другого человека»
+  const [guestMode, setGuestMode] = useState(false);
+  const [guest, setGuest] = useState<{ id: string; name: string; birthDate: string; core: MatrixCore } | null>(null);
+  const [gName, setGName] = useState('');
+  const [gDate, setGDate] = useState('');
   const [pendingSection, setPendingSection] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery<MatrixResponse>({
@@ -103,7 +110,40 @@ export default function Matrix() {
   }, []);
 
   const core = data?.core;
+  const { data: guestsData } = useQuery<{ ok: boolean; data: Array<{ id: string; name: string; birthDate: string }> }>({
+    queryKey: ['/api/matrix/guests'],
+    enabled: guestMode,
+  });
+
+  const guestMutation = useMutation({
+    mutationFn: async (payload: { name: string; birthDate: string }) => {
+      const resp = await apiRequest('POST', '/api/matrix/guest', payload);
+      if (!resp.ok) { const e: any = new Error(resp.error); e.code = resp.error; e.cost = resp.cost; throw e; }
+      return resp.data;
+    },
+    onSuccess: (d) => {
+      haptic.notify('success');
+      setGuest(d); setGName(''); setGDate('');
+      queryClient.invalidateQueries({ queryKey: ['/api/matrix/guests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
+    },
+    onError: (e: any) => {
+      haptic.notify('error');
+      if (e.code === 'subscription_required') { toast({ title: ru ? 'Нужна подписка' : 'Subscription needed' }); setLocation('/subscribe'); }
+      else if (e.code === 'insufficient_orbs') { toast({ title: ru ? `Не хватает звёзд (нужно ${e.cost} ⭐)` : `Not enough stars (${e.cost} ⭐)` }); setLocation('/buy-energy'); }
+      else toast({ title: ru ? 'Не получилось' : 'Failed', variant: 'destructive' });
+    },
+  });
+
+  const openGuest = async (id: string) => {
+    try {
+      const resp = await apiRequest('GET', `/api/matrix/guest/${id}`);
+      if (resp.ok) { haptic.select(); setGuest(resp.data); }
+    } catch { /* noop */ }
+  };
+
   const tappedMeta = tapped ? arcanaMetaByN(tapped.value) : null;
+  const activeCore: MatrixCore | null = guestMode ? (guest?.core ?? null) : (data?.core ?? null);
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -127,7 +167,40 @@ export default function Matrix() {
             </p>
             <Button className="mt-4" onClick={() => refetch()}>{ru ? 'Повторить' : 'Retry'}</Button>
           </Card>
-        ) : isLoading || !core ? (
+        ) : guestMode && !guest ? (
+          <>
+            <Card className="p-4 anim-fade-up">
+              <h2 className="font-display font-semibold mb-1">{ru ? 'Матрица для другого человека' : 'Matrix for someone else'}</h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                {ru ? 'Октаграмма, зоны и арканы по дате рождения. Разборы разделов доступны только для своей матрицы.' : 'Octagram, zones and arcana by birth date. Section readings are for your own matrix only.'}
+              </p>
+              <Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder={ru ? 'Имя человека' : 'Person name'} className="h-11 mb-2" data-testid="input-guest-name" />
+              <Input type="date" value={gDate} onChange={(e) => setGDate(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="h-11 mb-3" data-testid="input-guest-date" />
+              <Button
+                className="w-full h-11"
+                disabled={guestMutation.isPending || !gName.trim() || !gDate}
+                onClick={() => { haptic.impact('medium'); guestMutation.mutate({ name: gName.trim(), birthDate: gDate }); }}
+                data-testid="button-guest-calc"
+              >
+                {guestMutation.isPending ? (ru ? 'Считаем…' : 'Calculating…') : (<>{ru ? 'Построить матрицу' : 'Build the matrix'} <OrbIcon className="w-4 h-4 mx-1" /> 15</>)}
+              </Button>
+            </Card>
+
+            {(guestsData?.data?.length ?? 0) > 0 && (
+              <div className="mt-5 space-y-2">
+                <h2 className="text-sm font-medium text-muted-foreground">{ru ? 'Сохранённые' : 'Saved'}</h2>
+                {guestsData!.data.map((g) => (
+                  <Card key={g.id} className="p-3 hover-elevate cursor-pointer" onClick={() => openGuest(g.id)} data-testid={`guest-${g.id}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{g.name}</span>
+                      <span className="text-xs text-muted-foreground">{g.birthDate}</span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (isLoading && !guestMode) || !core ? (
           <div className="py-24 flex justify-center"><Loader /></div>
         ) : (
           <>
@@ -147,6 +220,18 @@ export default function Matrix() {
               ))}
             </div>
 
+            {guestMode && guest && (
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="font-display font-semibold">{guest.name}</p>
+                  <p className="text-xs text-muted-foreground">{guest.birthDate}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => { haptic.select(); setGuest(null); }} data-testid="button-guest-close">
+                  <X className="w-4 h-4 mr-1" />{ru ? 'К списку' : 'Back'}
+                </Button>
+              </div>
+            )}
+
             <Card className="p-4 anim-fade-up wheel-nebula">
               <MatrixOctagram core={core} zone={zone} onNodeTap={(n) => { haptic.impact('light'); setTapped(n); }} activeNodeId={tapped?.id} />
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
@@ -154,6 +239,7 @@ export default function Matrix() {
               </p>
             </Card>
 
+            {!guestMode && (<>
             {/* Секции разбора */}
             <div className="mt-6 space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground">
@@ -195,6 +281,7 @@ export default function Matrix() {
                 );
               })}
             </div>
+            </>)}
 
             <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
               {ru
@@ -221,15 +308,48 @@ export default function Matrix() {
                   {ru ? tapped.label.ru : tapped.label.en} · {ru ? tappedMeta.keyRu : tappedMeta.keyEn}
                 </DrawerDescription>
               </DrawerHeader>
+              {arcanaCardId(tapped.value) && (
+                <button
+                  type="button"
+                  className="mx-auto mb-3 block w-[132px] rounded-xl overflow-hidden border border-[hsl(41,50%,40%)]/60 tap-scale"
+                  onClick={() => { haptic.impact('light'); setCardZoom(arcanaCardId(tapped.value)); }}
+                  aria-label={ru ? 'Увеличить карту' : 'Zoom the card'}
+                  data-testid="button-arcana-card"
+                >
+                  <img src={`/tarot/${arcanaCardId(tapped.value)}.webp`} alt="" className="w-full h-auto" loading="lazy"
+                       onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
+                </button>
+              )}
+              <p className="text-center text-[11px] text-muted-foreground mb-3">
+                {ru ? 'Нажмите на карту, чтобы рассмотреть' : 'Tap the card to view it large'}
+              </p>
               <p className="text-sm text-muted-foreground">
                 {ru
-                  ? 'Полное значение этого аркана в вашей матрице — в разборах разделов ниже на странице.'
-                  : 'The full meaning of this arcana in your matrix is in the section readings below.'}
+                  ? (guestMode
+                    ? 'Ключ аркана — выше. Полные AI-разборы доступны в вашей собственной матрице.'
+                    : 'Полное значение этого аркана в вашей матрице — в разборах разделов ниже на странице.')
+                  : (guestMode
+                    ? 'The arcana key is above. Full AI readings are available in your own matrix.'
+                    : 'The full meaning of this arcana in your matrix is in the section readings below.')}
               </p>
             </div>
           )}
         </DrawerContent>
       </Drawer>
+
+      {/* Лайтбокс карты аркана */}
+      {cardZoom && (
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex flex-col" onClick={() => setCardZoom(null)} data-testid="arcana-lightbox">
+          <div className="flex justify-end p-4">
+            <button type="button" className="p-2 rounded-full bg-muted/60 text-foreground" onClick={() => setCardZoom(null)} aria-label={ru ? 'Закрыть' : 'Close'}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center px-4 pb-8" onClick={(e) => e.stopPropagation()}>
+            <img src={`/tarot/${cardZoom}.webp`} alt="" className="max-h-full max-w-full object-contain rounded-xl" onClick={() => setCardZoom(null)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

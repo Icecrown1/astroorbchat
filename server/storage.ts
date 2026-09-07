@@ -7,6 +7,7 @@ import {
   natalReadings,
   horoscopeReadings,
   matrixReadings,
+  guestMatrices,
   tarotReadings,
   compatibilityReadings,
   aiQuestions,
@@ -909,6 +910,18 @@ export class DatabaseStorage implements IStorage {
           eq(matrixReadings.kbVersion, kbVersion),
         )
       );
+  }
+
+  // ---- Гостевые матрицы
+  async createGuestMatrix(data: { userId: string; name: string; birthDate: string }) {
+    const [row] = await db.insert(guestMatrices).values(data).returning();
+    return row;
+  }
+  async getGuestMatrices(userId: string) {
+    return db.select().from(guestMatrices).where(eq(guestMatrices.userId, userId)).orderBy(desc(guestMatrices.createdAt));
+  }
+  async deleteGuestMatrix(id: string, userId: string) {
+    await db.delete(guestMatrices).where(and(eq(guestMatrices.id, id), eq(guestMatrices.userId, userId)));
   }
 
   // ---- Таро

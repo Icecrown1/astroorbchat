@@ -682,6 +682,17 @@ export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 
 
+// Матрицы судьбы для других людей (платно, как гостевые карты)
+export const guestMatrices = pgTable("guest_matrices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  birthDate: varchar("birth_date", { length: 10 }).notNull(), // YYYY-MM-DD
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  userIdx: index("guest_matrices_user_idx").on(t.userId),
+}));
+
 // Расклады Таро: история и кэш (карта дня — одна на календарный день)
 export const tarotReadings = pgTable("tarot_readings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

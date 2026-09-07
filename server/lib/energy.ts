@@ -31,6 +31,7 @@ export const ORB_COSTS = {
   horoscope_weekly: 5,
   matrix_section: 5,         // Секция разбора Матрицы судьбы (хвост/деньги/любовь/предназначение/род)
   matrix_full: 25,           // Все платные секции матрицы разом (выгоднее на ~30%)
+  matrix_guest: 15,          // Матрица судьбы для другого человека (октаграмма+зоны, без AI-разборов)
   
   // High priority (15-20 orbs)
   horoscope_monthly: 15,
