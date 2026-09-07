@@ -210,9 +210,17 @@ export const referralRewards = pgTable("referral_rewards", {
   // New fields for different reward types based on subscription tier
   rewardKind: varchar("reward_kind", { length: 30 }).notNull().default("orbs"), // 'orbs', 'subscription_standard_days', 'subscription_premium_days'
   subscriptionDays: integer("subscription_days"), // Days of subscription granted (for free users)
+  /** hold → granted/claimable → (revoked при рефанде). Легаси-строки считаем granted. */
+  status: varchar("status", { length: 16 }).notNull().default("granted"),
+  /** Награда «созревает» через 72 часа — окно для рефанда/антифрода */
+  unlockAt: timestamp("unlock_at"),
+  grantedAt: timestamp("granted_at"),
+  revokedAt: timestamp("revoked_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   referrerIdIdx: index("referral_rewards_referrer_id_idx").on(table.referrerId),
+  referredIdx: index("referral_rewards_referred_idx").on(table.referredUserId),
+  statusIdx: index("referral_rewards_status_idx").on(table.status),
 }));
 
 export const referralRewardsRelations = relations(referralRewards, ({ one }) => ({

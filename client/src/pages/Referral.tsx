@@ -31,6 +31,7 @@ interface ReferralCodeResponse {
     referralCode: string;
     referrals: ReferralItem[];
     pendingChoices: ReferralItem[];
+    holdRewards: ReferralItem[];
     totalRewards: number;
     totalReferrals: number;
   };
@@ -102,21 +103,26 @@ export default function Referral() {
     }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    hapticFeedback('medium');
+    // Нативная карточка Telegram (Bot API 8.0): готовим сообщение на сервере и открываем системный шэр
+    const wa = (window as any).Telegram?.WebApp;
+    if (wa?.shareMessage) {
+      try {
+        const resp = await apiRequest('POST', '/api/referral/share-message', { locale });
+        if (resp.ok && resp.data?.preparedMessageId) {
+          wa.shareMessage(resp.data.preparedMessageId, (sent: boolean) => {
+            if (sent) hapticFeedback('light');
+          });
+          return;
+        }
+      } catch { /* фолбэк ниже */ }
+    }
     if (referralLink) {
-      const text = locale === 'ru' 
-        ? `Присоединяйся ко мне в Astro Orb для астрологических прогнозов с ИИ! ${referralLink}`
-        : `Join me on Astro Orb for AI-powered astrology readings! ${referralLink}`;
-      if (navigator.share) {
-        navigator.share({
-          title: 'Astro Orb',
-          text: text,
-          url: referralLink,
-        });
-      } else {
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`);
-      }
-      hapticFeedback('medium');
+      const text = locale === 'ru'
+        ? `✨ Смотрю натальную карту и Таро в AstroOrbi. Заходи — бесплатная карта по моей ссылке:`
+        : `✨ I read my birth chart and Tarot in AstroOrbi. Join me — free chart via my link:`;
+      window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`);
     }
   };
 
@@ -295,6 +301,34 @@ export default function Referral() {
             </div>
           )}
         </Card>
+
+        {(data?.data?.holdRewards?.length ?? 0) > 0 && (
+          <Card className="p-4 anim-fade-up" data-testid="card-hold-rewards">
+            <div className="flex items-center gap-2 mb-2">
+              <Gift className="w-4 h-4 text-[hsl(var(--solar-gold))]" />
+              <h2 className="font-display font-semibold">{locale === 'ru' ? 'Награды созревают' : 'Rewards maturing'}</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              {locale === 'ru'
+                ? 'Начислим через 72 часа после оплаты друга — защита от возвратов.'
+                : 'Granted 72 hours after your friend’s payment — refund protection.'}
+            </p>
+            <div className="space-y-2">
+              {data!.data!.holdRewards.map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between text-sm rounded-lg bg-muted/40 px-3 py-2" data-testid={`hold-${r.id}`}>
+                  <span className="text-foreground/85">{r.userName}</span>
+                  <span className="text-muted-foreground">
+                    {r.rewardKind === 'pending_choice'
+                      ? (locale === 'ru' ? 'выбор награды' : 'reward choice')
+                      : `+${r.energyAmount} ⭐${r.subscriptionDays ? ` · +${r.subscriptionDays}${locale === 'ru' ? 'д' : 'd'}` : ''}`}
+                    {' · '}
+                    {r.unlockAt ? new Date(r.unlockAt).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {pendingChoices.length > 0 && (
           <Card className="p-6 mb-6 border-primary/40 bg-primary/5">

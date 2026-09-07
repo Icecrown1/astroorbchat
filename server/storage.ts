@@ -675,6 +675,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(referralRewards.createdAt));
   }
 
+  async updateReferralReward(id: string, updates: Partial<ReferralReward>): Promise<void> {
+    await db.update(referralRewards).set(updates as any).where(eq(referralRewards.id, id));
+  }
+
+  async getReferralRewardsByReferrer(referrerId: string): Promise<ReferralReward[]> {
+    return this.getReferralRewardsByReferrerId(referrerId);
+  }
+
   async getReferralReward(id: string): Promise<ReferralReward | undefined> {
     const [reward] = await db
       .select()

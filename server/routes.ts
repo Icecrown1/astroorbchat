@@ -7,7 +7,7 @@ import { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana
 import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
-import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus, claimReferralChoice } from "./lib/referral";
+import { generateReferralCode, applyReferralBonus, handleSubscriptionReferralBonus, claimReferralChoice, processDueReferralRewards, revokeReferralRewardsForReferred } from "./lib/referral";
 import { 
   checkAndResetEnergy, 
   checkSubscriptionExpiry, 
@@ -2634,6 +2634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/referral/code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
+      // Лениво начисляем созревшие (72ч) hold-награды
+      try { await processDueReferralRewards(storage, user.id); } catch (e) { console.error('[REFERRAL] process due failed:', e); }
       
       // Get all referral rewards for this user
       const rewards = await storage.getReferralRewardsByReferrerId(user.id);
@@ -2649,20 +2651,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rewardKind: reward.rewardKind,
             energyAmount: reward.energyAmount,
             subscriptionDays: reward.subscriptionDays,
+            status: (reward as any).status || 'granted',
+            unlockAt: (reward as any).unlockAt || null,
             createdAt: reward.createdAt,
           };
         })
       );
 
       // Pending choices: free referrer must pick Standard (7d) or Premium (3d)
-      const pendingChoices = referralsWithDetails.filter(r => r.rewardKind === 'pending_choice');
+      const pendingChoices = referralsWithDetails.filter(r => r.rewardKind === 'pending_choice' && (r as any).status === 'claimable');
+      // Созревающие награды (72ч окно) — показываем с таймером
+      const holdRewards = referralsWithDetails.filter(r => (r as any).status === 'hold');
 
       res.json({
         ok: true,
         data: {
           referralCode: user.referralCode,
-          referrals: referralsWithDetails,
+          referrals: referralsWithDetails.filter(r => (r as any).status !== 'revoked'),
           pendingChoices,
+          holdRewards,
           totalRewards: rewards.reduce((sum, r) => sum + r.energyAmount, 0),
           totalReferrals: rewards.filter(r => r.rewardType === 'signup').length,
         },
@@ -2673,6 +2680,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Claim a pending referral choice reward (free referrer: Standard 7d OR Premium 3d)
+  // Нативный шаринг приглашения: готовим inline-сообщение, клиент открывает системный шэр
+  app.post("/api/referral/share-message", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user?.tgId || String(user.tgId).startsWith('test') || String(user.tgId).startsWith('virtual')) {
+        return res.status(400).json({ ok: false, error: 'telegram_only' });
+      }
+      const locale = String(req.body?.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const { getBotUsername } = await import('./lib/telegramStars');
+      const bot = await getBotUsername();
+      if (!bot) return res.status(500).json({ ok: false, error: 'bot_username_unavailable' });
+      const link = `https://t.me/${bot}?startapp=${user.referralCode}`;
+
+      const text = locale === 'ru'
+        ? `✨ Я смотрю натальную карту, Матрицу судьбы и Таро в AstroOrbi — точная астрономия и AI-разборы прямо в Telegram.\n\nЗаходи по моей ссылке — бесплатная натальная карта:`
+        : `✨ I read my birth chart, Matrix of Destiny and Tarot in AstroOrbi — precise astronomy with AI readings right inside Telegram.\n\nJoin with my link and get your free chart:`;
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/savePreparedInlineMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: Number(user.tgId),
+          allow_user_chats: true,
+          allow_group_chats: true,
+          allow_channel_chats: false,
+          result: {
+            type: 'article',
+            id: `ref_${Date.now()}`,
+            title: 'AstroOrbi',
+            input_message_content: { message_text: `${text}\n${link}` },
+            reply_markup: { inline_keyboard: [[{ text: locale === 'ru' ? '✨ Открыть AstroOrbi' : '✨ Open AstroOrbi', url: link }]] },
+          },
+        }),
+      });
+      const data: any = await tgRes.json();
+      if (!data.ok) {
+        console.error('[REFERRAL] savePreparedInlineMessage failed:', data);
+        return res.status(502).json({ ok: false, error: 'prepare_failed' });
+      }
+      res.json({ ok: true, data: { preparedMessageId: data.result.id } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/referral/claim-choice", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
@@ -4183,6 +4236,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rollback = `-${inv.t === 'sub' ? '30 days' : (inv.m || 1) + 'mo'} (until ${newEnd.toISOString()}, ${stillActive ? 'active' : 'canceled'})`;
           }
         }
+      }
+
+      // Clawback реферальной награды за эту оплату друга (подписочные типы)
+      if (inv.t === 'sub' || inv.t === 'subonce') {
+        try { await revokeReferralRewardsForReferred(storage, userId); } catch (e) { console.error('[REFERRAL] clawback failed:', e); }
       }
 
       try {
