@@ -48,7 +48,10 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     return res.status(401).json({ ok: false, error: 'User not found' });
   }
 
-  if (!user.isAdmin) {
+  // Dev-workspace: админка открыта без флага (тестовые пользователи пересоздаются).
+  // В проде (NODE_ENV=production) — только is_admin=true.
+  const devBypass = process.env.NODE_ENV === 'development';
+  if (!user.isAdmin && !devBypass) {
     return res.status(403).json({ ok: false, error: 'Admin access required' });
   }
 

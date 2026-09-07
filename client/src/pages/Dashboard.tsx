@@ -331,7 +331,7 @@ export default function Dashboard() {
             <Receipt className="w-4 h-4" />
             {locale === 'ru' ? 'Платежи' : 'Payments'}
           </Button>
-          {user?.isAdmin && (
+          {(user?.isAdmin || import.meta.env.DEV) && (
             <Button
               variant="outline"
               className="w-full"
