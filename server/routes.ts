@@ -3063,10 +3063,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const validated = updateEnergySchema.parse(req.body);
-      
-      // Set purchased energy to the specified amount (admin override)
-      await storage.updateUser(userId, { purchasedEnergy: validated.energy });
-      res.json({ ok: true });
+
+      // Начисляем в рабочий пул (referralOrbs — несгораемые), как покупку.
+      // Старое поле purchasedEnergy — легаси, в баланс не входит: запись туда выглядела успешной, но ничего не давала.
+      await creditPurchasedOrbs(storage, userId, validated.energy, 'admin');
+      const orbInfo = await getUserOrbs(storage, userId);
+      res.json({ ok: true, data: { orbs: orbInfo.total } });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ ok: false, error: error.errors[0].message });

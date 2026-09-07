@@ -387,7 +387,7 @@ export async function creditPurchasedOrbs(
   storage: any,
   userId: string,
   orbs: number,
-  source: 'stars' | 'yookassa' | 'ton'
+  source: 'stars' | 'yookassa' | 'ton' | 'admin'
 ): Promise<number> {
   const user = await storage.getUser(userId);
   if (!user) throw new Error(`creditPurchasedOrbs: user ${userId} not found`);
