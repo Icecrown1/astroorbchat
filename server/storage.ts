@@ -200,10 +200,15 @@ export class DatabaseStorage implements IStorage {
 
   // Subscription operations
   async getSubscription(userId: string): Promise<Subscription | undefined> {
+    // У пользователя может быть несколько строк (истёкшая + новая): без ORDER BY Postgres
+    // отдаёт произвольную, причём после UPDATE «первой» часто становится старая —
+    // выдача писала в одну строку, а чтение попадало в другую. Берём с самым поздним концом.
     const [subscription] = await db
       .select()
       .from(subscriptions)
-      .where(eq(subscriptions.userId, userId));
+      .where(eq(subscriptions.userId, userId))
+      .orderBy(desc(subscriptions.currentPeriodEnd))
+      .limit(1);
     return subscription || undefined;
   }
 
