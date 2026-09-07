@@ -2511,6 +2511,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .select()
           .from(paymentEventLog)
           .where(dsql`${paymentEventLog.provider} = 'stars' AND ${paymentEventLog.payload}->'message'->'successful_payment'->>'invoice_payload' LIKE ${'%"u":"' + userId + '"%'}`);
+        // Возвраты: события refund_<chargeId> в том же журнале
+        const refundRows = await db
+          .select()
+          .from(paymentEventLog)
+          .where(dsql`${paymentEventLog.provider} = 'stars' AND ${paymentEventLog.eventId} LIKE 'refund_%'`);
+        const refundedCharges = new Set(refundRows.map((r: any) => String(r.eventId).replace(/^refund_/, '')));
+
         starsFormatted = rows.map((r: any) => {
           const sp = r.payload?.message?.successful_payment || {};
           let inv: any = {};
@@ -2518,9 +2525,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             id: `stars_${r.eventId}`,
             userId,
-            kind: 'energy_pack',
+            refunded: refundedCharges.has(String(sp.telegram_payment_charge_id || '')),
+            kind: inv.t ? 'subscription' : 'energy_pack',
             energyAmount: Number(inv.o) || null,
-            tier: null,
+            tier: inv.t || null,
             amountRUB: null,
             amountTON: null,
             amountStars: Number(sp.total_amount) || null,

@@ -311,6 +311,28 @@ export default function Settings() {
             </Button>
           </a>
         </Card>
+        <Card className="p-4" data-testid="card-support">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+            {locale === 'ru' ? 'Поддержка' : 'Support'}
+          </p>
+          <div className="space-y-2">
+            <a href="https://t.me/Icecrown1" target="_blank" rel="noreferrer" className="block">
+              <Button variant="outline" className="w-full justify-start" data-testid="button-support-telegram">
+                {locale === 'ru' ? 'Написать в Telegram' : 'Message us on Telegram'}
+              </Button>
+            </a>
+            <a href="mailto:Icecrown@astroorbi.com" className="block">
+              <Button variant="outline" className="w-full justify-start" data-testid="button-support-email">
+                Icecrown@astroorbi.com
+              </Button>
+            </a>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {locale === 'ru' ? 'Отвечаем в течение дня.' : 'We reply within a day.'}
+          </p>
+        </Card>
+
+
 
         {import.meta.env.DEV && (
           <Card className="p-4 border-dashed" data-testid="card-dev-tools">

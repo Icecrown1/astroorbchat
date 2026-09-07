@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Receipt, Wallet, Calendar, TrendingUp, ArrowUpRight, ArrowLeft } from "lucide-react";
+import { Loader2, Receipt, Wallet, Calendar, TrendingUp, ArrowUpRight, ArrowLeft, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/contexts/LocaleContext";
@@ -19,6 +19,7 @@ interface Payment {
   yookassaPaymentId: string | null;
   paymentMethod: 'ton' | 'yookassa' | 'stars';
   status: string;
+  refunded?: boolean;
   createdAt: string;
 }
 
@@ -102,6 +103,13 @@ export default function PaymentHistory() {
     return status === "completed" || status === "confirmed" || status === "succeeded";
   };
 
+  // Неуспешные и зависшие сутки+ — предлагаем оплатить заново
+  const canRetry = (p: Payment) => {
+    if (p.status === 'failed' || p.status === 'canceled') return true;
+    if (p.status === 'pending' && Date.now() - new Date(p.createdAt).getTime() > ONE_DAY_MS) return true;
+    return false;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -165,6 +173,9 @@ export default function PaymentHistory() {
                 <p className="text-sm text-muted-foreground mt-2">
                   {t.paymentHistory.noPurchases}
                 </p>
+                <Button className="mt-6" onClick={() => navigate('/subscribe')} data-testid="button-empty-subscribe">
+                  {locale === 'ru' ? 'Выбрать подписку' : 'Choose a plan'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -190,8 +201,13 @@ export default function PaymentHistory() {
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge variant={getStatusColor(payment.status, payment.createdAt)} data-testid={`badge-status-${payment.id}`}>
-                      {getStatusLabel(payment.status, payment.createdAt)}
+                    <Badge
+                      variant={payment.refunded ? 'outline' : getStatusColor(payment.status, payment.createdAt)}
+                      data-testid={`badge-status-${payment.id}`}
+                    >
+                      {payment.refunded
+                        ? (locale === 'ru' ? 'Возврат' : 'Refunded')
+                        : getStatusLabel(payment.status, payment.createdAt)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -224,7 +240,7 @@ export default function PaymentHistory() {
                     </Badge>
                   </div>
                   
-                  {isCompleted(payment.status) && payment.paymentMethod === 'ton' && payment.txHash && !payment.txHash.startsWith("pending_") && (
+                  {payment.paymentMethod === 'ton' && payment.txHash && !payment.txHash.startsWith("pending_") && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -236,11 +252,39 @@ export default function PaymentHistory() {
                       <ArrowUpRight className="h-4 w-4" />
                     </Button>
                   )}
+
+                  {payment.paymentMethod === 'ton' && payment.status === 'pending' && (
+                    <p className="text-xs text-muted-foreground" data-testid={`text-ton-pending-${payment.id}`}>
+                      {payment.txHash && !payment.txHash.startsWith('pending_')
+                        ? (locale === 'ru' ? 'Транзакция в сети, ждём подтверждений — обычно 1–2 минуты.' : 'Transaction found, waiting for confirmations — usually 1–2 minutes.')
+                        : (locale === 'ru' ? 'Ждём вашу транзакцию в сети TON. Если оплатили, она появится в течение пары минут.' : 'Waiting for your TON transaction. If you paid, it will appear within a couple of minutes.')}
+                    </p>
+                  )}
+
+                  {!payment.refunded && canRetry(payment) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => navigate(payment.kind === 'subscription' ? '/subscribe' : '/buy-energy')}
+                      data-testid={`button-retry-${payment.id}`}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      {locale === 'ru' ? 'Оплатить снова' : 'Pay again'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
+
+        <p className="text-center text-xs text-muted-foreground pt-2" data-testid="text-support">
+          {locale === 'ru' ? 'Проблема с оплатой? ' : 'Payment issue? '}
+          <a className="text-primary underline-offset-2 hover:underline" href="https://t.me/Icecrown1" target="_blank" rel="noreferrer">Telegram</a>
+          {' · '}
+          <a className="text-primary underline-offset-2 hover:underline" href="mailto:Icecrown@astroorbi.com">Icecrown@astroorbi.com</a>
+        </p>
       </div>
     </div>
   );
