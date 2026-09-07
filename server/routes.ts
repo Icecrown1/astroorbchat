@@ -3077,33 +3077,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const updateSubscriptionSchema = z.object({
     tier: z.enum(["standard", "pro", "premium"]),
     status: z.enum(["active", "canceled", "expired"]),
+    days: z.number().int().min(1).max(730).optional(), // срок подарка; по умолчанию 30
   });
 
   app.post("/api/admin/users/:userId/subscription", requireAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
       const validated = updateSubscriptionSchema.parse(req.body);
-      
-      const existingSub = await storage.getSubscription(userId);
-      const startedAt = new Date();
-      const currentPeriodEnd = dayjs(startedAt).add(30, "days").toDate();
-      
-      if (existingSub) {
-        await storage.updateSubscription(existingSub.id, {
-          tier: validated.tier,
-          status: validated.status,
-          currentPeriodEnd,
-        });
-      } else {
-        await storage.createSubscription({
+
+      if (validated.status === 'active') {
+        // Выдача/продление через единую точку: срок от max(now, конец текущей), месячные звёзды начислятся
+        const result = await activateSubscriptionForUser(storage, {
           userId,
-          tier: validated.tier,
-          status: validated.status,
-          startedAt,
-          currentPeriodEnd,
+          tier: validated.tier as any,
+          periodDays: validated.days || 30,
+          source: 'admin',
+          meta: { autoRenew: false },
         });
+        return res.json({ ok: true, data: { until: result.currentPeriodEnd, orbs: result.monthlyOrbs } });
       }
-      
+
+      // canceled / expired — просто смена статуса
+      const existingSub = await storage.getSubscription(userId);
+      if (existingSub) {
+        await storage.updateSubscription(existingSub.id, { tier: validated.tier, status: validated.status });
+      }
       res.json({ ok: true });
     } catch (error: any) {
       if (error instanceof z.ZodError) {

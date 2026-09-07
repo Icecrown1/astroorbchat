@@ -66,6 +66,7 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [energyAmount, setEnergyAmount] = useState("");
   const [subscriptionTier, setSubscriptionTier] = useState("");
+  const [subscriptionDays, setSubscriptionDays] = useState("30");
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [activatingId, setActivatingId] = useState<string | null>(null);
 
@@ -101,8 +102,8 @@ export default function Admin() {
   });
 
   const updateSubscriptionMutation = useMutation({
-    mutationFn: async ({ userId, tier, status }: { userId: string; tier: string; status: string }) => {
-      return await apiRequest("POST", `/api/admin/users/${userId}/subscription`, { tier, status });
+    mutationFn: async ({ userId, tier, status, days }: { userId: string; tier: string; status: string; days?: number }) => {
+      return await apiRequest("POST", `/api/admin/users/${userId}/subscription`, { tier, status, days });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -148,7 +149,16 @@ export default function Admin() {
   }
 
   const stats = statsData?.data;
-  const users = usersData?.data || [];
+  const allUsers = usersData?.data || [];
+  const [userQuery, setUserQuery] = useState("");
+  const users = userQuery.trim()
+    ? allUsers.filter((u: any) => {
+        const q = userQuery.trim().toLowerCase().replace(/^@/, "");
+        return (u.username || "").toLowerCase().includes(q)
+          || (u.name || "").toLowerCase().includes(q)
+          || String(u.tgId || "").includes(q);
+      })
+    : allUsers;
   const pendingPayments = pendingPaymentsData?.payments || [];
 
   interface StarsPayment {
@@ -253,6 +263,13 @@ export default function Admin() {
                 <CardDescription>{t.admin.viewManageUsers}</CardDescription>
               </CardHeader>
               <CardContent>
+                <Input
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder="Поиск: @ник, имя или tg id"
+                  className="mb-3 max-w-sm"
+                  data-testid="input-user-search"
+                />
                 <div className="space-y-4">
                   {users.map((user) => (
                     <div
@@ -339,6 +356,19 @@ export default function Admin() {
                                 </SelectContent>
                               </Select>
 
+                              <Select value={subscriptionDays} onValueChange={setSubscriptionDays}>
+                                <SelectTrigger data-testid="select-subscription-days">
+                                  <SelectValue placeholder="Срок" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="7">7 дней</SelectItem>
+                                  <SelectItem value="30">30 дней</SelectItem>
+                                  <SelectItem value="90">90 дней</SelectItem>
+                                  <SelectItem value="180">180 дней</SelectItem>
+                                  <SelectItem value="365">365 дней</SelectItem>
+                                </SelectContent>
+                              </Select>
+
                               <Select value={subscriptionStatus} onValueChange={setSubscriptionStatus}>
                                 <SelectTrigger data-testid="select-subscription-status">
                                   <SelectValue placeholder={t.admin.selectStatus} />
@@ -358,6 +388,7 @@ export default function Admin() {
                                       userId: selectedUser.id,
                                       tier: subscriptionTier,
                                       status: subscriptionStatus,
+                                      days: parseInt(subscriptionDays) || 30,
                                     });
                                   }
                                 }}
