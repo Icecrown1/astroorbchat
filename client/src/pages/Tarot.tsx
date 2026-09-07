@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Sparkles, RotateCcw, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, Sparkles, RotateCcw, X, Share2 } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { Loader } from '@/components/Loader';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { getTarotCard, TAROT_SPREADS, type TarotSpreadId, type DrawnTarotCard } from '@shared/tarot';
+import { makeCanvas, drawCosmicBg, drawTarotCard, drawWrappedText, drawFooter, fontsReady, sendShareImage, shareColors, SHARE_W } from '@/lib/shareCard';
 
 interface TarotReading {
   id: string;
@@ -161,6 +162,67 @@ export default function Tarot() {
     { id: 'celtic', title: ru ? 'Кельтский крест' : 'Celtic Cross', desc: ru ? 'Глубокий разбор из 10 карт' : 'A deep 10-card reading', cost: costs.celtic, needsQuestion: true },
   ];
 
+  const [sharing, setSharing] = useState(false);
+
+  const shareReading = async () => {
+    if (!reading || !spreadDef) return;
+    haptic.impact('medium');
+    setSharing(true);
+    try {
+      await fontsReady();
+      const { canvas, ctx } = makeCanvas();
+      drawCosmicBg(ctx);
+
+      // Вопрос или заголовок расклада
+      ctx.textAlign = 'center';
+      ctx.fillStyle = shareColors.INK;
+      ctx.font = '46px Prata, serif';
+      const title = reading.question
+        ? `«${reading.question}»`
+        : (ru ? (reading.spread === 'daily' ? 'Карта дня' : 'Расклад Таро') : (reading.spread === 'daily' ? 'Card of the day' : 'Tarot reading'));
+      drawWrappedText(ctx, title, SHARE_W / 2, 150, 880, 62, 3);
+
+      // Карты: 1 — крупно, 2-3 — веером, больше — первые 3 и бейдж "+N"
+      const shown = reading.cards.slice(0, 3);
+      const cw = shown.length === 1 ? 380 : 270;
+      const cy = 640;
+      const spread = shown.length === 1 ? [0] : shown.length === 2 ? [-160, 160] : [-250, 0, 250];
+      const rot = shown.length === 1 ? [0] : shown.length === 2 ? [-6, 6] : [-9, 0, 9];
+      for (let i = 0; i < shown.length; i++) {
+        await drawTarotCard(ctx, shown[i].cardId, SHARE_W / 2 + spread[i], cy + (i === 1 && shown.length === 3 ? -24 : 0), cw, rot[i], shown[i].reversed);
+      }
+      if (reading.cards.length > 3) {
+        ctx.fillStyle = shareColors.GOLD;
+        ctx.font = '34px Inter, sans-serif';
+        ctx.fillText(ru ? `и ещё ${reading.cards.length - 3} карт…` : `and ${reading.cards.length - 3} more…`, SHARE_W / 2, cy + 300);
+      }
+
+      // Имена карт / вердикт
+      ctx.fillStyle = shareColors.GOLD;
+      ctx.font = '32px Prata, serif';
+      if (reading.spread === 'yesno' && reading.interpretation.verdict) {
+        const v = reading.interpretation.verdict;
+        ctx.fillText(v === 'yes' ? (ru ? 'Скорее да' : 'Leaning yes') : v === 'no' ? (ru ? 'Скорее нет' : 'Leaning no') : (ru ? 'Не всё однозначно' : 'It depends'), SHARE_W / 2, 1020);
+      } else {
+        const names = shown.map((c) => getTarotCard(c.cardId)?.nameEn).filter(Boolean).join(' · ');
+        drawWrappedText(ctx, names, SHARE_W / 2, 1020, 900, 42, 2);
+      }
+
+      await drawFooter(ctx, ru ? 'Вытяни свою карту — бесплатно в AstroOrbi' : 'Draw your own card — free in AstroOrbi');
+
+      const caption = ru
+        ? (reading.question ? `Спросила у Таро: «${reading.question}» ✨` : 'Моя карта дня в AstroOrbi ✨')
+        : (reading.question ? `Asked the Tarot: “${reading.question}” ✨` : 'My card of the day in AstroOrbi ✨');
+      const result = await sendShareImage(canvas, caption, locale);
+      if (result === 'downloaded') toast({ title: ru ? 'Картинка сохранена' : 'Image saved' });
+    } catch (e) {
+      console.error('[SHARE] tarot failed', e);
+      toast({ title: ru ? 'Не получилось поделиться' : 'Share failed', variant: 'destructive' });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const spreadDef = reading ? TAROT_SPREADS[reading.spread] : null;
   const verdictLabel = (v?: string) =>
     v === 'yes' ? (ru ? 'Скорее да' : 'Leaning yes') : v === 'no' ? (ru ? 'Скорее нет' : 'Leaning no') : (ru ? 'Не всё однозначно' : 'It depends');
@@ -243,10 +305,16 @@ export default function Tarot() {
                 : 'This reading is for reflection and entertainment; it is not medical, legal or psychological advice.'}
             </p>
 
-            <Button variant="outline" className="w-full" onClick={() => { haptic.impact('light'); setReading(null); }} data-testid="button-new-reading">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              {ru ? 'Новый расклад' : 'New reading'}
-            </Button>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={shareReading} disabled={sharing} data-testid="button-share-reading">
+                <Share2 className="w-4 h-4 mr-2" />
+                {sharing ? (ru ? 'Готовим…' : 'Preparing…') : (ru ? 'Поделиться' : 'Share')}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => { haptic.impact('light'); setReading(null); }} data-testid="button-new-reading">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {ru ? 'Новый расклад' : 'New reading'}
+              </Button>
+            </div>
           </div>
         ) : (
           /* ---------- Выбор расклада ---------- */

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Lock, Users, Plus, X } from 'lucide-react';
+import { ArrowLeft, Lock, Users, Plus, X, Share2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -15,6 +15,7 @@ import { useEnergy } from '@/store/useEnergy';
 import { MatrixOctagram, type MatrixZone, type OctagramNode } from '@/components/MatrixOctagram';
 import { arcanaMetaByN, arcanaCardId } from '@shared/matrixArcanaMeta';
 import { haptic } from '@/lib/haptics';
+import { makeCanvas, drawCosmicBg, drawWrappedText, drawFooter, fontsReady, sendShareImage, shareColors, SHARE_W } from '@/lib/shareCard';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
 
 type SectionState = { id: MatrixSectionId; free: boolean; content: string | null };
@@ -142,6 +143,58 @@ export default function Matrix() {
     } catch { /* noop */ }
   };
 
+  const [sharing, setSharing] = useState(false);
+
+  const shareMatrix = async () => {
+    haptic.impact('medium');
+    setSharing(true);
+    try {
+      await fontsReady();
+      const svgEl = document.querySelector('svg[data-octagram]') as SVGSVGElement | null;
+      if (!svgEl) throw new Error('octagram not found');
+      const clone = svgEl.cloneNode(true) as SVGSVGElement;
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', '400'); clone.setAttribute('height', '400');
+      const svgText = new XMLSerializer().serializeToString(clone);
+      const svgUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+      const img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = svgUrl;
+      });
+
+      const { canvas, ctx } = makeCanvas();
+      drawCosmicBg(ctx);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = shareColors.INK;
+      ctx.font = '52px Prata, serif';
+      const title = guestMode && guest ? guest.name : (ru ? 'Моя Матрица судьбы' : 'My Matrix of Destiny');
+      drawWrappedText(ctx, title, SHARE_W / 2, 140, 900, 64, 2);
+      const dateLine = guestMode && guest ? guest.birthDate : '';
+      if (dateLine) {
+        ctx.fillStyle = shareColors.MUTED;
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillText(dateLine, SHARE_W / 2, 210);
+      }
+
+      const size = 880;
+      ctx.drawImage(img, (SHARE_W - size) / 2, 260, size, size);
+      URL.revokeObjectURL(svgUrl);
+
+      await drawFooter(ctx, ru ? 'Рассчитай свою матрицу — бесплатно в AstroOrbi' : 'Calculate your own matrix — free in AstroOrbi');
+
+      const caption = guestMode && guest
+        ? (ru ? `Матрица судьбы: ${guest.name} ✨` : `Matrix of Destiny: ${guest.name} ✨`)
+        : (ru ? 'Моя Матрица судьбы в AstroOrbi ✨' : 'My Matrix of Destiny in AstroOrbi ✨');
+      const result = await sendShareImage(canvas, caption, locale);
+      if (result === 'downloaded') toast({ title: ru ? 'Картинка сохранена' : 'Image saved' });
+    } catch (e) {
+      console.error('[SHARE] matrix failed', e);
+      toast({ title: ru ? 'Не получилось поделиться' : 'Share failed', variant: 'destructive' });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const tappedMeta = tapped ? arcanaMetaByN(tapped.value) : null;
   const activeCore: MatrixCore | null = guestMode ? (guest?.core ?? null) : (data?.core ?? null);
 
@@ -237,6 +290,10 @@ export default function Matrix() {
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {ru ? 'Нажмите на любую точку матрицы' : 'Tap any point of the matrix'}
               </p>
+              <Button variant="outline" size="sm" className="mt-3 w-full" onClick={shareMatrix} disabled={sharing} data-testid="button-share-matrix">
+                <Share2 className="w-4 h-4 mr-2" />
+                {sharing ? (ru ? 'Готовим…' : 'Preparing…') : (ru ? 'Поделиться' : 'Share')}
+              </Button>
             </Card>
 
             {!guestMode && (<>

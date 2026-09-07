@@ -2681,6 +2681,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Claim a pending referral choice reward (free referrer: Standard 7d OR Premium 3d)
   // Нативный шаринг приглашения: готовим inline-сообщение, клиент открывает системный шэр
+  // ===== Шаринг картинок результатов (Таро/Матрица) =====
+  // Клиент рисует карточку на canvas и присылает PNG; мы кладём во временное хранилище,
+  // отдаём по публичному URL и готовим inline-фото с кнопкой-рефссылкой.
+  const SHARE_DIR = '/tmp/astroorbi_share';
+  app.get('/share/:file', async (req, res) => {
+    try {
+      const file = String(req.params.file || '');
+      if (!/^[a-f0-9-]+\.png$/.test(file)) return res.status(400).end();
+      const fs = await import('fs');
+      const path = `${SHARE_DIR}/${file}`;
+      if (!fs.existsSync(path)) return res.status(404).end();
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      fs.createReadStream(path).pipe(res);
+    } catch { res.status(500).end(); }
+  });
+
+  app.post("/api/share/image", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      const image = String(req.body?.image || '');
+      const caption = String(req.body?.caption || '').slice(0, 900);
+      const locale = String(req.body?.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const m = image.match(/^data:image\/png;base64,(.+)$/);
+      if (!m) return res.status(400).json({ ok: false, error: 'png_base64_required' });
+      const buf = Buffer.from(m[1], 'base64');
+      if (buf.length > 3 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'too_large' });
+
+      const fs = await import('fs');
+      const crypto = await import('crypto');
+      fs.mkdirSync(SHARE_DIR, { recursive: true });
+      // Ленивая уборка: файлы старше 2 часов
+      try {
+        const now = Date.now();
+        for (const f of fs.readdirSync(SHARE_DIR)) {
+          const st = fs.statSync(`${SHARE_DIR}/${f}`);
+          if (now - st.mtimeMs > 2 * 3600 * 1000) fs.unlinkSync(`${SHARE_DIR}/${f}`);
+        }
+      } catch { /* noop */ }
+      const fname = `${crypto.randomUUID()}.png`;
+      fs.writeFileSync(`${SHARE_DIR}/${fname}`, buf);
+
+      const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+      const photoUrl = `${proto}://${host}/share/${fname}`;
+
+      // Вне Telegram (dev-браузер) — отдаём просто URL для скачивания
+      if (!user?.tgId || String(user.tgId).startsWith('test') || String(user.tgId).startsWith('virtual')) {
+        return res.json({ ok: true, data: { url: photoUrl } });
+      }
+
+      const { getBotUsername } = await import('./lib/telegramStars');
+      const bot = await getBotUsername();
+      const link = bot ? `https://t.me/${bot}?startapp=${user.referralCode}` : null;
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/savePreparedInlineMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: Number(user.tgId),
+          allow_user_chats: true,
+          allow_group_chats: true,
+          allow_channel_chats: true,
+          result: {
+            type: 'photo',
+            id: `share_${Date.now()}`,
+            photo_url: photoUrl,
+            thumbnail_url: photoUrl,
+            photo_width: 1080,
+            photo_height: 1350,
+            caption,
+            ...(link ? { reply_markup: { inline_keyboard: [[{ text: locale === 'ru' ? '✨ Попробовать бесплатно' : '✨ Try it free', url: link }]] } } : {}),
+          },
+        }),
+      });
+      const data: any = await tgRes.json();
+      if (!data.ok) {
+        console.error('[SHARE] savePreparedInlineMessage failed:', data);
+        return res.json({ ok: true, data: { url: photoUrl } }); // мягкий фолбэк
+      }
+      res.json({ ok: true, data: { preparedMessageId: data.result.id, url: photoUrl } });
+    } catch (error: any) {
+      console.error('[SHARE] error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/referral/share-message", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
