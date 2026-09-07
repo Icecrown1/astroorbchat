@@ -3056,7 +3056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const updateEnergySchema = z.object({
-    energy: z.number().int().min(0).max(1000),
+    energy: z.number().int().min(1).max(100000),
   });
 
   app.post("/api/admin/users/:userId/energy", requireAdmin, async (req, res) => {
@@ -3067,6 +3067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Начисляем в рабочий пул (referralOrbs — несгораемые), как покупку.
       // Старое поле purchasedEnergy — легаси, в баланс не входит: запись туда выглядела успешной, но ничего не давала.
       await creditPurchasedOrbs(storage, userId, validated.energy, 'admin');
+      const { getUserOrbs } = await import('./lib/energy.js');
       const orbInfo = await getUserOrbs(storage, userId);
       res.json({ ok: true, data: { orbs: orbInfo.total } });
     } catch (error: any) {
