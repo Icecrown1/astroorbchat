@@ -67,6 +67,7 @@ export default function Admin() {
   const [energyAmount, setEnergyAmount] = useState("");
   const [subscriptionTier, setSubscriptionTier] = useState("");
   const [subscriptionDays, setSubscriptionDays] = useState("30");
+  const [userQuery, setUserQuery] = useState("");
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [activatingId, setActivatingId] = useState<string | null>(null);
 
@@ -150,7 +151,6 @@ export default function Admin() {
 
   const stats = statsData?.data;
   const allUsers = usersData?.data || [];
-  const [userQuery, setUserQuery] = useState("");
   const users = userQuery.trim()
     ? allUsers.filter((u: any) => {
         const q = userQuery.trim().toLowerCase().replace(/^@/, "");
