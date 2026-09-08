@@ -198,6 +198,7 @@ export default function Matrix() {
         : (ru ? 'Моя Матрица судьбы в AstroOrbi ✨' : 'My Matrix of Destiny in AstroOrbi ✨');
       const result = await sendShareImage(canvas, caption, locale);
       if (result === 'downloaded') toast({ title: ru ? 'Картинка сохранена' : 'Image saved' });
+      if (result === 'failed') toast({ title: ru ? 'Не получилось отправить' : 'Could not share', description: ru ? 'Проверьте соединение и попробуйте ещё раз' : 'Check your connection and try again', variant: 'destructive' });
     } catch (e) {
       console.error('[SHARE] matrix failed', e);
       toast({ title: ru ? 'Не получилось поделиться' : 'Share failed', variant: 'destructive' });

@@ -11,12 +11,13 @@ const MUTED = '#8B8A99';
 const GOLD = '#E8C36B';
 const IRIS = '#7C5CFC';
 
-export function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string, timeoutMs = 8000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const timer = setTimeout(() => reject(new Error('image timeout: ' + src)), timeoutMs);
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = (e) => { clearTimeout(timer); reject(e); };
     img.src = src;
   });
 }
@@ -145,12 +146,16 @@ export async function sendShareImage(canvas: HTMLCanvasElement, caption: string,
   const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
   const wa = (window as any).Telegram?.WebApp;
   try {
-    const resp = await apiRequest('POST', '/api/share/image', { image: dataUrl, caption, locale });
+    // Сторожевой таймер: медленная сеть не должна вешать кнопку навсегда
+    const resp: any = await Promise.race([
+      apiRequest('POST', '/api/share/image', { image: dataUrl, caption, locale }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('share timeout')), 25000)),
+    ]);
     if (resp.ok && resp.data?.preparedMessageId && wa?.shareMessage) {
       wa.shareMessage(resp.data.preparedMessageId);
       return 'shared';
     }
-  } catch { /* ниже */ }
+  } catch (e) { console.error('[SHARE] send failed:', e); }
   // В Telegram сохранения в галерею нет и не притворяемся: получатель сохранит фото из чата.
   if (wa) return 'failed';
   // Обычный браузер (dev): скачиваем файл
