@@ -14,17 +14,17 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 240 4% 96%;
+  --background: 36 33% 96%; /* Moon Milk #FAF7F2 */
 
-  --foreground: 240 8% 12%;
+  --foreground: 251 25% 16%; /* Dark Ink */
 
-  --border: 240 6% 82%;
+  --border: 36 18% 84%;
 
-  --card: 240 4% 94%;
+  --card: 0 0% 100%;
 
   --card-foreground: 240 8% 12%;
 
-  --card-border: 240 6% 88%;
+  --card-border: 36 20% 88%;
 
   --sidebar: 240 5% 92%;
 
@@ -49,14 +49,14 @@
   --popover-border: 240 6% 84%;
 
   /* AstroOrb Palette */
-  --solar-gold: 41 64% 55%;
+  --solar-gold: 41 72% 40%; /* тёмное золото — читается на светлом */
   --deep-amber: 36 67% 37%;
   --pearl-white: 60 20% 98%;
   --iridescent-blue: 207 57% 75%;
   --soft-rose: 348 54% 82%;
   --opal-violet: 254 48% 76%;
 
-  --primary: 41 64% 55%;
+  --primary: 252 72% 56%; /* ирис: бренд-цвет и на светлой теме */
 
   --primary-foreground: 222 5% 12%;
 
@@ -64,11 +64,11 @@
 
   --secondary-foreground: 240 8% 15%;
 
-  --muted: 240 10% 88%;
+  --muted: 36 22% 90%;
 
-  --muted-foreground: 240 6% 35%;
+  --muted-foreground: 251 12% 40%;
 
-  --accent: 207 57% 75%;
+  --accent: 251 45% 93%;
 
   --accent-foreground: 207 30% 20%;
 

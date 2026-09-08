@@ -152,9 +152,14 @@ export async function sendShareImage(canvas: HTMLCanvasElement, caption: string,
       return 'shared';
     }
   } catch { /* фолбэк ниже */ }
-  // Телефон в Telegram: сохранение в галерею через нативный downloadFile (Bot API 7.10+)
+  // Телефон в Telegram: сохранение через нативный downloadFile (Bot API 7.10+),
+  // на старых клиентах — открываем PNG во внешнем браузере (там длинный тап = сохранить),
+  // в обычном браузере — прямое скачивание.
   if (url && wa?.downloadFile) {
     try { wa.downloadFile({ url, file_name: 'astroorbi.png' }); return 'downloaded'; } catch { /* дальше */ }
+  }
+  if (url && wa?.openLink) {
+    try { wa.openLink(url); return 'downloaded'; } catch { /* дальше */ }
   }
   try {
     const a = document.createElement('a');

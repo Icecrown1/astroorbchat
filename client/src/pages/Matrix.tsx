@@ -16,6 +16,8 @@ import { MatrixOctagram, type MatrixZone, type OctagramNode } from '@/components
 import { arcanaMetaByN, arcanaCardId } from '@shared/matrixArcanaMeta';
 import { haptic } from '@/lib/haptics';
 import { makeCanvas, drawCosmicBg, drawWrappedText, drawFooter, fontsReady, sendShareImage, shareColors, SHARE_W } from '@/lib/shareCard';
+import { shareOrCopyText, funnelFooter } from '@/lib/shareText';
+import { useAuth } from '@/store/useAuth';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
 import { arcanaOfYear } from '@shared/matrix';
 
@@ -48,6 +50,7 @@ const SECTIONS_META: Record<MatrixSectionId, { ru: string; en: string; descRu: s
 export default function Matrix() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { locale } = useTranslation();
   const { decreaseOrbs } = useEnergy();
   const ru = locale === 'ru';
@@ -201,6 +204,29 @@ export default function Matrix() {
     } finally {
       setSharing(false);
     }
+  };
+
+  const shareReadings = async () => {
+    haptic.impact('medium');
+    const src = guestMode ? (guest?.sections || []) : (data?.sections || []);
+    const opened = src.filter((x: any) => x.content);
+    if (!opened.length) {
+      toast({ title: ru ? 'Сначала откройте хотя бы один раздел' : 'Open at least one section first' });
+      return;
+    }
+    const title = guestMode && guest
+      ? (ru ? `🔯 Матрица судьбы: ${guest.name} (${guest.birthDate})` : `🔯 Matrix of Destiny: ${guest.name} (${guest.birthDate})`)
+      : (ru ? '🔯 Моя Матрица судьбы' : '🔯 My Matrix of Destiny');
+    const parts = [title];
+    for (const sec of opened.slice(0, 4)) {
+      const meta = SECTIONS_META[sec.id as MatrixSectionId];
+      const label = meta ? (ru ? meta.ru : meta.en) : sec.id;
+      parts.push(`✦ ${label}\n${String(sec.content).slice(0, 700)}`);
+    }
+    if (opened.length > 4) parts.push(ru ? `…и ещё ${opened.length - 4} раздел(а) в приложении` : `…and ${opened.length - 4} more sections in the app`);
+    parts.push(funnelFooter(locale, (user as any)?.referralCode));
+    const r = await shareOrCopyText(parts.join('\n\n'), locale);
+    if (r === 'copied') toast({ title: ru ? 'Разбор скопирован' : 'Reading copied' });
   };
 
   const tappedMeta = tapped ? arcanaMetaByN(tapped.value) : null;
@@ -389,6 +415,11 @@ export default function Matrix() {
                 );
               })}
             </div>
+
+              <Button variant="outline" size="sm" className="mt-3 w-full" onClick={shareReadings} data-testid="button-share-readings">
+                <Share2 className="w-4 h-4 mr-2" />
+                {ru ? 'Поделиться разбором (текст)' : 'Share readings (text)'}
+              </Button>
             </>)}
 
             <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
