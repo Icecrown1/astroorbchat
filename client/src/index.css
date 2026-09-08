@@ -531,3 +531,17 @@ input[type='date']::-webkit-date-and-time-value { text-align: left; }
 .perf-lite .vg { animation: none !important; }
 .perf-lite [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 .perf-lite .wheel-nebula { background-image: radial-gradient(circle at 50% 42%, rgba(142,123,255,0.10), transparent 62%); }
+
+
+/* ===== Светлая тема: пилюля баланса — фарфор с золотом вместо коричневой капли ===== */
+:root:not(.dark) .energy-pill {
+  background: linear-gradient(135deg, #FFFFFF, hsl(41 75% 94%)) !important;
+  border-color: hsl(41 62% 58%) !important;
+  box-shadow: 0 6px 20px rgba(184, 141, 44, 0.18) !important;
+}
+:root:not(.dark) .energy-pill[data-tier="premium"] {
+  background: linear-gradient(135deg, hsl(44 90% 97%), hsl(41 85% 90%)) !important;
+}
+:root:not(.dark) .energy-pill * { text-shadow: none !important; }
+:root:not(.dark) .energy-pill span { color: hsl(251 25% 16%) !important; }
+:root:not(.dark) .energy-pill svg { color: hsl(41 72% 38%) !important; }

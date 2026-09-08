@@ -206,6 +206,27 @@ export default function Matrix() {
     }
   };
 
+  const smartCut = (text: string, limit: number) => {
+    if (text.length <= limit) return text;
+    const cut = text.slice(0, limit);
+    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '), cut.lastIndexOf('.\n'));
+    return (end > limit * 0.5 ? cut.slice(0, end + 1) : cut) + (ru ? '\n\n…продолжение — в приложении' : '\n\n…continued in the app');
+  };
+
+  const shareOneReading = async (sec: any) => {
+    haptic.impact('light');
+    const meta = SECTIONS_META[sec.id as MatrixSectionId];
+    const label = meta ? (ru ? meta.ru : meta.en) : sec.id;
+    const who = guestMode && guest
+      ? `${guest.name} (${guest.birthDate})`
+      : (ru ? 'моя матрица' : 'my matrix');
+    const header = `🔯 ${ru ? 'Матрица судьбы' : 'Matrix of Destiny'} — ${label} · ${who}`;
+    const footer = funnelFooter(locale, (user as any)?.referralCode);
+    const body = smartCut(String(sec.content || ''), 3400 - header.length - footer.length);
+    const r = await shareOrCopyText([header, body, footer].join('\n\n'), locale);
+    if (r === 'copied') toast({ title: ru ? 'Раздел скопирован' : 'Section copied' });
+  };
+
   const shareReadings = async () => {
     haptic.impact('medium');
     const src = guestMode ? (guest?.sections || []) : (data?.sections || []);
@@ -221,7 +242,7 @@ export default function Matrix() {
     for (const sec of opened.slice(0, 4)) {
       const meta = SECTIONS_META[sec.id as MatrixSectionId];
       const label = meta ? (ru ? meta.ru : meta.en) : sec.id;
-      parts.push(`✦ ${label}\n${String(sec.content).slice(0, 700)}`);
+      parts.push(`✦ ${label}\n${smartCut(String(sec.content), 700)}`);
     }
     if (opened.length > 4) parts.push(ru ? `…и ещё ${opened.length - 4} раздел(а) в приложении` : `…and ${opened.length - 4} more sections in the app`);
     parts.push(funnelFooter(locale, (user as any)?.referralCode));
@@ -409,7 +430,19 @@ export default function Matrix() {
                       )}
                     </div>
                     {s.content && (
-                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/90">{s.content}</p>
+                      <>
+                        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/90">{s.content}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 text-muted-foreground"
+                          onClick={(e) => { e.stopPropagation(); shareOneReading(s); }}
+                          data-testid={`button-share-section-${s.id}`}
+                        >
+                          <Share2 className="w-3.5 h-3.5 mr-1.5" />
+                          {ru ? 'Поделиться разделом' : 'Share this section'}
+                        </Button>
+                      </>
                     )}
                   </Card>
                 );

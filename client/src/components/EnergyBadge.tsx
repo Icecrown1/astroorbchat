@@ -94,8 +94,9 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
 
   return (
     <div
+      data-tier={tier}
       className={cn(
-        'relative inline-flex items-center gap-3 px-5 py-3 rounded-full border border-[hsl(252,60%,40%)] bg-[linear-gradient(135deg,hsl(252,45%,16%),hsl(232,30%,12%))] shadow-[0_0_24px_rgba(142,123,255,0.25)]',
+        'energy-pill relative inline-flex items-center gap-3 px-5 py-3 rounded-full border border-[hsl(252,60%,40%)] bg-[linear-gradient(135deg,hsl(252,45%,16%),hsl(232,30%,12%))] shadow-[0_0_24px_rgba(142,123,255,0.25)]',
         `bg-gradient-to-r ${content.gradient}`,
         `shadow-lg ${content.shadowColor}`,
         content.muted && 'opacity-60',
