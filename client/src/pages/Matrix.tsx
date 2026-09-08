@@ -17,6 +17,7 @@ import { arcanaMetaByN, arcanaCardId } from '@shared/matrixArcanaMeta';
 import { haptic } from '@/lib/haptics';
 import { makeCanvas, drawCosmicBg, drawWrappedText, drawFooter, fontsReady, sendShareImage, shareColors, SHARE_W } from '@/lib/shareCard';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
+import { arcanaOfYear } from '@shared/matrix';
 
 type SectionState = { id: MatrixSectionId; free: boolean; content: string | null };
 type MatrixResponse = { ok: boolean; core: MatrixCore; sections: SectionState[] };
@@ -321,6 +322,30 @@ export default function Matrix() {
                 {sharing ? (ru ? 'Готовим…' : 'Preparing…') : (ru ? 'Поделиться' : 'Share')}
               </Button>
             </Card>
+
+            {core && (() => {
+              const yn = arcanaOfYear(core, new Date().getFullYear());
+              const ym = arcanaMetaByN(yn);
+              const cid = arcanaCardId(yn);
+              return (
+                <Card className="mt-6 p-3 flex items-center gap-3 anim-fade-up" data-testid="card-year-arcana">
+                  {cid && (
+                    <button type="button" className="shrink-0 w-14 rounded-lg overflow-hidden border border-[hsl(41,50%,40%)]/50" onClick={() => { haptic.impact('light'); setCardZoom(cid); }}>
+                      <img src={`/tarot/${cid}.webp`} alt="" className="w-full h-auto" loading="lazy" />
+                    </button>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {ru ? `Аркан ${new Date().getFullYear()} года` : `Arcana of ${new Date().getFullYear()}`}
+                    </p>
+                    <p className="font-display font-semibold truncate">{yn} · {ym ? (ru ? ym.ru : ym.en) : ''}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {ru ? 'Личная тема года — разбор в списке ниже (3 ⭐)' : 'Your personal year theme — reading below (3 ⭐)'}
+                    </p>
+                  </div>
+                </Card>
+              );
+            })()}
 
             {(<>
             {/* Секции разбора */}
