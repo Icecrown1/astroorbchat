@@ -224,9 +224,23 @@ export default function Tarot() {
 
       await drawFooter(ctx, ru ? 'Вытяни свою карту — бесплатно в AstroOrbi' : 'Draw your own card — free in AstroOrbi');
 
-      const caption = ru
-        ? (reading.question ? `Спросила у Таро: «${reading.question}» ✨` : 'Моя карта дня в AstroOrbi ✨')
-        : (reading.question ? `Asked the Tarot: “${reading.question}” ✨` : 'My card of the day in AstroOrbi ✨');
+      // Подпись к фото: краткий текст расклада (лимит Telegram — 1024 символа)
+      const capParts: string[] = [];
+      capParts.push(ru
+        ? (reading.question ? `🔮 «${reading.question}»` : (reading.spread === 'daily' ? '🔮 Моя карта дня' : '🔮 Мой расклад Таро'))
+        : (reading.question ? `🔮 “${reading.question}”` : (reading.spread === 'daily' ? '🔮 My card of the day' : '🔮 My Tarot reading')));
+      if (reading.spread === 'yesno' && reading.interpretation.verdict) {
+        const v = reading.interpretation.verdict;
+        capParts.push(v === 'yes' ? (ru ? '✅ Скорее да' : '✅ Leaning yes') : v === 'no' ? (ru ? '⛔ Скорее нет' : '⛔ Leaning no') : (ru ? '⚖️ Не всё однозначно' : '⚖️ It depends'));
+      }
+      if (reading.interpretation.synthesis) capParts.push(reading.interpretation.synthesis);
+      if (reading.interpretation.advice) capParts.push((ru ? '💡 ' : '💡 ') + reading.interpretation.advice);
+      let caption = capParts.join('\n\n');
+      if (caption.length > 1000) {
+        const cut = caption.slice(0, 1000);
+        const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('.\n'));
+        caption = (end > 500 ? cut.slice(0, end + 1) : cut) + (ru ? ' …' : ' …');
+      }
       const result = await sendShareImage(canvas, caption, locale);
       if (result === 'downloaded') toast({ title: ru ? 'Картинка сохранена' : 'Image saved' });
     } catch (e) {

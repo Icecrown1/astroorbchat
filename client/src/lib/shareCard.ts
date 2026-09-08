@@ -141,29 +141,22 @@ export function makeCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingC
 
 /** Отправка: Telegram-карточка либо скачивание файла (dev-браузер) */
 export async function sendShareImage(canvas: HTMLCanvasElement, caption: string, locale: string): Promise<'shared' | 'downloaded' | 'failed'> {
-  const dataUrl = canvas.toDataURL('image/png');
+  // JPEG обязателен: Telegram принимает inline-фото только в JPEG (PNG ломал подготовку карточки)
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
   const wa = (window as any).Telegram?.WebApp;
-  let url: string | null = null;
   try {
     const resp = await apiRequest('POST', '/api/share/image', { image: dataUrl, caption, locale });
-    url = resp?.data?.url || null;
     if (resp.ok && resp.data?.preparedMessageId && wa?.shareMessage) {
       wa.shareMessage(resp.data.preparedMessageId);
       return 'shared';
     }
-  } catch { /* фолбэк ниже */ }
-  // Телефон в Telegram: сохранение через нативный downloadFile (Bot API 7.10+),
-  // на старых клиентах — открываем PNG во внешнем браузере (там длинный тап = сохранить),
-  // в обычном браузере — прямое скачивание.
-  if (url && wa?.downloadFile) {
-    try { wa.downloadFile({ url, file_name: 'astroorbi.png' }); return 'downloaded'; } catch { /* дальше */ }
-  }
-  if (url && wa?.openLink) {
-    try { wa.openLink(url); return 'downloaded'; } catch { /* дальше */ }
-  }
+  } catch { /* ниже */ }
+  // В Telegram сохранения в галерею нет и не притворяемся: получатель сохранит фото из чата.
+  if (wa) return 'failed';
+  // Обычный браузер (dev): скачиваем файл
   try {
     const a = document.createElement('a');
-    a.href = dataUrl; a.download = 'astroorbi.png'; a.click();
+    a.href = dataUrl; a.download = 'astroorbi.jpg'; a.click();
     return 'downloaded';
   } catch { return 'failed'; }
 }

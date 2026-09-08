@@ -2688,11 +2688,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/share/:file', async (req, res) => {
     try {
       const file = String(req.params.file || '');
-      if (!/^[a-f0-9-]+\.png$/.test(file)) return res.status(400).end();
+      if (!/^[a-f0-9-]+\.(png|jpg)$/.test(file)) return res.status(400).end();
       const fs = await import('fs');
       const path = `${SHARE_DIR}/${file}`;
       if (!fs.existsSync(path)) return res.status(404).end();
-      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Content-Type', file.endsWith('.jpg') ? 'image/jpeg' : 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       fs.createReadStream(path).pipe(res);
     } catch { res.status(500).end(); }
@@ -2747,9 +2747,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const image = String(req.body?.image || '');
       const caption = String(req.body?.caption || '').slice(0, 900);
       const locale = String(req.body?.locale || 'ru') === 'en' ? 'en' : 'ru';
-      const m = image.match(/^data:image\/png;base64,(.+)$/);
-      if (!m) return res.status(400).json({ ok: false, error: 'png_base64_required' });
-      const buf = Buffer.from(m[1], 'base64');
+      const m = image.match(/^data:image\/(png|jpeg);base64,(.+)$/);
+      if (!m) return res.status(400).json({ ok: false, error: 'image_base64_required' });
+      const ext = m[1] === 'jpeg' ? 'jpg' : 'png';
+      const buf = Buffer.from(m[2], 'base64');
       if (buf.length > 3 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'too_large' });
 
       const fs = await import('fs');
@@ -2763,7 +2764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (now - st.mtimeMs > 2 * 3600 * 1000) fs.unlinkSync(`${SHARE_DIR}/${f}`);
         }
       } catch { /* noop */ }
-      const fname = `${crypto.randomUUID()}.png`;
+      const fname = `${crypto.randomUUID()}.${ext}`;
       fs.writeFileSync(`${SHARE_DIR}/${fname}`, buf);
 
       const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
