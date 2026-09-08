@@ -234,12 +234,14 @@ export default function Tarot() {
         capParts.push(v === 'yes' ? (ru ? '✅ Скорее да' : '✅ Leaning yes') : v === 'no' ? (ru ? '⛔ Скорее нет' : '⛔ Leaning no') : (ru ? '⚖️ Не всё однозначно' : '⚖️ It depends'));
       }
       if (reading.interpretation.synthesis) capParts.push(reading.interpretation.synthesis);
-      if (reading.interpretation.advice) capParts.push((ru ? '💡 ' : '💡 ') + reading.interpretation.advice);
       let caption = capParts.join('\n\n');
-      if (caption.length > 1000) {
-        const cut = caption.slice(0, 1000);
+      // Короткая подпись: шторка подтверждения Telegram на iOS не скроллится —
+      // длинный предпросмотр прятал кнопки «Отправить/Отмена» за экраном
+      const CAP = 300;
+      if (caption.length > CAP) {
+        const cut = caption.slice(0, CAP);
         const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('.\n'));
-        caption = (end > 500 ? cut.slice(0, end + 1) : cut) + (ru ? ' …' : ' …');
+        caption = (end > CAP * 0.4 ? cut.slice(0, end + 1) : cut.replace(/\s?\S*$/, '')) + (ru ? ' …' : ' …');
       }
       const result = await sendShareImage(canvas, caption, locale);
       if (result === 'downloaded') toast({ title: ru ? 'Картинка сохранена' : 'Image saved' });
