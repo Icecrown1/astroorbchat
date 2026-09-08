@@ -68,6 +68,26 @@ export default function Admin() {
   const [subscriptionTier, setSubscriptionTier] = useState("");
   const [subscriptionDays, setSubscriptionDays] = useState("30");
   const [userQuery, setUserQuery] = useState("");
+  const [vkText, setVkText] = useState("");
+  const [vkCardId, setVkCardId] = useState<string | null>(null);
+  const [vkLoading, setVkLoading] = useState<string | null>(null);
+
+  const generateVk = async (kind: 'horoscope' | 'card') => {
+    setVkLoading(kind);
+    try {
+      const resp = await apiRequest('POST', '/api/admin/vk/generate', { kind });
+      if (resp.ok) {
+        setVkText(resp.data.text || '');
+        setVkCardId(resp.data.cardId || null);
+      } else {
+        toast({ title: 'Не сгенерировалось', description: resp.error, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Ошибка генерации', description: e.message, variant: 'destructive' });
+    } finally {
+      setVkLoading(null);
+    }
+  };
 
   interface StarsPayment {
     chargeId: string; userId: string | null; tgUserId: number | null; type: 'subscription' | 'orbs';
@@ -247,6 +267,9 @@ export default function Admin() {
               <Users className="h-4 w-4 mr-2" />
               {t.admin.tabUsers}
             </TabsTrigger>
+            <TabsTrigger value="vk" data-testid="tab-vk">
+              ВК-контент
+            </TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">
               <CreditCard className="h-4 w-4 mr-2" />
               {t.admin.tabPayments}
@@ -412,6 +435,58 @@ export default function Admin() {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="vk" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Генератор постов для ВК</CardTitle>
+                <CardDescription>Гороскоп дня (утро 7:45) и карта дня (вечер 20:30) — по контент-плану. Ссылку добавляйте первым комментарием.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => generateVk('horoscope')} disabled={!!vkLoading} data-testid="button-vk-horoscope">
+                    {vkLoading === 'horoscope' ? 'Пишем…' : '🌅 Гороскоп дня'}
+                  </Button>
+                  <Button onClick={() => generateVk('card')} disabled={!!vkLoading} variant="secondary" data-testid="button-vk-card">
+                    {vkLoading === 'card' ? 'Тянем карту…' : '🃏 Карта дня'}
+                  </Button>
+                </div>
+
+                {vkCardId && (
+                  <div className="flex items-center gap-4">
+                    <img src={`/tarot/${vkCardId}.webp`} alt="" className="w-24 rounded-lg border border-border" />
+                    <a href={`/tarot/${vkCardId}.webp`} download={`card_${vkCardId}.webp`}>
+                      <Button variant="outline" size="sm" data-testid="button-vk-card-download">Скачать картинку</Button>
+                    </a>
+                  </div>
+                )}
+
+                {vkText && (
+                  <>
+                    <textarea
+                      value={vkText}
+                      onChange={(e) => setVkText(e.target.value)}
+                      rows={14}
+                      className="w-full rounded-lg border border-border bg-background p-3 text-sm"
+                      data-testid="textarea-vk-text"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(vkText);
+                          toast({ title: 'Скопировано — вставляйте в ВК' });
+                        } catch { toast({ title: 'Не удалось скопировать', variant: 'destructive' }); }
+                      }}
+                      data-testid="button-vk-copy"
+                    >
+                      Скопировать текст
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

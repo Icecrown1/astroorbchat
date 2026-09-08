@@ -3237,6 +3237,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Генератор ВК-контента: гороскоп дня / карта дня (тексты под аудиторию паблика)
+  app.post("/api/admin/vk/generate", requireAdmin, async (req, res) => {
+    try {
+      const kind = String(req.body?.kind || '');
+      const { openai } = await import('./lib/openai.js');
+
+      if (kind === 'horoscope') {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          temperature: 0.9,
+          max_completion_tokens: 1400,
+          messages: [{
+            role: 'user',
+            content: `Напиши гороскоп на сегодня для паблика ВКонтакте. Аудитория — женщины 35–60, Уфа и Башкортостан. По каждому из 12 знаков ровно 2 предложения: одно наблюдение дня + один мягкий совет. Тон тёплый, житейский, без пафоса, эзотерических терминов, обещаний и запугиваний. Начни с одной общей фразы про энергию дня (1 предложение). Перед названием каждого знака — его эмодзи (♈♉♊♋♌♍♎♏♐♑♒♓). Заверши строкой: «Подробный личный прогноз — по вашей натальной карте, ссылка в первом комментарии». Верни только текст поста, без пояснений.`,
+          }],
+        });
+        return res.json({ ok: true, data: { text: completion.choices[0]?.message?.content || '' } });
+      }
+
+      if (kind === 'card') {
+        const { TAROT_DECK } = await import('@shared/tarot');
+        const card = TAROT_DECK[Math.floor(Math.random() * TAROT_DECK.length)];
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          temperature: 0.9,
+          max_completion_tokens: 500,
+          messages: [{
+            role: 'user',
+            content: `Напиши вечерний пост «Карта дня» для паблика ВКонтакте (женщины 35–60, тёплый житейский тон, без эзотерического пафоса). Карта: ${card.nameRu} (${card.nameEn}). Ключевые значения: ${card.kw[0]}. Структура: эмодзи + «Карта этого вечера — ${card.nameRu}.», затем 3-4 предложения: что карта мягко советует на вечер, один конкретный маленький шаг (по-домашнему: чай, звонок, прогулка). Заверши: «Завтра будет новая карта. А какая выпадет лично вам — можно вытянуть бесплатно (ссылка в первом комментарии)». Верни только текст поста.`,
+          }],
+        });
+        return res.json({ ok: true, data: { text: completion.choices[0]?.message?.content || '', cardId: card.id, cardName: card.nameRu } });
+      }
+
+      res.status(400).json({ ok: false, error: 'unknown kind' });
+    } catch (error: any) {
+      console.error('[VK GEN] error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
