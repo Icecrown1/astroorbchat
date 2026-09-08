@@ -180,7 +180,7 @@
   --secondary: 232 22% 16%;
   --secondary-foreground: 231 24% 93%;
   --muted: 232 22% 14%;
-  --muted-foreground: 229 12% 66%;
+  --muted-foreground: 229 13% 70%; /* WCAG AA: чуть светлее на тёмном */
   --accent: 232 22% 17%;
   --accent-foreground: 231 24% 93%;
   --destructive: 351 78% 68%;
@@ -522,3 +522,12 @@ input[type='date'], input[type='time'] {
   text-align: left;
 }
 input[type='date']::-webkit-date-and-time-value { text-align: left; }
+
+
+/* ===== Спринт F: облегчённый режим для слабых устройств ===== */
+.perf-lite .wheel-idle,
+.perf-lite .wheel-enter,
+.perf-lite .anim-fade-up,
+.perf-lite .vg { animation: none !important; }
+.perf-lite [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.perf-lite .wheel-nebula { background-image: radial-gradient(circle at 50% 42%, rgba(142,123,255,0.10), transparent 62%); }

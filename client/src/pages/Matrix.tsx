@@ -224,7 +224,7 @@ export default function Matrix() {
         <div className="mb-4 flex gap-1.5 p-1 rounded-xl bg-muted/50">
           <button
             type="button"
-            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${!guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+            className={`flex-1 h-11 rounded-lg text-sm transition-colors ${!guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
             onClick={() => { haptic.select(); setGuestMode(false); }}
             data-testid="matrix-tab-my"
           >
@@ -232,7 +232,7 @@ export default function Matrix() {
           </button>
           <button
             type="button"
-            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+            className={`flex-1 h-11 rounded-lg text-sm transition-colors ${guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
             onClick={() => { haptic.select(); setGuestMode(true); setTapped(null); }}
             data-testid="matrix-tab-guest"
           >
@@ -291,7 +291,7 @@ export default function Matrix() {
                   key={z.id}
                   onClick={() => { haptic.select(); setZone(z.id); }}
                   aria-pressed={zone === z.id}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                  className={`whitespace-nowrap rounded-full border px-4 py-2.5 min-h-[44px] text-xs transition-colors flex items-center ${
                     zone === z.id ? 'border-primary bg-primary/15 text-foreground' : 'border-border text-muted-foreground'
                   }`}
                 >

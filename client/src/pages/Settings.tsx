@@ -23,7 +23,7 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import { Locale } from '@/lib/translations';
 import type { User, Subscription } from '@shared/schema';
 import dayjs from 'dayjs';
-import { useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 const SUPPORT_USERNAME =
   (import.meta.env.VITE_SUPPORT_USERNAME || import.meta.env.VITE_BOT_USERNAME || 'AstroOrbBot').replace('@', '');
@@ -40,6 +40,13 @@ export default function Settings() {
   const { toast } = useToast();
   const { updateUser, clearAuth } = useAuth();
   const { t, locale, setLocale } = useTranslation();
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    (localStorage.getItem('theme') === 'light' ? 'light' : 'dark'));
+  const applyTheme = (next: 'dark' | 'light') => {
+    setTheme(next);
+    localStorage.setItem('theme', next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+  };
 
   const { data, isLoading, error } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
@@ -175,6 +182,33 @@ export default function Settings() {
                   <SelectItem value="ru">{t.settings.russian}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4">{locale === 'ru' ? 'Тема' : 'Theme'}</h3>
+              <div className="flex gap-1.5 p-1 rounded-xl bg-muted/50">
+                <button
+                  type="button"
+                  className={`flex-1 h-11 rounded-lg text-sm transition-colors ${theme === 'dark' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                  onClick={() => applyTheme('dark')}
+                  data-testid="theme-dark"
+                >
+                  {locale === 'ru' ? '🌙 Тёмная' : '🌙 Dark'}
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 h-11 rounded-lg text-sm transition-colors ${theme === 'light' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                  onClick={() => applyTheme('light')}
+                  data-testid="theme-light"
+                >
+                  {locale === 'ru' ? '☀️ Светлая' : '☀️ Light'}
+                </button>
+              </div>
+              {theme === 'light' && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {locale === 'ru' ? 'Светлая тема — бета: космический стиль задуман тёмным.' : 'Light theme is beta: the cosmic style is designed dark-first.'}
+                </p>
+              )}
             </div>
 
             <div className="border-t pt-4">
