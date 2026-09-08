@@ -2698,6 +2698,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch { res.status(500).end(); }
   });
 
+  // Текстовый шаринг: готовое сообщение с кнопкой-рефссылкой
+  app.post("/api/share/text", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      const text = String(req.body?.text || '').slice(0, 3800);
+      const locale = String(req.body?.locale || 'ru') === 'en' ? 'en' : 'ru';
+      if (!text.trim()) return res.status(400).json({ ok: false, error: 'text_required' });
+      if (!user?.tgId || String(user.tgId).startsWith('test') || String(user.tgId).startsWith('virtual')) {
+        return res.json({ ok: true, data: {} }); // dev: клиент скопирует в буфер
+      }
+      const { getBotUsername } = await import('./lib/telegramStars');
+      const bot = await getBotUsername();
+      const link = bot ? `https://t.me/${bot}?startapp=${user.referralCode}` : null;
+      const tgRes = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/savePreparedInlineMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: Number(user.tgId),
+          allow_user_chats: true,
+          allow_group_chats: true,
+          allow_channel_chats: true,
+          result: {
+            type: 'article',
+            id: `sharetext_${Date.now()}`,
+            title: 'AstroOrbi',
+            input_message_content: { message_text: text },
+            ...(link ? { reply_markup: { inline_keyboard: [[{ text: locale === 'ru' ? '✨ Попробовать бесплатно' : '✨ Try it free', url: link }]] } } : {}),
+          },
+        }),
+      });
+      const data: any = await tgRes.json();
+      if (!data.ok) {
+        console.error('[SHARE][text] failed:', data);
+        return res.json({ ok: true, data: {} });
+      }
+      res.json({ ok: true, data: { preparedMessageId: data.result.id } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/share/image", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

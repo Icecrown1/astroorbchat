@@ -8,8 +8,10 @@ import { PlanetModal } from '@/components/PlanetModal';
 import { Loader, FullPageLoader } from '@/components/Loader';
 import PlanetIcon from '@/components/PlanetIcon';
 import { ImportantDatesList } from '@/components/ImportantDatesList';
-import { ArrowLeft, RefreshCw, Calendar, Lock, Crown } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Calendar, Lock, Crown, Share2 } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
+import { shareOrCopyText, funnelFooter } from '@/lib/shareText';
+import { useAuth } from '@/store/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -97,10 +99,16 @@ function getPlanetDescription(planetName: string, sign: string, locale: 'ru' | '
   return planetDesc[locale];
 }
 
+const ZODIAC_RU: Record<string, string> = {
+  Aries: 'Овен', Taurus: 'Телец', Gemini: 'Близнецы', Cancer: 'Рак', Leo: 'Лев', Virgo: 'Дева',
+  Libra: 'Весы', Scorpio: 'Скорпион', Sagittarius: 'Стрелец', Capricorn: 'Козерог', Aquarius: 'Водолей', Pisces: 'Рыбы',
+};
+
 export default function MyNatalChart() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const { user } = useAuth();
   const { tier } = useEnergy();
   const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
   const [expandedPlanet, setExpandedPlanet] = useState<string | null>(null);
@@ -339,6 +347,30 @@ export default function MyNatalChart() {
                 houses={chartData.houses}
                 onPlanetClick={setSelectedPlanet}
               />
+
+              <Button
+                variant="outline"
+                className="w-full mt-4"
+                data-testid="button-share-natal"
+                onClick={async () => {
+                  const find = (n: string) => (chartData.planets as any[]).find((p: any) => p.name === n)?.sign;
+                  const sun = find('Sun'); const moon = find('Moon');
+                  const asc = (chartData.angles as any)?.Ascendant?.sign;
+                  const zr = (sign: string) => locale === 'ru' ? (ZODIAC_RU[sign] || sign) : sign;
+                  const text = [
+                    locale === 'ru' ? '🪐 Мои три кита по натальной карте:' : '🪐 My natal chart essentials:',
+                    [sun && `☀️ ${locale === 'ru' ? 'Солнце' : 'Sun'} — ${zr(sun)}`,
+                     moon && `🌙 ${locale === 'ru' ? 'Луна' : 'Moon'} — ${zr(moon)}`,
+                     asc && `⬆️ ${locale === 'ru' ? 'Асцендент' : 'Ascendant'} — ${zr(asc)}`].filter(Boolean).join('\n'),
+                    funnelFooter(locale, (user as any)?.referralCode),
+                  ].filter(Boolean).join('\n\n');
+                  const r = await shareOrCopyText(text, locale);
+                  if (r === 'copied') toast({ title: locale === 'ru' ? 'Скопировано' : 'Copied' });
+                }}
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                {locale === 'ru' ? 'Поделиться картой' : 'Share my chart'}
+              </Button>
             </div>
           </Card>
 

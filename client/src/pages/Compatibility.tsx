@@ -14,8 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from '@/components/Loader';
 import { CompatibilityRating } from '@/components/CompatibilityRating';
 import { CompatibilityArchive } from '@/components/CompatibilityArchive';
-import { ArrowLeft, Heart, HeartCrack, UserPlus, Users, Archive } from 'lucide-react';
+import { ArrowLeft, Heart, HeartCrack, UserPlus, Users, Archive, Share2 } from 'lucide-react';
 import { FeatureVignette } from '@/components/FeatureVignette';
+import { shareOrCopyText, funnelFooter } from '@/lib/shareText';
+import { useAuth } from '@/store/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -34,6 +36,7 @@ interface GuestChart {
 export default function Compatibility() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { t, locale } = useTranslation();
   const { decreaseOrbs } = useEnergy();
   const [compatibilityData, setCompatibilityData] = useState<any>(null);
@@ -403,6 +406,26 @@ export default function Compatibility() {
                 </div>
               </Card>
             )}
+
+            <Button
+              className="w-full"
+              data-testid="button-share-compatibility"
+              onClick={async () => {
+                const cd: any = compatibilityData;
+                const rating = cd?.compatibilityRating != null ? `${cd.compatibilityRating}/10` : '';
+                const analysis = String(cd?.analysis || '').slice(0, 500);
+                const text = [
+                  `💞 ${locale === 'ru' ? 'Наша совместимость' : 'Our compatibility'}: ${cd?.partners || ''}${rating ? ` — ${rating}` : ''}`,
+                  analysis,
+                  funnelFooter(locale, (user as any)?.referralCode),
+                ].filter(Boolean).join('\n\n');
+                const r = await shareOrCopyText(text, locale);
+                if (r === 'copied') toast({ title: locale === 'ru' ? 'Скопировано' : 'Copied' });
+              }}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              {locale === 'ru' ? 'Поделиться результатом' : 'Share result'}
+            </Button>
 
             <Button
               variant="outline"

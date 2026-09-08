@@ -511,3 +511,14 @@
   .tarot-flip-inner { transition: none; }
   .tarot-deal { animation: none; }
 }
+
+/* iOS/Android WebView: нативные date/time инпуты вылезают за контейнер */
+input[type='date'], input[type='time'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  width: 100%;
+  display: block;
+  text-align: left;
+}
+input[type='date']::-webkit-date-and-time-value { text-align: left; }

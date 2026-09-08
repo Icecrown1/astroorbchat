@@ -13,6 +13,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { getTarotCard, TAROT_SPREADS, type TarotSpreadId, type DrawnTarotCard } from '@shared/tarot';
+import { funnelFooter } from '@/lib/shareText';
+import { useAuth } from '@/store/useAuth';
 import { makeCanvas, drawCosmicBg, drawTarotCard, drawWrappedText, drawFooter, fontsReady, sendShareImage, shareColors, SHARE_W } from '@/lib/shareCard';
 
 interface TarotReading {
@@ -105,6 +107,7 @@ export default function Tarot() {
   const [lightbox, setLightbox] = useState<{ cardId: string; reversed: boolean; positionLabel: string } | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
+  const { user } = useAuth();
   const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
     queryKey: [`/api/tarot/status?locale=${locale}`],
   });
@@ -324,13 +327,12 @@ export default function Tarot() {
                 if (!reading || !spreadDef) return;
                 const it = reading.interpretation;
                 const parts = [
-                  reading.question ? `«${reading.question}»` : '',
+                  `🔮 ${ru ? 'Расклад Таро' : 'Tarot reading'}${reading.question ? `\n«${reading.question}»` : ''}`,
                   it.intro,
-                  ...it.cards.map((c) => `${c.title}\n${c.text}`),
-                  `${ru ? 'Общая картина' : 'The bigger picture'}\n${it.synthesis}`,
-                  `${ru ? 'Совет' : 'Advice'}\n${it.advice}`,
-                  '',
-                  ru ? 'Расклад сделан в AstroOrbi ✨' : 'Reading made in AstroOrbi ✨',
+                  ...it.cards.map((c) => `🃏 ${c.title}\n${c.text}`),
+                  `🌌 ${ru ? 'Общая картина' : 'The bigger picture'}\n${it.synthesis}`,
+                  `💡 ${ru ? 'Совет' : 'Advice'}\n${it.advice}`,
+                  funnelFooter(locale, (user as any)?.referralCode),
                 ].filter(Boolean).join('\n\n');
                 try {
                   await navigator.clipboard.writeText(parts);

@@ -12,6 +12,9 @@ import { MonthlyPlanModal } from '@/components/MonthlyPlanModal';
 import { ArrowLeft, MoonStar, Calendar, CalendarRange, Archive as ArchiveIcon } from 'lucide-react';
 import { FeatureVignette } from '@/components/FeatureVignette';
 import { OrbIcon } from '@/components/OrbIcon';
+import { shareOrCopyText, funnelFooter } from '@/lib/shareText';
+import { useAuth } from '@/store/useAuth';
+import { Share2 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -29,6 +32,7 @@ interface HoroscopeData {
 export default function Horoscope() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { t, locale } = useTranslation();
   const { decreaseOrbs } = useEnergy();
   const [activeTab, setActiveTab] = useState<'day' | 'week' | 'month'>('day');
@@ -224,6 +228,28 @@ export default function Horoscope() {
                   </div>
 
                   <HoroscopeThemes themes={horoscopeData} />
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    data-testid="button-share-horoscope"
+                    onClick={async () => {
+                      const hd: any = horoscopeData;
+                      const label = (ruK: string, enK: string) => (locale === 'ru' ? ruK : enK);
+                      const lines = [
+                        `🌙 ${label('Мой гороскоп на сегодня', 'My horoscope for today')}`,
+                        hd.love ? `❤️ ${label('Любовь', 'Love')}: ${hd.love}` : '',
+                        hd.money ? `💰 ${label('Деньги', 'Money')}: ${hd.money}` : '',
+                        hd.work ? `💼 ${label('Работа', 'Work')}: ${hd.work}` : '',
+                        hd.health ? `🌿 ${label('Здоровье', 'Health')}: ${hd.health}` : '',
+                        funnelFooter(locale, (user as any)?.referralCode),
+                      ].filter(Boolean).join('\n\n');
+                      const r = await shareOrCopyText(lines, locale);
+                      if (r === 'copied') toast({ title: locale === 'ru' ? 'Гороскоп скопирован' : 'Horoscope copied' });
+                    }}
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    {locale === 'ru' ? 'Поделиться гороскопом' : 'Share horoscope'}
+                  </Button>
                 </Card>
 
                 <Button
