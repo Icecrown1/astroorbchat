@@ -41,6 +41,7 @@ const SECTIONS_META: Record<MatrixSectionId, { ru: string; en: string; descRu: s
   love: { ru: 'Канал отношений', en: 'Love channel', descRu: 'Какой партнёр «ваш» и что мешает встрече', descEn: 'Your kind of partner and what stands in the way' },
   purpose: { ru: 'Предназначение', en: 'Purpose', descRu: 'Личное, социальное, духовное и планетарное — 4 уровня', descEn: 'Personal, social, spiritual, planetary — 4 levels' },
   rod: { ru: 'Родовой квадрат', en: 'Ancestral square', descRu: 'Программы рода по четырём линиям', descEn: 'Family programs across four lines' },
+  year: { ru: 'Аркан года', en: 'Year arcana', descRu: 'Тема и уроки вашего личного года', descEn: 'Theme and lessons of your personal year' },
 };
 
 export default function Matrix() {
@@ -102,7 +103,7 @@ export default function Matrix() {
       } else if (code === 'insufficient_orbs') {
         toast({
           title: ru ? 'Не хватает звёзд' : 'Not enough stars',
-          description: ru ? `Раздел стоит ${SECTION_COST} ⭐` : `A section costs ${SECTION_COST} ⭐`,
+          description: ru ? `Раздел стоит ${SECTION_COST} ⭐ (Аркан года — 3 ⭐)` : `A section costs ${SECTION_COST} ⭐ (Year arcana — 3 ⭐)`,
         });
         setLocation('/buy-energy');
       } else {
@@ -350,7 +351,7 @@ export default function Matrix() {
                             ru ? 'Открыть бесплатно' : 'Open free'
                           ) : (
                             <span className="flex items-center gap-1">
-                              <Lock className="h-3.5 w-3.5" /> {SECTION_COST} <OrbIcon className="h-3.5 w-3.5" />
+                              <Lock className="h-3.5 w-3.5" /> {s.id === 'year' ? 3 : SECTION_COST} <OrbIcon className="h-3.5 w-3.5" />
                             </span>
                           )}
                         </Button>

@@ -1322,6 +1322,7 @@ const MATRIX_SECTION_TITLES: Record<string, { ru: string; en: string; posKey: ke
   love: { ru: 'Канал отношений', en: 'Relationships channel', posKey: 'relationships' },
   purpose: { ru: 'Предназначение (4 уровня)', en: 'Life purpose (4 levels)', posKey: 'spirit' },
   rod: { ru: 'Родовой квадрат', en: 'Ancestral square', posKey: 'karma' },
+  year: { ru: `Аркан ${new Date().getFullYear()} года (личный год)`, en: `Arcana of ${new Date().getFullYear()} (personal year)`, posKey: 'spirit' },
 };
 
 export async function generateMatrixSection(params: {

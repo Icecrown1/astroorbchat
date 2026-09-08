@@ -5097,7 +5097,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Платные секции: доступ и баланс проверяем ДО генерации, списываем ПОСЛЕ успеха
       if (!isFree) {
-        const access = await canAccessFeature(storage, userId, 'matrix_section');
+        const costKey = sectionId === 'year' ? 'matrix_year' : 'matrix_section';
+        const access = await canAccessFeature(storage, userId, costKey as any);
         if (!access.allowed) {
           return res.status(402).json({
             ok: false,
@@ -5117,7 +5118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!isFree) {
-        const deduction = await deductOrbs(storage, userId, 'matrix_section');
+        const deduction = await deductOrbs(storage, userId, (sectionId === 'year' ? 'matrix_year' : 'matrix_section') as any);
         if (!deduction.ok) {
           return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
         }

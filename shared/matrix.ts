@@ -147,6 +147,13 @@ export function calcMatrixFromISO(iso: string): MatrixCore | null {
 }
 
 /** Идентификаторы платных/бесплатных секций разбора. */
+/** Аркан личного года: день + месяц + сумма цифр интересующего года, приведённые к 1..22.
+ *  core.a = приведённый день, core.b = приведённый месяц — считается из ядра. */
+export function arcanaOfYear(core: MatrixCore, targetYear: number): number {
+  const yearSum = String(targetYear).split('').reduce((s, d) => s + Number(d), 0);
+  return reduce22(core.a + core.b + reduce22(yearSum));
+}
+
 export const MATRIX_SECTIONS = [
   "comfort", // центр E — бесплатный крючок
   "persona", // точка A — бесплатный крючок
@@ -155,6 +162,7 @@ export const MATRIX_SECTIONS = [
   "love",
   "purpose",
   "rod",
+  "year", // аркан личного года — отдельная цена 3⭐
 ] as const;
 export type MatrixSectionId = (typeof MATRIX_SECTIONS)[number];
 
@@ -177,5 +185,7 @@ export function sectionArcana(core: MatrixCore, section: MatrixSectionId): numbe
       return [core.personalPurpose, core.socialPurpose, core.spiritualPurpose, core.planetaryPurpose];
     case "rod":
       return [core.rodTL, core.rodTR, core.rodBR, core.rodBL];
+    case "year":
+      return [arcanaOfYear(core, new Date().getFullYear())];
   }
 }
