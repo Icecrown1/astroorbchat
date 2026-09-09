@@ -2779,8 +2779,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getBotUsername } = await import('./lib/telegramStars');
       const bot = await getBotUsername();
       const link = bot ? `https://t.me/${bot}?startapp=${user.referralCode}` : null;
+      const TG = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
-      const tgRes = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/savePreparedInlineMessage`, {
+      // Байты — сразу в Telegram (тихий sendPhoto себе + мгновенное удаление → file_id).
+      // Прод авто-масштабируется: URL с диска одного инстанса другой не отдаст (серые превью).
+      let photoFileId: string | null = null;
+      try {
+        const fd = new FormData();
+        fd.append('chat_id', String(user.tgId));
+        fd.append('disable_notification', 'true');
+        fd.append('photo', new Blob([buf], { type: 'image/jpeg' }), 'share.jpg');
+        const sendRes = await fetch(`${TG}/sendPhoto`, { method: 'POST', body: fd });
+        const sendData: any = await sendRes.json();
+        if (sendData.ok) {
+          const sizes = sendData.result?.photo || [];
+          photoFileId = sizes.length ? sizes[sizes.length - 1].file_id : null;
+          fetch(`${TG}/deleteMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: Number(user.tgId), message_id: sendData.result.message_id }),
+          }).catch(() => { /* noop */ });
+        } else {
+          console.error('[SHARE] sendPhoto failed:', sendData);
+        }
+      } catch (e) {
+        console.error('[SHARE] sendPhoto error:', e);
+      }
+
+      const resultPayload = photoFileId
+        ? { type: 'photo', id: `share_${Date.now()}`, photo_file_id: photoFileId }
+        : { type: 'photo', id: `share_${Date.now()}`, photo_url: photoUrl, thumbnail_url: photoUrl, photo_width: 1080, photo_height: 1350 };
+
+      const tgRes = await fetch(`${TG}/savePreparedInlineMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2789,12 +2819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           allow_group_chats: true,
           allow_channel_chats: true,
           result: {
-            type: 'photo',
-            id: `share_${Date.now()}`,
-            photo_url: photoUrl,
-            thumbnail_url: photoUrl,
-            photo_width: 1080,
-            photo_height: 1350,
+            ...resultPayload,
             caption,
             ...(link ? { reply_markup: { inline_keyboard: [[{ text: locale === 'ru' ? '✨ Попробовать бесплатно' : '✨ Try it free', url: link }]] } } : {}),
           },
