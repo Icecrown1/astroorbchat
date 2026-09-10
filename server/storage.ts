@@ -934,11 +934,13 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async getTarotReadings(userId: string, limit = 20) {
+  async getTarotReadings(userId: string, limit = 20, spread?: string) {
     return db
       .select()
       .from(tarotReadings)
-      .where(eq(tarotReadings.userId, userId))
+      .where(spread
+        ? and(eq(tarotReadings.userId, userId), eq(tarotReadings.spread, spread))
+        : eq(tarotReadings.userId, userId))
       .orderBy(desc(tarotReadings.createdAt))
       .limit(limit);
   }

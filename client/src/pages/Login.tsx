@@ -1,3 +1,4 @@
+import { hasTrialStartParam } from '@/lib/telegram';
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -70,7 +71,10 @@ export default function Login() {
         // Check if user needs to complete registration
         // Profile is complete if birthPlace is set (not null from minimal registration)
         const profileComplete = userData.birthPlace !== null && userData.birthPlace !== '';
-        if (!profileComplete) {
+        if (hasTrialStartParam()) {
+          // Лид-магнит: пробный расклад без онбординга — данные рождения для него не нужны
+          setLocation("/tarot-trial");
+        } else if (!profileComplete) {
           console.log('[Mini App Auth] User needs to complete registration');
           setLocation("/register");
         } else {

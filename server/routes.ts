@@ -4854,6 +4854,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============ ТАРО ============
   // Карта дня — бесплатно, одна на календарный день (по timezone пользователя), повтор возвращает ту же
   // Платные расклады — через canAccessFeature/deductOrbs как остальные фичи
+  // ===== Лид-магнит: один бесплатный пробный расклад (3 карты) на свой вопрос =====
+  // Без звёзд, без данных рождения, одна проба на пользователя (spread='trial').
+  app.get("/api/tarot/trial", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const rows = await storage.getTarotReadings(userId, 1, 'trial');
+      const existing = rows?.[0];
+      res.json({ ok: true, data: existing ? { used: true, reading: existing } : { used: false } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/tarot/trial", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+      const locale = String(req.body.locale || 'ru') === 'en' ? 'en' : 'ru';
+
+      const question = String(req.body.question || '').trim();
+      if (question.length < 10 || question.length > 500) {
+        return res.status(400).json({ ok: false, error: 'question_length' });
+      }
+
+      // Право на одну пробу
+      const prior = await storage.getTarotReadings(userId, 1, 'trial');
+      if (prior?.length) {
+        return res.json({ ok: true, data: { reading: prior[0], repeated: true } });
+      }
+
+      const { TAROT_SPREADS, drawCards, getTarotCard, getCardAstro, sunSignFromDate } = await import('@shared/tarot');
+      const spread = TAROT_SPREADS['three']; // самый короткий содержательный расклад на открытый вопрос
+      const drawn = drawCards(spread.cards);
+
+      let astroProfile: { sunSign?: string } = {};
+      if (user.birthdayDate) {
+        try { astroProfile.sunSign = sunSignFromDate(new Date(user.birthdayDate), locale); } catch { /* noop */ }
+      }
+
+      const { generateTarotReading } = await import('./lib/openai.js');
+      const interpretation = await generateTarotReading({
+        astroProfile,
+        spread: 'three',
+        question,
+        name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
+        gender: (user as any).gender || 'other',
+        locale,
+        cards: drawn.map((d: any) => {
+          const card = getTarotCard(d.cardId)!;
+          const pos = spread.positions[d.position];
+          return {
+            name: locale === 'ru' ? `${card.nameEn} (${card.nameRu})` : card.nameEn,
+            position: locale === 'ru' ? pos[0] : pos[1],
+            reversed: d.reversed,
+            keywordsUpright: locale === 'ru' ? card.kw[0] : card.kw[2],
+            keywordsReversed: locale === 'ru' ? card.kw[1] : card.kw[3],
+            astro: getCardAstro(card, locale),
+          };
+        }),
+      });
+
+      const saved = await storage.saveTarotReading({
+        userId,
+        spread: 'trial',
+        question,
+        cards: drawn,
+        interpretation,
+        locale,
+        day: dayjs().format('YYYY-MM-DD'),
+      });
+      res.json({ ok: true, data: { reading: saved } });
+    } catch (error: any) {
+      console.error('[TAROT][trial] error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/tarot/draw", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

@@ -240,3 +240,9 @@ export function consumePendingPaymentFromStartParam(): string | null {
   } catch { /* noop */ }
   return paymentId;
 }
+
+/** Лид-магнит: вход по startapp=trial / trial_tarot */
+export function hasTrialStartParam(): boolean {
+  const sp = getStartParam();
+  return sp === 'trial' || sp === 'trial_tarot';
+}
