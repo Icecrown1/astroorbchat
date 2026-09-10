@@ -4889,8 +4889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const spread = TAROT_SPREADS['three']; // самый короткий содержательный расклад на открытый вопрос
       const drawn = drawCards(spread.cards);
 
+      // Астропрофиль — только если человек РЕАЛЬНО прошёл онбординг (birthPlace заполняется
+      // только там). У автосозданных аккаунтов birthdayDate — заглушка, из неё выходили
+      // ложные мосты вида «Солнце в Рыбах, как у тебя» для человека без данных рождения.
       let astroProfile: { sunSign?: string } = {};
-      if (user.birthdayDate) {
+      const profileComplete = !!(user as any).birthPlace;
+      if (profileComplete && user.birthdayDate) {
         try { astroProfile.sunSign = sunSignFromDate(new Date(user.birthdayDate), locale); } catch { /* noop */ }
       }
 
@@ -4989,7 +4993,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
       } catch { /* noop */ }
-      if (!astroProfile.sunSign && user.birthdayDate) {
+      if (!astroProfile.sunSign && user.birthdayDate && (user as any).birthPlace) {
+        // birthPlace как маркер пройденного онбординга: у автосозданных дата — заглушка
         try { astroProfile.sunSign = sunSignFromDate(new Date(user.birthdayDate), locale); } catch { /* noop */ }
       }
 
