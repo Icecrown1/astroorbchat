@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { Loader } from '@/components/Loader';
+import { useAuth } from '@/store/useAuth';
 import { OrbIcon } from '@/components/OrbIcon';
 import { XCircle, AlertCircle, MessageCircle, Crown, X } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -56,6 +57,7 @@ function Sparks({ gold }: { gold: boolean }) {
 
 export default function PaymentSuccess() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const { locale } = useTranslation();
   const ru = locale === 'ru';
   const search = useSearch();
@@ -312,8 +314,24 @@ export default function PaymentSuccess() {
         </>
       )}
 
+      {user && !(user as any).birthPlace && (
+        <div className="mt-6 rounded-xl border border-primary/40 bg-primary/10 p-4 text-left" data-testid="block-finish-onboarding">
+          <p className="text-sm font-medium">
+            {ru ? 'Остался один шаг' : 'One step left'}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {ru
+              ? 'Заполните данные рождения — и мы построим вашу натальную карту, матрицу и прогнозы.'
+              : 'Add your birth details — and we will build your natal chart, matrix and forecasts.'}
+          </p>
+          <Button className="mt-3 w-full" onClick={() => { haptic.impact('medium'); navigate('/register'); }} data-testid="button-finish-onboarding">
+            {ru ? 'Заполнить данные рождения' : 'Add birth details'}
+          </Button>
+        </div>
+      )}
+
       <Button
-        onClick={() => { haptic.impact('light'); navigate('/dashboard'); }}
+        onClick={() => { haptic.impact('light'); navigate(user && !(user as any).birthPlace ? '/register' : '/dashboard'); }}
         className="w-full mt-8"
         size="lg"
         data-testid="button-go-dashboard"

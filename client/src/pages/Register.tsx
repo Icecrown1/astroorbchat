@@ -464,6 +464,11 @@ export default function Register() {
         <h1 className="anim-fade-up anim-d1 font-display font-bold text-3xl leading-tight mt-8 max-w-sm">
           {ru ? 'Ваша карта уже на небе. Построим её за минуту' : 'Your chart is already in the sky. Let\u2019s build it in a minute'}
         </h1>
+        <p className="anim-fade-up anim-d1 text-sm text-[hsl(var(--solar-gold))] mt-3 max-w-xs" data-testid="text-register-note">
+          {ru
+            ? 'Данные рождения нужны для точных расчётов — натальной карты, матрицы и прогнозов.'
+            : 'Birth details power the real calculations — your chart, matrix and forecasts.'}
+        </p>
         <p className="anim-fade-up anim-d2 text-muted-foreground mt-4 max-w-xs">
           {ru ? 'Swiss Ephemeris — та же астрономия, что у NASA' : 'Swiss Ephemeris — the same astronomy NASA uses'}
         </p>
