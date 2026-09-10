@@ -37,7 +37,7 @@ import LeadMagnet from '@/pages/LeadMagnet';
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
 function Router() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [location, navigate] = useLocation();
 
   useEffect(() => {
@@ -76,8 +76,18 @@ function Router() {
     
     if (!isAuthenticated && !isPublicRoute) {
       navigate('/login');
+      return;
     }
-  }, [isAuthenticated, location, navigate]);
+
+    // Онбординг-гейт: без реальных данных рождения (birthPlace — маркер) пускаем только
+    // на пробный расклад, тарифы и оплату; всё остальное — сначала регистрация.
+    // Иначе trial-пользователь строил наталку/матрицу на дате-заглушке.
+    const onboardingFree = ['/tarot-trial', '/register', '/login', '/legal', '/lead', '/subscribe', '/buy-energy'];
+    const isOnboardingFree = onboardingFree.includes(location) || location.startsWith('/payment-success');
+    if (isAuthenticated && user && !(user as any).birthPlace && !isOnboardingFree) {
+      navigate('/register');
+    }
+  }, [isAuthenticated, user, location, navigate]);
 
   return (
     <Switch>
