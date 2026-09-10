@@ -246,3 +246,13 @@ export function hasTrialStartParam(): boolean {
   const sp = getStartParam();
   return sp === 'trial' || sp === 'trial_tarot';
 }
+
+/** Одноразовое срабатывание trial-диплинка за сессию (для уже авторизованных) */
+export function consumeTrialFromStartParam(): boolean {
+  if (!hasTrialStartParam()) return false;
+  try {
+    if (sessionStorage.getItem('astro_trial_deeplink')) return false;
+    sessionStorage.setItem('astro_trial_deeplink', '1');
+  } catch { /* noop */ }
+  return true;
+}

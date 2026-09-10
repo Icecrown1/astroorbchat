@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
-import { initTelegram, consumePendingPaymentFromStartParam } from '@/lib/telegram';
+import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
 import NotFound from '@/pages/not-found';
@@ -49,6 +49,13 @@ function Router() {
     if (!isAuthenticated) return;
     const paymentId = consumePendingPaymentFromStartParam();
     if (paymentId) navigate(`/payment-success?paymentId=${paymentId}`);
+  }, [isAuthenticated]);
+
+  // Лид-магнит: startapp=trial → экран пробного расклада (и для уже авторизованных —
+  // логин-флоу у них не выполняется, редирект из Login не срабатывает)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (consumeTrialFromStartParam()) navigate('/tarot-trial');
   }, [isAuthenticated]);
 
   // Возврат в приложение (после оплаты во внешнем окне, из фона) — обновить баланс и подписку
