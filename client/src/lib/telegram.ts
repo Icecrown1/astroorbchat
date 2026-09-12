@@ -256,3 +256,13 @@ export function consumeTrialFromStartParam(): boolean {
   } catch { /* noop */ }
   return true;
 }
+
+/** Пуш «карта дня»: вход по startapp=daily */
+export function consumeDailyFromStartParam(): boolean {
+  if (getStartParam() !== 'daily') return false;
+  try {
+    if (sessionStorage.getItem('astro_daily_deeplink')) return false;
+    sessionStorage.setItem('astro_daily_deeplink', '1');
+  } catch { /* noop */ }
+  return true;
+}

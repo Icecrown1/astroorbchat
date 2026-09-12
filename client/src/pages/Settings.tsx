@@ -38,7 +38,7 @@ interface UserMeResponse {
 export default function Settings() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { updateUser, clearAuth } = useAuth();
+  const { user, updateUser, clearAuth } = useAuth();
   const { t, locale, setLocale } = useTranslation();
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     (localStorage.getItem('theme') === 'light' ? 'light' : 'dark'));
@@ -209,6 +209,31 @@ export default function Settings() {
                   {locale === 'ru' ? 'Светлая тема — бета: космический стиль задуман тёмным.' : 'Light theme is beta: the cosmic style is designed dark-first.'}
                 </p>
               )}
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-2">{locale === 'ru' ? 'Уведомления' : 'Notifications'}</h3>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between rounded-xl border border-border px-4 py-3 min-h-[44px]"
+                onClick={async () => {
+                  const next = !(user as any)?.pushEnabled;
+                  updateUser({ ...(user as any), pushEnabled: next });
+                  try { await apiRequest('PATCH', '/api/user/push', { enabled: next }); }
+                  catch { updateUser({ ...(user as any), pushEnabled: !next }); }
+                }}
+                data-testid="toggle-daily-push"
+              >
+                <span className="text-sm text-left">
+                  {locale === 'ru' ? 'Карта дня каждое утро' : 'Daily card every morning'}
+                  <span className="block text-xs text-muted-foreground">
+                    {locale === 'ru' ? 'Одно сообщение в день, около 10:00' : 'One message a day, around 10:00'}
+                  </span>
+                </span>
+                <span className={`h-6 w-11 rounded-full transition-colors relative ${(user as any)?.pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${(user as any)?.pushEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </span>
+              </button>
             </div>
 
             <div className="border-t pt-4">

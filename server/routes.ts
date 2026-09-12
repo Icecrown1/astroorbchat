@@ -4856,6 +4856,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Платные расклады — через canAccessFeature/deductOrbs как остальные фичи
   // ===== Лид-магнит: один бесплатный пробный расклад (3 карты) на свой вопрос =====
   // Без звёзд, без данных рождения, одна проба на пользователя (spread='trial').
+  // Ре-энгейджмент: тумблер ежедневного пуша
+  app.patch("/api/user/push", requireAuth, async (req, res) => {
+    try {
+      const enabled = !!req.body?.enabled;
+      await storage.updateUser((req as any).userId, { pushEnabled: enabled });
+      res.json({ ok: true, data: { pushEnabled: enabled } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Win-back-рассылка по базе (разовая, из админки)
+  app.post("/api/admin/broadcast", requireAdmin, async (req, res) => {
+    try {
+      const { runWinbackBroadcast } = await import('./lib/reengagement');
+      const result = await runWinbackBroadcast(storage);
+      res.json({ ok: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   app.get("/api/tarot/trial", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;

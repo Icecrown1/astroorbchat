@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   birthTime: varchar("birth_time", { length: 5 }),
   birthPlace: text("birth_place"),
   timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Moscow"),
+  /** Ре-энгейджмент: ежедневный пуш «карта дня» (отключается в настройках) */
+  pushEnabled: boolean("push_enabled").notNull().default(true),
+  lastPushAt: timestamp("last_push_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   // New orb system: subscriptionOrbs = monthly orbs for Standard (250/month), referralOrbs = orbs from referrals

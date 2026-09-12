@@ -112,5 +112,13 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+
+    // Ре-энгейджмент: тик ежедневного пуша «карта дня» (окно 10:00-11:59 по TZ пользователя)
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      Promise.all([import('./lib/reengagement'), import('./storage')]).then(([{ runDailyPushTick }, { storage }]) => {
+        setTimeout(() => runDailyPushTick(storage), 30_000);
+        setInterval(() => runDailyPushTick(storage), 10 * 60_000);
+      }).catch((e) => console.error('[PUSH] init failed:', e));
+    }
   });
 })();

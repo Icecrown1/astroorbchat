@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
-import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam } from '@/lib/telegram';
+import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam, consumeDailyFromStartParam } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
 import NotFound from '@/pages/not-found';
@@ -56,6 +56,7 @@ function Router() {
   useEffect(() => {
     if (!isAuthenticated) return;
     if (consumeTrialFromStartParam()) navigate('/tarot-trial');
+    else if (consumeDailyFromStartParam()) navigate('/tarot');
   }, [isAuthenticated]);
 
   // Возврат в приложение (после оплаты во внешнем окне, из фона) — обновить баланс и подписку
