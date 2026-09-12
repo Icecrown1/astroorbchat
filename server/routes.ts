@@ -4856,6 +4856,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Платные расклады — через canAccessFeature/deductOrbs как остальные фичи
   // ===== Лид-магнит: один бесплатный пробный расклад (3 карты) на свой вопрос =====
   // Без звёзд, без данных рождения, одна проба на пользователя (spread='trial').
+  // Тик рассылки по внешнему крону (Autoscale спит — внутренний таймер ненадёжен).
+  // Вызов: GET /api/push/tick?key=<PUSH_TICK_KEY> каждые 30 минут (cron-job.org и т.п.)
+  app.get("/api/push/tick", async (req, res) => {
+    try {
+      const key = process.env.PUSH_TICK_KEY;
+      if (!key || String(req.query.key) !== key) {
+        return res.status(403).json({ ok: false, error: 'forbidden' });
+      }
+      const { runDailyPushTick } = await import('./lib/reengagement');
+      await runDailyPushTick(storage);
+      res.json({ ok: true, ts: new Date().toISOString() });
+    } catch (error: any) {
+      console.error('[PUSH TICK HTTP] error:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Аналитика: приём событий (тихий fire-and-forget с клиента)
   app.post("/api/track", requireAuth, async (req, res) => {
     try {
