@@ -464,6 +464,31 @@ export default function Admin() {
                   </div>
                 )}
 
+                <div className="border-t pt-4 mt-2">
+                  <p className="text-sm font-medium mb-1">Рассылка «Возвращение»</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Разовое сообщение всем живым пользователям (кроме отключивших уведомления): что нового + кнопка на бесплатный расклад. Не злоупотреблять — максимум раз в несколько недель.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    disabled={vkLoading === 'broadcast'}
+                    onClick={async () => {
+                      if (!confirm('Отправить рассылку ВСЕМ пользователям прямо сейчас?')) return;
+                      setVkLoading('broadcast');
+                      try {
+                        const resp = await apiRequest('POST', '/api/admin/broadcast', {});
+                        if (resp.ok) toast({ title: `Отправлено: ${resp.data.sent}`, description: `Заблокировали бота: ${resp.data.blocked} · пропущено: ${resp.data.skipped}` });
+                        else toast({ title: 'Ошибка рассылки', description: resp.error, variant: 'destructive' });
+                      } catch (e: any) {
+                        toast({ title: 'Ошибка рассылки', description: e.message, variant: 'destructive' });
+                      } finally { setVkLoading(null); }
+                    }}
+                    data-testid="button-winback"
+                  >
+                    {vkLoading === 'broadcast' ? 'Рассылаем…' : '📣 Отправить win-back'}
+                  </Button>
+                </div>
+
                 {vkText && (
                   <>
                     <textarea
