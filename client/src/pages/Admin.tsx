@@ -69,6 +69,10 @@ export default function Admin() {
   const [subscriptionDays, setSubscriptionDays] = useState("30");
   const [userQuery, setUserQuery] = useState("");
   const [vkText, setVkText] = useState("");
+  const [analyticsDays, setAnalyticsDays] = useState(7);
+  const { data: analyticsData } = useQuery<{ ok: boolean; data: { pages: any[]; clicks: any[] } }>({
+    queryKey: [`/api/admin/analytics?days=${analyticsDays}`],
+  });
   const [vkCardId, setVkCardId] = useState<string | null>(null);
   const [vkLoading, setVkLoading] = useState<string | null>(null);
 
@@ -267,6 +271,9 @@ export default function Admin() {
               <Users className="h-4 w-4 mr-2" />
               {t.admin.tabUsers}
             </TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="tab-analytics">
+              Аналитика
+            </TabsTrigger>
             <TabsTrigger value="vk" data-testid="tab-vk">
               ВК-контент
             </TabsTrigger>
@@ -434,6 +441,50 @@ export default function Admin() {
                       {t.admin.noUsers}
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Что нажимают люди</CardTitle>
+                <CardDescription>Просмотры экранов и клики по кнопкам. Всего · уникальных людей.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2 mb-4">
+                  {[7, 30].map((d) => (
+                    <Button key={d} size="sm" variant={analyticsDays === d ? 'default' : 'outline'} onClick={() => setAnalyticsDays(d)} data-testid={`analytics-days-${d}`}>
+                      {d} дней
+                    </Button>
+                  ))}
+                </div>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Экраны</p>
+                    <div className="space-y-1">
+                      {(analyticsData?.data?.pages || []).map((r: any) => (
+                        <div key={r.value} className="flex justify-between text-sm border-b border-border/50 py-1.5">
+                          <span className="truncate mr-2">{r.value || '/'}</span>
+                          <span className="text-muted-foreground whitespace-nowrap">{r.cnt} · {r.uniq} чел</span>
+                        </div>
+                      ))}
+                      {!(analyticsData?.data?.pages || []).length && <p className="text-sm text-muted-foreground">Пока пусто — данные копятся после деплоя.</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Кнопки</p>
+                    <div className="space-y-1">
+                      {(analyticsData?.data?.clicks || []).map((r: any) => (
+                        <div key={r.value} className="flex justify-between text-sm border-b border-border/50 py-1.5">
+                          <span className="truncate mr-2">{r.value}</span>
+                          <span className="text-muted-foreground whitespace-nowrap">{r.cnt} · {r.uniq} чел</span>
+                        </div>
+                      ))}
+                      {!(analyticsData?.data?.clicks || []).length && <p className="text-sm text-muted-foreground">Пока пусто.</p>}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

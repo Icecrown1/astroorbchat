@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
+import { trackPage, installClickTracking } from '@/lib/analytics';
 import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam, consumeDailyFromStartParam } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
@@ -58,6 +59,13 @@ function Router() {
     if (consumeTrialFromStartParam()) navigate('/tarot-trial');
     else if (consumeDailyFromStartParam()) navigate('/tarot');
   }, [isAuthenticated]);
+
+  // Аналитика: просмотры страниц и клики по data-testid (после авторизации)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    installClickTracking();
+    trackPage(location);
+  }, [isAuthenticated, location]);
 
   // Возврат в приложение (после оплаты во внешнем окне, из фона) — обновить баланс и подписку
   useEffect(() => {

@@ -4856,6 +4856,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Платные расклады — через canAccessFeature/deductOrbs как остальные фичи
   // ===== Лид-магнит: один бесплатный пробный расклад (3 карты) на свой вопрос =====
   // Без звёзд, без данных рождения, одна проба на пользователя (spread='trial').
+  // Аналитика: приём событий (тихий fire-and-forget с клиента)
+  app.post("/api/track", requireAuth, async (req, res) => {
+    try {
+      const name = String(req.body?.name || '').slice(0, 80);
+      const value = String(req.body?.value || '').slice(0, 160);
+      if (name === 'page' || name === 'click') {
+        const { events } = await import("../shared/schema");
+        await db.insert(events).values({ userId: (req as any).userId, name, value });
+      }
+      res.json({ ok: true });
+    } catch { res.json({ ok: true }); } // аналитика никогда не мешает приложению
+  });
+
+  // Сводка: топ страниц и кликов за период
+  app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
+    try {
+      const days = Math.min(90, Math.max(1, parseInt(String(req.query.days)) || 7));
+      const { events } = await import("../shared/schema");
+      const { sql: dsql } = await import("drizzle-orm");
+      const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+      const rows: any = await db.execute(dsql`
+        SELECT name, value, count(*)::int AS cnt, count(DISTINCT user_id)::int AS uniq
+        FROM events WHERE created_at > ${since}
+        GROUP BY name, value ORDER BY cnt DESC LIMIT 60`);
+      const list = rows.rows || rows;
+      res.json({
+        ok: true,
+        data: {
+          pages: list.filter((r: any) => r.name === 'page'),
+          clicks: list.filter((r: any) => r.name === 'click'),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Ре-энгейджмент: тумблер ежедневного пуша
   app.patch("/api/user/push", requireAuth, async (req, res) => {
     try {

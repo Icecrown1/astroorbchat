@@ -685,6 +685,18 @@ export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 
 
+// Аналитика: события интерфейса (просмотры страниц, клики по кнопкам)
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  name: varchar("name", { length: 80 }).notNull(),   // 'page' | 'click'
+  value: varchar("value", { length: 160 }),           // путь страницы или data-testid кнопки
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  nameIdx: index("events_name_idx").on(t.name, t.createdAt),
+  userIdx: index("events_user_idx").on(t.userId),
+}));
+
 // Матрицы судьбы для других людей (платно, как гостевые карты)
 export const guestMatrices = pgTable("guest_matrices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
