@@ -50,6 +50,7 @@
 
   /* AstroOrb Palette */
   --solar-gold: 41 72% 40%; /* тёмное золото — читается на светлом */
+  --success: 150 55% 32%;
   --deep-amber: 36 67% 37%;
   --pearl-white: 60 20% 98%;
   --iridescent-blue: 207 57% 75%;
@@ -169,6 +170,7 @@
 
   /* AstroOrb Palette (dark) */
   --solar-gold: 41 81% 68%;
+  --success: 160 55% 56%;
   --deep-amber: 38 55% 53%;
   --pearl-white: 231 24% 93%;
   --iridescent-blue: 217 60% 70%;
@@ -439,7 +441,7 @@
 }
 
 /* Строки «Стоимость: N звёзд» — золотые в едином стиле */
-.text-primary:has(+ .cost-marker) { color: hsl(41 81% 68%); }
+.text-primary:has(+ .cost-marker) { color: hsl(var(--solar-gold)); }
 
 /* Персональные анимации виньеток при касании карточки */
 .vg { transform-origin: 50% 50%; transition: transform .4s cubic-bezier(.22,.8,.3,1); }
@@ -545,3 +547,27 @@ input[type='date']::-webkit-date-and-time-value { text-align: left; }
 :root:not(.dark) .energy-pill * { text-shadow: none !important; }
 :root:not(.dark) .energy-pill span { color: hsl(251 25% 16%) !important; }
 :root:not(.dark) .energy-pill svg { color: hsl(41 72% 38%) !important; }
+
+
+/* ===== Светлая тема «Moon Milk»: полировка ===== */
+:root:not(.dark) .bg-card {
+  box-shadow: 0 1px 2px rgba(27, 22, 51, 0.05), 0 10px 28px -14px rgba(27, 22, 51, 0.12);
+}
+/* Тёмный «медальон» октаграммы/колеса оставляем намеренно — как гравюра на бумаге,
+   но добавляем золотую окантовку, чтобы он выглядел рамой, а не дырой */
+:root:not(.dark) .wheel-nebula {
+  border: 1px solid hsl(41 55% 62% / 0.55);
+  box-shadow: 0 14px 40px -18px rgba(27, 22, 51, 0.35);
+}
+/* Внутри тёмного медальона приглушённый текст должен остаться светлым */
+:root:not(.dark) .wheel-nebula .text-muted-foreground { color: hsl(229 13% 72%); }
+:root:not(.dark) .wheel-nebula .text-foreground\/90,
+:root:not(.dark) .wheel-nebula .text-foreground { color: hsl(240 20% 92%); }
+/* Кнопка «Поделиться» внутри медальона — светлая обводка */
+:root:not(.dark) .wheel-nebula button { border-color: hsl(41 50% 60% / .5); color: hsl(41 75% 80%); }
+/* Активные чипы зон/вкладок: ирис с белым текстом уже ок; неактивные — темнее */
+:root:not(.dark) .text-muted-foreground { }
+/* Тосты/дровер поверх светлого — лёгкая тень */
+:root:not(.dark) [role="dialog"], :root:not(.dark) .drawer-content {
+  box-shadow: 0 -8px 40px -12px rgba(27, 22, 51, 0.18);
+}

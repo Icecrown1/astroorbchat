@@ -1,6 +1,6 @@
 /** Line-art виньетки карточек фич: тонкий штрих + фирменные акценты (вместо иконок в квадратах). */
 const IRIS = 'hsl(252 100% 74%)';
-const GOLD = 'hsl(41 81% 68%)';
+const GOLD = 'hsl(var(--solar-gold))';
 
 export type VignetteKind = 'natal' | 'guest' | 'matrix' | 'solar' | 'horoscope' | 'compat' | 'oracle' | 'tarot';
 

@@ -810,7 +810,7 @@ export default function Subscribe() {
 
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-chart-3/20 to-chart-2/20">
-                        <OrbIcon className="w-5 h-5 text-[hsl(41,81%,68%)]" />
+                        <OrbIcon className="w-5 h-5 text-[hsl(var(--solar-gold))]" />
                         <span className="font-bold">{getOrbsDisplay(tier)}</span>
                       </div>
                       {getLocalizedFeatures(tier).map((feature, index) => (
@@ -1055,7 +1055,7 @@ export default function Subscribe() {
         {/* Trust-блок: почему нам можно верить */}
         <div className="mt-6 grid gap-2 anim-fade-up">
           <div className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <span className="mt-0.5 text-[hsl(41,81%,68%)]">✦</span>
+            <span className="mt-0.5 text-[hsl(var(--solar-gold))]">✦</span>
             <p className="text-xs leading-relaxed text-muted-foreground">
               {locale === 'ru'
                 ? 'Расчёты — Swiss Ephemeris, та же астрономия, что у NASA JPL. Никаких «примерно»: позиции планет с точностью до минуты дуги.'
@@ -1063,7 +1063,7 @@ export default function Subscribe() {
             </p>
           </div>
           <div className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <span className="mt-0.5 text-[hsl(160,55%,56%)]">✓</span>
+            <span className="mt-0.5 text-[hsl(var(--success))]">✓</span>
             <p className="text-xs leading-relaxed text-muted-foreground">
               {locale === 'ru'
                 ? 'Отмена в один клик в любой момент. Никаких скрытых списаний: автопродление — только по вашему явному согласию.'

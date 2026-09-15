@@ -54,7 +54,7 @@ export function FeatureCard({
     >
       {isBlocked && (
         <div className="absolute top-4 left-4">
-          <Lock className="w-5 h-5 text-[hsl(41,81%,68%)]" />
+          <Lock className="w-5 h-5 text-[hsl(var(--solar-gold))]" />
         </div>
       )}
       
@@ -88,7 +88,7 @@ export function FeatureCard({
             )}
             {!premiumOnly && energyCost > 0 && (
               <Badge variant={locked ? "outline" : "secondary"} className="shrink-0">
-                <OrbIcon className="w-3 h-3 mr-1 text-[hsl(41,81%,68%)]" />
+                <OrbIcon className="w-3 h-3 mr-1 text-[hsl(var(--solar-gold))]" />
                 {energyCost % 1 === 0 ? energyCost : energyCost.toFixed(1)}
               </Badge>
             )}
