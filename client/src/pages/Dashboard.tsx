@@ -352,7 +352,7 @@ export default function Dashboard() {
           {(((data as any)?.data?.isAdmin ?? user?.isAdmin) || import.meta.env.DEV) && (
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full col-span-3"
               onClick={() => navigate('/admin')}
               data-testid="button-admin"
             >
@@ -363,7 +363,7 @@ export default function Dashboard() {
 
           <Button
             variant="ghost"
-            className="w-full text-muted-foreground"
+            className="w-full col-span-3 text-muted-foreground"
             onClick={toggleTheme}
             data-testid="button-theme-toggle"
           >
