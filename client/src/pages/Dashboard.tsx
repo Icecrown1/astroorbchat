@@ -19,7 +19,7 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Shield,
-  Hexagon, MoonStar, Sparkles } from 'lucide-react';
+  Hexagon, MoonStar, Sparkles, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo } from 'react';
@@ -81,6 +81,14 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { orbs, tier, setOrbs, setMaxOrbs, setTier, setResetAt, setEnergy } = useEnergy();
   const { t, locale } = useTranslation();
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    (localStorage.getItem('theme') === 'light' ? 'light' : 'dark'));
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('theme', next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+  };
 
   // Orb costs from ORB_COSTS config
   // oracle: 0.5, daily: 1, planet/house: 2, dates: 3, weekly: 5, monthly: 15, solar: 15 (Premium only), guest_chart/compatibility: 20
@@ -352,6 +360,18 @@ export default function Dashboard() {
               {locale === 'ru' ? 'Админ панель' : 'Admin Panel'}
             </Button>
           )}
+
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={toggleTheme}
+            data-testid="button-theme-toggle"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+            {theme === 'dark'
+              ? (locale === 'ru' ? 'Светлая тема' : 'Light theme')
+              : (locale === 'ru' ? 'Тёмная тема' : 'Dark theme')}
+          </Button>
         </div>
       </div>
     </div>
