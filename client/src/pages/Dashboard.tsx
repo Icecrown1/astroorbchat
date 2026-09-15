@@ -19,10 +19,10 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Shield,
-  Hexagon, MoonStar, Sparkles, Sun, Moon } from 'lucide-react';
+  Hexagon, MoonStar, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { User, Subscription } from '@shared/schema';
 import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
