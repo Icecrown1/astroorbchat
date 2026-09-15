@@ -429,7 +429,7 @@ export default function Tarot() {
                           dailyDone ? (
                             <Badge variant="secondary" className="text-[10px]">{ru ? 'Сегодня открыта' : 'Done today'}</Badge>
                           ) : (
-                            <Badge className="bg-green-600 hover:bg-green-600 text-[10px]">{ru ? 'Бесплатно' : 'Free'}</Badge>
+                            <Badge variant="outline" className="badge-free text-[10px]">{ru ? 'Бесплатно' : 'Free'}</Badge>
                           )
                         ) : (
                           <Badge variant="outline" className="text-[10px] gap-1">

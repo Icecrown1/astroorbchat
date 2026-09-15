@@ -57,7 +57,7 @@
   --soft-rose: 348 54% 82%;
   --opal-violet: 254 48% 76%;
 
-  --primary: 252 72% 56%; /* ирис: бренд-цвет и на светлой теме */
+  --primary: 252 62% 50%; /* ирис глубже: контраст кнопок и читаемый disabled на светлом */
 
   --primary-foreground: 222 5% 12%;
 
@@ -570,4 +570,23 @@ input[type='date']::-webkit-date-and-time-value { text-align: left; }
 /* Тосты/дровер поверх светлого — лёгкая тень */
 :root:not(.dark) [role="dialog"], :root:not(.dark) .drawer-content {
   box-shadow: 0 -8px 40px -12px rgba(27, 22, 51, 0.18);
+}
+
+
+/* ===== Сигнальные плашки: тонированные, из палитры бренда (обе темы) ===== */
+.badge-free {
+  background: hsl(var(--success) / 0.12) !important;
+  color: hsl(var(--success)) !important;
+  border: 1px solid hsl(var(--success) / 0.30) !important;
+}
+.badge-cost {
+  background: hsl(var(--solar-gold) / 0.12) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--solar-gold) / 0.35) !important;
+}
+/* Заблокированные фичи: приглушённая версия ценника */
+.badge-cost-locked {
+  background: hsl(var(--muted) / 0.6) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
 }

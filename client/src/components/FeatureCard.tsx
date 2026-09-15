@@ -87,13 +87,13 @@ export function FeatureCard({
               </Badge>
             )}
             {!premiumOnly && energyCost > 0 && (
-              <Badge variant={locked ? "outline" : "secondary"} className="shrink-0">
+              <Badge variant="outline" className={cn("shrink-0", locked ? "badge-cost-locked" : "badge-cost")}>
                 <OrbIcon className="w-3 h-3 mr-1 text-[hsl(var(--solar-gold))]" />
                 {energyCost % 1 === 0 ? energyCost : energyCost.toFixed(1)}
               </Badge>
             )}
             {!premiumOnly && energyCost === 0 && (
-              <Badge variant="default" className="shrink-0 bg-green-600 no-default-hover-elevate no-default-active-elevate">
+              <Badge variant="outline" className="shrink-0 badge-free no-default-hover-elevate no-default-active-elevate">
                 {locale === 'ru' ? 'Бесплатно' : 'Free'}
               </Badge>
             )}
