@@ -185,7 +185,7 @@ export function GuestChartForm() {
             {guestCharts.data.map((chart) => (
               <div
                 key={chart.id}
-                className="p-3 rounded-lg bg-muted flex items-center justify-between"
+                className="p-3 rounded-lg bg-[hsl(var(--solar-gold)/0.08)] border border-[hsl(var(--solar-gold)/0.22)] flex items-center justify-between"
                 data-testid={`guest-chart-${chart.id}`}
               >
                 <div>
