@@ -40,17 +40,12 @@ export default function Settings() {
   const { toast } = useToast();
   const { user, updateUser, clearAuth } = useAuth();
   const { t, locale, setLocale } = useTranslation();
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    (localStorage.getItem('theme') === 'light' ? 'light' : 'dark'));
-  const applyTheme = (next: 'dark' | 'light') => {
-    setTheme(next);
-    localStorage.setItem('theme', next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-  };
+  const [pushBusy, setPushBusy] = useState(false);
 
   const { data, isLoading, error } = useQuery<UserMeResponse>({
     queryKey: ['/api/user/me'],
   });
+  const pushEnabled = ((data?.data as any)?.pushEnabled ?? (user as any)?.pushEnabled ?? true) as boolean;
 
   // Handle 401 errors - user not found in database (e.g. after database recreation)
   useEffect(() => {
@@ -185,42 +180,33 @@ export default function Settings() {
             </div>
 
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-4">{locale === 'ru' ? 'Тема' : 'Theme'}</h3>
-              <div className="flex gap-1.5 p-1 rounded-xl bg-muted/50">
-                <button
-                  type="button"
-                  className={`flex-1 h-11 rounded-lg text-sm transition-colors ${theme === 'dark' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-                  onClick={() => applyTheme('dark')}
-                  data-testid="theme-dark"
-                >
-                  {locale === 'ru' ? '🌙 Тёмная' : '🌙 Dark'}
-                </button>
-                <button
-                  type="button"
-                  className={`flex-1 h-11 rounded-lg text-sm transition-colors ${theme === 'light' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-                  onClick={() => applyTheme('light')}
-                  data-testid="theme-light"
-                >
-                  {locale === 'ru' ? '☀️ Светлая' : '☀️ Light'}
-                </button>
-              </div>
-              {theme === 'light' && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {locale === 'ru' ? 'Светлая тема — бета: космический стиль задуман тёмным.' : 'Light theme is beta: the cosmic style is designed dark-first.'}
-                </p>
-              )}
-            </div>
-
-            <div className="mb-6">
               <h3 className="text-lg font-semibold mb-2">{locale === 'ru' ? 'Уведомления' : 'Notifications'}</h3>
               <button
                 type="button"
                 className="w-full flex items-center justify-between rounded-xl border border-border px-4 py-3 min-h-[44px]"
                 onClick={async () => {
-                  const next = !(user as any)?.pushEnabled;
-                  updateUser({ ...(user as any), pushEnabled: next });
-                  try { await apiRequest('PATCH', '/api/user/push', { enabled: next }); }
-                  catch { updateUser({ ...(user as any), pushEnabled: !next }); }
+                  if (pushBusy) return;
+                  const current = pushEnabled;
+                  const next = !current;
+                  setPushBusy(true);
+                  const setCache = (val: boolean) =>
+                    queryClient.setQueryData<UserMeResponse>(['/api/user/me'], (old) =>
+                      old ? { ...old, data: { ...(old.data as any), pushEnabled: val } } : old);
+                  setCache(next);
+                  if (user) updateUser({ ...(user as any), pushEnabled: next });
+                  try {
+                    await apiRequest('PATCH', '/api/user/push', { enabled: next });
+                  } catch {
+                    setCache(current);
+                    if (user) updateUser({ ...(user as any), pushEnabled: current });
+                    toast({
+                      title: locale === 'ru' ? 'Не удалось сохранить' : 'Failed to save',
+                      description: locale === 'ru' ? 'Проверь соединение и попробуй ещё раз' : 'Check your connection and try again',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setPushBusy(false);
+                  }
                 }}
                 data-testid="toggle-daily-push"
               >
@@ -230,8 +216,8 @@ export default function Settings() {
                     {locale === 'ru' ? 'Одно сообщение в день, около 10:00' : 'One message a day, around 10:00'}
                   </span>
                 </span>
-                <span className={`h-6 w-11 rounded-full transition-colors relative ${(user as any)?.pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${(user as any)?.pushEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                <span className={`h-6 w-11 rounded-full transition-colors relative ${pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${pushEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                 </span>
               </button>
             </div>
