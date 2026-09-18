@@ -211,9 +211,9 @@ export default function Settings() {
                 data-testid="toggle-daily-push"
               >
                 <span className="text-sm text-left">
-                  {locale === 'ru' ? 'Карта дня каждое утро' : 'Daily card every morning'}
+                  {locale === 'ru' ? 'Напоминания от AstroOrbi' : 'AstroOrbi reminders'}
                   <span className="block text-xs text-muted-foreground">
-                    {locale === 'ru' ? 'Одно сообщение в день, около 10:00' : 'One message a day, around 10:00'}
+                    {locale === 'ru' ? 'Раз в несколько дней, утром: карта дня, гороскоп, матрица' : 'Every few days in the morning: daily card, horoscope, matrix'}
                   </span>
                 </span>
                 <span className={`h-6 w-11 rounded-full transition-colors relative ${pushEnabled ? 'bg-primary' : 'bg-muted'}`}>

@@ -258,11 +258,24 @@ export function consumeTrialFromStartParam(): boolean {
 }
 
 /** Пуш «карта дня»: вход по startapp=daily */
-export function consumeDailyFromStartParam(): boolean {
-  if (getStartParam() !== 'daily') return false;
+// Дип-линки пуш-кампаний: startapp → маршрут в приложении
+const PUSH_DEEPLINK_ROUTES: Record<string, string> = {
+  daily: '/tarot',
+  horoscope: '/horoscope',
+  matrix: '/matrix',
+  compat: '/compatibility',
+  ask: '/ask',
+};
+
+/** Возвращает маршрут для startapp пуш-кампании (однократно за сессию) или null */
+export function consumePushRouteFromStartParam(): string | null {
+  const param = getStartParam();
+  if (!param) return null;
+  const route = PUSH_DEEPLINK_ROUTES[param];
+  if (!route) return null;
   try {
-    if (sessionStorage.getItem('astro_daily_deeplink')) return false;
-    sessionStorage.setItem('astro_daily_deeplink', '1');
+    if (sessionStorage.getItem('astro_push_deeplink')) return null;
+    sessionStorage.setItem('astro_push_deeplink', '1');
   } catch { /* noop */ }
-  return true;
+  return route;
 }

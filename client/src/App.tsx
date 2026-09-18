@@ -7,7 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { trackPage, installClickTracking } from '@/lib/analytics';
-import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam, consumeDailyFromStartParam } from '@/lib/telegram';
+import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam, consumePushRouteFromStartParam } from '@/lib/telegram';
 import { useAuth } from '@/store/useAuth';
 import { useEnergy } from '@/store/useEnergy';
 import NotFound from '@/pages/not-found';
@@ -56,8 +56,9 @@ function Router() {
   // логин-флоу у них не выполняется, редирект из Login не срабатывает)
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (consumeTrialFromStartParam()) navigate('/tarot-trial');
-    else if (consumeDailyFromStartParam()) navigate('/tarot');
+    if (consumeTrialFromStartParam()) { navigate('/tarot-trial'); return; }
+    const pushRoute = consumePushRouteFromStartParam();
+    if (pushRoute) navigate(pushRoute);
   }, [isAuthenticated]);
 
   // Аналитика: просмотры страниц и клики по data-testid (после авторизации)
