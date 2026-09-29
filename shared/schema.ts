@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   /** Ре-энгейджмент: ежедневный пуш «карта дня» (отключается в настройках) */
   pushEnabled: boolean("push_enabled").notNull().default(true),
   lastPushAt: timestamp("last_push_at"),
+  lastPushTheme: integer("last_push_theme"), // индекс темы последнего пуша — для ротации без повторов
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   // New orb system: subscriptionOrbs = monthly orbs for Standard (250/month), referralOrbs = orbs from referrals

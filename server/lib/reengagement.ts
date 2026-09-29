@@ -3,6 +3,7 @@
 // в местном дне пользователя (окно отправки 10:00–11:59 его таймзоны).
 // Интервал 3/4/5 дней выбирается детерминированно из (userId, lastPushAt) —
 // стабилен между тиками, «перекатывается» после каждой отправки.
+import { createHash } from 'crypto';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import tzPlugin from 'dayjs/plugin/timezone.js';
@@ -40,14 +41,18 @@ const PUSH_CAMPAIGNS: { text: string; button: string; startapp: string }[] = [
   },
 ];
 
-// Простой стабильный хэш для детерминированного «рандома» на пользователя
+// Стабильный хэш для детерминированного «рандома» на пользователя.
+// md5 вместо FNV: FNV на строках, различающихся последней цифрой даты,
+// после % 5 коррелирует — ~24% юзеров получали одну тему три раза подряд.
 function seedHash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
+  return createHash('md5').update(s).digest().readUInt32BE(0);
+}
+
+/** Случайная тема, гарантированно не равная теме предыдущей отправки (u.lastPushTheme) */
+function pickThemeIdx(prevTheme: number | null | undefined): number {
+  const n = PUSH_CAMPAIGNS.length;
+  const pool = Array.from({ length: n }, (_, i) => i).filter((i) => i !== prevTheme);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function isRealTgId(tgId: unknown): boolean {
@@ -101,19 +106,20 @@ export async function runDailyPushTick(storage: any): Promise<void> {
       if (local.hour() < 10 || local.hour() >= 12) continue;
       const localToday = local.format('YYYY-MM-DD');
 
-      if (u.lastPushAt) {
-        const lastLocal = dayjs(u.lastPushAt).tz(tz).format('YYYY-MM-DD');
-        const daysSince = dayjs(localToday).diff(dayjs(lastLocal), 'day');
+      const prevLocal = u.lastPushAt ? dayjs(u.lastPushAt).tz(tz).format('YYYY-MM-DD') : null;
+      if (prevLocal) {
+        const daysSince = dayjs(localToday).diff(dayjs(prevLocal), 'day');
         // интервал 3–5 дней, стабильный между тиками до следующей отправки
         const interval = 3 + (seedHash(`${u.id}:${new Date(u.lastPushAt).toISOString()}`) % 3);
         if (daysSince < interval) continue;
       }
       // lastPushAt == null → новый пользователь, шлём в первое же окно
 
+      // тема — случайная, но никогда не совпадает с прошлой отправкой
+      const themeIdx = pickThemeIdx(u.lastPushTheme);
+      const c = PUSH_CAMPAIGNS[themeIdx];
       // резервируем ДО отправки — двойной тик не продублирует сообщение
-      await storage.updateUser(u.id, { lastPushAt: new Date() });
-      // тема — детерминированная ротация по пользователю и дню
-      const c = PUSH_CAMPAIGNS[seedHash(`${u.id}:${localToday}`) % PUSH_CAMPAIGNS.length];
+      await storage.updateUser(u.id, { lastPushAt: new Date(), lastPushTheme: themeIdx });
       const result = await sendPush(String(u.tgId), c.text, c.button, links.get(c.startapp) ?? null);
       if (result === 'blocked') {
         await storage.updateUser(u.id, { pushEnabled: false });
