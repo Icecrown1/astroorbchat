@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
+import { useTierGate } from '@/hooks/useTierGate';
 
 interface HoroscopeData {
   money: string;
@@ -31,6 +32,7 @@ interface HoroscopeData {
 
 export default function Horoscope() {
   const [, navigate] = useLocation();
+  useTierGate();
   const { toast } = useToast();
   const { user } = useAuth();
   const { t, locale } = useTranslation();

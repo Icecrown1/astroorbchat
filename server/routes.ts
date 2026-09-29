@@ -18,6 +18,7 @@ import {
   canAccessFeature,
   deductOrbs,
   getUserTier,
+  getUserOrbs,
   checkAndResetOrbs,
   creditPurchasedOrbs,
 } from "./lib/energy";
@@ -2139,6 +2140,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const natalChart = await storage.getNatalChart(userId);
       if (!natalChart || !natalChart.data) {
         return res.status(409).json({ ok: false, error: "NATAL_NOT_INITIALIZED" });
+      }
+
+      // Гейт ДО вызова GPT: оракул недоступен на free, и нужен баланс —
+      // раньше проверка шла только после генерации и не блокировала ответ
+      const { total: orbBalance, tier: userTier } = await getUserOrbs(storage, userId);
+      if (userTier === 'free') {
+        return res.status(403).json({ ok: false, error: "SUBSCRIPTION_REQUIRED" });
+      }
+      if (orbBalance < ENERGY_COSTS.ask) {
+        return res.status(402).json({ ok: false, error: "INSUFFICIENT_ORBS" });
       }
 
       // Execute the reading using full natal chart data as foundation

@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
 import dayjs from 'dayjs';
+import { useTierGate } from '@/hooks/useTierGate';
 
 interface GuestChart {
   id: string;
@@ -35,6 +36,7 @@ interface GuestChart {
 
 export default function Compatibility() {
   const [, navigate] = useLocation();
+  useTierGate();
   const { toast } = useToast();
   const { user } = useAuth();
   const { t, locale } = useTranslation();

@@ -17,9 +17,11 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
+import { useTierGate } from '@/hooks/useTierGate';
 
 export default function Ask() {
   const [, navigate] = useLocation();
+  useTierGate();
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const { decreaseOrbs } = useEnergy();
