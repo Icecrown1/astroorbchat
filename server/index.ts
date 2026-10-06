@@ -73,10 +73,16 @@ app.use((req, res, next) => {
     }
   };
 
-  // Initial run after 5 minutes (give server time to fully start)
-  setTimeout(runReconciliation, 5 * 60 * 1000);
-  // Repeat every 2 hours
-  setInterval(runReconciliation, RECONCILE_INTERVAL_MS);
+  // Фоновые задачи (сверка платежей, пуши) — только в опубликованном приложении.
+  // После разделения БД dev/prod воркспейс работает с отдельной базой и тем же токеном бота:
+  // без этого гейта кнопка Run слала бы реальным пользователям дубли пушей.
+  const backgroundJobs = process.env.NODE_ENV === 'production' || process.env.ENABLE_BACKGROUND_JOBS === '1';
+  if (backgroundJobs) {
+    setTimeout(runReconciliation, 5 * 60 * 1000); // первый прогон через 5 минут
+    setInterval(runReconciliation, RECONCILE_INTERVAL_MS); // далее каждые 2 часа
+  } else {
+    console.log('[STARTUP] Background jobs (reconcile, push) disabled outside production');
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -114,7 +120,7 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
 
     // Ре-энгейджмент: тик ежедневного пуша «карта дня» (окно 10:00-11:59 по TZ пользователя)
-    if (process.env.TELEGRAM_BOT_TOKEN) {
+    if (backgroundJobs && process.env.TELEGRAM_BOT_TOKEN) {
       Promise.all([import('./lib/reengagement'), import('./storage')]).then(([{ runDailyPushTick }, { storage }]) => {
         setTimeout(() => runDailyPushTick(storage), 30_000);
         setInterval(() => runDailyPushTick(storage), 10 * 60_000);
