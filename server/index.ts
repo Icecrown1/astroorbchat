@@ -51,6 +51,14 @@ app.use((req, res, next) => {
     console.warn('[STARTUP] WARNING: SUPPORT_CHAT_ID is not set — support alerts will be dropped to console instead of sent via Telegram');
   }
 
+  // Прод-база Replit отдельна от dev: досоздаём недостающие nullable-колонки до приёма запросов
+  const { ensureSchema, getSchemaReport } = await import('./lib/ensureSchema');
+  await ensureSchema();
+  app.get('/api/health/schema', (_req, res) => {
+    const r = getSchemaReport();
+    res.json({ ok: !!r && !r.error && r.missing.length === 0, ...r });
+  });
+
   const server = await registerRoutes(app);
 
   // Run payment reconciliation every 2 hours to catch any missed webhook activations
