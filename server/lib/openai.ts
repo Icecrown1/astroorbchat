@@ -1312,7 +1312,11 @@ export async function generateSignHoroscope(
 
 // ===== Матрица судьбы: генерация разбора секции =====
 import { MATRIX_KB_VERSION, arcanaByN, type ArcanaKnowledge } from './matrixKb.js';
-import type { MatrixSectionId } from '@shared/matrix';
+import { arcanaConcrete } from './matrixKbConcrete.js';
+import {
+  SECTION_ROLES, PAIR_ZONES, PAIR_ZONE_META, pairZoneArcana,
+  type MatrixSectionId, type MatrixCore, type SectionReadingV2, type PairReadingV2,
+} from '@shared/matrix';
 
 const MATRIX_SECTION_TITLES: Record<string, { ru: string; en: string; posKey: keyof ArcanaKnowledge['pos'] }> = {
   comfort: { ru: 'Зона комфорта (центр матрицы)', en: 'Comfort zone (matrix center)', posKey: 'personality' },
@@ -1325,6 +1329,61 @@ const MATRIX_SECTION_TITLES: Record<string, { ru: string; en: string; posKey: ke
   year: { ru: `Аркан ${new Date().getFullYear()} года (личный год)`, en: `Arcana of ${new Date().getFullYear()} (personal year)`, posKey: 'spirit' },
 };
 
+/** Знания по аркану для промпта: смысл из БЗ + конкретные проявления (v2). */
+function arcanaKnowledgeBlock(n: number, posKey: keyof ArcanaKnowledge['pos'], extraPos?: keyof ArcanaKnowledge['pos']): string {
+  const a = arcanaByN(n);
+  const c = arcanaConcrete(n);
+  return [
+    `Аркан ${a.n} «${a.name}» (${a.keywords.join(', ')})`,
+    `  Суть в плюсе: ${a.plus}`,
+    `  Суть в минусе: ${a.minus}`,
+    `  Задача: ${a.task}`,
+    `  В этой позиции: ${a.pos[posKey]}`,
+    extraPos && extraPos !== posKey ? `  Также: ${a.pos[extraPos]}` : '',
+    `  Конкретные проявления в плюсе: ${c.plus.join('; ')}`,
+    `  Конкретные проявления в минусе: ${c.minus.join('; ')}`,
+    `  Сферы и занятия: ${c.work.join(', ')}`,
+  ].filter(Boolean).join('\n');
+}
+
+async function chatJson(system: string, user: string, maxTokens: number): Promise<any> {
+  // Одна повторная попытка: модель изредка обрезает или ломает JSON
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      max_completion_tokens: maxTokens,
+    });
+    const raw = completion.choices[0]?.message?.content?.trim();
+    if (!raw) continue;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      console.warn('[MATRIX] JSON parse failed, retrying');
+    }
+  }
+  throw new Error('Matrix generation returned invalid JSON');
+}
+
+/** Тон для разборов матрицы: без «гармонии» и прочих слов из стоп-листа промпта. */
+function matrixTone(gender: string, en: boolean): string {
+  if (en) {
+    if (gender === 'female') return 'Tone: warm and caring, but concrete — no comforting generalities.';
+    if (gender === 'male') return 'Tone: direct and to the point, respectful, without excess emotion.';
+    return 'Tone: neutral, warm and concrete; make no assumptions about gender.';
+  }
+  if (gender === 'female') return 'Тон: тёплый и бережный, но конкретный — без утешительных общих слов.';
+  if (gender === 'male') return 'Тон: прямой и по делу, уважительный, без лишней эмоциональности.';
+  return 'Тон: нейтральный, тёплый и конкретный; не делайте предположений о поле.';
+}
+
+const isText = (x: unknown, min = 40) => typeof x === 'string' && x.trim().length >= min;
+
+/** Разбор секции личной матрицы → JSON-строка SectionReadingV2. */
 export async function generateMatrixSection(params: {
   section: MatrixSectionId;
   arcana: number[];
@@ -1334,52 +1393,132 @@ export async function generateMatrixSection(params: {
   locale: string;
 }): Promise<string> {
   const { section, arcana, name, gender, birthDate, locale } = params;
+  const en = locale === 'en';
   const meta = MATRIX_SECTION_TITLES[section];
+  const roles = SECTION_ROLES[section];
 
-  const knowledge = arcana
-    .map((n) => {
-      const a = arcanaByN(n);
-      return [
-        `Аркан ${a.n} «${a.name}» (${a.keywords.join(', ')})`,
-        `  В плюсе: ${a.plus}`,
-        `  В минусе: ${a.minus}`,
-        `  Задача: ${a.task}`,
-        `  В этой позиции: ${a.pos[meta.posKey]}`,
-      ].join('\n');
-    })
-    .join('\n\n');
+  const arcanaRoles = arcana
+    .map((n, i) => `${i + 1}) ${n} «${arcanaByN(n).name}» — ${roles[i]?.ru ?? ''}`)
+    .join('\n');
+  const knowledge = Array.from(new Set(arcana)).map((n) => arcanaKnowledgeBlock(n, meta.posKey)).join('\n\n');
 
-  const languageInstruction =
-    locale === 'en'
-      ? 'IMPORTANT: Respond STRICTLY in English (arcana names may be translated naturally).'
-      : 'ВАЖНО: Ответь СТРОГО на русском языке.';
+  const languageInstruction = en
+    ? 'IMPORTANT: Write all JSON string values STRICTLY in natural English, addressing the person as "you". Arcana names may be translated.'
+    : 'ВАЖНО: Все тексты внутри JSON — СТРОГО на русском языке.';
 
   const promptText = loadPrompt('matrix_section', {
     name,
     birthDate,
-    sectionTitle: locale === 'en' ? meta.en : meta.ru,
-    arcanaList: arcana.join(', '),
+    sectionTitle: en ? meta.en : meta.ru,
+    arcanaRoles,
     knowledge,
-    toneInstruction: personalizeTone(gender || 'other'),
+    itemsCount: String(arcana.length),
+    toneInstruction: matrixTone(gender || 'other', en),
     languageInstruction,
   });
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Ты — тёплый и практичный консультант по Матрице судьбы. Пишешь связные персональные разборы без эзотерических клише, строго по переданной базе знаний.',
-      },
-      { role: 'user', content: promptText },
-    ],
-    max_completion_tokens: 700,
+  const data = await chatJson(
+    'Ты — практичный консультант по Матрице судьбы. Пишешь конкретно, узнаваемо и по делу, строго по переданной базе знаний. Отвечаешь только валидным JSON.',
+    promptText,
+    600 + arcana.length * 650,
+  );
+
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (items.length < arcana.length || !items.slice(0, arcana.length).every((it: any) => isText(it?.plus) && isText(it?.minus))) {
+    throw new Error('Matrix section JSON incomplete');
+  }
+
+  const reading: SectionReadingV2 = {
+    v: 2,
+    kind: 'section',
+    summary: String(data.summary || '').trim(),
+    items: arcana.map((n, i) => ({
+      arcana: n,
+      role: en ? roles[i]?.en ?? '' : roles[i]?.ru ?? '',
+      plus: String(items[i].plus).trim(),
+      minus: String(items[i].minus).trim(),
+    })),
+    steps: (Array.isArray(data.steps) ? data.steps : []).map((x: any) => String(x).trim()).filter(Boolean).slice(0, 3),
+  };
+  return JSON.stringify(reading);
+}
+
+/** Разбор матрицы пары → JSON-строка PairReadingV2. */
+export async function generateMatrixPair(params: {
+  pair: MatrixCore;
+  name: string;
+  birthDate: string;
+  partnerName: string;
+  partnerBirthDate: string;
+  locale: string;
+}): Promise<string> {
+  const { pair, name, birthDate, partnerName, partnerBirthDate, locale } = params;
+  const en = locale === 'en';
+  const posByZone: Record<string, keyof ArcanaKnowledge['pos']> = {
+    essence: 'personality', love: 'relationships', money: 'money', tail: 'karma', purpose: 'spirit',
+  };
+
+  const zonesList = PAIR_ZONES.map((z) => {
+    const ar = pairZoneArcana(pair, z);
+    const roles = PAIR_ZONE_META[z].roles;
+    return `[${z}] ${PAIR_ZONE_META[z].title.ru}: ` + ar.map((n, i) => `${n} «${arcanaByN(n).name}» (${roles[i]?.ru ?? ''})`).join('; ');
+  }).join('\n');
+
+  const seen = new Set<number>();
+  const knowledge = PAIR_ZONES.flatMap((z) =>
+    pairZoneArcana(pair, z)
+      .filter((n) => !seen.has(n) && seen.add(n))
+      .map((n) => arcanaKnowledgeBlock(n, posByZone[z], 'relationships')),
+  ).join('\n\n');
+
+  const languageInstruction = en
+    ? 'IMPORTANT: Write all JSON string values STRICTLY in natural English, addressing the couple as "you two" / "you". Arcana names may be translated.'
+    : 'ВАЖНО: Все тексты внутри JSON — СТРОГО на русском языке.';
+
+  const promptText = loadPrompt('matrix_pair', {
+    name,
+    birthDate,
+    partnerName,
+    partnerBirthDate,
+    pairCenter: String(pair.e),
+    zonesList,
+    knowledge,
+    zoneIds: PAIR_ZONES.join(', '),
+    languageInstruction,
   });
 
-  const content = completion.choices[0]?.message?.content?.trim();
-  if (!content) throw new Error('Failed to generate matrix section');
-  return content;
+  const data = await chatJson(
+    'Ты — практичный консультант по Матрице судьбы. Описываешь устройство пары конкретно и бережно, без вердиктов о совместимости. Отвечаешь только валидным JSON.',
+    promptText,
+    3600,
+  );
+
+  const zones = Array.isArray(data?.zones) ? data.zones : [];
+  const byId = new Map<string, any>(zones.map((z: any) => [String(z?.id), z]));
+  const built = PAIR_ZONES.map((z, i) => {
+    const src = byId.get(z) ?? zones[i];
+    if (!src || !isText(src.plus) || !isText(src.minus)) throw new Error(`Matrix pair JSON incomplete: ${z}`);
+    const meta = PAIR_ZONE_META[z];
+    return {
+      id: z,
+      title: en ? meta.title.en : meta.title.ru,
+      arcana: pairZoneArcana(pair, z),
+      roles: meta.roles.map((r) => (en ? r.en : r.ru)),
+      plus: String(src.plus).trim(),
+      minus: String(src.minus).trim(),
+    };
+  });
+
+  const reading: PairReadingV2 = {
+    v: 2,
+    kind: 'pair',
+    partnerName,
+    partnerBirthDate,
+    summary: String(data.summary || '').trim(),
+    zones: built,
+    steps: (Array.isArray(data.steps) ? data.steps : []).map((x: any) => String(x).trim()).filter(Boolean).slice(0, 3),
+  };
+  return JSON.stringify(reading);
 }
 
 export { MATRIX_KB_VERSION };

@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import express from "express";
 import { storage } from "./storage";
 import { db } from "./db";
-import { calcMatrixFromISO, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana } from "../shared/matrix";
+import { calcMatrixFromISO, calcPairMatrix, MATRIX_SECTIONS, FREE_MATRIX_SECTIONS, sectionArcana, parseReadingV2 } from "../shared/matrix";
+import { createHash } from "crypto";
 import { requireAuth, requireAdmin } from "./middleware/auth";
 import { validateTelegramInitData, parseTelegramInitData } from "./lib/telegram";
 import { generateToken } from "./lib/jwt";
@@ -5163,6 +5164,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Состояние секций матрицы: свежий разбор или разбор старой версии БЗ (outdated → обновление бесплатно). */
+  const matrixSectionStates = async (userId: string, locale: string, birthISO: string) => {
+    const { MATRIX_KB_VERSION } = await import('./lib/openai.js');
+    const rows = await storage.getMatrixReadingsAllVersions(userId, locale, birthISO);
+    return MATRIX_SECTIONS.map((id: string) => {
+      const cur = rows.find((r: any) => r.sectionId === id && r.kbVersion === MATRIX_KB_VERSION);
+      const old = rows.find((r: any) => r.sectionId === id && r.kbVersion < MATRIX_KB_VERSION);
+      return {
+        id,
+        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
+        content: cur?.content ?? old?.content ?? null,
+        outdated: !cur && !!old,
+      };
+    });
+  };
+
   app.get("/api/matrix/me", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
@@ -5174,13 +5191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!core) return res.status(400).json({ ok: false, error: 'Invalid birth date' });
 
       const locale = String(req.query.locale || 'ru') === 'en' ? 'en' : 'ru';
-      const { MATRIX_KB_VERSION } = await import('./lib/openai.js');
-      const cached = await storage.getMatrixReadings(userId, locale, birthISO, MATRIX_KB_VERSION);
-      const sections = MATRIX_SECTIONS.map((id: string) => ({
-        id,
-        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
-        content: cached.find((r: any) => r.sectionId === id)?.content ?? null,
-      }));
+      const sections = await matrixSectionStates(userId, locale, birthISO);
 
       res.json({ ok: true, core, sections });
     } catch (error: any) {
@@ -5243,13 +5254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!row) return res.status(404).json({ ok: false, error: 'not_found' });
       const core = calcMatrixFromISO(row.birthDate);
       const locale = String(req.query.locale || 'ru') === 'en' ? 'en' : 'ru';
-      const { MATRIX_KB_VERSION } = await import('./lib/openai.js');
-      const cached = await storage.getMatrixReadings((req as any).userId, locale, row.birthDate, MATRIX_KB_VERSION);
-      const sections = MATRIX_SECTIONS.map((id: string) => ({
-        id,
-        free: (FREE_MATRIX_SECTIONS as string[]).includes(id),
-        content: cached.find((r: any) => r.sectionId === id)?.content ?? null,
-      }));
+      const sections = await matrixSectionStates((req as any).userId, locale, row.birthDate);
       res.json({ ok: true, data: { id: row.id, name: row.name, birthDate: row.birthDate, core, sections } });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
@@ -5289,10 +5294,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Кэш: повторное открытие купленной секции бесплатно
       const existing = await storage.getMatrixReading(userId, sectionId, locale, birthISO, MATRIX_KB_VERSION);
-      if (existing) return res.json({ ok: true, section: sectionId, content: existing.content, cached: true });
+      if (existing) return res.json({ ok: true, section: sectionId, content: existing.content, cached: true, charged: false, cost: 0 });
+
+      // Куплено раньше (старая версия БЗ) → обновление в новом формате бесплатно
+      const allVersions = await storage.getMatrixReadingsAllVersions(userId, locale, birthISO);
+      const owned = allVersions.some((r: any) => r.sectionId === sectionId);
+      const needsPayment = !isFree && !owned;
 
       // Платные секции: доступ и баланс проверяем ДО генерации, списываем ПОСЛЕ успеха
-      if (!isFree) {
+      if (needsPayment) {
         const costKey = sectionId === 'year' ? 'matrix_year' : 'matrix_section';
         const access = await canAccessFeature(storage, userId, costKey as any);
         if (!access.allowed) {
@@ -5313,18 +5323,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
         locale,
       });
 
-      if (!isFree) {
-        const deduction = await deductOrbs(storage, userId, (sectionId === 'year' ? 'matrix_year' : 'matrix_section') as any);
+      let cost = 0;
+      if (needsPayment) {
+        const costKey = (sectionId === 'year' ? 'matrix_year' : 'matrix_section') as any;
+        const deduction = await deductOrbs(storage, userId, costKey);
         if (!deduction.ok) {
           return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
         }
+        cost = (ORB_COSTS as any)[costKey] ?? 0;
       }
 
       await storage.saveMatrixReading({ userId, sectionId, locale, birthDate: birthISO, kbVersion: MATRIX_KB_VERSION, content });
-      res.json({ ok: true, section: sectionId, content, cached: false });
+      res.json({ ok: true, section: sectionId, content, cached: false, charged: needsPayment, cost });
     } catch (error: any) {
       console.error('[MATRIX] /section error:', error);
       res.status(500).json({ ok: false, error: 'Matrix section generation failed' });
+    }
+  });
+
+  // ===== Совместимость по матрице судьбы =====
+  const pairKey = (birthDate: string, name: string) =>
+    `pair:${birthDate}:${createHash('md5').update(name.trim().toLowerCase()).digest('hex').slice(0, 8)}`;
+
+  app.post("/api/matrix/pair", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+      const partnerName = String(req.body?.name || '').trim().slice(0, 60);
+      const partnerBirthDate = String(req.body?.birthDate || '').trim();
+      if (!partnerName || !/^\d{4}-\d{2}-\d{2}$/.test(partnerBirthDate)) {
+        return res.status(400).json({ ok: false, error: 'name_and_date_required' });
+      }
+      const partnerCore = calcMatrixFromISO(partnerBirthDate);
+      const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      const userCore = calcMatrixFromISO(birthISO);
+      if (!partnerCore || !userCore) return res.status(400).json({ ok: false, error: 'invalid_date' });
+
+      const locale = String(req.body?.locale || 'ru') === 'en' ? 'en' : 'ru';
+      const pairCore = calcPairMatrix(userCore, partnerCore);
+      const key = pairKey(partnerBirthDate, partnerName);
+      const base = { key, partnerName, partnerBirthDate, userCore, partnerCore, pairCore };
+
+      const { generateMatrixPair, MATRIX_KB_VERSION } = await import('./lib/openai.js');
+      const rows = await storage.getMatrixPairReadings(userId, birthISO);
+      const cur = rows.find((r: any) => r.sectionId === key && r.locale === locale && r.kbVersion === MATRIX_KB_VERSION);
+      if (cur) return res.json({ ok: true, data: { ...base, reading: cur.content, cached: true, charged: false, cost: 0 } });
+
+      // Уже оплачено (другой язык или старая версия БЗ) — генерируем без списания
+      const owned = rows.some((r: any) => r.sectionId === key);
+      if (!owned) {
+        const access = await canAccessFeature(storage, userId, 'matrix_pair' as any);
+        if (!access.allowed) {
+          return res.status(402).json({
+            ok: false,
+            error: access.requiresPremium ? 'premium_required' : access.requiresSubscription ? 'subscription_required' : 'insufficient_orbs',
+            cost: access.cost,
+          });
+        }
+      }
+
+      const content = await generateMatrixPair({
+        pair: pairCore,
+        name: user.name || (locale === 'en' ? 'You' : 'Вы'),
+        birthDate: birthISO,
+        partnerName,
+        partnerBirthDate,
+        locale,
+      });
+
+      let cost = 0;
+      if (!owned) {
+        const deduction = await deductOrbs(storage, userId, 'matrix_pair' as any);
+        if (!deduction.ok) return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
+        cost = (ORB_COSTS as any).matrix_pair ?? 0;
+      }
+
+      await storage.saveMatrixReading({ userId, sectionId: key, locale, birthDate: birthISO, kbVersion: MATRIX_KB_VERSION, content });
+      res.json({ ok: true, data: { ...base, reading: content, cached: false, charged: !owned, cost } });
+    } catch (error: any) {
+      console.error('[MATRIX] /pair error:', error);
+      res.status(500).json({ ok: false, error: 'Matrix pair generation failed' });
+    }
+  });
+
+  // Сохранённые пары (для повторного открытия — бесплатно)
+  app.get("/api/matrix/pairs", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+      const birthISO = new Date(user.birthdayDate).toISOString().slice(0, 10);
+      const rows = await storage.getMatrixPairReadings(userId, birthISO);
+      const seen = new Set<string>();
+      const data = [];
+      for (const r of rows as any[]) {
+        if (seen.has(r.sectionId)) continue;
+        const parsed = parseReadingV2(r.content);
+        if (!parsed || parsed.kind !== 'pair') continue;
+        seen.add(r.sectionId);
+        data.push({ key: r.sectionId, partnerName: parsed.partnerName, partnerBirthDate: parsed.partnerBirthDate, createdAt: r.createdAt });
+      }
+      res.json({ ok: true, data });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
     }
   });
 

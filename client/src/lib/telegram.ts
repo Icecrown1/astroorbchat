@@ -263,6 +263,7 @@ const PUSH_DEEPLINK_ROUTES: Record<string, string> = {
   daily: '/tarot',
   horoscope: '/horoscope',
   matrix: '/matrix',
+  matrix_pair: '/matrix?tab=pair',
   compat: '/compatibility',
   ask: '/ask',
 };

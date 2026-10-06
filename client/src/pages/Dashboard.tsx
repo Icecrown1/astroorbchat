@@ -72,9 +72,9 @@ export default function Dashboard() {
     try {
       const sp = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param
         || new URLSearchParams(window.location.search).get('tgWebAppStartParam');
-      if (sp && String(sp).startsWith('web_matrix') && !sessionStorage.getItem('astro_matrix_deeplink_done')) {
+      if (sp && /^web_(en_)?matrix/.test(String(sp)) && !sessionStorage.getItem('astro_matrix_deeplink_done')) {
         sessionStorage.setItem('astro_matrix_deeplink_done', '1');
-        navigate('/matrix');
+        navigate(/^web_(en_)?matrix_pair/.test(String(sp)) ? '/matrix?tab=pair' : '/matrix');
       }
     } catch { /* noop */ }
   }, []);
@@ -112,7 +112,7 @@ export default function Dashboard() {
     {
       icon: Hexagon,
       title: locale === 'ru' ? 'Матрица судьбы' : 'Matrix of Destiny',
-      description: locale === 'ru' ? '22 аркана по дате рождения' : '22 arcana from your birth date',
+      description: locale === 'ru' ? '22 аркана по дате рождения · совместимость' : '22 arcana by birth date · compatibility',
       energyCost: 0,
       path: '/matrix',
       premiumOnly: false,

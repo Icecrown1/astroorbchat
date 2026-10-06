@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Loader } from '@/components/Loader';
-import { ArrowLeft, Lock, Users, Plus, X, Share2 } from 'lucide-react';
+import { ArrowLeft, Lock, X, Share2, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -20,8 +20,11 @@ import { shareOrCopyText, funnelFooter } from '@/lib/shareText';
 import { useAuth } from '@/store/useAuth';
 import type { MatrixCore, MatrixSectionId } from '@shared/matrix';
 import { arcanaOfYear } from '@shared/matrix';
+import { MatrixReading, readingToText } from '@/components/MatrixReading';
+import { MatrixPairTab, type PairResult } from '@/components/MatrixPairTab';
 
-type SectionState = { id: MatrixSectionId; free: boolean; content: string | null };
+type SectionState = { id: MatrixSectionId; free: boolean; content: string | null; outdated?: boolean };
+type Tab = 'my' | 'guest' | 'pair';
 type MatrixResponse = { ok: boolean; core: MatrixCore; sections: SectionState[] };
 
 const SECTION_COST = 5;
@@ -58,8 +61,16 @@ export default function Matrix() {
   const [zone, setZone] = useState<MatrixZone>('all');
   const [tapped, setTapped] = useState<OctagramNode | null>(null);
   const [cardZoom, setCardZoom] = useState<string | null>(null); // id карты Таро в лайтбоксе
-  // Режим «для другого человека»
-  const [guestMode, setGuestMode] = useState(false);
+  // Вкладки: своя матрица / для другого / совместимость (?tab=pair — дип-линк)
+  const [tab, setTab] = useState<Tab>(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab');
+      return t === 'pair' || t === 'guest' ? t : 'my';
+    } catch { return 'my'; }
+  });
+  const guestMode = tab === 'guest';
+  const pairMode = tab === 'pair';
+  const [pair, setPair] = useState<PairResult | null>(null);
   const [guest, setGuest] = useState<{ id: string; name: string; birthDate: string; core: MatrixCore; sections?: SectionState[] } | null>(null);
   const [gName, setGName] = useState('');
   const [gDate, setGDate] = useState('');
@@ -74,26 +85,24 @@ export default function Matrix() {
   });
 
   const sectionMutation = useMutation({
-    mutationFn: async (section: MatrixSectionId) => {
-      return await apiRequest('POST', '/api/matrix/section', { section, locale, guestId: guestMode && guest ? guest.id : undefined });
+    mutationFn: async (v: { section: MatrixSectionId; guestId?: string }) => {
+      return await apiRequest('POST', '/api/matrix/section', { section: v.section, locale, guestId: v.guestId });
     },
-    onMutate: (section) => setPendingSection(section),
+    onMutate: (v) => setPendingSection(v.section),
     onSettled: () => setPendingSection(null),
-    onSuccess: (resp, section) => {
-      if (guestMode) {
-        setGuest((g) => g ? {
-          ...g,
-          sections: (g.sections || []).map((x) => (x.id === section ? { ...x, content: resp.content } : x)),
-        } : g);
+    onSuccess: (resp, v) => {
+      const patch = (x: SectionState): SectionState => (x.id === v.section ? { ...x, content: resp.content, outdated: false } : x);
+      if (v.guestId) {
+        // Разбор гостя не должен попадать в кэш своей матрицы
+        setGuest((g) => (g && g.id === v.guestId ? { ...g, sections: (g.sections || []).map(patch) } : g));
+      } else {
+        queryClient.setQueryData<MatrixResponse>(['/api/matrix/me', locale], (old) =>
+          old ? { ...old, sections: old.sections.map(patch) } : old,
+        );
       }
-      queryClient.setQueryData<MatrixResponse>(['/api/matrix/me', locale], (old) =>
-        old
-          ? { ...old, sections: old.sections.map((s) => (s.id === section ? { ...s, content: resp.content } : s)) }
-          : old,
-      );
       haptic.notify('success');
-      const wasFree = data?.sections.find((s) => s.id === section)?.free;
-      if (!wasFree && !resp.cached) decreaseOrbs(SECTION_COST);
+      // Сервер сообщает, было ли списание (обновление старого разбора и кэш — бесплатно)
+      if (resp.charged && resp.cost) decreaseOrbs(resp.cost);
     },
     onError: (e: any) => {
       haptic.notify('error');
@@ -126,6 +135,7 @@ export default function Matrix() {
     queryKey: ['/api/matrix/guests'],
     enabled: guestMode,
   });
+  const userName = (user as any)?.name || (ru ? 'Вы' : 'You');
 
   const guestMutation = useMutation({
     mutationFn: async (payload: { name: string; birthDate: string }) => {
@@ -178,9 +188,11 @@ export default function Matrix() {
       ctx.textAlign = 'center';
       ctx.fillStyle = shareColors.INK;
       ctx.font = '52px Prata, serif';
-      const title = guestMode && guest ? guest.name : (ru ? 'Моя Матрица судьбы' : 'My Matrix of Destiny');
+      const title = pairMode && pair
+        ? (ru ? 'Матрица пары' : 'Couple matrix')
+        : guestMode && guest ? guest.name : (ru ? 'Моя Матрица судьбы' : 'My Matrix of Destiny');
       drawWrappedText(ctx, title, SHARE_W / 2, 140, 900, 64, 2);
-      const dateLine = guestMode && guest ? guest.birthDate : '';
+      const dateLine = pairMode && pair ? `${userName} + ${pair.partnerName}` : guestMode && guest ? guest.birthDate : '';
       if (dateLine) {
         ctx.fillStyle = shareColors.MUTED;
         ctx.font = '32px Inter, sans-serif';
@@ -191,9 +203,13 @@ export default function Matrix() {
       ctx.drawImage(img, (SHARE_W - size) / 2, 260, size, size);
       URL.revokeObjectURL(svgUrl);
 
-      await drawFooter(ctx, ru ? 'Рассчитай свою матрицу — бесплатно в AstroOrbi' : 'Calculate your own matrix — free in AstroOrbi');
+      await drawFooter(ctx, pairMode
+        ? (ru ? 'Совместимость по матрице судьбы — в AstroOrbi' : 'Matrix of Destiny compatibility — in AstroOrbi')
+        : (ru ? 'Рассчитай свою матрицу — бесплатно в AstroOrbi' : 'Calculate your own matrix — free in AstroOrbi'));
 
-      const caption = guestMode && guest
+      const caption = pairMode && pair
+        ? (ru ? `Наша матрица пары в AstroOrbi ✨ Проверь совместимость по датам рождения` : `Our couple matrix in AstroOrbi ✨ Check your compatibility by birth dates`)
+        : guestMode && guest
         ? (ru ? `Матрица судьбы: ${guest.name} ✨` : `Matrix of Destiny: ${guest.name} ✨`)
         : (ru ? 'Моя Матрица судьбы в AstroOrbi ✨' : 'My Matrix of Destiny in AstroOrbi ✨');
       const result = await sendShareImage(canvas, caption, locale);
@@ -223,7 +239,7 @@ export default function Matrix() {
       : (ru ? 'моя матрица' : 'my matrix');
     const header = `🔯 ${ru ? 'Матрица судьбы' : 'Matrix of Destiny'} — ${label} · ${who}`;
     const footer = funnelFooter(locale, (user as any)?.referralCode);
-    const body = smartCut(String(sec.content || ''), 3400 - header.length - footer.length);
+    const body = smartCut(readingToText(String(sec.content || ''), ru), 3400 - header.length - footer.length);
     const r = await shareOrCopyText([header, body, footer].join('\n\n'), locale);
     if (r === 'copied') toast({ title: ru ? 'Раздел скопирован' : 'Section copied' });
   };
@@ -243,12 +259,24 @@ export default function Matrix() {
     for (const sec of opened.slice(0, 4)) {
       const meta = SECTIONS_META[sec.id as MatrixSectionId];
       const label = meta ? (ru ? meta.ru : meta.en) : sec.id;
-      parts.push(`✦ ${label}\n${smartCut(String(sec.content), 700)}`);
+      parts.push(`✦ ${label}\n${smartCut(readingToText(String(sec.content), ru), 700)}`);
     }
     if (opened.length > 4) parts.push(ru ? `…и ещё ${opened.length - 4} раздел(а) в приложении` : `…and ${opened.length - 4} more sections in the app`);
     parts.push(funnelFooter(locale, (user as any)?.referralCode));
     const r = await shareOrCopyText(parts.join('\n\n'), locale);
     if (r === 'copied') toast({ title: ru ? 'Разбор скопирован' : 'Reading copied' });
+  };
+
+  const sharePairText = async () => {
+    if (!pair) return;
+    haptic.impact('medium');
+    const header = ru
+      ? `💞 Совместимость по матрице судьбы: ${userName} + ${pair.partnerName}`
+      : `💞 Matrix of Destiny compatibility: ${userName} + ${pair.partnerName}`;
+    const footer = funnelFooter(locale, (user as any)?.referralCode);
+    const body = smartCut(readingToText(pair.reading, ru), 3400 - header.length - footer.length);
+    const r = await shareOrCopyText([header, body, footer].join('\n\n'), locale);
+    if (r === 'copied') toast({ title: ru ? 'Разбор пары скопирован' : 'Couple reading copied' });
   };
 
   const tappedMeta = tapped ? arcanaMetaByN(tapped.value) : null;
@@ -269,23 +297,22 @@ export default function Matrix() {
           </div>
         </div>
 
-        <div className="mb-4 flex gap-1.5 p-1 rounded-xl bg-muted/50">
-          <button
-            type="button"
-            className={`flex-1 h-11 rounded-lg text-sm transition-colors ${!guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-            onClick={() => { haptic.select(); setGuestMode(false); }}
-            data-testid="matrix-tab-my"
-          >
-            {ru ? 'Моя матрица' : 'My matrix'}
-          </button>
-          <button
-            type="button"
-            className={`flex-1 h-11 rounded-lg text-sm transition-colors ${guestMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
-            onClick={() => { haptic.select(); setGuestMode(true); setTapped(null); }}
-            data-testid="matrix-tab-guest"
-          >
-            {ru ? 'Для другого' : 'For someone else'}
-          </button>
+        <div className="mb-4 flex gap-1 p-1 rounded-xl bg-muted/50">
+          {([
+            { id: 'my', ru: 'Моя матрица', en: 'My matrix' },
+            { id: 'guest', ru: 'Для другого', en: 'Someone else' },
+            { id: 'pair', ru: 'Совместимость', en: 'Compatibility' },
+          ] as { id: Tab; ru: string; en: string }[]).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`flex-1 h-11 rounded-lg px-1 text-[13px] leading-tight transition-colors ${tab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              onClick={() => { haptic.select(); setTab(t.id); setTapped(null); setZone('all'); }}
+              data-testid={`matrix-tab-${t.id}`}
+            >
+              {ru ? t.ru : t.en}
+            </button>
+          ))}
         </div>
 
         {isError ? (
@@ -295,12 +322,27 @@ export default function Matrix() {
             </p>
             <Button className="mt-4" onClick={() => refetch()}>{ru ? 'Повторить' : 'Retry'}</Button>
           </Card>
+        ) : pairMode ? (
+          <MatrixPairTab
+            ru={ru}
+            locale={locale}
+            userName={userName}
+            pair={pair}
+            setPair={(p) => { setPair(p); setTapped(null); }}
+            activeNodeId={tapped?.id}
+            onNodeTap={(n) => { haptic.impact('light'); setTapped(n); }}
+            onCardZoom={(cid) => { haptic.impact('light'); setCardZoom(cid); }}
+            onShareImage={shareMatrix}
+            onShareText={sharePairText}
+            sharing={sharing}
+            onNavigate={setLocation}
+          />
         ) : guestMode && !guest ? (
           <>
             <Card className="p-4 anim-fade-up">
               <h2 className="font-display font-semibold mb-1">{ru ? 'Матрица для другого человека' : 'Matrix for someone else'}</h2>
               <p className="text-xs text-muted-foreground mb-3">
-                {ru ? 'Октаграмма, зоны и арканы по дате рождения. Разборы разделов доступны только для своей матрицы.' : 'Octagram, zones and arcana by birth date. Section readings are for your own matrix only.'}
+                {ru ? 'Октаграмма, зоны и арканы по дате рождения. Разборы разделов открываются так же, как в вашей матрице.' : 'Octagram, zones and arcana by birth date. Section readings open the same way as in your own matrix.'}
               </p>
               <Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder={ru ? 'Имя человека' : 'Person name'} className="h-11 mb-2" data-testid="input-guest-name" />
               <Input type="date" value={gDate} onChange={(e) => setGDate(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="h-11 mb-3" data-testid="input-guest-date" />
@@ -415,7 +457,7 @@ export default function Matrix() {
                         <Button
                           size="sm"
                           disabled={busy}
-                          onClick={() => { haptic.impact('medium'); sectionMutation.mutate(s.id); }}
+                          onClick={() => { haptic.impact('medium'); sectionMutation.mutate({ section: s.id, guestId: guestMode && guest ? guest.id : undefined }); }}
                           data-testid={`button-matrix-${s.id}`}
                         >
                           {busy ? (
@@ -432,7 +474,25 @@ export default function Matrix() {
                     </div>
                     {s.content && (
                       <>
-                        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/90">{s.content}</p>
+                        {s.outdated && (
+                          <div className="mt-3 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {ru
+                                ? 'Мы обновили разборы: теперь по каждому аркану — конкретные проявления «в плюсе» и «в минусе», а ещё шаги на месяц. Обновление бесплатное.'
+                                : 'We\'ve upgraded the readings: each arcanum now gets concrete examples at its best and at its worst, plus steps for the month. The update is free.'}
+                            </p>
+                            <Button
+                              size="sm"
+                              className="mt-2 w-full"
+                              disabled={busy}
+                              onClick={(e) => { e.stopPropagation(); haptic.impact('medium'); sectionMutation.mutate({ section: s.id, guestId: guestMode && guest ? guest.id : undefined }); }}
+                              data-testid={`button-matrix-refresh-${s.id}`}
+                            >
+                              {busy ? <OrbIcon className="h-4 w-4 animate-pulse" /> : (<><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{ru ? 'Обновить разбор — бесплатно' : 'Update the reading — free'}</>)}
+                            </Button>
+                          </div>
+                        )}
+                        <MatrixReading content={s.content} ru={ru} onCardZoom={(cid) => { haptic.impact('light'); setCardZoom(cid); }} />
                         <Button
                           variant="ghost"
                           size="sm"
@@ -478,7 +538,7 @@ export default function Matrix() {
                   {ru ? tappedMeta.ru : tappedMeta.en}
                 </DrawerTitle>
                 <DrawerDescription>
-                  {ru ? tapped.label.ru : tapped.label.en} · {ru ? tappedMeta.keyRu : tappedMeta.keyEn}
+                  {pairMode ? '' : `${ru ? tapped.label.ru : tapped.label.en} · `}{ru ? tappedMeta.keyRu : tappedMeta.keyEn}
                 </DrawerDescription>
               </DrawerHeader>
               {arcanaCardId(tapped.value) && (
@@ -498,11 +558,15 @@ export default function Matrix() {
               </p>
               <p className="text-sm text-muted-foreground">
                 {ru
-                  ? (guestMode
-                    ? 'Ключ аркана — выше. Полные AI-разборы доступны в вашей собственной матрице.'
+                  ? (pairMode
+                    ? 'Если точка входит в одну из пяти зон, её значение для пары — в разборе ниже.'
+                    : guestMode
+                    ? 'Подробное значение — в разборах разделов ниже.'
                     : 'Полное значение этого аркана в вашей матрице — в разборах разделов ниже на странице.')
-                  : (guestMode
-                    ? 'The arcana key is above. Full AI readings are available in your own matrix.'
+                  : (pairMode
+                    ? 'If this point belongs to one of the five zones, its meaning for your couple is in the reading below.'
+                    : guestMode
+                    ? 'The detailed meaning is in the section readings below.'
                     : 'The full meaning of this arcana in your matrix is in the section readings below.')}
               </p>
             </div>

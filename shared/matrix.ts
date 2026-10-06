@@ -189,3 +189,170 @@ export function sectionArcana(core: MatrixCore, section: MatrixSectionId): numbe
       return [arcanaOfYear(core, new Date().getFullYear())];
   }
 }
+
+/* ===================== Роли позиций (подписи в разборах) ===================== */
+
+type L = { ru: string; en: string };
+
+/** Подписи позиций для арканов секции — в том же порядке, что sectionArcana(). */
+export const SECTION_ROLES: Record<MatrixSectionId, L[]> = {
+  comfort: [{ ru: "Центр матрицы — зона комфорта", en: "Matrix center — comfort zone" }],
+  persona: [{ ru: "Визитная карточка — день рождения", en: "Calling card — day of birth" }],
+  karmic_tail: [
+    { ru: "Первое число хвоста — что тянется из прошлого", en: "First tail number — what carries over from the past" },
+    { ru: "Второе число — как это проявляется сейчас", en: "Second number — how it shows up now" },
+    { ru: "Третье число — главный урок", en: "Third number — the main lesson" },
+  ],
+  money: [
+    { ru: "Точка входа в деньги", en: "Money entry point" },
+    { ru: "Материальная задача (год рождения)", en: "Material task (birth year)" },
+    { ru: "Денежный угол родового квадрата", en: "Money corner of the ancestral square" },
+  ],
+  love: [
+    { ru: "Точка входа в отношения", en: "Relationship entry point" },
+    { ru: "Угол отношений в родовом квадрате", en: "Relationship corner of the ancestral square" },
+    { ru: "Основание хвоста — прошлый опыт в отношениях", en: "Tail base — past experience in relationships" },
+  ],
+  purpose: [
+    { ru: "Личное предназначение (примерно до 40 лет)", en: "Personal purpose (roughly up to 40)" },
+    { ru: "Социальное предназначение (40–60 лет)", en: "Social purpose (40–60)" },
+    { ru: "Духовное предназначение (после 60)", en: "Spiritual purpose (60+)" },
+    { ru: "Планетарное предназначение", en: "Planetary purpose" },
+  ],
+  rod: [
+    { ru: "Отцовская линия рода — духовная программа", en: "Paternal line — spiritual program" },
+    { ru: "Материнская линия рода — духовная программа", en: "Maternal line — spiritual program" },
+    { ru: "Отцовская линия рода — материальная программа", en: "Paternal line — material program" },
+    { ru: "Материнская линия рода — материальная программа", en: "Maternal line — material program" },
+  ],
+  year: [{ ru: "Аркан личного года", en: "Personal year arcana" }],
+};
+
+/* ===================== Совместимость: матрица пары ===================== */
+
+/**
+ * Матрица пары (канон из ТЗ, п. 1.10): одноимённые позиции двух матриц
+ * складываются и приводятся к 1–22. Центр пары = reduce(центр₁ + центр₂).
+ */
+export function calcPairMatrix(p: MatrixCore, q: MatrixCore): MatrixCore {
+  const s = (x: number, y: number) => reduce22(x + y);
+  return {
+    a: s(p.a, q.a), b: s(p.b, q.b), c: s(p.c, q.c), d: s(p.d, q.d), e: s(p.e, q.e),
+    rodTL: s(p.rodTL, q.rodTL), rodTR: s(p.rodTR, q.rodTR), rodBR: s(p.rodBR, q.rodBR), rodBL: s(p.rodBL, q.rodBL),
+    sky: s(p.sky, q.sky), earth: s(p.earth, q.earth),
+    personalPurpose: s(p.personalPurpose, q.personalPurpose),
+    maleLine: s(p.maleLine, q.maleLine),
+    femaleLine: s(p.femaleLine, q.femaleLine),
+    socialPurpose: s(p.socialPurpose, q.socialPurpose),
+    spiritualPurpose: s(p.spiritualPurpose, q.spiritualPurpose),
+    planetaryPurpose: s(p.planetaryPurpose, q.planetaryPurpose),
+    moneyEntry: s(p.moneyEntry, q.moneyEntry),
+    loveEntry: s(p.loveEntry, q.loveEntry),
+    tailG: s(p.tailG, q.tailG), tailR: s(p.tailR, q.tailR), tailS: s(p.tailS, q.tailS),
+    ageDecades: p.ageDecades.map((x, i) => ({ age: x.age, arcana: s(x.arcana, q.ageDecades[i].arcana) })),
+  };
+}
+
+export const PAIR_ZONES = ["essence", "love", "money", "tail", "purpose"] as const;
+export type PairZoneId = (typeof PAIR_ZONES)[number];
+
+export const PAIR_ZONE_META: Record<PairZoneId, { title: L; roles: L[] }> = {
+  essence: {
+    title: { ru: "Суть союза", en: "The core of your bond" },
+    roles: [
+      { ru: "Центр пары — на чём держится союз", en: "Couple center — what holds the bond together" },
+      { ru: "Как вас видят окружающие", en: "How others see you as a couple" },
+      { ru: "Что вас притягивает друг к другу", en: "What draws you to each other" },
+    ],
+  },
+  love: {
+    title: { ru: "Отношения и быт", en: "Love and everyday life" },
+    roles: [
+      { ru: "Точка входа в отношения пары", en: "The couple's relationship entry point" },
+      { ru: "Угол отношений — общие сценарии в чувствах и быту", en: "Relationship corner — shared patterns in feelings and home life" },
+    ],
+  },
+  money: {
+    title: { ru: "Деньги пары", en: "Money as a couple" },
+    roles: [
+      { ru: "Точка входа в деньги пары", en: "The couple's money entry point" },
+      { ru: "Материальная задача пары", en: "The couple's material task" },
+      { ru: "Денежный угол — как вы тратите и копите вместе", en: "Money corner — how you spend and save together" },
+    ],
+  },
+  tail: {
+    title: { ru: "Кармический хвост пары", en: "The couple's karmic tail" },
+    roles: [
+      { ru: "Что каждый принёс из прошлого опыта", en: "What each of you brings from the past" },
+      { ru: "Как это проявляется в вашей паре", en: "How it shows up in your relationship" },
+      { ru: "Общий урок союза", en: "The shared lesson of the bond" },
+    ],
+  },
+  purpose: {
+    title: { ru: "Задача пары", en: "Your purpose as a couple" },
+    roles: [
+      { ru: "Задача пары друг для друга", en: "What you're here to give each other" },
+      { ru: "Задача пары для семьи и окружения", en: "What you're here to give family and others" },
+    ],
+  },
+};
+
+export function pairZoneArcana(pair: MatrixCore, zone: PairZoneId): number[] {
+  switch (zone) {
+    case "essence":
+      return [pair.e, pair.a, pair.b];
+    case "love":
+      return [pair.loveEntry, pair.rodBL];
+    case "money":
+      return [pair.moneyEntry, pair.c, pair.rodBR];
+    case "tail":
+      return [pair.tailG, pair.tailR, pair.tailS];
+    case "purpose":
+      return [pair.personalPurpose, pair.socialPurpose];
+  }
+}
+
+/* ===================== Формат сохранённых разборов (v2) ===================== */
+
+export interface ReadingItemV2 {
+  arcana: number;
+  role: string;
+  plus: string;
+  minus: string;
+}
+export interface SectionReadingV2 {
+  v: 2;
+  kind: "section";
+  summary: string;
+  items: ReadingItemV2[];
+  steps: string[];
+}
+export interface PairZoneReadingV2 {
+  id: PairZoneId;
+  title: string;
+  arcana: number[];
+  roles: string[];
+  plus: string;
+  minus: string;
+}
+export interface PairReadingV2 {
+  v: 2;
+  kind: "pair";
+  partnerName: string;
+  partnerBirthDate: string;
+  summary: string;
+  zones: PairZoneReadingV2[];
+  steps: string[];
+}
+
+/** Разбор сохранённого текста: v2-JSON или старый простой текст (null). */
+export function parseReadingV2(content: string | null | undefined): SectionReadingV2 | PairReadingV2 | null {
+  if (!content || content[0] !== "{") return null;
+  try {
+    const j = JSON.parse(content);
+    if (j && j.v === 2 && (j.kind === "section" || j.kind === "pair")) return j;
+  } catch {
+    /* старый формат */
+  }
+  return null;
+}

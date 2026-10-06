@@ -169,6 +169,24 @@ export default function Compatibility() {
 
           <TabsContent value="new">
             {!compatibilityData && (
+              <button
+                type="button"
+                onClick={() => navigate('/matrix?tab=pair')}
+                className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/[0.06] px-4 py-3 text-left"
+                data-testid="link-matrix-pair"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">
+                    {locale === 'ru' ? 'Совместимость по матрице судьбы' : 'Matrix of Destiny compatibility'}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {locale === 'ru' ? 'Только по дате рождения — без времени и места' : 'Birth date only — no time or place needed'}
+                  </span>
+                </span>
+                <span className="shrink-0 text-primary">→</span>
+              </button>
+            )}
+            {!compatibilityData && (
           <Card className="p-6">
             <div className="mb-6">
               <div className="inline-flex p-4 rounded-full bg-gradient-to-br from-chart-5/20 to-chart-2/20 mb-4">

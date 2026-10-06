@@ -10,7 +10,7 @@
  * Структура позиций (pos): как читается аркан в конкретной точке матрицы.
  */
 
-export const MATRIX_KB_VERSION = 1;
+export const MATRIX_KB_VERSION = 2; // v2: структурированные разборы «в плюсе / в минусе» + конкретика (matrixKbConcrete)
 
 export interface ArcanaKnowledge {
   n: number;

@@ -56,7 +56,7 @@ import {
   type InsertWebhookError,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, lt, ne } from "drizzle-orm";
+import { eq, and, desc, isNull, lt, ne, like } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -910,6 +910,36 @@ export class DatabaseStorage implements IStorage {
           eq(matrixReadings.kbVersion, kbVersion),
         )
       );
+  }
+
+  /** Все версии разборов (для бесплатного обновления уже купленных при смене версии БЗ). */
+  async getMatrixReadingsAllVersions(userId: string, locale: string, birthDate: string) {
+    return db
+      .select()
+      .from(matrixReadings)
+      .where(
+        and(
+          eq(matrixReadings.userId, userId),
+          eq(matrixReadings.locale, locale),
+          eq(matrixReadings.birthDate, birthDate),
+        )
+      )
+      .orderBy(desc(matrixReadings.createdAt));
+  }
+
+  /** Сохранённые разборы совместимости (sectionId = "pair:<дата>:<hash>"). */
+  async getMatrixPairReadings(userId: string, birthDate: string) {
+    return db
+      .select()
+      .from(matrixReadings)
+      .where(
+        and(
+          eq(matrixReadings.userId, userId),
+          eq(matrixReadings.birthDate, birthDate),
+          like(matrixReadings.sectionId, 'pair:%'),
+        )
+      )
+      .orderBy(desc(matrixReadings.createdAt));
   }
 
   // ---- Гостевые матрицы

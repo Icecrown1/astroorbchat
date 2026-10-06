@@ -423,9 +423,9 @@ export default function Register() {
       haptic.notify('success');
       // Дип-линк с сайта web_matrix_* — сразу в матрицу (как делает Dashboard), иначе первый экран — своя карта
       const sp = getStartParam();
-      if (sp && String(sp).startsWith('web_matrix')) {
+      if (sp && /^web_(en_)?matrix/.test(String(sp))) {
         try { sessionStorage.setItem('astro_matrix_deeplink_done', '1'); } catch { /* noop */ }
-        navigate('/matrix');
+        navigate(/^web_(en_)?matrix_pair/.test(String(sp)) ? '/matrix?tab=pair' : '/matrix');
       } else {
         navigate('/my-natal-chart');
       }
