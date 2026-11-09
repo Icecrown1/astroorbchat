@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader } from '@/components/Loader';
 import { EmailReceiptDialog } from '@/components/EmailReceiptDialog';
-import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, TrendingUp, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CreditCard, Check, Wallet, RefreshCw, TrendingUp, RotateCcw, Gift } from 'lucide-react';
 import { OrbIcon } from '@/components/OrbIcon';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useTranslation } from '@/contexts/LocaleContext';
 import WebApp from '@twa-dev/sdk';
 import { openPaymentLink } from '@/lib/telegram';
+import { useFirstMonthOffer } from '@/components/FirstMonthOfferButton';
 import type { User, Subscription } from '@shared/schema';
 
 interface UserMeResponse {
@@ -132,7 +133,13 @@ export default function Subscribe() {
   const wallet = useTonWallet();
   const walletConnected = !!wallet;
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>('annual');
+  const [selectedPeriod, setSelectedPeriod] = useState<SubscriptionPeriod>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('offer') === 'first_month' ? 'monthly' : 'annual';
+    } catch {
+      return 'annual';
+    }
+  });
   const [pendingTonTier, setPendingTonTier] = useState<{ tier: SubscriptionTier; period: SubscriptionPeriod; mode?: 'new' | 'renew' | 'upgrade' } | null>(null);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [pendingYookassaTier, setPendingYookassaTier] = useState<SubscriptionTier | null>(null);
@@ -159,6 +166,19 @@ export default function Subscribe() {
   });
 
   const currentSubscription = userData?.data?.subscription;
+
+  // Акция «первый месяц −50%» (только оплата картой, период 1 месяц, первая оплаченная подписка)
+  const firstMonthOffer = useFirstMonthOffer(currentSubscription?.status !== 'active');
+  const promoMonthlyRub = (tier: SubscriptionTier): number | null => {
+    if (!firstMonthOffer) return null;
+    const p = tier.tier === 'premium' ? firstMonthOffer.premium?.promo : firstMonthOffer.standard?.promo;
+    return typeof p === 'number' ? p : null;
+  };
+  /** Цена при оплате картой с учётом акции */
+  const cardPriceRub = (tier: SubscriptionTier, period: SubscriptionPeriod): number => {
+    const promo = period === 'monthly' ? promoMonthlyRub(tier) : null;
+    return promo ?? calculatePeriodPriceRub(tier, period);
+  };
 
   interface UpgradePreviewData {
     canUpgrade: boolean;
@@ -689,6 +709,36 @@ export default function Subscribe() {
           </div>
         ) : (
           <>
+            {firstMonthOffer && (
+              <Card className="p-4 mb-5 border-primary/40 bg-primary/10" data-testid="card-offer-first-month">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--solar-gold))]/15">
+                    <Gift className="h-5 w-5 text-[hsl(var(--solar-gold))]" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display font-bold">
+                      {locale === 'ru' ? `Первый месяц −${firstMonthOffer.discountPct ?? 50}%` : `First month ${firstMonthOffer.discountPct ?? 50}% off`}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {locale === 'ru'
+                        ? `Standard — ${firstMonthOffer.standard?.promo} ₽ вместо ${firstMonthOffer.standard?.full} ₽, Premium — ${firstMonthOffer.premium?.promo} ₽ вместо ${firstMonthOffer.premium?.full} ₽. Для первой подписки на 1 месяц при оплате картой.`
+                        : `Standard ${firstMonthOffer.standard?.promo} ₽ instead of ${firstMonthOffer.standard?.full} ₽, Premium ${firstMonthOffer.premium?.promo} ₽ instead of ${firstMonthOffer.premium?.full} ₽. For your first 1-month subscription paid by card.`}
+                    </p>
+                    {selectedPeriod !== 'monthly' && (
+                      <Button
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => { haptic.impact('light'); setSelectedPeriod('monthly'); }}
+                        data-testid="button-offer-pick-monthly"
+                      >
+                        {locale === 'ru' ? 'Выбрать 1 месяц со скидкой' : 'Pick 1 month with the discount'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Period Selector */}
             <div className="flex justify-center gap-2 mb-4">
               {(['monthly', 'semiannual', 'annual'] as SubscriptionPeriod[]).map((period) => {
@@ -706,6 +756,11 @@ export default function Subscribe() {
                     {config.savingRu && (
                       <Badge className="absolute -top-2 -right-2 bg-chart-3 text-xs px-1">
                         {locale === 'ru' ? config.savingRu : config.savingEn}
+                      </Badge>
+                    )}
+                    {period === 'monthly' && firstMonthOffer && (
+                      <Badge className="absolute -top-2 -right-2 bg-[hsl(var(--solar-gold))] text-[hsl(var(--background))] text-xs px-1">
+                        −{firstMonthOffer.discountPct ?? 50}%
                       </Badge>
                     )}
                   </Button>
@@ -765,6 +820,7 @@ export default function Subscribe() {
               {SUBSCRIPTION_TIERS.map((tier) => {
                 const totalPriceRub = calculatePeriodPriceRub(tier, selectedPeriod);
                 const pricePerMonthRub = tier.pricesRub[selectedPeriod];
+                const promoRub = selectedPeriod === 'monthly' ? promoMonthlyRub(tier) : null;
                 const basePricePerMonth = tier.pricesRub.monthly;
                 const periodConfig = PERIOD_CONFIG[selectedPeriod];
                 
@@ -787,19 +843,33 @@ export default function Subscribe() {
                       <h3 className="text-2xl font-display font-bold mb-2">
                         {getLocalizedTierName(tier)}
                       </h3>
+                      {promoRub !== null ? (
+                        <>
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <span className="text-4xl font-bold text-[hsl(var(--solar-gold))]">{promoRub} ₽</span>
+                            <span className="text-muted-foreground line-through">{pricePerMonthRub} ₽</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground" data-testid={`text-promo-note-${tier.tier}`}>
+                            {locale === 'ru'
+                              ? `первый месяц при оплате картой${autoRenew ? `, далее ${pricePerMonthRub} ₽/мес` : ''}`
+                              : `first month when paying by card${autoRenew ? `, then ${pricePerMonthRub} ₽/mo` : ''}`}
+                          </p>
+                        </>
+                      ) : (
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className="text-4xl font-bold">{pricePerMonthRub} ₽</span>
                         <span className="text-muted-foreground">
                           / {locale === 'ru' ? 'мес' : 'mo'}
                         </span>
                       </div>
+                      )}
                       {selectedPeriod !== 'monthly' && (
                         <p className="text-sm text-muted-foreground line-through">
                           {basePricePerMonth} ₽/{locale === 'ru' ? 'мес' : 'mo'}
                         </p>
                       )}
                       <p className="text-sm text-chart-3 font-medium">
-                        {locale === 'ru' ? 'Итого за' : 'Total for'} {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}: {totalPriceRub} ₽
+                        {locale === 'ru' ? 'Итого за' : 'Total for'} {locale === 'ru' ? periodConfig.labelRu : periodConfig.labelEn}: {promoRub ?? totalPriceRub} ₽
                         {selectedPeriod !== 'monthly' && (
                           <span className="ml-1 text-muted-foreground">
                             {locale === 'ru' ? `· ≈ ${Math.round(totalPriceRub / (periodConfig.months * 30))} ₽/день` : `· ≈ ${Math.round(totalPriceRub / (periodConfig.months * 30))} ₽/day`}
@@ -1011,7 +1081,7 @@ export default function Subscribe() {
                               {yookassaMutation.isPending ? (
                                 <><Loader className="mr-2" size="sm" />{t.subscribe.subscribing}</>
                               ) : (
-                                <><CreditCard className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оплатить ${totalPriceRub} ₽` : `Pay ${totalPriceRub} ₽`}</>
+                                <><CreditCard className="w-4 h-4 mr-2" />{locale === 'ru' ? `Оплатить ${promoRub ?? totalPriceRub} ₽` : `Pay ${promoRub ?? totalPriceRub} ₽`}</>
                               )}
                             </Button>
                           </>
@@ -1092,7 +1162,7 @@ export default function Subscribe() {
               setPendingYookassaTier(null);
             }
           }}
-          amount={`${calculatePeriodPriceRub(pendingYookassaTier, selectedPeriod)} ₽`}
+          amount={`${cardPriceRub(pendingYookassaTier, selectedPeriod)} ₽`}
           description={locale === 'ru' 
             ? `Подписка ${pendingYookassaTier.nameRu} (${PERIOD_CONFIG[selectedPeriod].labelRu})`
             : `${pendingYookassaTier.name} Subscription (${PERIOD_CONFIG[selectedPeriod].labelEn})`

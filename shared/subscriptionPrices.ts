@@ -33,3 +33,15 @@ export function upgradeRub(remainingDays: number): number {
 export function starsForRub(rub: number): number {
   return Math.max(1, Math.ceil(rub));
 }
+
+/**
+ * Акция «первый месяц −50%»: для тех, кто ещё ни разу не платил за подписку.
+ * Только оплата картой (ЮKassa) и только период 1 месяц; автопродление — уже по полной цене.
+ * Право на скидку решает сервер (server/lib/firstMonthOffer.ts), клиент лишь показывает цены.
+ */
+export const FIRST_MONTH_DISCOUNT_PCT = 50;
+export const FIRST_MONTH_PROMO_CODE = 'first_month_50';
+
+export function firstMonthPromoRub(tier: PaidTier): number {
+  return Math.floor((SUBSCRIPTION_PRICES_PER_MONTH[tier][1] * (100 - FIRST_MONTH_DISCOUNT_PCT)) / 100);
+}

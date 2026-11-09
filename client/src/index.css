@@ -590,3 +590,30 @@ input[type='date']::-webkit-date-and-time-value { text-align: left; }
   color: hsl(var(--muted-foreground)) !important;
   border: 1px solid hsl(var(--border)) !important;
 }
+
+/* Акция «первый месяц −50%» — плавающая кнопка на главном */
+@keyframes offerPop {
+  0% { transform: translateY(140%); opacity: 0; }
+  70% { transform: translateY(-6%); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes offerGlow {
+  0%, 100% { box-shadow: 0 10px 40px -12px hsl(252 100% 74% / .55), 0 0 0 1px hsl(252 100% 74% / .35); }
+  50% { box-shadow: 0 10px 52px -8px hsl(252 100% 74% / .8), 0 0 0 1px hsl(41 81% 68% / .55); }
+}
+@keyframes offerPing {
+  0% { transform: scale(1); opacity: .75; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes offerGift {
+  0%, 82%, 100% { transform: rotate(0); }
+  86% { transform: rotate(-14deg); }
+  90% { transform: rotate(11deg); }
+  94% { transform: rotate(-6deg); }
+}
+.offer-pop { animation: offerPop .6s cubic-bezier(.2,.9,.3,1.15) both, offerGlow 3.2s ease-in-out .6s infinite; }
+.offer-ping { animation: offerPing 1.6s cubic-bezier(0,0,.2,1) infinite; }
+.offer-gift { animation: offerGift 4s ease-in-out 1.2s infinite; transform-origin: 50% 70%; }
+@media (prefers-reduced-motion: reduce) {
+  .offer-pop, .offer-ping, .offer-gift { animation: none !important; }
+}

@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { User, Subscription } from '@shared/schema';
 import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
+import { FirstMonthOfferButton } from '@/components/FirstMonthOfferButton';
 
 const VIGNETTES: Record<string, VignetteKind> = {
   '/my-natal-chart': 'natal',
@@ -229,7 +230,7 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-palette opacity-20" />
       </div>
 
-      <div className="container max-w-4xl mx-auto px-4 py-6 pb-20">
+      <div className={`container max-w-4xl mx-auto px-4 py-6 ${tier === 'free' ? 'pb-32' : 'pb-20'}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -374,6 +375,9 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Акция «первый месяц −50%» — только тем, кто ещё не платил за подписку */}
+      <FirstMonthOfferButton enabled={tier === 'free'} />
     </div>
   );
 }

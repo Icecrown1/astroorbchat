@@ -5,6 +5,7 @@
  */
 import dayjs from 'dayjs';
 import { sendSupportAlert } from './support';
+import { FIRST_MONTH_PROMO_CODE, normalizePaidTier, subscriptionRub, type PeriodMonths } from '@shared/subscriptionPrices';
 
 export type SubscriptionSource = 'yookassa' | 'ton' | 'stars' | 'dodo' | 'dev' | 'admin';
 
@@ -184,13 +185,18 @@ export async function activateSucceededYookassaPayment(
       }
       // Текущая уже закончилась — активируем сразу
     }
+    // Акционный первый месяц (−50%): автопродление списывает уже полную цену тарифа
+    let renewalAmountRUB = dbPayment.amountRUB;
+    if (ykPayment.metadata?.promo === FIRST_MONTH_PROMO_CODE) {
+      renewalAmountRUB = subscriptionRub(normalizePaidTier(dbPayment.tier), periodMonths as PeriodMonths).toFixed(2);
+    }
     // Новая покупка: срок от сегодня (ЮKassa subscription — не продление; продление идёт через subscription_renewal)
     await activateSubscriptionForUser(storage, {
       userId: dbPayment.userId,
       tier: dbPayment.tier as any,
       periodMonths,
       source: 'yookassa',
-      meta: { autoRenew, paymentMethodId, amountRUB: dbPayment.amountRUB, extend: false },
+      meta: { autoRenew, paymentMethodId, amountRUB: renewalAmountRUB, extend: false },
     });
 
   } else if (dbPayment.kind === 'subscription_upgrade') {

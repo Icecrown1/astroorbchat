@@ -40,7 +40,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
 import { ORB_PACKS, getOrbPack, getOrbPackByOrbs } from "@shared/orbPacks";
-import { SUBSCRIPTION_PRICES_PER_MONTH, PERIOD_LABEL_RU, STARS_SUB_PRICES, subscriptionRub, upgradeRub, starsForRub, normalizePaidTier, type PeriodMonths } from "@shared/subscriptionPrices";
+import { SUBSCRIPTION_PRICES_PER_MONTH, PERIOD_LABEL_RU, STARS_SUB_PRICES, subscriptionRub, upgradeRub, starsForRub, normalizePaidTier, firstMonthPromoRub, FIRST_MONTH_DISCOUNT_PCT, FIRST_MONTH_PROMO_CODE, type PeriodMonths } from "@shared/subscriptionPrices";
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 
@@ -3478,6 +3478,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upgrade/renewal preview for current subscriber
+  // Акция «первый месяц −50%»: показывать ли кнопку на главном и скидку на экране подписки
+  app.get("/api/offers/first-month", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { isFirstMonthOfferEligible, firstMonthOfferPrices } = await import("./lib/firstMonthOffer");
+      const eligible = await isFirstMonthOfferEligible(userId);
+      res.json({ ok: true, data: { eligible, ...firstMonthOfferPrices() } });
+    } catch (error: any) {
+      console.error("[Offer] first-month check failed:", error?.message || error);
+      // Сбой проверки — просто не показываем акцию
+      res.json({ ok: true, data: { eligible: false } });
+    }
+  });
+
   app.get("/api/subscription/upgrade-preview", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
@@ -3616,6 +3630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let amountRUB: string;
       let energyAmount: number | undefined;
       let tier: string | undefined;
+      let promo: string | null = null;
 
       if (validated.kind === "energy_pack" && validated.pack) {
         const orbPack = getOrbPackByOrbs(validated.pack.energy);
@@ -3643,7 +3658,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const tierPrices = SUBSCRIPTION_PRICES_PER_MONTH[normalizedTier] as Record<number, number>;
         const pricePerMonth = tierPrices[periodMonths as 1 | 6 | 12] || tierPrices[1];
-        const totalPrice = pricePerMonth * periodMonths;
+        let totalPrice = pricePerMonth * periodMonths;
+
+        // Акция «первый месяц −50%»: месяц картой, ни одной оплаченной подписки раньше (решает только сервер)
+        if (periodMonths === 1 && !scheduleAfterCurrent) {
+          const { isFirstMonthOfferEligible } = await import("./lib/firstMonthOffer");
+          if (await isFirstMonthOfferEligible(userId)) {
+            totalPrice = firstMonthPromoRub(normalizedTier);
+            promo = FIRST_MONTH_PROMO_CODE;
+          }
+        }
         
         let periodLabel = '1 месяц';
         if (periodMonths === 6) periodLabel = '6 месяцев';
@@ -3653,6 +3677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description = scheduleAfterCurrent && scheduledStart
           ? `Подписка ${tierLabel} на ${periodLabel} (с ${dayjs(scheduledStart).format('DD.MM.YYYY')})`
           : `Подписка ${tierLabel} на ${periodLabel}`;
+        if (promo) description = `Подписка ${tierLabel} на ${periodLabel}, скидка ${FIRST_MONTH_DISCOUNT_PCT}% на первый месяц`;
         amountRUB = totalPrice.toFixed(2);
         tier = normalizedTier === 'premium' ? 'pro' : 'standard';
       } else if (validated.kind === "subscription_upgrade") {
@@ -3808,6 +3833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           periodMonths: validated.periodMonths || 1,
           autoRenew: validated.autoRenew || false,
           scheduleAfterCurrent: scheduleAfterCurrent ? 'true' : 'false',
+          ...(promo ? { promo } : {}),
         },
       });
 
