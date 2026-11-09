@@ -82,15 +82,12 @@ export function openLink(url: string) {
   telegram.openLink(url);
 }
 
-/** Событие «открыта внешняя страница оплаты» — его слушает PaymentLinkHelper (подсказка, если страница не загрузилась). */
-export const PAYMENT_LINK_EVENT = 'astro:payment-link-opened';
-
 /**
- * Открыть внешний URL оплаты из мини-аппа без показа подсказки.
- * window.location.href внутри Mini App ненадёжен (особенно на iOS), поэтому
- * сначала WebApp.openLink, затем window.open / location.
+ * Reliably open an external payment URL from inside the Telegram Mini App.
+ * window.location.href is unreliable in the Mini App (especially on iOS), so we
+ * prefer WebApp.openLink and fall back to window.open / location only if needed.
  */
-export function launchPaymentUrl(url: string) {
+export function openPaymentLink(url: string) {
   if (!url) return;
   try {
     const tg = telegram as any;
@@ -110,18 +107,6 @@ export function launchPaymentUrl(url: string) {
   }
 
   window.location.href = url;
-}
-
-/**
- * Открыть страницу оплаты ЮKassa и показать в приложении подсказку на случай,
- * если страница не загрузится (чёрный экран во встроенном браузере Telegram, VPN).
- */
-export function openPaymentLink(url: string) {
-  if (!url) return;
-  launchPaymentUrl(url);
-  try {
-    window.dispatchEvent(new CustomEvent(PAYMENT_LINK_EVENT, { detail: { url } }));
-  } catch { /* noop */ }
 }
 
 /**
