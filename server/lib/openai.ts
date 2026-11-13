@@ -1530,6 +1530,8 @@ export interface TarotInterpretationInput {
   forcedVerdict?: 'yes' | 'no' | 'maybe';
   /** Натальный профиль для персонализации: связь стихий карт со знаками человека */
   astroProfile?: { sunSign?: string; moonSign?: string; ascendant?: string };
+  /** Расклад админа для другого: знаки планет по дате рождения (строки describeQuickChart) */
+  birthAstro?: { subject?: string; partner?: { name: string; chart: string } };
   question?: string | null;
   name: string;
   gender: string;
@@ -1603,8 +1605,25 @@ No clichés ("changes await you", "everything will be fine", "inner work") — b
       : `Natal profile: Sun in ${ap.sunSign}${ap.moonSign ? `, Moon in ${ap.moonSign}` : ''}${ap.ascendant ? `, ascendant ${ap.ascendant}` : ''}.`)
     : '';
 
+  // Знаки по дате рождения (админ: расклад для другого человека, иногда — и для второго человека из вопроса)
+  const ba = input.birthAstro;
+  const hasBirth = !!(ba?.subject || ba?.partner);
+  const birthLine = !hasBirth ? '' : (ru
+    ? `\nЗнаки планет по дате рождения (время и место неизвестны — асцендент и дома не упоминай):` +
+      (ba!.subject ? `\n— ${input.name}: ${ba!.subject}.` : `\n— ${input.name}: знаки неизвестны, не придумывай их.`) +
+      (ba!.partner ? `\n— ${ba!.partner.name} (второй человек в вопросе): ${ba!.partner.chart}.` : '') +
+      `\nОпирайся на эти знаки вместо натального профиля. Планеты выбирай по теме вопроса: любовь и отношения — Венера и Марс (чувства — Луна); деньги и работа — Юпитер, Сатурн и Меркурий; общение, переговоры, решения — Меркурий; характер, путь, самооценка — Солнце; эмоции, дом, интуиция — Луна.` +
+      (ba!.partner && ba!.subject ? ` Сопоставь знаки двух людей по теме вопроса (например, Венера одного и Марс другого: стихии в гармонии или в напряжении) и прямо скажи, что из этого следует для их ситуации.` : '') +
+      ` Сделай 2–3 астро-моста на весь расклад (не в каждой карте), называй планету и знак прямо («твоя Венера в Водолее…»), каждый мост должен менять совет. Если знак указан как «X или Y» — не выбирай за человека: опирайся на то, что общее у обоих знаков, или на другие планеты.`
+    : `\nPlanet signs from the birth date (time and place unknown — do not mention the ascendant or houses):` +
+      (ba!.subject ? `\n— ${input.name}: ${ba!.subject}.` : `\n— ${input.name}: signs unknown, do not invent them.`) +
+      (ba!.partner ? `\n— ${ba!.partner.name} (the other person in the question): ${ba!.partner.chart}.` : '') +
+      `\nUse these signs instead of a natal profile. Pick planets by the topic: love and relationships — Venus and Mars (feelings — Moon); money and work — Jupiter, Saturn and Mercury; communication, negotiations, decisions — Mercury; character, path, self-worth — Sun; emotions, home, intuition — Moon.` +
+      (ba!.partner && ba!.subject ? ` Compare the two people's signs on the topic (e.g. one person's Venus and the other's Mars: elements in harmony or tension) and say plainly what it means for their situation.` : '') +
+      ` Build 2–3 astro-bridges for the whole reading (not per card), naming planet and sign directly ("your Venus in Aquarius…"); each bridge must change the advice. If a sign is given as "X or Y", do not choose for the person: rely on what both signs share or on other planets.`);
+
   // Нет натального профиля (расклад для другого человека или без данных рождения) — запрещаем выдуманные мосты
-  const noNatalLine = ap?.sunSign
+  const noNatalLine = (ap?.sunSign || hasBirth)
     ? ''
     : (ru
       ? 'Натального профиля нет: НЕ строй астро-мосты с Солнцем, Луной или асцендентом человека и не придумывай его знак. Стихию, планету или знак карты можно упомянуть только как свойство самой карты.'
@@ -1614,7 +1633,7 @@ No clichés ("changes await you", "everything will be fine", "inner work") — b
 
 ${spreadNote[input.spread]}
 
-${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}). ${astroLine}${noNatalLine}
+${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}). ${astroLine}${noNatalLine}${birthLine}
 ${input.question ? `${ru ? 'Вопрос' : 'Question'}: «${input.question}»` : (ru ? 'Вопрос не задан — читай про общее состояние и ближайший фокус.' : 'No question — read the general state and near focus.')}
 
 ${ru ? 'Выпавшие карты' : 'Cards drawn'}:

@@ -5125,14 +5125,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowReversed = req.body.allowReversed !== false;
 
       // Админ: расклад для другого человека — своё имя/пол, без натальной карты, без списания звёзд и без кэша карты дня
-      let forOther: { name: string; gender: 'female' | 'male' | 'other' } | null = null;
+      let forOther: {
+        name: string;
+        gender: 'female' | 'male' | 'other';
+        birthDate?: string;
+        partner?: { name: string; birthDate?: string };
+      } | null = null;
       if (req.body.forOther && typeof req.body.forOther === 'object') {
         const isAdmin = !!(user as any).isAdmin || process.env.NODE_ENV === 'development';
         if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin access required' });
-        const name = String(req.body.forOther.name || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+        const clean = (v: unknown) => String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+        const name = clean(req.body.forOther.name);
         if (!name) return res.status(400).json({ ok: false, error: 'name_required' });
         const g = String(req.body.forOther.gender || 'other');
         forOther = { name, gender: g === 'female' || g === 'male' ? g : 'other' };
+        const bd = String(req.body.forOther.birthDate || '').trim();
+        if (bd) forOther.birthDate = bd;
+        const p = req.body.forOther.partner;
+        if (p && typeof p === 'object') {
+          const pName = clean(p.name);
+          const pDate = String(p.birthDate || '').trim();
+          if (pName || pDate) forOther.partner = { name: pName || (locale === 'ru' ? 'второй человек' : 'the other person'), ...(pDate ? { birthDate: pDate } : {}) };
+        }
+      }
+
+      // Знаки планет по датам рождения (админ: «для другого»)
+      let birthAstro: { subject?: string; partner?: { name: string; chart: string } } | undefined;
+      let subjectSigns: Record<string, string> | undefined;
+      let partnerSigns: Record<string, string> | undefined;
+      if (forOther && (forOther.birthDate || forOther.partner?.birthDate)) {
+        const { quickChart, describeQuickChart, compactQuickChart } = await import('./lib/quickChart');
+        const lc = locale === 'en' ? 'en' : 'ru';
+        if (forOther.birthDate) {
+          const c = quickChart(forOther.birthDate);
+          if (!c) return res.status(400).json({ ok: false, error: 'bad_birth_date' });
+          birthAstro = { subject: describeQuickChart(c, lc) };
+          subjectSigns = compactQuickChart(c, lc);
+        }
+        if (forOther.partner?.birthDate) {
+          const c = quickChart(forOther.partner.birthDate);
+          if (!c) return res.status(400).json({ ok: false, error: 'bad_birth_date' });
+          birthAstro = { ...(birthAstro || {}), partner: { name: forOther.partner.name, chart: describeQuickChart(c, lc) } };
+          partnerSigns = compactQuickChart(c, lc);
+        }
       }
 
       const tz = user.timezone || 'Europe/Moscow';
@@ -5186,6 +5221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         astroProfile,
         spread: spreadId,
         question: spreadId === 'daily' ? null : question,
+        birthAstro,
         name: forOther ? forOther.name : (user.name || (locale === 'ru' ? 'друг' : 'friend')),
         gender: forOther ? forOther.gender : ((user as any).gender || 'other'),
         locale,
@@ -5216,6 +5252,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (forOther) {
         (interpretation as any).subjectName = forOther.name;
         (interpretation as any).subjectGender = forOther.gender;
+        if (forOther.birthDate) (interpretation as any).subjectBirthDate = forOther.birthDate;
+        if (subjectSigns) (interpretation as any).subjectSigns = subjectSigns;
+        if (forOther.partner) {
+          (interpretation as any).partnerName = forOther.partner.name;
+          if (forOther.partner.birthDate) (interpretation as any).partnerBirthDate = forOther.partner.birthDate;
+          if (partnerSigns) (interpretation as any).partnerSigns = partnerSigns;
+        }
       }
 
       const saved = await storage.saveTarotReading({

@@ -32,6 +32,9 @@ interface TarotReading {
     verdict?: string;
     /** Расклад админа «для другого человека» */
     subjectName?: string;
+    subjectSigns?: Record<string, string>;
+    partnerName?: string;
+    partnerSigns?: Record<string, string>;
   };
   day: string;
   createdAt: string;
@@ -99,6 +102,27 @@ function FlipCard({ drawn, delayMs, positionLabel, onOpen }: { drawn: DrawnTarot
   );
 }
 
+/** «14.03.1998», «14/3/98», «14 03 1998» → '1998-03-14'; пусто → ''; ошибка → null */
+function parseBirthInput(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return '';
+  const m = v.match(/^(\d{1,2})[.\/\-\s]+(\d{1,2})[.\/\-\s]+(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const d = +m[1], mo = +m[2];
+  let y = +m[3];
+  if (m[3].length === 2) y = y > new Date().getFullYear() % 100 ? 1900 + y : 2000 + y;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  if (y < 1900 || dt.getTime() > Date.now()) return null;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+const SIGN_GLYPHS: Array<[string, string]> = [['sun', '☉'], ['moon', '☽'], ['venus', '♀'], ['mars', '♂']];
+function signsLine(signs?: Record<string, string>): string {
+  if (!signs) return '';
+  return SIGN_GLYPHS.filter(([k]) => signs[k]).map(([k, g]) => `${g} ${signs[k]}`).join(' · ');
+}
+
 export default function Tarot() {
   const [, navigate] = useLocation();
   const { locale } = useTranslation();
@@ -118,7 +142,14 @@ export default function Tarot() {
   const [otherName, setOtherName] = useState('');
   const [otherGender, setOtherGender] = useState<'female' | 'male' | 'other'>('female');
   const [nameError, setNameError] = useState(false);
+  const [otherBirth, setOtherBirth] = useState('');
+  const [partnerName, setPartnerName] = useState('');
+  const [partnerBirth, setPartnerBirth] = useState('');
+  const [birthError, setBirthError] = useState<null | 'subject' | 'partner'>(null);
   const forOther = isAdmin && forOtherOn;
+  const otherBirthIso = parseBirthInput(otherBirth);
+  const partnerBirthIso = parseBirthInput(partnerBirth);
+  const fmtDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(ru ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
     queryKey: [`/api/tarot/status?locale=${locale}`],
@@ -134,7 +165,16 @@ export default function Tarot() {
         spread,
         locale,
         question: spread === 'daily' ? undefined : question.trim(),
-        ...(forOther ? { forOther: { name: otherName.trim(), gender: otherGender } } : {}),
+        ...(forOther ? {
+          forOther: {
+            name: otherName.trim(),
+            gender: otherGender,
+            ...(otherBirthIso ? { birthDate: otherBirthIso } : {}),
+            ...(partnerName.trim() || partnerBirthIso
+              ? { partner: { name: partnerName.trim(), ...(partnerBirthIso ? { birthDate: partnerBirthIso } : {}) } }
+              : {}),
+          },
+        } : {}),
       });
       if (!response.ok) {
         const err: any = new Error(response.error || 'failed');
@@ -165,6 +205,8 @@ export default function Tarot() {
           description: ru ? `Нужно ${err.cost} ⭐ — пополните баланс` : `You need ${err.cost} ⭐ — top up your balance`,
         });
         navigate('/buy-energy');
+      } else if (err.code === 'bad_birth_date' || err.message === 'bad_birth_date') {
+        toast({ title: ru ? 'Проверьте дату рождения' : 'Check the birth date', description: ru ? 'Формат ДД.ММ.ГГГГ, не позже сегодняшнего дня' : 'Use DD.MM.YYYY, not later than today', variant: 'destructive' });
       } else {
         toast({ title: ru ? 'Не получилось' : 'Something went wrong', description: ru ? 'Попробуйте ещё раз' : 'Please try again', variant: 'destructive' });
       }
@@ -307,6 +349,16 @@ export default function Tarot() {
                 {ru ? `Расклад для: ${reading.interpretation.subjectName}` : `Reading for: ${reading.interpretation.subjectName}`}
               </p>
             )}
+            {(reading.interpretation.subjectSigns || reading.interpretation.partnerSigns) && (
+              <div className="text-center text-xs text-muted-foreground space-y-0.5 -mt-3 anim-fade-up" data-testid="text-reading-signs">
+                {reading.interpretation.subjectSigns && (
+                  <p>{reading.interpretation.subjectName}: {signsLine(reading.interpretation.subjectSigns)}</p>
+                )}
+                {reading.interpretation.partnerSigns && (
+                  <p>{reading.interpretation.partnerName}: {signsLine(reading.interpretation.partnerSigns)}</p>
+                )}
+              </div>
+            )}
             {reading.question && (
               <p className="text-sm text-muted-foreground text-center anim-fade-up" data-testid="text-question">«{reading.question}»</p>
             )}
@@ -406,7 +458,7 @@ export default function Tarot() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{ru ? 'Расклад для другого человека' : 'Reading for someone else'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {ru ? 'Только админ · без натальной карты · звёзды не списываются' : 'Admin only · no birth chart · no stars charged'}
+                      {ru ? 'Только админ · ваша натальная карта не используется · звёзды не списываются' : 'Admin only · your own chart is not used · no stars charged'}
                     </p>
                   </div>
                   <Switch
@@ -452,6 +504,60 @@ export default function Tarot() {
                         </Button>
                       ))}
                     </div>
+
+                    <div>
+                      <Input
+                        id="tarot-other-birth"
+                        value={otherBirth}
+                        onChange={(e) => { setOtherBirth(e.target.value); if (birthError === 'subject') setBirthError(null); }}
+                        placeholder={ru ? 'Дата рождения: ДД.ММ.ГГГГ (необязательно)' : 'Birth date: DD.MM.YYYY (optional)'}
+                        inputMode="numeric"
+                        maxLength={10}
+                        className={`h-11 ${birthError === 'subject' ? 'border-destructive' : ''}`}
+                        data-testid="input-other-birth"
+                      />
+                      {otherBirth.trim() && (
+                        <p className={`text-xs mt-1.5 ${otherBirthIso ? 'text-muted-foreground' : 'text-destructive'}`}>
+                          {otherBirthIso ? `✓ ${fmtDate(otherBirthIso)}` : (ru ? 'Формат: 14.03.1998' : 'Format: 14.03.1998')}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-1">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {ru ? 'Второй человек в вопросе (например, партнёр) — необязательно' : 'The other person in the question (e.g. a partner) — optional'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={partnerName}
+                          onChange={(e) => setPartnerName(e.target.value)}
+                          placeholder={ru ? 'Имя' : 'Name'}
+                          maxLength={40}
+                          className="h-11"
+                          data-testid="input-partner-name"
+                        />
+                        <Input
+                          id="tarot-partner-birth"
+                          value={partnerBirth}
+                          onChange={(e) => { setPartnerBirth(e.target.value); if (birthError === 'partner') setBirthError(null); }}
+                          placeholder={ru ? 'ДД.ММ.ГГГГ' : 'DD.MM.YYYY'}
+                          inputMode="numeric"
+                          maxLength={10}
+                          className={`h-11 ${birthError === 'partner' ? 'border-destructive' : ''}`}
+                          data-testid="input-partner-birth"
+                        />
+                      </div>
+                      {partnerBirth.trim() && (
+                        <p className={`text-xs mt-1.5 ${partnerBirthIso ? 'text-muted-foreground' : 'text-destructive'}`}>
+                          {partnerBirthIso ? `✓ ${fmtDate(partnerBirthIso)}` : (ru ? 'Формат: 02.11.1996' : 'Format: 02.11.1996')}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {ru
+                        ? 'По датам считаем знаки Солнца, Луны, Меркурия, Венеры, Марса, Юпитера и Сатурна и вплетаем нужные по теме вопроса.'
+                        : 'From the dates we compute the Sun, Moon, Mercury, Venus, Mars, Jupiter and Saturn signs and weave in those that fit the question.'}
+                    </p>
                   </div>
                 )}
               </Card>
@@ -485,6 +591,18 @@ export default function Tarot() {
                       haptic.notify('warning');
                       setNameError(true);
                       document.getElementById('tarot-other-name')?.focus();
+                      return;
+                    }
+                    if (forOther && otherBirthIso === null) {
+                      haptic.notify('warning');
+                      setBirthError('subject');
+                      document.getElementById('tarot-other-birth')?.focus();
+                      return;
+                    }
+                    if (forOther && partnerBirthIso === null) {
+                      haptic.notify('warning');
+                      setBirthError('partner');
+                      document.getElementById('tarot-partner-birth')?.focus();
                       return;
                     }
                     if (s.needsQuestion && !question.trim()) {
