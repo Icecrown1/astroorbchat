@@ -1603,11 +1603,18 @@ No clichés ("changes await you", "everything will be fine", "inner work") — b
       : `Natal profile: Sun in ${ap.sunSign}${ap.moonSign ? `, Moon in ${ap.moonSign}` : ''}${ap.ascendant ? `, ascendant ${ap.ascendant}` : ''}.`)
     : '';
 
+  // Нет натального профиля (расклад для другого человека или без данных рождения) — запрещаем выдуманные мосты
+  const noNatalLine = ap?.sunSign
+    ? ''
+    : (ru
+      ? 'Натального профиля нет: НЕ строй астро-мосты с Солнцем, Луной или асцендентом человека и не придумывай его знак. Стихию, планету или знак карты можно упомянуть только как свойство самой карты.'
+      : 'There is no natal profile: do NOT build astro-bridges to the person\'s Sun, Moon or ascendant and do not invent their sign. A card\'s element, planet or sign may be mentioned only as a property of the card itself.');
+
   const userPrompt = `${languageInstruction}
 
 ${spreadNote[input.spread]}
 
-${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}). ${astroLine}
+${ru ? 'Человек' : 'Person'}: ${input.name} (${input.gender}). ${astroLine}${noNatalLine}
 ${input.question ? `${ru ? 'Вопрос' : 'Question'}: «${input.question}»` : (ru ? 'Вопрос не задан — читай про общее состояние и ближайший фокус.' : 'No question — read the general state and near focus.')}
 
 ${ru ? 'Выпавшие карты' : 'Cards drawn'}:

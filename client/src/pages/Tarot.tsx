@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Sparkles, RotateCcw, X, Share2, Copy } from 'lucide-react';
+import { ArrowLeft, Sparkles, RotateCcw, X, Share2, Copy, UserRound } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { OrbIcon } from '@/components/OrbIcon';
 import { Loader } from '@/components/Loader';
 import { useTranslation } from '@/contexts/LocaleContext';
@@ -29,6 +30,8 @@ interface TarotReading {
     synthesis: string;
     advice: string;
     verdict?: string;
+    /** Расклад админа «для другого человека» */
+    subjectName?: string;
   };
   day: string;
   createdAt: string;
@@ -108,6 +111,15 @@ export default function Tarot() {
   const [zoomed, setZoomed] = useState(false);
 
   const { user } = useAuth();
+
+  // Админ: расклад для другого человека (имя + пол, без натальной карты, без списания звёзд)
+  const isAdmin = !!(user as any)?.isAdmin || import.meta.env.DEV;
+  const [forOtherOn, setForOtherOn] = useState(false);
+  const [otherName, setOtherName] = useState('');
+  const [otherGender, setOtherGender] = useState<'female' | 'male' | 'other'>('female');
+  const [nameError, setNameError] = useState(false);
+  const forOther = isAdmin && forOtherOn;
+
   const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
     queryKey: [`/api/tarot/status?locale=${locale}`],
   });
@@ -122,6 +134,7 @@ export default function Tarot() {
         spread,
         locale,
         question: spread === 'daily' ? undefined : question.trim(),
+        ...(forOther ? { forOther: { name: otherName.trim(), gender: otherGender } } : {}),
       });
       if (!response.ok) {
         const err: any = new Error(response.error || 'failed');
@@ -227,7 +240,9 @@ export default function Tarot() {
       // Подпись к фото: краткий текст расклада (лимит Telegram — 1024 символа)
       const capParts: string[] = [];
       capParts.push(ru
-        ? (reading.question ? `🔮 «${reading.question}»` : (reading.spread === 'daily' ? '🔮 Моя карта дня' : '🔮 Мой расклад Таро'))
+        ? (reading.interpretation.subjectName
+          ? `🔮 ${reading.spread === 'daily' ? 'Карта дня' : 'Расклад Таро'} для ${reading.interpretation.subjectName}${reading.question ? `\n«${reading.question}»` : ''}`
+          : reading.question ? `🔮 «${reading.question}»` : (reading.spread === 'daily' ? '🔮 Моя карта дня' : '🔮 Мой расклад Таро'))
         : (reading.question ? `🔮 “${reading.question}”` : (reading.spread === 'daily' ? '🔮 My card of the day' : '🔮 My Tarot reading')));
       if (reading.spread === 'yesno' && reading.interpretation.verdict) {
         const v = reading.interpretation.verdict;
@@ -287,6 +302,11 @@ export default function Tarot() {
         ) : reading && spreadDef ? (
           /* ---------- Результат ---------- */
           <div className="space-y-5">
+            {reading.interpretation.subjectName && (
+              <p className="text-center text-xs uppercase tracking-[0.16em] text-[hsl(var(--solar-gold))] anim-fade-up" data-testid="text-reading-subject">
+                {ru ? `Расклад для: ${reading.interpretation.subjectName}` : `Reading for: ${reading.interpretation.subjectName}`}
+              </p>
+            )}
             {reading.question && (
               <p className="text-sm text-muted-foreground text-center anim-fade-up" data-testid="text-question">«{reading.question}»</p>
             )}
@@ -344,7 +364,7 @@ export default function Tarot() {
                 if (!reading || !spreadDef) return;
                 const it = reading.interpretation;
                 const parts = [
-                  `🔮 ${ru ? 'Расклад Таро' : 'Tarot reading'}${reading.question ? `\n«${reading.question}»` : ''}`,
+                  `🔮 ${ru ? 'Расклад Таро' : 'Tarot reading'}${it.subjectName ? (ru ? ` для ${it.subjectName}` : ` for ${it.subjectName}`) : ''}${reading.question ? `\n«${reading.question}»` : ''}`,
                   it.intro,
                   ...it.cards.map((c) => `🃏 ${c.title}\n${c.text}`),
                   `🌌 ${ru ? 'Общая картина' : 'The bigger picture'}\n${it.synthesis}`,
@@ -379,12 +399,70 @@ export default function Tarot() {
         ) : (
           /* ---------- Выбор расклада ---------- */
           <div className="space-y-4">
+            {isAdmin && (
+              <Card className="p-4 anim-fade-up border-[hsl(var(--solar-gold))]/30" data-testid="card-tarot-for-other">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <UserRound className="w-5 h-5 shrink-0 text-[hsl(var(--solar-gold))]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{ru ? 'Расклад для другого человека' : 'Reading for someone else'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {ru ? 'Только админ · без натальной карты · звёзды не списываются' : 'Admin only · no birth chart · no stars charged'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={forOtherOn}
+                    onCheckedChange={(v) => { haptic.select(); setForOtherOn(v); setNameError(false); }}
+                    data-testid="switch-tarot-for-other"
+                  />
+                </label>
+                {forOtherOn && (
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <Input
+                        id="tarot-other-name"
+                        value={otherName}
+                        onChange={(e) => { setOtherName(e.target.value); if (nameError) setNameError(false); }}
+                        placeholder={ru ? 'Имя человека' : "Person's name"}
+                        maxLength={40}
+                        className={`h-11 ${nameError ? 'border-destructive' : ''}`}
+                        data-testid="input-other-name"
+                      />
+                      {nameError && (
+                        <p className="text-xs mt-1.5 text-destructive">
+                          {ru ? 'Впишите имя — расклад обращается к человеку по имени' : 'Enter a name — the reading addresses the person by name'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        ['female', ru ? 'Женщина' : 'Woman'],
+                        ['male', ru ? 'Мужчина' : 'Man'],
+                        ['other', ru ? 'Не важно' : 'Any'],
+                      ] as const).map(([g, label]) => (
+                        <Button
+                          key={g}
+                          type="button"
+                          size="sm"
+                          variant={otherGender === g ? 'default' : 'outline'}
+                          className="min-h-[40px]"
+                          onClick={() => { haptic.select(); setOtherGender(g); }}
+                          data-testid={`button-other-gender-${g}`}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+
             <div className="anim-fade-up">
               <Input
                 id="tarot-question"
                 value={question}
                 onChange={(e) => { setQuestion(e.target.value); if (questionError) setQuestionError(false); }}
-                placeholder={ru ? 'Ваш вопрос картам' : 'Your question for the cards'}
+                placeholder={forOther ? (ru ? 'Вопрос этого человека' : "This person's question") : (ru ? 'Ваш вопрос картам' : 'Your question for the cards')}
                 maxLength={300}
                 className={`h-11 ${questionError ? 'border-destructive' : ''}`}
                 data-testid="input-question"
@@ -403,6 +481,12 @@ export default function Tarot() {
                   key={s.id}
                   className={`p-4 hover-elevate cursor-pointer anim-fade-up anim-d${i + 1}`}
                   onClick={() => {
+                    if (forOther && !otherName.trim()) {
+                      haptic.notify('warning');
+                      setNameError(true);
+                      document.getElementById('tarot-other-name')?.focus();
+                      return;
+                    }
                     if (s.needsQuestion && !question.trim()) {
                       haptic.notify('warning');
                       setQuestionError(true);
@@ -425,7 +509,11 @@ export default function Tarot() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h2 className="font-display font-semibold">{s.title}</h2>
-                        {isDaily ? (
+                        {forOther ? (
+                          <Badge variant="outline" className="text-[10px] border-[hsl(var(--solar-gold))]/50 text-[hsl(var(--solar-gold))]">
+                            {ru ? 'Админ' : 'Admin'}
+                          </Badge>
+                        ) : isDaily ? (
                           dailyDone ? (
                             <Badge variant="secondary" className="text-[10px]">{ru ? 'Сегодня открыта' : 'Done today'}</Badge>
                           ) : (
@@ -447,7 +535,11 @@ export default function Tarot() {
             })}
 
             <p className="text-[11px] text-muted-foreground text-center px-4 anim-fade-up anim-d5">
-              {ru
+              {forOther
+                ? (ru
+                  ? 'Расклад для другого человека: обращение по имени, без натальной карты. Звёзды не списываются, карта дня не сбрасывает вашу.'
+                  : "A reading for someone else: addressed by name, no birth chart. No stars are charged, and it doesn't replace your own daily card.")
+                : ru
                 ? 'Карта дня — одна на день и всегда бесплатна. Платные расклады тратят звёзды с баланса.'
                 : 'The daily card is one per day and always free. Paid spreads use stars from your balance.'}
             </p>

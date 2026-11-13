@@ -5069,11 +5069,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const allowReversed = req.body.allowReversed !== false;
 
+      // Админ: расклад для другого человека — своё имя/пол, без натальной карты, без списания звёзд и без кэша карты дня
+      let forOther: { name: string; gender: 'female' | 'male' | 'other' } | null = null;
+      if (req.body.forOther && typeof req.body.forOther === 'object') {
+        const isAdmin = !!(user as any).isAdmin || process.env.NODE_ENV === 'development';
+        if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin access required' });
+        const name = String(req.body.forOther.name || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+        if (!name) return res.status(400).json({ ok: false, error: 'name_required' });
+        const g = String(req.body.forOther.gender || 'other');
+        forOther = { name, gender: g === 'female' || g === 'male' ? g : 'other' };
+      }
+
       const tz = user.timezone || 'Europe/Moscow';
       const day = dayjs().tz(tz).format('YYYY-MM-DD');
 
       // Карта дня: кэш на день
-      if (spreadId === 'daily') {
+      if (forOther) {
+        // проверок доступа и кэша нет — это инструмент админа
+      } else if (spreadId === 'daily') {
         const existing = await storage.getTarotDailyReading(userId, day, locale);
         if (existing) {
           return res.json({ ok: true, data: { ...existing, cached: true } });
@@ -5096,7 +5109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forcedVerdict = spreadId === 'yesno' ? yesNoVerdict(drawn[0].cardId, drawn[0].reversed) : undefined;
       // Астро-профиль: из натальной карты (если построена), иначе Солнце по дате рождения
       let astroProfile: { sunSign?: string; moonSign?: string; ascendant?: string } = {};
-      try {
+      if (!forOther) try {
         const natal = await storage.getNatalChart(userId);
         const chartData: any = natal?.data;
         if (chartData?.planets?.Sun?.sign) {
@@ -5107,7 +5120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
       } catch { /* noop */ }
-      if (!astroProfile.sunSign && user.birthdayDate && (user as any).birthPlace) {
+      if (!forOther && !astroProfile.sunSign && user.birthdayDate && (user as any).birthPlace) {
         // birthPlace как маркер пройденного онбординга: у автосозданных дата — заглушка
         try { astroProfile.sunSign = sunSignFromDate(new Date(user.birthdayDate), locale); } catch { /* noop */ }
       }
@@ -5118,8 +5131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         astroProfile,
         spread: spreadId,
         question: spreadId === 'daily' ? null : question,
-        name: user.name || (locale === 'ru' ? 'друг' : 'friend'),
-        gender: (user as any).gender || 'other',
+        name: forOther ? forOther.name : (user.name || (locale === 'ru' ? 'друг' : 'friend')),
+        gender: forOther ? forOther.gender : ((user as any).gender || 'other'),
         locale,
         cards: drawn.map((d) => {
           const card = getTarotCard(d.cardId)!;
@@ -5136,8 +5149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      // Списание ПОСЛЕ успешной генерации
-      if (spreadId !== 'daily') {
+      // Списание ПОСЛЕ успешной генерации (расклад админа для другого — бесплатно)
+      if (spreadId !== 'daily' && !forOther) {
         const deduction = await deductOrbs(storage, userId, `tarot_${spreadId}` as any);
         if (!deduction.ok) {
           return res.status(402).json({ ok: false, error: deduction.error || 'insufficient_orbs' });
@@ -5145,6 +5158,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (forcedVerdict) interpretation.verdict = forcedVerdict;
+      if (forOther) {
+        (interpretation as any).subjectName = forOther.name;
+        (interpretation as any).subjectGender = forOther.gender;
+      }
 
       const saved = await storage.saveTarotReading({
         userId, spread: spreadId, question, locale, cards: drawn, interpretation, day,

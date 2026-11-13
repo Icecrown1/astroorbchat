@@ -56,7 +56,7 @@ import {
   type InsertWebhookError,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, lt, ne, like } from "drizzle-orm";
+import { eq, and, desc, isNull, lt, ne, like, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -959,7 +959,11 @@ export class DatabaseStorage implements IStorage {
     const rows = await db
       .select()
       .from(tarotReadings)
-      .where(and(eq(tarotReadings.userId, userId), eq(tarotReadings.day, day), eq(tarotReadings.spread, 'daily'), eq(tarotReadings.locale, locale)))
+      .where(and(
+        eq(tarotReadings.userId, userId), eq(tarotReadings.day, day), eq(tarotReadings.spread, 'daily'), eq(tarotReadings.locale, locale),
+        // расклады админа «для другого человека» не считаются его картой дня
+        sql`(${tarotReadings.interpretation}->>'subjectName') is null`,
+      ))
       .limit(1);
     return rows[0];
   }
