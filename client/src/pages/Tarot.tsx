@@ -117,6 +117,33 @@ function parseBirthInput(raw: string): string | null {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+/** Маска даты при наборе: цифры → «ДД.ММ.ГГГГ», точки ставятся сами */
+function maskBirthInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+/** Вставка из комментария: «14/3/98», «14 03 1998», «14.03.98» → «14.03.1998»; иначе — как набор цифр */
+function pasteBirthInput(text: string): string {
+  const iso = parseBirthInput(text);
+  if (iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+  }
+  return maskBirthInput(text);
+}
+
+/** Подсказка под полем: готово / ещё вводится / ошибка */
+function birthHint(raw: string, iso: string | null, ru: boolean, fmt: (iso: string) => string): { text: string; bad: boolean } | null {
+  if (!raw.trim()) return null;
+  if (iso) return { text: `✓ ${fmt(iso)}`, bad: false };
+  const digits = raw.replace(/\D/g, '').length;
+  if (digits < 8) return { text: ru ? 'Введите 8 цифр: день, месяц, год — точки поставятся сами' : 'Type 8 digits: day, month, year — dots are added automatically', bad: false };
+  return { text: ru ? 'Такой даты нет — проверьте день и месяц' : 'No such date — check the day and month', bad: true };
+}
+
 const SIGN_GLYPHS: Array<[string, string]> = [['sun', '☉'], ['moon', '☽'], ['venus', '♀'], ['mars', '♂']];
 function signsLine(signs?: Record<string, string>): string {
   if (!signs) return '';
@@ -147,8 +174,9 @@ export default function Tarot() {
   const [partnerBirth, setPartnerBirth] = useState('');
   const [birthError, setBirthError] = useState<null | 'subject' | 'partner'>(null);
   const forOther = isAdmin && forOtherOn;
-  const otherBirthIso = parseBirthInput(otherBirth);
-  const partnerBirthIso = parseBirthInput(partnerBirth);
+  const fullDate = (v: string) => (/^\d{2}\.\d{2}\.\d{4}$/.test(v) ? parseBirthInput(v) : v.trim() ? null : '');
+  const otherBirthIso = fullDate(otherBirth);
+  const partnerBirthIso = fullDate(partnerBirth);
   const fmtDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(ru ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
@@ -518,18 +546,17 @@ export default function Tarot() {
                       <Input
                         id="tarot-other-birth"
                         value={otherBirth}
-                        onChange={(e) => { setOtherBirth(e.target.value); if (birthError === 'subject') setBirthError(null); }}
-                        placeholder={ru ? 'Дата рождения: ДД.ММ.ГГГГ (необязательно)' : 'Birth date: DD.MM.YYYY (optional)'}
+                        onChange={(e) => { setOtherBirth(maskBirthInput(e.target.value)); if (birthError === 'subject') setBirthError(null); }}
+                        onPaste={(e) => { e.preventDefault(); setOtherBirth(pasteBirthInput(e.clipboardData.getData('text'))); if (birthError === 'subject') setBirthError(null); }}
+                        placeholder={ru ? 'Дата рождения, например 14031998' : 'Birth date, e.g. 14031998'}
                         inputMode="numeric"
-                        maxLength={10}
                         className={`h-11 ${birthError === 'subject' ? 'border-destructive' : ''}`}
                         data-testid="input-other-birth"
                       />
-                      {otherBirth.trim() && (
-                        <p className={`text-xs mt-1.5 ${otherBirthIso ? 'text-muted-foreground' : 'text-destructive'}`}>
-                          {otherBirthIso ? `✓ ${fmtDate(otherBirthIso)}` : (ru ? 'Формат: 14.03.1998' : 'Format: 14.03.1998')}
-                        </p>
-                      )}
+                      {(() => {
+                        const h = birthHint(otherBirth, otherBirthIso, ru, fmtDate);
+                        return h && <p className={`text-xs mt-1.5 ${h.bad || birthError === 'subject' ? 'text-destructive' : 'text-muted-foreground'}`}>{h.text}</p>;
+                      })()}
                     </div>
 
                     <div className="pt-1">
@@ -548,19 +575,18 @@ export default function Tarot() {
                         <Input
                           id="tarot-partner-birth"
                           value={partnerBirth}
-                          onChange={(e) => { setPartnerBirth(e.target.value); if (birthError === 'partner') setBirthError(null); }}
+                          onChange={(e) => { setPartnerBirth(maskBirthInput(e.target.value)); if (birthError === 'partner') setBirthError(null); }}
+                          onPaste={(e) => { e.preventDefault(); setPartnerBirth(pasteBirthInput(e.clipboardData.getData('text'))); if (birthError === 'partner') setBirthError(null); }}
                           placeholder={ru ? 'ДД.ММ.ГГГГ' : 'DD.MM.YYYY'}
                           inputMode="numeric"
-                          maxLength={10}
                           className={`h-11 ${birthError === 'partner' ? 'border-destructive' : ''}`}
                           data-testid="input-partner-birth"
                         />
                       </div>
-                      {partnerBirth.trim() && (
-                        <p className={`text-xs mt-1.5 ${partnerBirthIso ? 'text-muted-foreground' : 'text-destructive'}`}>
-                          {partnerBirthIso ? `✓ ${fmtDate(partnerBirthIso)}` : (ru ? 'Формат: 02.11.1996' : 'Format: 02.11.1996')}
-                        </p>
-                      )}
+                      {(() => {
+                        const h = birthHint(partnerBirth, partnerBirthIso, ru, fmtDate);
+                        return h && <p className={`text-xs mt-1.5 ${h.bad || birthError === 'partner' ? 'text-destructive' : 'text-muted-foreground'}`}>{h.text}</p>;
+                      })()}
                     </div>
                     <p className="text-[11px] text-muted-foreground">
                       {ru
