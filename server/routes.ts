@@ -5014,6 +5014,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Самодиагностика: база, схема, OpenAI, Python/Swiss Ephemeris, бот (админ)
+  app.get("/api/admin/health", requireAdmin, async (_req, res) => {
+    try {
+      const { runHealthCheck } = await import('./lib/healthCheck');
+      res.json({ ok: true, data: await runHealthCheck() });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Win-back-рассылка по базе (разовая, из админки)
   app.post("/api/admin/broadcast", requireAdmin, async (req, res) => {
     try {
@@ -5267,7 +5277,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true, data: { ...saved, cached: false } });
     } catch (error: any) {
       console.error('[TAROT] /draw error:', error);
-      res.status(500).json({ ok: false, error: 'Tarot reading failed' });
+      let isAdmin = false;
+      try { isAdmin = !!(await storage.getUser((req as any).userId) as any)?.isAdmin; } catch { /* noop */ }
+      const reason = String(error?.error?.message || error?.message || error).slice(0, 300);
+      res.status(500).json({ ok: false, error: isAdmin ? `Tarot reading failed: ${reason}` : 'Tarot reading failed' });
     }
   });
 

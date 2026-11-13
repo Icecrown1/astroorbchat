@@ -191,8 +191,11 @@ export default function Tarot() {
       queryClient.invalidateQueries({ queryKey: ['/api/user/me'] });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    onError: (err: any) => {
+    onError: (err: any, spreadId: TarotSpreadId) => {
       haptic.notify('error');
+      // apiRequest бросает Error(message = поле error сервера) на любой не-2xx: код — в message
+      if (!err.code && typeof err.message === 'string' && /^[a-z_]+$/.test(err.message)) err.code = err.message;
+      if (err.code === 'insufficient_orbs' && !err.cost) err.cost = (costs as Record<string, number>)[spreadId] ?? '';
       if (err.code === 'subscription_required' || err.code === 'premium_required') {
         toast({
           title: ru ? 'Нужна подписка' : 'Subscription needed',
@@ -208,7 +211,13 @@ export default function Tarot() {
       } else if (err.code === 'bad_birth_date' || err.message === 'bad_birth_date') {
         toast({ title: ru ? 'Проверьте дату рождения' : 'Check the birth date', description: ru ? 'Формат ДД.ММ.ГГГГ, не позже сегодняшнего дня' : 'Use DD.MM.YYYY, not later than today', variant: 'destructive' });
       } else {
-        toast({ title: ru ? 'Не получилось' : 'Something went wrong', description: ru ? 'Попробуйте ещё раз' : 'Please try again', variant: 'destructive' });
+        // админу — настоящая причина (сервер присылает её только админам)
+        const reason = typeof err.message === 'string' && err.message.startsWith('Tarot reading failed:') ? err.message.slice(22).trim() : '';
+        toast({
+          title: ru ? 'Не получилось' : 'Something went wrong',
+          description: reason || (ru ? 'Попробуйте ещё раз' : 'Please try again'),
+          variant: 'destructive',
+        });
       }
     },
   });

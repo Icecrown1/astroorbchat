@@ -10,6 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/LocaleContext";
 import AdminContestCard from "@/components/AdminContestCard";
+import AdminHealthCard from "@/components/AdminHealthCard";
 import {
   Dialog,
   DialogContent,
@@ -223,6 +224,8 @@ export default function Admin() {
             <p className="text-muted-foreground mt-1">{t.admin.subtitle}</p>
           </div>
         </div>
+
+        <AdminHealthCard />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-total-users">
