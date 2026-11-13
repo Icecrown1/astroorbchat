@@ -4959,6 +4959,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Конкурс среди пригласивших друзей: статус для пользователя
+  app.get("/api/contest/referral", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      const { getContestStatus } = await import('./lib/referralContest');
+      res.json({ ok: true, data: await getContestStatus(userId, !!(user as any)?.isAdmin) });
+    } catch (error: any) {
+      console.error('[CONTEST] status failed:', error?.message || error);
+      res.status(500).json({ ok: false, error: 'contest_status_failed' });
+    }
+  });
+
+  // Конкурс: участники и результат (админ)
+  app.get("/api/admin/contest", requireAdmin, async (_req, res) => {
+    try {
+      const { listParticipants, getDrawResult, publicName, isAnnounced } = await import('./lib/referralContest');
+      const { REFERRAL_CONTEST } = await import('@shared/referralContest');
+      const [participants, draw, announced] = await Promise.all([listParticipants(), getDrawResult(), isAnnounced()]);
+      res.json({
+        ok: true,
+        data: {
+          contest: REFERRAL_CONTEST,
+          announced,
+          draw,
+          participants: participants.map((p) => ({ id: p.id, name: p.name, publicName: publicName(p.name), username: p.username, invited: p.invited })),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Конкурс: анонс-пуш всем (повторно — только с force)
+  app.post("/api/admin/contest/announce", requireAdmin, async (req, res) => {
+    try {
+      const { announceContest } = await import('./lib/referralContest');
+      res.json({ ok: true, data: await announceContest(storage, req.body?.force === true) });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Конкурс: провести розыгрыш сейчас (до даты окончания — только с force)
+  app.post("/api/admin/contest/draw", requireAdmin, async (req, res) => {
+    try {
+      const { drawWinner } = await import('./lib/referralContest');
+      const r = await drawWinner(storage, req.body?.force === true);
+      if (!r.ok) return res.status(400).json({ ok: false, error: r.error });
+      res.json({ ok: true, data: r });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
   // Win-back-рассылка по базе (разовая, из админки)
   app.post("/api/admin/broadcast", requireAdmin, async (req, res) => {
     try {

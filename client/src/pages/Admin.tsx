@@ -9,6 +9,7 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/LocaleContext";
+import AdminContestCard from "@/components/AdminContestCard";
 import {
   Dialog,
   DialogContent,
@@ -275,7 +276,7 @@ export default function Admin() {
               Аналитика
             </TabsTrigger>
             <TabsTrigger value="vk" data-testid="tab-vk">
-              ВК-контент
+              Контент и пуши
             </TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">
               <CreditCard className="h-4 w-4 mr-2" />
@@ -565,6 +566,8 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+
+            <AdminContestCard />
           </TabsContent>
 
           <TabsContent value="payments" className="mt-4 space-y-6">

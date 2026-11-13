@@ -132,6 +132,11 @@ app.use((req, res, next) => {
       Promise.all([import('./lib/reengagement'), import('./storage')]).then(([{ runDailyPushTick }, { storage }]) => {
         setTimeout(() => runDailyPushTick(storage), 30_000);
         setInterval(() => runDailyPushTick(storage), 10 * 60_000);
+        // Конкурс среди пригласивших: розыгрыш сам после даты окончания
+        import('./lib/referralContest').then(({ runContestTick }) => {
+          setTimeout(() => runContestTick(storage), 45_000);
+          setInterval(() => runContestTick(storage), 10 * 60_000);
+        }).catch((e) => console.error('[CONTEST] tick init failed:', e));
       }).catch((e) => console.error('[PUSH] init failed:', e));
     }
   });

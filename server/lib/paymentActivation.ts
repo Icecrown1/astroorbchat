@@ -26,6 +26,8 @@ export interface ActivateSubscriptionParams {
     extend?: boolean;
     /** Явная дата старта периода (запланированная подписка после текущей) */
     startAt?: Date;
+    /** Не начислять реферальный бонус пригласившему (подписка не оплачена — например, приз конкурса) */
+    skipReferralBonus?: boolean;
   };
 }
 
@@ -74,7 +76,7 @@ export async function activateSubscriptionForUser(storage: any, p: ActivateSubsc
     orbsResetAt: dayjs().add(30, 'days').toDate(),
   });
 
-  if (!wasActive) {
+  if (!wasActive && !p.meta?.skipReferralBonus) {
     try {
       const { handleSubscriptionReferralBonus } = await import('./referral');
       await handleSubscriptionReferralBonus(storage, p.userId);

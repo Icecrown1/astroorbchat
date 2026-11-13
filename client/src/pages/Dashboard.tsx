@@ -27,6 +27,7 @@ import type { User, Subscription } from '@shared/schema';
 import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
 import { FirstMonthOfferButton } from '@/components/FirstMonthOfferButton';
+import { ReferralContestBanner } from '@/components/ReferralContest';
 
 const VIGNETTES: Record<string, VignetteKind> = {
   '/my-natal-chart': 'natal',
@@ -269,6 +270,9 @@ export default function Dashboard() {
             <LowEnergyAlert />
           </div>
         )}
+
+        {/* Конкурс среди пригласивших друзей */}
+        <ReferralContestBanner />
 
         {/* Onboarding Coachmark */}
         <Coachmark

@@ -14,6 +14,7 @@ import { useTranslation } from '@/contexts/LocaleContext';
 import { useEnergy } from '@/store/useEnergy';
 import { useEffect } from 'react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { ReferralContestCard } from '@/components/ReferralContest';
 
 interface ReferralItem {
   id: string;
@@ -221,6 +222,8 @@ export default function Referral() {
             <p className="text-muted-foreground">{t.referral.subtitle}</p>
           </div>
         </div>
+
+        <ReferralContestCard onInvite={handleShare} isAdmin={!!(user as any)?.isAdmin} />
 
         <Card className="p-6 mb-6">
           <div className="text-center mb-6">

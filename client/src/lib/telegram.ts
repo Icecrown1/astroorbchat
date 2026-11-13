@@ -266,6 +266,7 @@ const PUSH_DEEPLINK_ROUTES: Record<string, string> = {
   matrix_pair: '/matrix?tab=pair',
   compat: '/compatibility',
   ask: '/ask',
+  contest: '/referral',
 };
 
 /** Возвращает маршрут для startapp пуш-кампании (однократно за сессию) или null */

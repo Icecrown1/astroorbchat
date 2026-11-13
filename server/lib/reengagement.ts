@@ -55,11 +55,11 @@ function pickThemeIdx(prevTheme: number | null | undefined): number {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function isRealTgId(tgId: unknown): boolean {
+export function isRealTgId(tgId: unknown): boolean {
   return typeof tgId === 'string' && /^\d+$/.test(tgId);
 }
 
-async function getBotDeepLink(startapp: string): Promise<string | null> {
+export async function getBotDeepLink(startapp: string): Promise<string | null> {
   try {
     const { getBotUsername } = await import('./telegramStars');
     const bot = await getBotUsername();
@@ -67,7 +67,7 @@ async function getBotDeepLink(startapp: string): Promise<string | null> {
   } catch { return null; }
 }
 
-async function sendPush(tgId: string, text: string, buttonText: string, link: string | null): Promise<'ok' | 'blocked' | 'error'> {
+export async function sendPush(tgId: string, text: string, buttonText: string, link: string | null): Promise<'ok' | 'blocked' | 'error'> {
   try {
     const res = await fetch(`${TG()}/sendMessage`, {
       method: 'POST',
