@@ -57,7 +57,7 @@ h2 { font-size: 2rem; line-height: 1.15; }
   transform: translateX(-50%);
   width: min(100%, 35rem);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: .2rem;
   padding: .5rem .6rem calc(.45rem + env(safe-area-inset-bottom, 0px));
   background: #1f1a2d;
@@ -96,3 +96,8 @@ details { padding: .85rem; background: #211c2c; border: 1px solid #493d56; borde
 summary { cursor: pointer; }
 summary time { display: block; color: #d3c8da; font-size: .85rem; }
 details > .reading { margin-top: .8rem; }
+button:disabled { cursor: default; opacity: .65; }
+.profile-card, .server-reading { display: grid; gap: .7rem; }
+.profile-card { padding: 1.15rem; border: 1px solid #493d56; border-radius: 1rem; background: #211c2c; }
+details > .server-reading { margin-top: .8rem; }
+.server-reading p { white-space: pre-wrap; overflow-wrap: anywhere; }

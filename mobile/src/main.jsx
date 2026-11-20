@@ -5,6 +5,7 @@ import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
 import { MatrixOctagram } from '../../client/src/components/MatrixOctagram';
 import { cardImage } from './cards';
 import { Tarot, History, useReadings } from './Tarot';
+import { Account } from './Account';
 import './style.css';
 
 function localToday() {
@@ -98,6 +99,7 @@ const destinations = [
   ['tarot', 'Таро', '◇'],
   ['matrix', 'Матрица', '⟐'],
   ['history', 'История', '☾'],
+  ['account', 'Профиль', '◉'],
 ];
 
 function Home({ navigate, hasDaily }) {
@@ -141,6 +143,7 @@ function App() {
       {screen === 'tarot' && <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       <div hidden={screen !== 'matrix'}><Matrix /></div>
       {screen === 'history' && <History entries={readings.entries} openTarot={() => navigate('tarot')} />}
+      <div hidden={screen !== 'account'}><Account /></div>
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
         {destinations.map(([id, name, icon]) => (
           <button key={id} type="button" aria-current={id === screen ? 'page' : undefined} onClick={() => navigate(id)}>
