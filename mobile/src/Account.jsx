@@ -151,6 +151,12 @@ export function useAccount() {
     });
   }
 
+  async function refreshProfile(sessionToken) {
+    const user = await onlineRequest('/api/user/me', { token: sessionToken });
+    setProfile(user);
+    return user;
+  }
+
   async function loadAccount(sessionToken) {
     const [user, readings] = await Promise.all([
       onlineRequest('/api/user/me', { token: sessionToken }),
@@ -214,7 +220,7 @@ export function useAccount() {
 
   return {
     code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, draw,
-    refresh: () => run(() => loadAccount(token)),
+    refresh: () => run(() => loadAccount(token)), refreshProfile,
   };
 }
 

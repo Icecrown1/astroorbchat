@@ -7,6 +7,7 @@ import { cardImage } from './cards';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { Natal } from './Natal';
+import { Forecasts } from './Forecasts';
 import './style.css';
 
 function localToday() {
@@ -123,6 +124,12 @@ function Home({ navigate, online, hasDaily }) {
         <button className="feature" type="button" onClick={() => navigate('matrix')}>
           <img src={cardImage('star')} alt="" /><span>Матрица судьбы</span>
         </button>
+        <button className="feature" type="button" onClick={() => navigate('horoscope')}>
+          <img src={cardImage('wheel-of-fortune')} alt="" /><span>Гороскоп</span>
+        </button>
+        <button className="feature" type="button" onClick={() => navigate('compatibility')}>
+          <img src={cardImage('lovers')} alt="" /><span>Совместимость</span>
+        </button>
       </div>
       <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
     </div>
@@ -161,6 +168,11 @@ function App() {
           : <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
       {screen === 'natal' && <Natal key={account.profile?.id ?? Boolean(account.token)} account={account} openAccount={openAccount} />}
+      {['horoscope', 'compatibility'].map(kind => (
+        <div key={kind + Boolean(account.token)} hidden={screen !== kind}>
+          <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+        </div>
+      ))}
       <div hidden={screen !== 'matrix'}><Matrix /></div>
       {screen === 'history' && <section className="tarot-screen">
         <h1>История</h1>

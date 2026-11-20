@@ -152,3 +152,10 @@ header { margin-bottom: 1.3rem; }
 .planet-tabs button { min-height: 2.75rem; width: auto; padding: .35rem .7rem; background: #2e2340; color: #ede2f5; border: 1px solid #5c496d; }
 .planet-tabs button[aria-pressed="true"] { color: #251930; background: #ddc3fa; }
 .natal-interpretation p { margin-top: .75rem; white-space: pre-line; overflow-wrap: anywhere; }
+
+.forecast-period { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.forecast-result, .partner-extra { display: grid; gap: .65rem; }
+.forecast-result p { white-space: pre-line; overflow-wrap: anywhere; }
+.forecast-topic { display: grid; gap: .4rem; padding: .85rem; border-radius: .85rem; background: #2e2340; }
+.forecast-score strong { font-size: 1.6rem; color: #edcef9; }
+.partner-extra { margin-top: .8rem; }
