@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
+import { ReadingText } from './ReadingText';
 import { ResultCard } from './ResultCard';
 
 const solarCost = 15;
@@ -116,7 +117,7 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
         eyebrow={result.cached ? 'Сохранённый соляр' : 'Прогноз на год'}
         meta={[result.location, dateLabel(result.solar?.date)].filter(Boolean).join(' · ')}>
         {result.solar?.sign && <p>Солнце · {translateSign(result.solar.sign, 'ru')}</p>}
-        <p>{result.interpretation}</p>
+        <ReadingText text={result.interpretation} />
       </ResultCard>}
     </>}
   </section>;
@@ -185,11 +186,11 @@ export function Oracle({ account, openAccount, openNatal }) {
       {error && <p role="alert">{error}</p>}
       {!profile && !busy && <button className="secondary-button" type="button" onClick={account.refresh}>Загрузить профиль</button>}
       {needsNatal && <NatalPrompt openNatal={openNatal} />}
-      {result && <ResultCard title={result.question} eyebrow="Ответ Оракула"><p>{result.answer}</p></ResultCard>}
+      {result && <ResultCard title={result.question} eyebrow="Ответ Оракула"><ReadingText text={result.answer} /></ResultCard>}
       <button className="secondary-button" type="button" onClick={openHistory} disabled={busy}>
         {mustCheck ? 'Проверить историю и баланс' : 'История вопросов'}
       </button>
-      {history?.length === 0 && <p>В истории пока нет вопросов.</p>}
+      {history?.length === 0 && <p className="empty-panel">В истории пока нет вопросов.</p>}
       {history?.map(item => <details key={item.id}>
         <summary>{item.question}</summary>
         <div className="server-reading">{dateLabel(item.createdAt) && <p>{dateLabel(item.createdAt)}</p>}<p>{item.answer}</p></div>

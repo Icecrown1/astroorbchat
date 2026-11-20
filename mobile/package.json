@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "sync": "npm run build && cap sync"
+    "sync": "npm run build && cap sync",
+    "prepare:android": "node scripts/prepare-android.mjs"
   },
   "type": "module",
   "private": true,

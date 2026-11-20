@@ -18,6 +18,7 @@ npm run dev
 ```sh
 npm run build
 npx cap add android
+npm run prepare:android
 npx cap add ios
 ```
 

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { cardImage } from './cards';
+import brandIcon from '../../client/public/brand/favicon.svg?url';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { ProfileSettings } from './ProfileSettings';
@@ -38,17 +39,22 @@ const homeSections = [
 
 function Home({ navigate, online, hasDaily }) {
   return (
-    <main className="home">
+    <div className="home">
       <section className="hero home-hero">
         <img src={cardImage('moon')} alt="" className="cover" />
         <div className="intro">
           <h1>Карта дня</h1>
-          <p>На что сегодня стоит обратить внимание?</p>
+          <p>{online ? 'На что сегодня стоит обратить внимание?' : 'Вытяни карту дня. Она доступна офлайн и без входа.'}</p>
           <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
             {hasDaily && !online ? 'Посмотреть карту' : 'Открыть карту дня'}
           </button>
         </div>
       </section>
+      {!online && <section className="profile-card start-options" aria-label="Подключение аккаунта">
+        <div><h2>Уже пользуешься AstroOrbi в Telegram?</h2>
+          <p>Подключи аккаунт, чтобы открыть свои карты, историю и баланс.</p></div>
+        <button type="button" className="secondary-button" onClick={() => navigate('account')}>Подключить аккаунт</button>
+      </section>}
       {homeSections.map(({ title, items }) => (
         <section className="home-group" key={title} aria-label={title}>
           <h2>{title}</h2>
@@ -62,14 +68,16 @@ function Home({ navigate, online, hasDaily }) {
         </section>
       ))}
       <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
-    </main>
+    </div>
   );
 }
 
 function App() {
-  const [screen, setScreen] = useState('home');
+  const [route, setRoute] = useState({ screen: 'home', depth: 0 });
   const [tarotMode, setTarotMode] = useState('daily');
   const [tarotSource, setTarotSource] = useState(null);
+  const { screen, depth } = route;
+  const [offline, setOffline] = useState(() => !navigator.onLine);
   const readings = useReadings();
   const account = useAccount();
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
@@ -82,16 +90,51 @@ function App() {
   const profileKey = JSON.stringify([Boolean(account.token), account.profile?.id, account.profile?.birthdayDate,
     account.profile?.birthTime, account.profile?.birthPlace]);
 
+  useEffect(() => {
+    window.history.replaceState({ astroOrbi: true, screen: 'home', depth: 0 }, '');
+    function restore(event) {
+      if (!event.state?.astroOrbi) return;
+      setRoute(event.state);
+      if (event.state.tarotMode) setTarotMode(event.state.tarotMode);
+      setTarotSource(event.state.tarotSource ?? null);
+    }
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
+  useEffect(() => {
+    const updateConnection = () => setOffline(!navigator.onLine);
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    return () => {
+      window.removeEventListener('online', updateConnection);
+      window.removeEventListener('offline', updateConnection);
+    };
+  }, []);
+
   function navigate(next, mode, requestedSource) {
     if (mode) setTarotMode(mode);
     if (requestedSource) setTarotSource(requestedSource);
-    setScreen(next);
+    if (next === screen) return;
+    window.history.replaceState({ ...route, astroOrbi: true, tarotMode, tarotSource }, '');
+    const destination = {
+      astroOrbi: true, screen: next, depth: depth + 1,
+      tarotMode: mode ?? tarotMode, tarotSource: requestedSource ?? tarotSource,
+    };
+    window.history.pushState(destination, '');
+    setRoute(destination);
     window.scrollTo(0, 0);
   }
 
   return (
     <div className="page">
-      <header><span className="orb" aria-hidden="true"></span>AstroOrbi</header>
+      <header className="app-header">
+        {depth > 0 && screen !== 'home' && <button type="button" className="back-button" aria-label="Назад"
+          disabled={screen === 'settings' && account.busy} onClick={() => window.history.back()}>←</button>}
+        <img src={brandIcon} alt="" className="app-mark" />
+        <span>AstroOrbi</span>
+      </header>
+      {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <h1>Таро</h1>
@@ -131,13 +174,14 @@ function App() {
         <History entries={readings.entries} openTarot={() => navigate('tarot')} />
       </section>}
       {(screen === 'account' || (screen === 'settings' && !account.profile)) &&
-        <Account account={account} openHistory={openHistory} openSettings={openSettings} />}
+        <Account account={account} openHistory={openHistory} openSettings={openSettings}
+          openOffline={() => navigate('tarot', 'daily', 'offline')} />}
       {screen === 'settings' && account.profile &&
         <ProfileSettings key={account.profile.id} account={account} openAccount={openAccount} openNatal={openNatal} />}
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
         {destinations.map(([id, name, icon]) => (
           <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : ['guest-natal', 'dates'].includes(screen) ? 'natal' : screen) ? 'page' : undefined} onClick={() => navigate(id)}>
-            <span aria-hidden="true">{icon}</span>{name}
+            <span aria-hidden="true">{icon}</span><span className="nav-label">{name}</span>
           </button>
         ))}
       </nav>

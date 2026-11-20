@@ -226,20 +226,28 @@ export function useAccount() {
   };
 }
 
-export function Account({ account, openHistory, openSettings }) {
+export function Account({ account, openHistory, openSettings, openOffline }) {
   const { token, profile, code, setCode, signIn, signOut, refresh, busy, error } = account;
   return (
     <section className="tarot-screen">
       <h1>Профиль</h1>
       {!token ? (
-        <form className="profile-card" onSubmit={signIn}>
-          <h2>Подключить аккаунт</h2>
-          <p>В AstroOrbi в Telegram открой «Настройки → Мобильное приложение» и получи код входа.</p>
-          <label htmlFor="link-code">Код из Telegram</label>
-          <input id="link-code" value={code} onChange={event => setCode(event.target.value)} required
-            autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy} />
-          <button type="submit" disabled={busy}>{busy ? 'Подключаем…' : 'Войти'}</button>
-        </form>
+        <>
+          <form className="profile-card account-connect" onSubmit={signIn}>
+            <h2>Войти через Telegram</h2>
+            <ol className="connect-steps">
+              <li>Открой AstroOrbi в Telegram.</li>
+              <li>В настройках найди «Мобильное приложение» и получи код входа.</li>
+              <li>Вставь код сюда в течение 5 минут.</li>
+            </ol>
+            <label htmlFor="link-code">Код из Telegram</label>
+            <input id="link-code" value={code} onChange={event => setCode(event.target.value)} required
+              autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy}
+              aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'account-status' : undefined} />
+            <button type="submit" disabled={busy}>{busy ? 'Подключаем…' : 'Войти'}</button>
+          </form>
+          <button className="secondary-button" type="button" onClick={openOffline} disabled={busy}>Открыть офлайн-Таро</button>
+        </>
       ) : <>
         {profile && <div className="profile-card">
           <h2>{profile.name}</h2>
@@ -253,7 +261,7 @@ export function Account({ account, openHistory, openSettings }) {
           <button type="button" disabled={busy} onClick={signOut}>Выйти</button>
         </div>
       </>}
-      {error && <p role="alert">{error}</p>}
+      {error && <p id="account-status" role="alert">{error}</p>}
     </section>
   );
 }
@@ -284,7 +292,7 @@ export function AccountHistory({ account }) {
   return (
     <section className="tarot-screen">
       <h2>Из аккаунта</h2>
-      {!account.history.length && <p>В аккаунте пока нет раскладов.</p>}
+      {!account.history.length && <p className="empty-panel">В аккаунте пока нет раскладов.</p>}
       {account.history.map(reading => <ServerReading key={reading.id} reading={reading} />)}
     </section>
   );

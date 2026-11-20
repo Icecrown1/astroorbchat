@@ -6,6 +6,7 @@ on:
       - 'mobile/**'
       - 'shared/**'
       - 'client/public/tarot/**'
+      - 'client/public/brand/**'
       - '.github/workflows/mobile-android.yml'
   workflow_dispatch:
 
@@ -38,6 +39,7 @@ jobs:
           npm ci
           npm run build
           npx --no-install cap add android
+          npm run prepare:android
       - name: Build and verify the APK
         working-directory: mobile/android
         run: |

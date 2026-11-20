@@ -133,10 +133,10 @@ export function History({ entries, openTarot }) {
     <section className="tarot-screen">
       <h2>На этом устройстве</h2>
       {!entries.length && (
-        <>
+        <div className="empty-panel">
           <p>Здесь появятся карты дня и расклады с этого устройства.</p>
-          <button type="button" onClick={openTarot}>Открыть Таро</button>
-        </>
+          <button type="button" className="secondary-button" onClick={openTarot}>Открыть Таро</button>
+        </div>
       )}
       {entries.map(entry => (
         <details key={entry.id}>

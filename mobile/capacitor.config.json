@@ -1,6 +1,6 @@
 {
   "appId": "app.astroorbi.preview",
-  "appName": "AstroOrbi Preview",
+  "appName": "AstroOrbi",
   "webDir": "dist",
   "backgroundColor": "#171425",
   "plugins": {

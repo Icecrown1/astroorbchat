@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { onlineRequest } from './onlineApi';
 import { ResultCard } from './ResultCard';
+import { CityField } from './ProfileSettings';
 
 // These prices match ORB_COSTS in the deployed API.
 const periods = {
@@ -76,13 +77,13 @@ function savedForecast(row) {
 
 function PartnerFields({ busy }) {
   const [time, setTime] = useState('');
+  const [city, setCity] = useState('');
   return <>
     <label htmlFor="partner-name">Имя</label>
     <input id="partner-name" name="name" required maxLength={80} disabled={busy} />
     <label htmlFor="partner-date">Дата рождения</label>
     <input id="partner-date" name="date" type="date" max={new Date().toLocaleDateString('sv-SE')} required disabled={busy} />
-    <label htmlFor="partner-place">Город рождения</label>
-    <input id="partner-place" name="place" required maxLength={120} placeholder="Например, Уфа" disabled={busy} />
+    <CityField id="partner-place" name="place" value={city} change={setCity} disabled={busy} required />
     <details>
       <summary>Время рождения и пол</summary>
       <div className="partner-extra">

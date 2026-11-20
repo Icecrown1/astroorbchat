@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { translatePlanet, translateSign, translateSignPrepositional } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
+import { ReadingText } from './ReadingText';
 import { ResultCard } from './ResultCard';
 
 // The existing endpoint debits ORB_COSTS.important_date, not its legacy response cost.
@@ -164,7 +165,7 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
       </div>
       {readingEvent && !guestId && <div ref={readingAnchor} tabIndex={-1} aria-label="Разбор выбранного события"><ResultCard title={eventTitle(readingEvent)} eyebrow="Разбор даты"
         meta={fullDateFormat.format(new Date(readingEvent.date))}>
-        {result ? <p>{result.interpretation}</p> : <>
+        {result ? <ReadingText text={result.interpretation} /> : <>
           {eligible ? <button type="button" disabled={busy || uncertain} onClick={requestReading}>
             {readingBusy ? 'Готовим разбор…' : `Получить ИИ-разбор · до ${readingCost} орбов`}
           </button> : <p>Новый разбор доступен с подпиской.</p>}
@@ -172,7 +173,7 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
         </>}
         {readingError && <p role="status">{readingError}</p>}
       </ResultCard></div>}
-      {visibleEvents.length === 0 && <p>В этом периоде нет событий по выбранному фильтру.</p>}
+      {visibleEvents.length === 0 && <p className="empty-panel">В этом периоде нет событий по выбранному фильтру.</p>}
       <ol className="dates-list">
         {visibleEvents.map((event, index) => (
           <li key={`${event.date}-${event.type}-${event.planet ?? ''}-${index}`}>

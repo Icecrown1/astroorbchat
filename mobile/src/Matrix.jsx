@@ -4,6 +4,7 @@ import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
 import { MatrixOctagram } from '../../client/src/components/MatrixOctagram';
 import { cardImage } from './cards';
 import { onlineRequest } from './onlineApi';
+import { ChartViewport } from './ChartViewport';
 
 function localToday() {
   const now = new Date();
@@ -34,9 +35,9 @@ function MatrixResult({ core, title, centerTitle = 'Центр — зона ко
     <section className="results" aria-label={heading}>
       <h2>{heading}</h2>
       <p className="matrix-hint">Нажми на число, чтобы узнать его значение.</p>
-      <div className="matrix-board">
+      <ChartViewport className="matrix-board" label="Схема матрицы судьбы">
         <MatrixOctagram core={core} zone="all" onNodeTap={setSelected} activeNodeId={nodeId} label="Схема матрицы судьбы" />
-      </div>
+      </ChartViewport>
       <div aria-live="polite">
         <Arcana
           number={selected?.value ?? core.e}

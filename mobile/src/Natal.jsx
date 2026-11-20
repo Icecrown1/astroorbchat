@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChartCanvas } from '../../client/src/components/ChartCanvas';
 import { translatePlanet, translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
+import { ReadingText } from './ReadingText';
+import { ChartViewport } from './ChartViewport';
 import { NatalReadings } from './NatalReadings';
 
 function positionLabel(placement) {
@@ -58,10 +60,10 @@ export function NatalWheel({ chart, account, guest = false }) {
   const members = validHouses ? planets.filter(planet => planetHouse(planet.position, cusps) === houseNumber) : [];
 
   return <>
-    <div className="natal-wheel">
+    <ChartViewport className="natal-wheel" label="Колесо натальной карты">
       <ChartCanvas planets={planets} aspects={data.aspects ?? []} angles={data.angles}
         houses={data.houses} onPlanetClick={selectPlanet} />
-    </div>
+    </ChartViewport>
     {validHouses && <div className="mode-switch" role="group" aria-label="Разделы натальной карты">
       <button type="button" aria-pressed={view === 'planets'} onClick={() => setView('planets')}>Планеты</button>
       <button type="button" aria-pressed={view === 'houses'} onClick={() => setView('houses')}>Дома</button>
@@ -106,7 +108,7 @@ export function NatalWheel({ chart, account, guest = false }) {
     {typeof interpretation === 'string' && interpretation.trim() && (
       <details className="natal-interpretation">
         <summary>Общий разбор карты</summary>
-        <p>{interpretationText(interpretation)}</p>
+        <ReadingText text={interpretationText(interpretation)} />
       </details>
     )}
   </>;

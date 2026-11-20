@@ -70,7 +70,7 @@ export function GuestNatal({ account, openAccount }) {
     const name = form.get('name').trim();
     const birthPlace = city.trim();
     if (!name || !birthPlace || !Number.isFinite(birthday.getTime()) ||
-        birthday.toISOString().slice(0, 10) !== birthdayDate || birthday > new Date()) {
+        birthday.toISOString().slice(0, 10) !== birthdayDate || birthdayDate > new Date().toLocaleDateString('sv-SE')) {
       setError('Проверь имя, дату и город рождения.');
       return;
     }
@@ -149,7 +149,7 @@ export function GuestNatal({ account, openAccount }) {
           {chart.name}
         </button>
       ))}
-      {charts?.length === 0 && <p>Сохранённых карт пока нет.</p>}
+      {charts?.length === 0 && <p className="empty-panel">Сохранённых карт пока нет.</p>}
       <button type="button" className="secondary-button" disabled={busy} onClick={refresh}>
         {unknown ? 'Проверить карты и баланс' : charts ? 'Обновить список' : 'Загрузить карты'}
       </button>
@@ -162,10 +162,10 @@ export function GuestNatal({ account, openAccount }) {
           <option value="other">Другое</option><option value="female">Женский</option><option value="male">Мужской</option>
         </select>
         <label htmlFor="guest-natal-birthday">Дата рождения</label>
-        <input id="guest-natal-birthday" type="date" name="birthdayDate" required disabled={busy || Boolean(unknown)} />
+        <input id="guest-natal-birthday" type="date" name="birthdayDate" max={new Date().toLocaleDateString('sv-SE')} required disabled={busy || Boolean(unknown)} />
         <label htmlFor="guest-natal-time">Время рождения</label>
         <input id="guest-natal-time" type="time" name="birthTime" disabled={busy || Boolean(unknown)} />
-        <CityField id="guest-natal-city" value={city} change={setCity} disabled={busy || Boolean(unknown)} />
+        <CityField id="guest-natal-city" required value={city} change={setCity} disabled={busy || Boolean(unknown)} />
         <button type="submit" disabled={busy || Boolean(unknown)}>{busy ? 'Подождите…' : `Построить карту · ${price} орб.`}</button>
       </form>}
       {charts && needsSubscription && <p>Новые карты доступны с подпиской. Сохранённые можно открывать бесплатно.</p>}
