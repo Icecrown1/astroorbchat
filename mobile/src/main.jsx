@@ -3,13 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { calcMatrixFromISO } from '../../shared/matrix';
 import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
 import { MatrixOctagram } from '../../client/src/components/MatrixOctagram';
-import hero from '../../client/public/tarot/star.webp';
+import { cardImage } from './cards';
+import { Tarot, History, useReadings } from './Tarot';
 import './style.css';
-
-const cardImages = import.meta.glob(
-  '../../client/public/tarot/{magician,high-priestess,empress,emperor,hierophant,lovers,chariot,justice,hermit,wheel-of-fortune,strength,hanged-man,death,temperance,devil,tower,star,moon,sun,judgement,world,fool}.webp',
-  { eager: true, query: '?url', import: 'default' },
-);
 
 function localToday() {
   const now = new Date();
@@ -18,10 +14,9 @@ function localToday() {
 
 function Arcana({ title, number, description }) {
   const card = arcanaMetaByN(number);
-  const path = '../../client/public/tarot/' + arcanaCardId(number) + '.webp';
   return (
     <article className="arcana">
-      <img src={cardImages[path]} alt="" />
+      <img src={cardImage(arcanaCardId(number))} alt="" />
       <div>
         <p className="zone">{title}</p>
         <h3>{number} · {card.ru}</h3>
@@ -57,7 +52,7 @@ function MatrixResult({ core }) {
   );
 }
 
-function App() {
+function Matrix() {
   const [date, setDate] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -74,10 +69,9 @@ function App() {
   }
 
   return (
-    <div className="page">
-      <header><span className="orb" aria-hidden="true"></span>AstroOrbi</header>
+    <>
       <section className="hero">
-        <img src={hero} alt="" className="cover" />
+        <img src={cardImage('star')} alt="" className="cover" />
         <div className="intro">
           <h1>Матрица<br/>судьбы</h1>
           <p>Построй свою матрицу по дате рождения и исследуй её арканы.</p>
@@ -95,6 +89,65 @@ function App() {
         {error && <p role="alert">{error}</p>}
       </form>
       {result && <MatrixResult key={date} core={result} />}
+    </>
+  );
+}
+
+const destinations = [
+  ['home', 'Главная', '✦'],
+  ['tarot', 'Таро', '◇'],
+  ['matrix', 'Матрица', '⟐'],
+  ['history', 'История', '☾'],
+];
+
+function Home({ navigate, hasDaily }) {
+  return (
+    <div className="home">
+      <section className="hero home-hero">
+        <img src={cardImage('moon')} alt="" className="cover" />
+        <div className="intro">
+          <h1>Карта дня</h1>
+          <p>Один аркан и вопрос, над которым можно подумать сегодня.</p>
+          <button type="button" onClick={() => navigate('tarot', 'daily')}>{hasDaily ? 'Посмотреть карту' : 'Открыть карту дня'}</button>
+        </div>
+      </section>
+      <div className="feature-grid">
+        <button className="feature" type="button" onClick={() => navigate('tarot', 'three')}>
+          <img src={cardImage('high-priestess')} alt="" /><span>Три карты</span>
+        </button>
+        <button className="feature" type="button" onClick={() => navigate('matrix')}>
+          <img src={cardImage('star')} alt="" /><span>Матрица судьбы</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [screen, setScreen] = useState('home');
+  const [tarotMode, setTarotMode] = useState('daily');
+  const readings = useReadings();
+
+  function navigate(next, mode) {
+    if (mode) setTarotMode(mode);
+    setScreen(next);
+    window.scrollTo(0, 0);
+  }
+
+  return (
+    <div className="page">
+      <header><span className="orb" aria-hidden="true"></span>AstroOrbi</header>
+      {screen === 'home' && <Home navigate={navigate} hasDaily={readings.hasDaily} />}
+      {screen === 'tarot' && <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
+      <div hidden={screen !== 'matrix'}><Matrix /></div>
+      {screen === 'history' && <History entries={readings.entries} openTarot={() => navigate('tarot')} />}
+      <nav className="app-nav" aria-label="Разделы AstroOrbi">
+        {destinations.map(([id, name, icon]) => (
+          <button key={id} type="button" aria-current={id === screen ? 'page' : undefined} onClick={() => navigate(id)}>
+            <span aria-hidden="true">{icon}</span>{name}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
