@@ -17,7 +17,7 @@ function hasReading(reading, type) {
 }
 
 function Reading({ reading, kind }) {
-  return <article className="forecast-result">
+  return <article className="result-body forecast-result">
     {reading.title && <h3>{reading.title}</h3>}
     {kind === 'house' ? <>
       {reading.life_sphere && <p><strong>Сфера жизни.</strong> {reading.life_sphere}</p>}

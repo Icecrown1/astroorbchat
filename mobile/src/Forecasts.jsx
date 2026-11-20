@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { onlineRequest } from './onlineApi';
+import { ResultCard } from './ResultCard';
 
 // These prices match ORB_COSTS in the deployed API.
 const periods = {
@@ -201,7 +202,8 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
         {validation && <p role="alert">{validation}</p>}
         {error && <p role="alert">{error}</p>}
         {needsNatal && <button className="secondary-button" type="button" onClick={openNatal}>Открыть натальную карту</button>}
-        {result && <Result report={result} />}
+        {result && <ResultCard title={horoscope ? 'Твой прогноз' : 'Разбор совместимости'}
+          eyebrow={horoscope ? periods[period].name : 'Совместимость'}><Result report={result} /></ResultCard>}
         <button className="secondary-button" type="button" disabled={busy} onClick={checkHistory}>
           {mustCheck ? 'Проверить историю и баланс' : 'Загрузить историю'}
         </button>

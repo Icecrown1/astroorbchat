@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
+import { ResultCard } from './ResultCard';
 
 const solarCost = 15;
 const oracleCost = 0.5;
@@ -111,13 +112,12 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
       {error && <p role="alert">{error}</p>}
       {!profile && !busy && <button className="secondary-button" type="button" onClick={account.refresh}>Загрузить профиль</button>}
       {needsNatal && <NatalPrompt openNatal={openNatal} />}
-      {result && <article className="profile-card forecast-result">
-        <h2>Соляр на {result.targetYear} год</h2>
-        <p>{[result.location, dateLabel(result.solar?.date)].filter(Boolean).join(' · ')}</p>
+      {result && <ResultCard title={`Соляр на ${result.targetYear} год`}
+        eyebrow={result.cached ? 'Сохранённый соляр' : 'Прогноз на год'}
+        meta={[result.location, dateLabel(result.solar?.date)].filter(Boolean).join(' · ')}>
         {result.solar?.sign && <p>Солнце · {translateSign(result.solar.sign, 'ru')}</p>}
-        {result.cached && <p>Сохранённый расчёт</p>}
         <p>{result.interpretation}</p>
-      </article>}
+      </ResultCard>}
     </>}
   </section>;
 }
@@ -185,9 +185,7 @@ export function Oracle({ account, openAccount, openNatal }) {
       {error && <p role="alert">{error}</p>}
       {!profile && !busy && <button className="secondary-button" type="button" onClick={account.refresh}>Загрузить профиль</button>}
       {needsNatal && <NatalPrompt openNatal={openNatal} />}
-      {result && <article className="profile-card forecast-result">
-        <h2>{result.question}</h2><p>{result.answer}</p>
-      </article>}
+      {result && <ResultCard title={result.question} eyebrow="Ответ Оракула"><p>{result.answer}</p></ResultCard>}
       <button className="secondary-button" type="button" onClick={openHistory} disabled={busy}>
         {mustCheck ? 'Проверить историю и баланс' : 'История вопросов'}
       </button>

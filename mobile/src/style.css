@@ -223,3 +223,29 @@ header { margin-bottom: 1.3rem; }
 .dates-list h3 { font-size: 1rem; overflow-wrap: anywhere; }
 .dates-list p { color: #ddcde3; font-size: .85rem; }
 .dates-list p:empty { display: none; }
+
+.result-card {
+  border: 1px solid #735985;
+  border-radius: 1.1rem;
+  background: linear-gradient(160deg, #382841, #261e33 64%);
+  padding: clamp(1rem, 4vw, 1.35rem);
+  box-shadow: 0 .45rem 1.4rem #110c1944;
+  overflow-wrap: anywhere;
+}
+.result-card h2 { font-size: clamp(1.5rem, 6vw, 1.95rem); }
+.result-heading, .result-body { display: grid; gap: .65rem; }
+.result-heading { padding-bottom: .8rem; border-bottom: 1px solid #735985; }
+.result-eyebrow { color: #efd2fa; font-size: .78rem; font-weight: 700; letter-spacing: .035em; }
+.result-meta { color: #e3cfe9; font-size: .88rem; }
+.result-body p { color: #f0e4f1; line-height: 1.65; }
+.date-event-button {
+  width: auto;
+  min-height: 2.75rem;
+  padding: .15rem .25rem;
+  color: #f6e3fa;
+  text-align: left;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: .22em;
+}
+.date-event-button[aria-pressed="true"] { color: #f5cfac; }

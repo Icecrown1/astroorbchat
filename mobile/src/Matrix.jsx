@@ -256,7 +256,7 @@ function AccountMatrix({ account, openAccount, guest }) {
                 <span>{sectionNames[item.id]}</span>
                 <small>{item.content ? 'Сохранён' : item.free ? 'Бесплатно' : `${sectionCost(item)} орб.`}</small>
               </button>
-              {selected === item.id && <article className="profile-card forecast-result" aria-label={sectionNames[item.id]}>
+              {selected === item.id && <article className="result-card forecast-result" aria-label={sectionNames[item.id]}>
                 {section.content && <MatrixReading content={section.content} />}
                 {needsSubscription && <p>Новый разбор доступен с подпиской. Сохранённые разборы можно читать на любом тарифе.</p>}
                 {(!section.content || section.outdated) && !needsSubscription && (
@@ -302,7 +302,7 @@ function PairResult({ result, ownName }) {
   return <div className="matrix-screen">
     <p>{ownName || 'Ты'} и {result.partnerName} · {birthDateLabel(result.partnerBirthDate)}</p>
     <MatrixResult core={result.pairCore} title="Схема пары" centerTitle="Центр пары" />
-    <section className="profile-card forecast-result" aria-label="Разбор совместимости">
+    <section className="result-card forecast-result" aria-label="Разбор совместимости">
       <h2>Разбор совместимости</h2>
       {reading?.kind === 'pair' && Array.isArray(reading.zones) && Array.isArray(reading.steps) ? <>
         {reading.summary && <p>{reading.summary}</p>}
