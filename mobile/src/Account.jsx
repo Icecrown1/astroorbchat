@@ -4,6 +4,7 @@ import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-stora
 import { getTarotCard } from '../../shared/tarot';
 import { cardImage } from './cards';
 import { onlineRequest } from './onlineApi';
+import { BirthDetails } from './ProfileSettings';
 
 const tiers = { free: 'Бесплатный', standard: 'Standard', premium: 'Premium' };
 const spreads = { daily: 'Карта дня', three: 'Три карты', yesno: 'Да / Нет', celtic: 'Кельтский крест', trial: 'Пробный расклад' };
@@ -221,10 +222,11 @@ export function useAccount() {
   return {
     code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, draw,
     refresh: () => run(() => loadAccount(token)), refreshProfile,
+    mergeProfile: changes => setProfile(previous => ({ ...previous, ...changes })),
   };
 }
 
-export function Account({ account, openHistory }) {
+export function Account({ account, openHistory, openSettings }) {
   const { token, profile, code, setCode, signIn, signOut, refresh, busy, error } = account;
   return (
     <section className="tarot-screen">
@@ -244,6 +246,7 @@ export function Account({ account, openHistory }) {
           <p>Тариф · {tiers[profile.billingTier] || profile.billingTier}</p>
           {profile.orbs != null && <p>Баланс · {profile.orbs}</p>}
         </div>}
+        {profile && <BirthDetails profile={profile} openSettings={openSettings} busy={busy} />}
         <button className="secondary-button" type="button" onClick={openHistory}>История раскладов</button>
         <div className="mode-switch">
           <button type="button" disabled={busy} onClick={refresh}>Обновить</button>

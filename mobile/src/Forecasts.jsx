@@ -101,7 +101,7 @@ function PartnerFields({ busy }) {
   </>;
 }
 
-export function Forecasts({ kind, account, openAccount, openNatal }) {
+export function Forecasts({ kind, account, openAccount, openNatal, openSettings }) {
   const { token, profile, busy, error, run, refreshProfile } = account;
   const horoscope = kind === 'horoscope';
   const title = horoscope ? 'Гороскоп' : 'Совместимость';
@@ -190,7 +190,10 @@ export function Forecasts({ kind, account, openAccount, openNatal }) {
             ))}
           </div> : <PartnerFields busy={busy} />}
           {needsSubscription && <p>Для нового разбора нужна подписка.</p>}
-          {missingBirthplace && <p>Сначала укажи свой город рождения в профиле AstroOrbi в Telegram.</p>}
+          {missingBirthplace && <>
+            <p>Сначала укажи свой город рождения.</p>
+            <button type="button" className="secondary-button" onClick={openSettings}>Настройки профиля</button>
+          </>}
           <button type="submit" disabled={busy || mustCheck || needsSubscription || missingBirthplace}>
             {busy ? 'Подождите…' : `${horoscope ? 'Получить прогноз' : 'Рассчитать совместимость'} · ${cost} орб.`}
           </button>

@@ -55,7 +55,7 @@ function NatalWheel({ chart }) {
   </>;
 }
 
-export function Natal({ account, openAccount }) {
+export function Natal({ account, openAccount, openSettings }) {
   const { token, profile, run, busy, error } = account;
   const [result, setResult] = useState(null);
   const canBuild = Boolean(profile?.birthPlace && profile?.birthdayDate);
@@ -77,8 +77,8 @@ export function Natal({ account, openAccount }) {
   }
 
   useEffect(() => {
-    if (token && profile && !busy && result === null && !error) load();
-  }, [token, profile, busy, result, error]);
+    if (token && canBuild && !busy && result === null && !error) load();
+  }, [token, canBuild, busy, result, error]);
 
   return (
     <section className="tarot-screen">
@@ -87,12 +87,15 @@ export function Natal({ account, openAccount }) {
         <p>Войди, чтобы открыть карту своего аккаунта.</p>
         <button type="button" onClick={openAccount}>Подключить профиль</button>
       </div> : <>
-        {result?.chart?.data ? <>
+        {profile && !canBuild ? <div className="profile-card">
+          <p>Укажи дату и город рождения в настройках профиля.</p>
+          <button type="button" disabled={busy} onClick={openSettings}>Настройки профиля</button>
+        </div> : result?.chart?.data ? <>
           {profile && !profile.birthTime && <p>Время рождения не указано. Карта рассчитана на 12:00.</p>}
           <NatalWheel chart={result.chart} />
         </> : result ? <div className="profile-card">
-          <p>{canBuild ? 'Построим карту по данным рождения из твоего профиля.' : 'Укажи дату и место рождения в настройках AstroOrbi в Telegram.'}</p>
-          {canBuild && <button type="button" disabled={busy} onClick={() => load(true)}>{busy ? 'Строим карту…' : 'Построить карту'}</button>}
+          <p>Построим карту по данным рождения из твоего профиля.</p>
+          <button type="button" disabled={busy} onClick={() => load(true)}>{busy ? 'Строим карту…' : 'Построить карту'}</button>
         </div> : busy ? <p role="status">Загружаем карту…</p> :
           <button type="button" onClick={() => profile ? load() : account.refresh()}>Загрузить карту</button>}
         {error && <p role="alert">{error}</p>}

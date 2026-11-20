@@ -21,9 +21,8 @@ const messages = {
   mobile_login_unavailable: 'Вход сейчас недоступен. Попробуй позже.',
 };
 
-export async function onlineRequest(path, { token, data, envelope = false } = {}) {
+export async function onlineRequest(path, { token, data, envelope = false, method = data ? 'POST' : 'GET' } = {}) {
   const url = new URL(path, apiOrigin.origin).href;
-  const method = data ? 'POST' : 'GET';
   const headers = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (data) headers['Content-Type'] = 'application/json';
@@ -52,5 +51,5 @@ export async function onlineRequest(path, { token, data, envelope = false } = {}
     throw Object.assign(new Error('Сессия закончилась. Получи новый код входа.'), { expired: true });
   }
   if (response.status >= 200 && response.status < 300 && body?.ok) return envelope ? body : body.data;
-  throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500, code: body?.error });
+  throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500, code: body?.error, daysRemaining: body?.daysRemaining });
 }

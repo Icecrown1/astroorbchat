@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { cardImage } from './cards';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
+import { ProfileSettings } from './ProfileSettings';
 import { Natal } from './Natal';
 import { Forecasts } from './Forecasts';
 import { Oracle, Solar } from './AnnualAndOracle';
@@ -64,6 +65,10 @@ function App() {
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
+  const openSettings = () => navigate('settings');
+  const openNatal = () => navigate('natal');
+  const profileKey = JSON.stringify([Boolean(account.token), account.profile?.id, account.profile?.birthdayDate,
+    account.profile?.birthTime, account.profile?.birthPlace]);
 
   function navigate(next, mode, requestedSource) {
     if (mode) setTarotMode(mode);
@@ -86,17 +91,17 @@ function App() {
           ? <OnlineTarot account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
           : <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
-      {screen === 'natal' && <Natal key={account.profile?.id ?? Boolean(account.token)} account={account} openAccount={openAccount} />}
+      {screen === 'natal' && <Natal key={profileKey} account={account} openAccount={openAccount} openSettings={openSettings} />}
       {['horoscope', 'compatibility'].map(kind => (
-        <div key={kind + Boolean(account.token)} hidden={screen !== kind}>
-          <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+        <div key={kind + profileKey} hidden={screen !== kind}>
+          <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
         </div>
       ))}
-      <div key={'solar' + Boolean(account.token)} hidden={screen !== 'solar'}>
-        <Solar account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+      <div key={'solar' + profileKey} hidden={screen !== 'solar'}>
+        <Solar account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
       </div>
       <div key={'oracle' + Boolean(account.token)} hidden={screen !== 'oracle'}>
-        <Oracle account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+        <Oracle account={account} openAccount={openAccount} openNatal={openNatal} />
       </div>
       <div hidden={screen !== 'matrix'}><Matrix account={account} openAccount={openAccount} /></div>
       {screen === 'history' && <section className="tarot-screen">
@@ -104,10 +109,13 @@ function App() {
         <AccountHistory account={account} />
         <History entries={readings.entries} openTarot={() => navigate('tarot')} />
       </section>}
-      {screen === 'account' && <Account account={account} openHistory={openHistory} />}
+      {(screen === 'account' || (screen === 'settings' && !account.profile)) &&
+        <Account account={account} openHistory={openHistory} openSettings={openSettings} />}
+      {screen === 'settings' && account.profile &&
+        <ProfileSettings key={account.profile.id} account={account} openAccount={openAccount} openNatal={openNatal} />}
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
         {destinations.map(([id, name, icon]) => (
-          <button key={id} type="button" aria-current={id === screen ? 'page' : undefined} onClick={() => navigate(id)}>
+          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : screen) ? 'page' : undefined} onClick={() => navigate(id)}>
             <span aria-hidden="true">{icon}</span>{name}
           </button>
         ))}

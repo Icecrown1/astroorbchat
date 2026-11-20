@@ -22,7 +22,7 @@ function dateLabel(value) {
   return value && Number.isFinite(date.getTime()) ? formatDate.format(date) : '';
 }
 
-export function Solar({ account, openAccount, openNatal }) {
+export function Solar({ account, openAccount, openNatal, openSettings }) {
   const { token, profile, busy, error, run, refreshProfile } = account;
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
@@ -86,7 +86,10 @@ export function Solar({ account, openAccount, openNatal }) {
   return <section className="tarot-screen">
     <h1>Соляр</h1>
     {!token ? <SignInPrompt openAccount={openAccount} /> : <>
-      {incomplete ? <p>Добавь точное время и место рождения в профиле AstroOrbi в Telegram. Затем обнови профиль.</p> :
+      {incomplete ? <div className="profile-card">
+        <p>Для соляра нужны точное время и город рождения.</p>
+        <button type="button" onClick={openSettings}>Настройки профиля</button>
+      </div> :
         <form className="online-spread" onSubmit={check} onChange={() => { setChecked(null); setResult(null); }}>
           <label htmlFor="solar-year">Год</label>
           <select id="solar-year" value={year} onChange={event => setYear(Number(event.target.value))} disabled={busy}>
