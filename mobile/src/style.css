@@ -101,3 +101,17 @@ button:disabled { cursor: default; opacity: .65; }
 .profile-card { padding: 1.15rem; border: 1px solid #493d56; border-radius: 1rem; background: #211c2c; }
 details > .server-reading { margin-top: .8rem; }
 .server-reading p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.online-tarot-entry { margin-bottom: 1rem; }
+.online-spread { margin: 0; padding: 1rem; border: 1px solid #493d56; border-radius: 1rem; background: #211c2c; }
+.online-spread textarea, .online-spread select {
+  width: 100%;
+  min-height: 2.8rem;
+  font: inherit;
+  color: inherit;
+  background: #292137;
+  border: 1px solid #67547a;
+  border-radius: .65rem;
+  padding: .55rem .7rem;
+}
+.spread-toggle { display: flex; align-items: center; gap: .55rem; min-height: 2.75rem; }
+.spread-toggle input { appearance: auto; width: 1.15rem; min-height: 1.15rem; accent-color: #c897ef; }

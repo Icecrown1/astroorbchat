@@ -6,6 +6,10 @@ if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password)
 }
 
 const messages = {
+  subscription_required: 'Для этого расклада нужна подписка.',
+  premium_required: 'Этот расклад доступен по тарифу Premium.',
+  insufficient_orbs: 'Для расклада не хватает орбов.',
+  question_required: 'Добавь вопрос к раскладу.',
   invalid_code: 'Код истёк или уже использован. Получи новый в Telegram.',
   mobile_login_unavailable: 'Вход сейчас недоступен. Попробуй позже.',
 };
@@ -34,12 +38,12 @@ export async function onlineRequest(path, { token, data } = {}) {
       body = await response.json();
     }
   } catch {
-    throw new Error('Сервер недоступен. Проверь интернет и попробуй снова.');
+    throw Object.assign(new Error('Связь с сервером прервалась. Проверь интернет и попробуй снова.'), { uncertain: true });
   }
 
   if (response.status === 401) {
     throw Object.assign(new Error('Сессия закончилась. Получи новый код входа.'), { expired: true });
   }
   if (response.status >= 200 && response.status < 300 && body?.ok) return body.data;
-  throw new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.');
+  throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500 });
 }

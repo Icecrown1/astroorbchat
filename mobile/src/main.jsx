@@ -140,7 +140,10 @@ function App() {
     <div className="page">
       <header><span className="orb" aria-hidden="true"></span>AstroOrbi</header>
       {screen === 'home' && <Home navigate={navigate} hasDaily={readings.hasDaily} />}
-      {screen === 'tarot' && <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
+      {screen === 'tarot' && <>
+        <button className="online-tarot-entry" type="button" onClick={() => navigate('account')}>Таро с ИИ</button>
+        <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />
+      </>}
       <div hidden={screen !== 'matrix'}><Matrix /></div>
       {screen === 'history' && <History entries={readings.entries} openTarot={() => navigate('tarot')} />}
       <div hidden={screen !== 'account'}><Account /></div>
