@@ -6,6 +6,12 @@ if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password)
 }
 
 const messages = {
+  NATAL_INCOMPLETE: 'Добавь точное время и место рождения в профиле.',
+  SUBSCRIPTION_REQUIRED: 'Для этого раздела нужна подписка.',
+  INSUFFICIENT_ORBS: 'На балансе недостаточно орбов.',
+  'Premium subscription required for Solar Return': 'Для нового соляра нужен Premium.',
+  'Subscription required': 'Для этого раздела нужна подписка.',
+  'Insufficient stars': 'На балансе недостаточно орбов.',
   NATAL_NOT_INITIALIZED: 'Натальная карта ещё не построена.',
   subscription_required: 'Для этого расклада нужна подписка.',
   premium_required: 'Этот расклад доступен по тарифу Premium.',
@@ -15,7 +21,7 @@ const messages = {
   mobile_login_unavailable: 'Вход сейчас недоступен. Попробуй позже.',
 };
 
-export async function onlineRequest(path, { token, data } = {}) {
+export async function onlineRequest(path, { token, data, envelope = false } = {}) {
   const url = new URL(path, apiOrigin.origin).href;
   const method = data ? 'POST' : 'GET';
   const headers = { Accept: 'application/json' };
@@ -45,6 +51,6 @@ export async function onlineRequest(path, { token, data } = {}) {
   if (response.status === 401) {
     throw Object.assign(new Error('Сессия закончилась. Получи новый код входа.'), { expired: true });
   }
-  if (response.status >= 200 && response.status < 300 && body?.ok) return body.data;
+  if (response.status >= 200 && response.status < 300 && body?.ok) return envelope ? body : body.data;
   throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500, code: body?.error });
 }

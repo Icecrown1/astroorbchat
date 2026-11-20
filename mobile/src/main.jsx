@@ -8,6 +8,7 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { Natal } from './Natal';
 import { Forecasts } from './Forecasts';
+import { Oracle, Solar } from './AnnualAndOracle';
 import './style.css';
 
 function localToday() {
@@ -130,6 +131,12 @@ function Home({ navigate, online, hasDaily }) {
         <button className="feature" type="button" onClick={() => navigate('compatibility')}>
           <img src={cardImage('lovers')} alt="" /><span>Совместимость</span>
         </button>
+        <button className="feature" type="button" onClick={() => navigate('solar')}>
+          <img src={cardImage('temperance')} alt="" /><span>Соляр</span>
+        </button>
+        <button className="feature" type="button" onClick={() => navigate('oracle')}>
+          <img src={cardImage('hermit')} alt="" /><span>Оракул</span>
+        </button>
       </div>
       <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
     </div>
@@ -173,6 +180,12 @@ function App() {
           <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
         </div>
       ))}
+      <div key={'solar' + Boolean(account.token)} hidden={screen !== 'solar'}>
+        <Solar account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+      </div>
+      <div key={'oracle' + Boolean(account.token)} hidden={screen !== 'oracle'}>
+        <Oracle account={account} openAccount={openAccount} openNatal={() => navigate('natal')} />
+      </div>
       <div hidden={screen !== 'matrix'}><Matrix /></div>
       {screen === 'history' && <section className="tarot-screen">
         <h1>История</h1>
