@@ -1,0 +1,6 @@
+{
+  "appId": "app.astroorbi.preview",
+  "appName": "AstroOrbi Preview",
+  "webDir": "dist",
+  "backgroundColor": "#171425"
+}
