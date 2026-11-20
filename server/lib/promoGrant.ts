@@ -118,8 +118,7 @@ async function pushPromoGranted(storage: any, c: PromoCampaign) {
   const link = await getBotDeepLink('gift');
   const text =
     `🎁 Мы начислили вам ${c.amount} звёзд!\n\n` +
-    'Попробуйте то, что раньше было только в подписке: совместимость с партнёром, гороскоп на месяц и соляр — звёзд хватит на всё три.\n\n' +
-    `Пробный доступ ко всем функциям открыт до ${endDateRu(c.endsAt)}.`;
+    `Тратьте на что захотите — до ${endDateRu(c.endsAt)} в приложении открыты все функции, даже без подписки.`;
   const { rows } = await pool.query(
     `select id, tg_id from users where promo_campaign = $1 and push_enabled = true`,
     [c.id],
@@ -127,7 +126,7 @@ async function pushPromoGranted(storage: any, c: PromoCampaign) {
   let sent = 0, blocked = 0;
   for (const u of rows) {
     if (!isRealTgId(u.tg_id)) continue;
-    const res = await sendPush(String(u.tg_id), text, '✨ Потратить звёзды', link);
+    const res = await sendPush(String(u.tg_id), text, '✨ Открыть AstroOrbi', link);
     if (res === 'ok') sent++;
     if (res === 'blocked') { blocked++; await storage.updateUser(u.id, { pushEnabled: false }); }
     await new Promise((r) => setTimeout(r, 60));

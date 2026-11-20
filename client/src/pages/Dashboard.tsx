@@ -28,7 +28,6 @@ import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
 import { FirstMonthOfferButton } from '@/components/FirstMonthOfferButton';
 import { ReferralContestBanner } from '@/components/ReferralContest';
-import { TrialBanner } from '@/components/TrialBanner';
 import { openFeedback } from '@/components/FeedbackSheet';
 
 const VIGNETTES: Record<string, VignetteKind> = {
@@ -275,9 +274,6 @@ export default function Dashboard() {
             <LowEnergyAlert />
           </div>
         )}
-
-        {/* Акция: пробный доступ ко всем функциям */}
-        <TrialBanner trialUntil={data?.data?.trialAccessUntil} orbs={orbs} billingTier={data?.data?.billingTier} />
 
         {/* Конкурс среди пригласивших друзей */}
         <ReferralContestBanner />
