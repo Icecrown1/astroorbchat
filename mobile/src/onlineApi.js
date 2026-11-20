@@ -11,6 +11,8 @@ const messages = {
   INSUFFICIENT_ORBS: 'На балансе недостаточно орбов.',
   'Premium subscription required for Solar Return': 'Для нового соляра нужен Premium.',
   'Subscription required': 'Для этого раздела нужна подписка.',
+  'Необходима подписка': 'Для этого раздела нужна подписка.',
+  'Недостаточно звёзд': 'На балансе недостаточно орбов.',
   'Insufficient stars': 'На балансе недостаточно орбов.',
   NATAL_NOT_INITIALIZED: 'Натальная карта ещё не построена.',
   subscription_required: 'Для этого расклада нужна подписка.',

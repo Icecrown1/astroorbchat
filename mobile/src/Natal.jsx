@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChartCanvas } from '../../client/src/components/ChartCanvas';
 import { translatePlanet, translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
+import { NatalReadings } from './NatalReadings';
 
 function positionLabel(placement) {
   const sign = placement.sign ? translateSign(placement.sign, 'ru') : '';
@@ -16,9 +17,31 @@ function interpretationText(interpretation) {
   return template.content.textContent;
 }
 
-function NatalWheel({ chart }) {
+const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+
+function planetHouse(position, cusps) {
+  const index = cusps.findIndex((start, i) => {
+    const end = cusps[(i + 1) % cusps.length];
+    return start > end ? position >= start || position < end : position >= start && position < end;
+  });
+  return index === -1 ? null : index + 1;
+}
+
+function NatalWheel({ chart, account }) {
   const [selected, setSelected] = useState('Sun');
+  const [view, setView] = useState('planets');
+  const [houseNumber, setHouseNumber] = useState(1);
   const { data } = chart;
+  const cusps = data.houses?.cusps;
+  const validHouses = Array.isArray(cusps) && cusps.length === 12 && cusps.every(
+    number => Number.isFinite(number) && number >= 0 && number < 360,
+  );
+
+  function selectPlanet(name) {
+    setSelected(name);
+    setView('planets');
+  }
   const planets = useMemo(() => {
     const entries = Array.isArray(data.planets)
       ? data.planets
@@ -30,22 +53,56 @@ function NatalWheel({ chart }) {
 
   if (!current) return <p>В этой карте пока нет положений планет.</p>;
   const interpretation = chart.professionalInterpretation?.ru;
+  const currentHouse = validHouses ? planetHouse(current.position, cusps) : null;
+  const cusp = validHouses ? cusps[houseNumber - 1] : null;
+  const members = validHouses ? planets.filter(planet => planetHouse(planet.position, cusps) === houseNumber) : [];
 
   return <>
     <div className="natal-wheel">
       <ChartCanvas planets={planets} aspects={data.aspects ?? []} angles={data.angles}
-        houses={data.houses} onPlanetClick={setSelected} />
+        houses={data.houses} onPlanetClick={selectPlanet} />
     </div>
-    <div className="planet-tabs" aria-label="Планеты">
-      {planets.map(planet => (
-        <button key={planet.name} type="button" aria-pressed={current.name === planet.name}
-          onClick={() => setSelected(planet.name)}>{translatePlanet(planet.name, 'ru')}</button>
-      ))}
+    {validHouses && <div className="mode-switch" role="group" aria-label="Разделы натальной карты">
+      <button type="button" aria-pressed={view === 'planets'} onClick={() => setView('planets')}>Планеты</button>
+      <button type="button" aria-pressed={view === 'houses'} onClick={() => setView('houses')}>Дома</button>
+    </div>}
+    <div hidden={view !== 'planets'}>
+      <div className="tarot-screen">
+        <div className="planet-tabs" role="group" aria-label="Планеты">
+          {planets.map(planet => (
+            <button key={planet.name} type="button" aria-pressed={current.name === planet.name}
+              onClick={() => selectPlanet(planet.name)}>{translatePlanet(planet.name, 'ru')}</button>
+          ))}
+        </div>
+        <div className="profile-card">
+          <div aria-live="polite">
+            <h2>{translatePlanet(current.name, 'ru')}</h2>
+            <p>{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p>
+          </div>
+          <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />
+        </div>
+      </div>
     </div>
-    <div className="profile-card" aria-live="polite">
-      <h2>{translatePlanet(current.name, 'ru')}</h2>
-      <p>{positionLabel(current)}</p>
-    </div>
+    {validHouses && view === 'houses' && <>
+      <div className="planet-tabs" role="group" aria-label="Номер дома">
+        {cusps.map((_, index) => (
+          <button key={index} type="button" aria-label={`${index + 1}-й дом`} aria-pressed={houseNumber === index + 1}
+            onClick={() => setHouseNumber(index + 1)}>{index + 1}</button>
+        ))}
+      </div>
+      <div className="profile-card">
+        <div aria-live="polite">
+          <h2>{houseNumber}-й дом</h2>
+          <p>{positionLabel({ sign: zodiacSigns[Math.floor(cusp / 30)], degree_in_sign: cusp % 30 })}</p>
+          {members.length === 0 && <p>В этом доме нет планет.</p>}
+        </div>
+        {members.length > 0 && <div className="planet-tabs" role="group" aria-label="Разборы планет в этом доме">
+          {members.map(planet => <button key={planet.name} type="button" onClick={() => selectPlanet(planet.name)}>
+            {translatePlanet(planet.name, 'ru')}
+          </button>)}
+        </div>}
+      </div>
+    </>}
     {typeof interpretation === 'string' && interpretation.trim() && (
       <details className="natal-interpretation">
         <summary>Общий разбор карты</summary>
@@ -55,7 +112,7 @@ function NatalWheel({ chart }) {
   </>;
 }
 
-export function Natal({ account, openAccount, openSettings }) {
+export function Natal({ account, openAccount, openSettings, active }) {
   const { token, profile, run, busy, error } = account;
   const [result, setResult] = useState(null);
   const canBuild = Boolean(profile?.birthPlace && profile?.birthdayDate);
@@ -77,8 +134,8 @@ export function Natal({ account, openAccount, openSettings }) {
   }
 
   useEffect(() => {
-    if (token && canBuild && !busy && result === null && !error) load();
-  }, [token, canBuild, busy, result, error]);
+    if (active && token && canBuild && !busy && result === null && !error) load();
+  }, [active, token, canBuild, busy, result, error]);
 
   return (
     <section className="tarot-screen">
@@ -92,7 +149,7 @@ export function Natal({ account, openAccount, openSettings }) {
           <button type="button" disabled={busy} onClick={openSettings}>Настройки профиля</button>
         </div> : result?.chart?.data ? <>
           {profile && !profile.birthTime && <p>Время рождения не указано. Карта рассчитана на 12:00.</p>}
-          <NatalWheel chart={result.chart} />
+          <NatalWheel chart={result.chart} account={account} />
         </> : result ? <div className="profile-card">
           <p>Построим карту по данным рождения из твоего профиля.</p>
           <button type="button" disabled={busy} onClick={() => load(true)}>{busy ? 'Строим карту…' : 'Построить карту'}</button>

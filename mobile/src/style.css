@@ -177,3 +177,7 @@ header { margin-bottom: 1.3rem; }
 .matrix-section-list > button[aria-expanded="true"] { background: #453456; border-color: #d7a4f4; }
 .matrix-section-list small { flex-shrink: 0; color: #e6c9ef; font-weight: 500; }
 .matrix-screen .arcana p > span { display: block; margin-top: .45rem; }
+
+.natal-detail > .forecast-result { margin-top: .7rem; }
+.natal-detail h4 { margin: 0 0 .35rem; }
+.natal-detail ul { margin: 0; padding-left: 1.25rem; }

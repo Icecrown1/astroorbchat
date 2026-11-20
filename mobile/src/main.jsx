@@ -91,7 +91,9 @@ function App() {
           ? <OnlineTarot account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
           : <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
-      {screen === 'natal' && <Natal key={profileKey} account={account} openAccount={openAccount} openSettings={openSettings} />}
+      <div key={'natal' + profileKey} hidden={screen !== 'natal'}>
+        <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings} />
+      </div>
       {['horoscope', 'compatibility'].map(kind => (
         <div key={kind + profileKey} hidden={screen !== kind}>
           <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
