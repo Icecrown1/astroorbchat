@@ -2,5 +2,12 @@
   "appId": "app.astroorbi.preview",
   "appName": "AstroOrbi Preview",
   "webDir": "dist",
-  "backgroundColor": "#171425"
+  "backgroundColor": "#171425",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "auto",
+      "style": "DARK"
+    }
+  }
 }

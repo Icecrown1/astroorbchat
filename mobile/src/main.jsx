@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { calcMatrixFromISO } from '../../shared/matrix';
 import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
+import { MatrixOctagram } from '../../client/src/components/MatrixOctagram';
 import hero from '../../client/public/tarot/star.webp';
 import './style.css';
 
@@ -25,9 +26,34 @@ function Arcana({ title, number, description }) {
         <p className="zone">{title}</p>
         <h3>{number} · {card.ru}</h3>
         <p className="key">{card.keyRu}</p>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
     </article>
+  );
+}
+
+function MatrixResult({ core }) {
+  const [selected, setSelected] = useState(null);
+  const nodeId = selected?.id ?? 'e';
+
+  return (
+    <section className="results" aria-labelledby="result-title">
+      <h2 id="result-title">Твоя матрица</h2>
+      <p className="matrix-hint">Нажми на число, чтобы узнать его значение.</p>
+      <div className="matrix-board">
+        <MatrixOctagram core={core} zone="all" onNodeTap={setSelected} activeNodeId={nodeId} label="Схема матрицы судьбы" />
+      </div>
+      <div aria-live="polite">
+        <Arcana
+          number={selected?.value ?? core.e}
+          title={selected?.label.ru ?? 'Центр — зона комфорта'}
+          description={{
+            e: 'Центр матрицы. В этой системе он символизирует твой внутренний ресурс.',
+            a: 'Аркан дня рождения. Его связывают с первым впечатлением, которое ты производишь.',
+          }[nodeId]}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -54,7 +80,7 @@ function App() {
         <img src={hero} alt="" className="cover" />
         <div className="intro">
           <h1>Матрица<br/>судьбы</h1>
-          <p>Узнай два своих аркана по дате рождения.</p>
+          <p>Построй свою матрицу по дате рождения и исследуй её арканы.</p>
         </div>
       </section>
       <form onSubmit={calculate}>
@@ -68,15 +94,7 @@ function App() {
         <button type="submit">Рассчитать матрицу</button>
         {error && <p role="alert">{error}</p>}
       </form>
-      <div aria-live="polite">
-        {result && <section className="results">
-          <h2>Твои арканы</h2>
-          <Arcana number={result.e} title="Зона комфорта"
-            description="Центр матрицы. В этой системе он символизирует твой внутренний ресурс." />
-          <Arcana number={result.a} title="Визитная карточка"
-            description="Аркан дня рождения. Его связывают с первым впечатлением, которое ты производишь." />
-        </section>}
-      </div>
+      {result && <MatrixResult key={date} core={result} />}
     </div>
   );
 }

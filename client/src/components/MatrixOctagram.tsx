@@ -59,11 +59,13 @@ export function MatrixOctagram({
   zone,
   onNodeTap,
   activeNodeId,
+  label = "Matrix of Destiny octagram",
 }: {
   core: MatrixCore;
   zone: MatrixZone;
   onNodeTap: (node: OctagramNode) => void;
   activeNodeId?: string | null;
+  label?: string;
 }) {
   const nodes = useMemo(() => buildNodes(core), [core]);
   const byId = (id: string) => nodes.find((n) => n.id === id)!;
@@ -117,7 +119,7 @@ export function MatrixOctagram({
   };
 
   return (
-    <svg data-octagram viewBox="0 0 400 400" role="img" aria-label="Matrix of Destiny octagram" className="w-full max-w-[420px] mx-auto select-none">
+    <svg data-octagram viewBox="0 0 400 400" role="group" aria-label={label} className="w-full max-w-[420px] mx-auto select-none">
       <defs>
         <filter id="mxGlow" x="-80%" y="-80%" width="260%" height="260%">
           <feGaussianBlur stdDeviation="3.2" />
@@ -179,7 +181,15 @@ export function MatrixOctagram({
             className={`matrix-node ${active ? 'matrix-node-active' : ''}`}
             opacity={nodeOpacity(n)}
             onClick={() => onNodeTap(n)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onNodeTap(n);
+              }
+            }}
             role="button"
+            tabIndex={0}
+            aria-pressed={active}
             aria-label={`${n.label.ru}: аркан ${n.value}`}
           >
             <circle cx={n.x} cy={n.y} r={n.r + 1.5} fill="none" stroke={strokeColor} strokeWidth={active ? 6 : 4.5} opacity={active ? 0.75 : 0.55} filter="url(#mxGlow)" />
