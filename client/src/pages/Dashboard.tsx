@@ -19,7 +19,7 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Shield,
-  Hexagon, MoonStar, Sparkles } from 'lucide-react';
+  Hexagon, MoonStar, Sparkles, MessageCircleHeart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useMemo, useState } from 'react';
@@ -28,6 +28,8 @@ import { haptic } from '@/lib/haptics';
 import { FeatureVignette, type VignetteKind } from '@/components/FeatureVignette';
 import { FirstMonthOfferButton } from '@/components/FirstMonthOfferButton';
 import { ReferralContestBanner } from '@/components/ReferralContest';
+import { TrialBanner } from '@/components/TrialBanner';
+import { openFeedback } from '@/components/FeedbackSheet';
 
 const VIGNETTES: Record<string, VignetteKind> = {
   '/my-natal-chart': 'natal',
@@ -62,6 +64,9 @@ interface UserMeResponse {
     orbs?: number;
     maxOrbs?: number;
     tier?: 'free' | 'standard' | 'premium';
+    /** Оплаченный тариф (tier — уровень доступа, с учётом пробного доступа по акции) */
+    billingTier?: 'free' | 'standard' | 'premium';
+    trialAccessUntil?: string | null;
     orbsResetAt?: string;
   };
 }
@@ -231,7 +236,7 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-palette opacity-20" />
       </div>
 
-      <div className={`container max-w-4xl mx-auto px-4 py-6 ${tier === 'free' ? 'pb-32' : 'pb-20'}`}>
+      <div className={`container max-w-4xl mx-auto px-4 py-6 ${(data?.data?.billingTier ?? tier) === 'free' ? 'pb-32' : 'pb-20'}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -270,6 +275,9 @@ export default function Dashboard() {
             <LowEnergyAlert />
           </div>
         )}
+
+        {/* Акция: пробный доступ ко всем функциям */}
+        <TrialBanner trialUntil={data?.data?.trialAccessUntil} orbs={orbs} billingTier={data?.data?.billingTier} />
 
         {/* Конкурс среди пригласивших друзей */}
         <ReferralContestBanner />
@@ -367,6 +375,16 @@ export default function Dashboard() {
           )}
 
           <Button
+            variant="outline"
+            className="w-full col-span-3 min-h-[44px]"
+            onClick={() => openFeedback('dashboard')}
+            data-testid="button-feedback"
+          >
+            <MessageCircleHeart className="w-4 h-4 mr-2" />
+            {locale === 'ru' ? 'Оставить отзыв' : 'Leave feedback'}
+          </Button>
+
+          <Button
             variant="ghost"
             className="w-full col-span-3 text-muted-foreground"
             onClick={toggleTheme}
@@ -381,7 +399,7 @@ export default function Dashboard() {
       </div>
 
       {/* Акция «первый месяц −50%» — только тем, кто ещё не платил за подписку */}
-      <FirstMonthOfferButton enabled={tier === 'free'} />
+      <FirstMonthOfferButton enabled={(data?.data?.billingTier ?? tier) === 'free'} />
     </div>
   );
 }

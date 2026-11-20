@@ -34,6 +34,7 @@ import Archive from '@/pages/Archive';
 import Legal from '@/pages/Legal';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import LeadMagnet from '@/pages/LeadMagnet';
+import FeedbackSheet from '@/components/FeedbackSheet';
 
 const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
@@ -172,6 +173,7 @@ function App() {
             <EnergySyncProvider>
               <Toaster />
               <Router />
+              <FeedbackSheet />
             </EnergySyncProvider>
           </TooltipProvider>
         </TonConnectUIProvider>

@@ -48,6 +48,13 @@ export const users = pgTable("users", {
   signupSource: varchar("signup_source", { length: 64 }), // Web attribution: start_param web_{page}_{cta}
   isAdmin: boolean("is_admin").notNull().default(false),
   natalChart: jsonb("natal_chart"),
+  /** Акция «попробуй платное»: до этой даты Free/Standard пользуются функциями как Premium, тратя звёзды с баланса */
+  trialAccessUntil: timestamp("trial_access_until"),
+  /** Какая акция уже начислена (id из payment_event_log, provider='promo') — чтобы не начислить дважды */
+  promoCampaign: varchar("promo_campaign", { length: 64 }),
+  promoGrantedAt: timestamp("promo_granted_at"),
+  /** Когда отправлен пуш с просьбой об отзыве (через сутки после начисления) */
+  feedbackAskedAt: timestamp("feedback_asked_at"),
 }, (table) => ({
   tgIdIdx: index("users_tg_id_idx").on(table.tgId),
   referralCodeIdx: index("users_referral_code_idx").on(table.referralCode),

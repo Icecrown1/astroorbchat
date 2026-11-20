@@ -411,6 +411,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import new orb functions
       const { getUserOrbs, getUserTier, checkAndResetOrbs } = await import('./lib/energy.js');
       
+      // Идёт акция «попробуй платное» — начислить при первом открытии (один раз)
+      try {
+        const { maybeGrantPromo } = await import('./lib/promoGrant');
+        await maybeGrantPromo(userId);
+      } catch { /* акция не мешает загрузке */ }
+
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ ok: false, error: "User not found" });
@@ -425,7 +431,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get orb info for new system
       const orbInfo = await getUserOrbs(storage, userId);
-      const tier = await getUserTier(storage, userId);
+      const billingTier = await getUserTier(storage, userId);
+      // tier — уровень доступа к функциям (с учётом пробного доступа по акции); billingTier — оплаченный тариф
+      const tier = orbInfo.tier;
+      const trialActive = !!user.trialAccessUntil && new Date(user.trialAccessUntil) > new Date();
 
       res.json({ ok: true, data: { 
         ...user, 
@@ -435,6 +444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orbs: orbInfo.total,
         maxOrbs: orbInfo.maxOrbs,
         tier,
+        billingTier,
+        trialAccessUntil: trialActive ? user.trialAccessUntil : null,
         orbsResetAt: user.orbsResetAt,
         subscription, 
         natalInitialized: !!natalChart 
@@ -1051,8 +1062,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      const { getUserTier, deductOrbs } = await import('./lib/energy.js');
-      const tier = await getUserTier(storage, userId);
+      const { getFeatureTier, deductOrbs } = await import('./lib/energy.js');
+      const tier = await getFeatureTier(storage, userId);
 
       // BRIEF MODE: Free for all users — short description of what the planet does
       if (mode === 'brief') {
@@ -4242,6 +4253,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ok: true });
       }
 
+      // Бота добавили в группу или написали /chatid — сообщить id чата (для FEEDBACK_CHAT_ID)
+      try {
+        const botId = String(process.env.TELEGRAM_BOT_TOKEN || '').split(':')[0];
+        const added = (update.message?.new_chat_members || []).some((m: any) => String(m.id) === botId);
+        const t0 = String(update.message?.text || '');
+        if (update.message?.chat && (added || /^\/chatid(@\w+)?$/.test(t0.trim()))) {
+          const { replyChatId } = await import("./lib/feedback");
+          await replyChatId(update.message.chat, added);
+          return res.json({ ok: true });
+        }
+      } catch (e) { console.error('[BOT] chatid reply failed:', e); }
+
       // /paysupport и прочие сообщения — вежливый ответ
       const text = update.message?.text;
       if (text && text.startsWith("/paysupport")) {
@@ -5021,6 +5044,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true, data: await runHealthCheck() });
     } catch (error: any) {
       res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Удержание: возвращаются ли люди после первого дня (админ)
+  app.get("/api/admin/retention", requireAdmin, async (req, res) => {
+    try {
+      const { retentionReport } = await import('./lib/retention');
+      res.json({ ok: true, data: await retentionReport(parseInt(String(req.query.days)) || 30) });
+    } catch (error: any) {
+      console.error('[RETENTION] failed:', error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Акция «попробуй платное»: список и запуск (админ)
+  app.get("/api/admin/promo", requireAdmin, async (_req, res) => {
+    try {
+      const { listPromos, getActivePromo } = await import('./lib/promoGrant');
+      res.json({ ok: true, data: { active: await getActivePromo(true), campaigns: await listPromos() } });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/admin/promo/start", requireAdmin, async (req, res) => {
+    try {
+      const { startPromo } = await import('./lib/promoGrant');
+      const r = await startPromo(storage, { amount: req.body?.amount, days: req.body?.days, push: req.body?.push !== false });
+      if (!r.ok) return res.status(409).json({ ok: false, error: r.error, data: r.campaign });
+      res.json({ ok: true, data: r });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Отзыв из приложения → в Telegram-чат (FEEDBACK_CHAT_ID), можно анонимно
+  app.post("/api/feedback", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const text = String(req.body?.text || '').replace(/\u0000/g, '').trim().slice(0, 2000);
+      const r = Number(req.body?.rating);
+      const rating = Number.isInteger(r) && r >= 1 && r <= 5 ? r : null;
+      if (!text && !rating) return res.status(400).json({ ok: false, error: 'empty_feedback' });
+      const { feedbackRateLimited, deliverFeedback } = await import('./lib/feedback');
+      if (feedbackRateLimited(userId)) return res.status(429).json({ ok: false, error: 'too_many_feedbacks' });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+      const { getUserTier } = await import('./lib/energy.js');
+      const tier = await getUserTier(storage, userId);
+      const trial = !!user.trialAccessUntil && new Date(user.trialAccessUntil) > new Date();
+      const ok = await deliverFeedback({
+        user, tier, trial, rating, text,
+        anonymous: req.body?.anonymous !== false,
+        source: String(req.body?.source || '').slice(0, 30),
+      });
+      if (!ok) return res.status(503).json({ ok: false, error: 'feedback_not_delivered' });
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[FEEDBACK] failed:', error);
+      res.status(500).json({ ok: false, error: 'feedback_failed' });
     }
   });
 

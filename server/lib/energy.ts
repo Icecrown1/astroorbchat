@@ -178,13 +178,29 @@ export async function getUserTier(storage: any, userId: string): Promise<'free' 
   return 'free';
 }
 
+/**
+ * Уровень ДОСТУПА к функциям (не путать с оплаченным тарифом из getUserTier):
+ * во время пробного доступа по акции (users.trial_access_until) Free и Standard
+ * пользуются функциями как Premium и тратят звёзды с баланса. Ежемесячное
+ * пополнение звёзд и всё, что связано с оплатой, по-прежнему смотрит getUserTier.
+ */
+export async function getFeatureTier(storage: any, userId: string): Promise<'free' | 'standard' | 'premium'> {
+  const tier = await getUserTier(storage, userId);
+  if (tier === 'premium') return tier;
+  try {
+    const user = await storage.getUser(userId);
+    if (user?.trialAccessUntil && new Date(user.trialAccessUntil) > new Date()) return 'premium';
+  } catch { /* noop */ }
+  return tier;
+}
+
 // Check if feature is available for user
 export async function canAccessFeature(
   storage: any,
   userId: string,
   feature: keyof typeof ORB_COSTS
 ): Promise<{ allowed: boolean; requiresSubscription: boolean; requiresPremium: boolean; cost: number; tier: 'free' | 'standard' | 'premium' }> {
-  const tier = await getUserTier(storage, userId);
+  const tier = await getFeatureTier(storage, userId);
   const cost = ORB_COSTS[feature];
   const isPremiumOnly = PREMIUM_ONLY_FEATURES.includes(feature);
   
@@ -262,7 +278,7 @@ export async function deductOrbs(
   userId: string,
   feature: keyof typeof ORB_COSTS
 ): Promise<{ ok: boolean; error?: string }> {
-  const tier = await getUserTier(storage, userId);
+  const tier = await getFeatureTier(storage, userId);
   
   // Free users cannot use paid features
   if (tier === 'free') {
@@ -361,7 +377,9 @@ export async function getUserOrbs(storage: any, userId: string): Promise<{
   await checkAndResetOrbs(storage, userId);
   
   const user = await storage.getUser(userId);
-  const tier = await getUserTier(storage, userId);
+  const billingTier = await getUserTier(storage, userId);
+  // tier — уровень доступа (с учётом пробного доступа по акции), maxOrbs — по оплаченному тарифу
+  const tier = await getFeatureTier(storage, userId);
   
   if (!user) {
     return { subscriptionOrbs: 0, referralOrbs: 0, total: 0, maxOrbs: 0, tier: 'free' };
@@ -369,7 +387,7 @@ export async function getUserOrbs(storage: any, userId: string): Promise<{
   
   const subscriptionOrbs = parseFloat(user.subscriptionOrbs || '0');
   const referralOrbs = parseFloat(user.referralOrbs || '0');
-  const maxOrbs = tier === 'free' ? 0 : SUBSCRIPTION_MONTHLY_ORBS[tier];
+  const maxOrbs = billingTier === 'free' ? 0 : SUBSCRIPTION_MONTHLY_ORBS[billingTier];
   
   return {
     subscriptionOrbs,

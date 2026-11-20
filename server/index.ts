@@ -132,6 +132,11 @@ app.use((req, res, next) => {
       Promise.all([import('./lib/reengagement'), import('./storage')]).then(([{ runDailyPushTick }, { storage }]) => {
         setTimeout(() => runDailyPushTick(storage), 30_000);
         setInterval(() => runDailyPushTick(storage), 10 * 60_000);
+        // Акция «попробуй платное»: через сутки после начисления — пуш с просьбой об отзыве
+        import('./lib/promoGrant').then(({ runFeedbackAskTick }) => {
+          setTimeout(() => runFeedbackAskTick(storage), 60_000);
+          setInterval(() => runFeedbackAskTick(storage), 15 * 60_000);
+        }).catch((e) => console.error('[PROMO] tick init failed:', e));
         // Конкурс среди пригласивших: розыгрыш сам после даты окончания
         import('./lib/referralContest').then(({ runContestTick }) => {
           setTimeout(() => runContestTick(storage), 45_000);

@@ -16,8 +16,12 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
   const [timeUntilReset, setTimeUntilReset] = useState<string>('');
   const { locale } = useTranslation();
 
+  // Пробный доступ по акции: уровень доступа premium, но оплаченного тарифа нет (maxOrbs = 0) —
+  // ежемесячного пополнения нет, поэтому «из N» и таймер сброса не показываем
+  const trial = tier !== 'free' && maxOrbs === 0;
+
   useEffect(() => {
-    if (!resetAt || tier === 'free') return;
+    if (!resetAt || tier === 'free' || trial) return;
 
     const updateTimer = () => {
       const now = dayjs();
@@ -43,7 +47,7 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
     const interval = setInterval(updateTimer, 60000);
 
     return () => clearInterval(interval);
-  }, [resetAt, tier, locale]);
+  }, [resetAt, tier, locale, trial]);
 
   const getBadgeContent = () => {
     switch (tier) {
@@ -51,7 +55,7 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
         return {
           icon: Crown,
           value: orbs.toString(),
-          label: locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`,
+          label: trial ? (locale === 'ru' ? 'звёзд · пробный доступ' : 'stars · trial access') : (locale === 'ru' ? `из ${maxOrbs}` : `of ${maxOrbs}`),
           gradient: 'from-[hsl(41,50%,16%)] to-[hsl(38,40%,10%)] border border-[hsl(41,60%,42%)]',
           shadowColor: 'shadow-[0_0_26px_rgba(239,194,107,0.35)]',
         };
@@ -124,7 +128,7 @@ export function EnergyBadge({ className }: EnergyBadgeProps) {
         )}>
           {content.label}
         </span>
-        {(tier === 'standard' || tier === 'premium') && timeUntilReset && (
+        {(tier === 'standard' || tier === 'premium') && !trial && timeUntilReset && (
           <span className="text-[10px] text-white/60 font-medium mt-0.5">
             {locale === 'ru' ? 'Сброс:' : 'Reset:'} {timeUntilReset}
           </span>

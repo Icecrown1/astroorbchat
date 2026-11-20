@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/LocaleContext";
 import AdminContestCard from "@/components/AdminContestCard";
 import AdminHealthCard from "@/components/AdminHealthCard";
+import AdminPromoCard from "@/components/AdminPromoCard";
+import AdminRetentionCard from "@/components/AdminRetentionCard";
 import {
   Dialog,
   DialogContent,
@@ -451,6 +453,7 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-4">
+            <AdminRetentionCard />
             <Card>
               <CardHeader>
                 <CardTitle>Что нажимают люди</CardTitle>
@@ -570,6 +573,7 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            <AdminPromoCard />
             <AdminContestCard />
           </TabsContent>
 
