@@ -115,3 +115,40 @@ details > .server-reading { margin-top: .8rem; }
 }
 .spread-toggle { display: flex; align-items: center; gap: .55rem; min-height: 2.75rem; }
 .spread-toggle input { appearance: auto; width: 1.15rem; min-height: 1.15rem; accent-color: #c897ef; }
+
+body {
+  background: radial-gradient(ellipse at 60% 0%, #352545 0%, #231b32 22rem, #171425 42rem);
+  min-height: 100dvh;
+}
+.page { padding-inline: max(1.2rem, env(safe-area-inset-left, 0px)) max(1.2rem, env(safe-area-inset-right, 0px)); }
+header { margin-bottom: 1.3rem; }
+.hero, .profile-card, .tarot-empty, .matrix-board { border-radius: 1.55rem; }
+.home-hero { min-height: 18rem; box-shadow: 0 .7rem 2rem #0b071838; }
+.home-hero .cover { width: 81%; object-position: 50% 34%; }
+.home-hero .intro { padding: 1.35rem; }
+.home-hero::after { background: linear-gradient(90deg, #241a36 8%, #241a36cc 46%, #241a360a 100%); }
+.feature { border-radius: 1.3rem; }
+.home > h2 { margin-top: .18rem; }
+.tarot-screen > h1 { font-size: clamp(2.25rem, 10vw, 3.45rem); }
+.profile-card, .online-spread { border-color: #544163; }
+.profile-card p { color: #e2d5e8; }
+.mode-switch { border-radius: 1rem; background: #191424; padding: .22rem; gap: .25rem; }
+.mode-switch button { min-height: 2.85rem; border: 0; background: transparent; }
+.mode-switch button[aria-pressed="true"] { background: #453456; color: #fff0ff; }
+.secondary-button { color: #f4e7fb; background: #2e2340; border: 1px solid #5c496d; }
+.app-nav {
+  width: min(calc(100% - 1.25rem), 33.5rem);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  bottom: calc(.45rem + env(safe-area-inset-bottom, 0px));
+  padding: .32rem;
+  border: 1px solid #514263;
+  border-radius: 1.25rem;
+  background: #241b31;
+  box-shadow: 0 .4rem 1.5rem #10081d8c;
+}
+.natal-wheel { padding: .65rem; border-radius: 1.5rem; background: #20182d; border: 1px solid #4c3c5c; }
+.natal-wheel canvas { display: block; width: 100%; height: auto; cursor: pointer; }
+.planet-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.planet-tabs button { min-height: 2.75rem; width: auto; padding: .35rem .7rem; background: #2e2340; color: #ede2f5; border: 1px solid #5c496d; }
+.planet-tabs button[aria-pressed="true"] { color: #251930; background: #ddc3fa; }
+.natal-interpretation p { margin-top: .75rem; white-space: pre-line; overflow-wrap: anywhere; }

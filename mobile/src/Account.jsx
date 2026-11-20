@@ -1,10 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
 import { getTarotCard } from '../../shared/tarot';
 import { cardImage } from './cards';
 import { onlineRequest } from './onlineApi';
 
 const tiers = { free: 'Бесплатный', standard: 'Standard', premium: 'Premium' };
 const spreads = { daily: 'Карта дня', three: 'Три карты', yesno: 'Да / Нет', celtic: 'Кельтский крест', trial: 'Пробный расклад' };
+const native = Capacitor.isNativePlatform();
+const sessionKey = 'astroorbi.mobile.session';
 const onlineSpreads = ['daily', 'yesno', 'three', 'celtic'];
 const verdicts = { yes: 'Да', no: 'Нет', maybe: 'Пока неясно' };
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' });
@@ -44,8 +48,8 @@ function ServerReading({ reading, open }) {
   );
 }
 
-function OnlineSpreadForm({ status, profile, busy, draw }) {
-  const [spread, setSpread] = useState('daily');
+function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
+  const [spread, setSpread] = useState(initialSpread ?? 'daily');
   const [question, setQuestion] = useState('');
   const [allowReversed, setAllowReversed] = useState(true);
   const paid = spread !== 'daily';
@@ -59,7 +63,7 @@ function OnlineSpreadForm({ status, profile, busy, draw }) {
       if (paid && (!question.trim() || !hasCost || needsSubscription)) return;
       draw(paid ? { spread, question: question.trim(), allowReversed } : { spread });
     }}>
-      <h2>Таро с ИИ</h2>
+
       <label htmlFor="online-spread">Расклад</label>
       <select id="online-spread" value={spread} onChange={event => setSpread(event.target.value)} disabled={busy}>
         {onlineSpreads.map(id => <option key={id} value={id}>{spreads[id]}</option>)}
@@ -74,7 +78,7 @@ function OnlineSpreadForm({ status, profile, busy, draw }) {
           Перевёрнутые карты
         </label>
         {needsSubscription && <p>Для этого расклада нужна подписка.</p>}
-        {!hasCost && !needsSubscription && <p>Стоимость недоступна. Нажми «Обновить» в профиле.</p>}
+        {!hasCost && !needsSubscription && <p>Стоимость недоступна. Обнови историю и баланс.</p>}
       </>}
       <button type="submit" disabled={busy || (paid && (!hasCost || needsSubscription || !question.trim()))}>
         {busy ? 'Подождите…' : paid ? (hasCost ? `Сделать расклад · ${cost} орб.` : 'Сделать расклад') :
@@ -84,7 +88,7 @@ function OnlineSpreadForm({ status, profile, busy, draw }) {
   );
 }
 
-export function Account() {
+export function useAccount() {
   const [code, setCode] = useState('');
   const [token, setToken] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -95,7 +99,7 @@ export function Account() {
   const [error, setError] = useState('');
   const inFlight = useRef(false);
 
-  function signOut() {
+  function clearAccount() {
     setToken(null);
     setProfile(null);
     setHistory([]);
@@ -112,7 +116,10 @@ export function Account() {
     try {
       await action();
     } catch (failure) {
-      if (failure.expired) signOut();
+      if (failure.expired) {
+        clearAccount();
+        if (native) await SecureStorage.remove(sessionKey, false).catch(() => {});
+      }
       setError(failure.message);
     } finally {
       inFlight.current = false;
@@ -131,7 +138,16 @@ export function Account() {
       const session = await onlineRequest('/api/mobile/auth/exchange', { data: { code: code.trim() } });
       setCode('');
       setToken(session.token);
+      let stored = true;
+      if (native) {
+        try {
+          await SecureStorage.set(sessionKey, session.token, false, false, KeychainAccess.whenUnlockedThisDeviceOnly);
+        } catch {
+          stored = false;
+        }
+      }
       await loadAccount(session.token);
+      if (!stored) setError('Вход выполнен. Сохранить его на телефоне не удалось.');
     });
   }
 
@@ -146,6 +162,29 @@ export function Account() {
     setTarotStatus(await onlineRequest('/api/tarot/status?locale=ru', { token: sessionToken }));
   }
 
+  useEffect(() => {
+    if (!native) return;
+    run(async () => {
+      const saved = await SecureStorage.get(sessionKey, false, false);
+      if (typeof saved !== 'string' || !saved) return;
+      setToken(saved);
+      await loadAccount(saved);
+    });
+  }, []);
+
+  function signOut() {
+    run(async () => {
+      if (native) {
+        try {
+          await SecureStorage.remove(sessionKey, false);
+        } catch {
+          throw new Error('Не удалось удалить сохранённый вход. Попробуй снова.');
+        }
+      }
+      clearAccount();
+    });
+  }
+
   function draw(data) {
     run(async () => {
       let reading;
@@ -154,7 +193,7 @@ export function Account() {
       } catch (failure) {
         if (data.spread !== 'daily' && failure.uncertain) {
           setTarotStatus(null);
-          throw new Error('Результат запроса не получен. Нажми «Обновить» и проверь историю и баланс перед повтором.');
+          throw new Error('Результат запроса не получен. Обнови историю и баланс, прежде чем повторять.');
         }
         throw failure;
       }
@@ -167,50 +206,77 @@ export function Account() {
           setProfile(await onlineRequest('/api/user/me', { token }));
         } catch (failure) {
           if (failure.expired) throw failure;
-          setError('Расклад сохранён. Чтобы увидеть актуальный баланс, нажми «Обновить».');
+          setError('Расклад сохранён. Чтобы увидеть актуальный баланс, обнови историю.');
         }
       }
     });
   }
 
+  return {
+    code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, draw,
+    refresh: () => run(() => loadAccount(token)),
+  };
+}
+
+export function Account({ account, openHistory }) {
+  const { token, profile, code, setCode, signIn, signOut, refresh, busy, error } = account;
   return (
     <section className="tarot-screen">
       <h1>Профиль</h1>
       {!token ? (
-        <form onSubmit={signIn}>
-          <p>Открой AstroOrbi в Telegram и найди «Настройки → Мобильное приложение → Получить код входа».</p>
-          <label htmlFor="link-code">Одноразовый код</label>
+        <form className="profile-card" onSubmit={signIn}>
+          <h2>Подключить аккаунт</h2>
+          <p>В AstroOrbi в Telegram открой «Настройки → Мобильное приложение» и получи код входа.</p>
+          <label htmlFor="link-code">Код из Telegram</label>
           <input id="link-code" value={code} onChange={event => setCode(event.target.value)} required
             autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy} />
-          <button type="submit" disabled={busy}>{busy ? 'Подключаем профиль…' : 'Подключить профиль'}</button>
+          <button type="submit" disabled={busy}>{busy ? 'Подключаем…' : 'Войти'}</button>
         </form>
-      ) : (
-        <>
-          {profile && (
-            <div className="profile-card">
-              <h2>{profile.name}</h2>
-              <p>Тариф · {tiers[profile.billingTier] || profile.billingTier}</p>
-              {profile.orbs != null && <p>Баланс · {profile.orbs}</p>}
-            </div>
-          )}
-          <div className="mode-switch">
-            <button type="button" disabled={busy} onClick={() => run(() => loadAccount(token))}>Обновить</button>
-            <button type="button" disabled={busy} onClick={signOut}>Выйти</button>
-          </div>
-          {profile && (
-            <>
-              <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} draw={draw} />
-              {latest && <ServerReading key={latest.id} reading={latest} open />}
-              <h2>История аккаунта</h2>
-              {!history.length && <p>В аккаунте пока нет раскладов.</p>}
-              {history.filter(reading => reading.id !== latest?.id).map(reading =>
-                <ServerReading key={reading.id} reading={reading} />,
-              )}
-            </>
-          )}
-        </>
-      )}
+      ) : <>
+        {profile && <div className="profile-card">
+          <h2>{profile.name}</h2>
+          <p>Тариф · {tiers[profile.billingTier] || profile.billingTier}</p>
+          {profile.orbs != null && <p>Баланс · {profile.orbs}</p>}
+        </div>}
+        <button className="secondary-button" type="button" onClick={openHistory}>История раскладов</button>
+        <div className="mode-switch">
+          <button type="button" disabled={busy} onClick={refresh}>Обновить</button>
+          <button type="button" disabled={busy} onClick={signOut}>Выйти</button>
+        </div>
+      </>}
       {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
+
+export function OnlineTarot({ account, openAccount, openHistory, initialSpread }) {
+  const { token, profile, latest, tarotStatus, busy, error, draw, refresh } = account;
+  if (!token) return (
+    <div className="profile-card">
+      <p>Войди, чтобы получить ИИ-разбор и сохранить его в аккаунте.</p>
+      <button type="button" onClick={openAccount}>Подключить профиль</button>
+    </div>
+  );
+
+  return <>
+    {!profile && busy && <p role="status">Загружаем профиль…</p>}
+    {profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} draw={draw} initialSpread={initialSpread} />}
+    {latest && <ServerReading key={latest.id} reading={latest} open />}
+    {error && <>
+      <p role="alert">{error}</p>
+      <button className="secondary-button" type="button" onClick={refresh} disabled={busy}>Обновить историю и баланс</button>
+    </>}
+    <button className="secondary-button" type="button" onClick={openHistory}>История раскладов</button>
+  </>;
+}
+
+export function AccountHistory({ account }) {
+  if (!account.token) return null;
+  return (
+    <section className="tarot-screen">
+      <h2>Из аккаунта</h2>
+      {!account.history.length && <p>В аккаунте пока нет раскладов.</p>}
+      {account.history.map(reading => <ServerReading key={reading.id} reading={reading} />)}
     </section>
   );
 }

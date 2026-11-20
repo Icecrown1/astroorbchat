@@ -107,7 +107,6 @@ export function Tarot({ readings, mode, setMode }) {
 
   return (
     <section className="tarot-screen">
-      <h1>Таро</h1>
       <div className="mode-switch" aria-label="Виды раскладов">
         <button type="button" aria-pressed={mode === 'daily'} onClick={() => setMode('daily')}>Карта дня</button>
         <button type="button" aria-pressed={mode === 'three'} onClick={() => setMode('three')}>Три карты</button>
@@ -132,7 +131,7 @@ export function Tarot({ readings, mode, setMode }) {
 export function History({ entries, openTarot }) {
   return (
     <section className="tarot-screen">
-      <h1>История</h1>
+      <h2>На этом устройстве</h2>
       {!entries.length && (
         <>
           <p>Здесь появятся карты дня и расклады с этого устройства.</p>

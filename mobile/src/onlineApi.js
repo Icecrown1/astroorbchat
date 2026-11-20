@@ -6,6 +6,7 @@ if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password)
 }
 
 const messages = {
+  NATAL_NOT_INITIALIZED: 'Натальная карта ещё не построена.',
   subscription_required: 'Для этого расклада нужна подписка.',
   premium_required: 'Этот расклад доступен по тарифу Premium.',
   insufficient_orbs: 'Для расклада не хватает орбов.',
@@ -45,5 +46,5 @@ export async function onlineRequest(path, { token, data } = {}) {
     throw Object.assign(new Error('Сессия закончилась. Получи новый код входа.'), { expired: true });
   }
   if (response.status >= 200 && response.status < 300 && body?.ok) return body.data;
-  throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500 });
+  throw Object.assign(new Error(messages[body?.error] || 'Сервер не смог выполнить запрос. Попробуй позже.'), { uncertain: response.status >= 500, code: body?.error });
 }
