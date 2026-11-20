@@ -159,3 +159,21 @@ header { margin-bottom: 1.3rem; }
 .forecast-topic { display: grid; gap: .4rem; padding: .85rem; border-radius: .85rem; background: #2e2340; }
 .forecast-score strong { font-size: 1.6rem; color: #edcef9; }
 .partner-extra { margin-top: .8rem; }
+
+.matrix-screen { display: grid; gap: 1rem; }
+.matrix-screen form + .results { margin-top: 1rem; }
+.matrix-section-list { display: grid; gap: .45rem; }
+.matrix-section-list > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .7rem;
+  padding: .65rem .9rem;
+  text-align: left;
+  color: #f4e7fb;
+  background: #2e2340;
+  border: 1px solid #5c496d;
+}
+.matrix-section-list > button[aria-expanded="true"] { background: #453456; border-color: #d7a4f4; }
+.matrix-section-list small { flex-shrink: 0; color: #e6c9ef; font-weight: 500; }
+.matrix-screen .arcana p > span { display: block; margin-top: .45rem; }
