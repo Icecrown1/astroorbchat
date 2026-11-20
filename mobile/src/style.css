@@ -181,3 +181,45 @@ header { margin-bottom: 1.3rem; }
 .natal-detail > .forecast-result { margin-top: .7rem; }
 .natal-detail h4 { margin: 0 0 .35rem; }
 .natal-detail ul { margin: 0; padding-left: 1.25rem; }
+
+.home { gap: 1.45rem; }
+.home-hero {
+  min-height: clamp(18rem, 80vw, 23rem);
+  border: 1px solid #9474a878;
+  background: #261935;
+  box-shadow: 0 .8rem 2.2rem #110b1766;
+}
+.home-hero .cover { width: 100%; object-position: center 34%; }
+.home-hero::after {
+  background: linear-gradient(0deg, #191122 2%, #191122d9 29%, #19112255 60%, transparent 90%);
+}
+.home-hero .intro { width: 100%; max-width: 23rem; padding: clamp(1.15rem, 5vw, 1.8rem); }
+.home-hero .intro p { max-width: 17rem; }
+.home-hero .intro button { width: auto; min-width: min(100%, 13rem); padding-inline: .95rem; }
+.home-group { display: grid; gap: .75rem; }
+.home-group h2 { font-size: clamp(1.45rem, 6vw, 1.85rem); }
+.home .feature-grid { gap: .65rem; }
+.home .feature {
+  aspect-ratio: 5 / 4;
+  min-height: 7.5rem;
+  border-color: #79648980;
+  box-shadow: 0 .3rem 1rem #0f0a1655;
+}
+.home .feature::after { background: linear-gradient(0deg, #181121 5%, #17101fbb 25%, transparent 68%); }
+.home .feature span { inset: auto .75rem .65rem; font-size: .95rem; line-height: 1.25; text-shadow: 0 1px 6px #120a19; }
+.guest-card-link { text-align: left; padding-inline: 1rem; }
+.dates-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .55rem; }
+.dates-list li {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+  align-items: center;
+  gap: .8rem;
+  padding: .8rem;
+  border: 1px solid #554366;
+  border-radius: 1rem;
+  background: #251d30;
+}
+.dates-list time { padding: .4rem; border-radius: .6rem; background: #432e50; text-align: center; color: #f0d7fb; }
+.dates-list h3 { font-size: 1rem; overflow-wrap: anywhere; }
+.dates-list p { color: #ddcde3; font-size: .85rem; }
+.dates-list p:empty { display: none; }

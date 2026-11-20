@@ -28,7 +28,7 @@ function planetHouse(position, cusps) {
   return index === -1 ? null : index + 1;
 }
 
-function NatalWheel({ chart, account }) {
+export function NatalWheel({ chart, account, guest = false }) {
   const [selected, setSelected] = useState('Sun');
   const [view, setView] = useState('planets');
   const [houseNumber, setHouseNumber] = useState(1);
@@ -52,7 +52,7 @@ function NatalWheel({ chart, account }) {
   const current = planets.find(planet => planet.name === selected) ?? planets[0];
 
   if (!current) return <p>В этой карте пока нет положений планет.</p>;
-  const interpretation = chart.professionalInterpretation?.ru;
+  const interpretation = guest ? data.interpretation : chart.professionalInterpretation?.ru;
   const currentHouse = validHouses ? planetHouse(current.position, cusps) : null;
   const cusp = validHouses ? cusps[houseNumber - 1] : null;
   const members = validHouses ? planets.filter(planet => planetHouse(planet.position, cusps) === houseNumber) : [];
@@ -79,7 +79,7 @@ function NatalWheel({ chart, account }) {
             <h2>{translatePlanet(current.name, 'ru')}</h2>
             <p>{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p>
           </div>
-          <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />
+          {!guest && <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />}
         </div>
       </div>
     </div>
@@ -112,7 +112,7 @@ function NatalWheel({ chart, account }) {
   </>;
 }
 
-export function Natal({ account, openAccount, openSettings, active }) {
+export function Natal({ account, openAccount, openSettings, openGuests, openDates, active }) {
   const { token, profile, run, busy, error } = account;
   const [result, setResult] = useState(null);
   const canBuild = Boolean(profile?.birthPlace && profile?.birthdayDate);
@@ -155,6 +155,10 @@ export function Natal({ account, openAccount, openSettings, active }) {
           <button type="button" disabled={busy} onClick={() => load(true)}>{busy ? 'Строим карту…' : 'Построить карту'}</button>
         </div> : busy ? <p role="status">Загружаем карту…</p> :
           <button type="button" onClick={() => profile ? load() : account.refresh()}>Загрузить карту</button>}
+        <div className="mode-switch">
+          <button type="button" onClick={openGuests}>Карты близких</button>
+          {result?.chart?.data && canBuild && <button type="button" onClick={openDates}>Важные даты</button>}
+        </div>
         {error && <p role="alert">{error}</p>}
       </>}
     </section>

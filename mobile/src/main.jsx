@@ -5,6 +5,8 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { ProfileSettings } from './ProfileSettings';
 import { Natal } from './Natal';
+import { GuestNatal } from './GuestNatal';
+import { ImportantDates } from './ImportantDates';
 import { Forecasts } from './Forecasts';
 import { Oracle, Solar } from './AnnualAndOracle';
 import { Matrix } from './Matrix';
@@ -17,42 +19,50 @@ const destinations = [
   ['account', 'Профиль', '◉'],
 ];
 
+const homeSections = [
+  { title: 'О себе', items: [
+    ['natal', 'Натальная карта', 'sun'],
+    ['matrix', 'Матрица судьбы', 'star'],
+  ] },
+  { title: 'Прогнозы и подсказки', items: [
+    ['horoscope', 'Гороскоп', 'wheel-of-fortune'],
+    ['dates', 'Важные даты', 'high-priestess'],
+    ['solar', 'Соляр', 'temperance'],
+    ['oracle', 'Оракул', 'hermit'],
+  ] },
+  { title: 'О близких', items: [
+    ['compatibility', 'Совместимость', 'lovers'],
+    ['guest-natal', 'Карты близких', 'two-of-cups'],
+  ] },
+];
+
 function Home({ navigate, online, hasDaily }) {
   return (
-    <div className="home">
+    <main className="home">
       <section className="hero home-hero">
         <img src={cardImage('moon')} alt="" className="cover" />
         <div className="intro">
           <h1>Карта дня</h1>
-          <p>Вытащи карту и посмотри, на что сегодня стоит обратить внимание.</p>
+          <p>На что сегодня стоит обратить внимание?</p>
           <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
             {hasDaily && !online ? 'Посмотреть карту' : 'Открыть карту дня'}
           </button>
         </div>
       </section>
-      <h2>Исследуй себя</h2>
-      <div className="feature-grid">
-        <button className="feature" type="button" onClick={() => navigate('natal')}>
-          <img src={cardImage('sun')} alt="" /><span>Натальная карта</span>
-        </button>
-        <button className="feature" type="button" onClick={() => navigate('matrix')}>
-          <img src={cardImage('star')} alt="" /><span>Матрица судьбы</span>
-        </button>
-        <button className="feature" type="button" onClick={() => navigate('horoscope')}>
-          <img src={cardImage('wheel-of-fortune')} alt="" /><span>Гороскоп</span>
-        </button>
-        <button className="feature" type="button" onClick={() => navigate('compatibility')}>
-          <img src={cardImage('lovers')} alt="" /><span>Совместимость</span>
-        </button>
-        <button className="feature" type="button" onClick={() => navigate('solar')}>
-          <img src={cardImage('temperance')} alt="" /><span>Соляр</span>
-        </button>
-        <button className="feature" type="button" onClick={() => navigate('oracle')}>
-          <img src={cardImage('hermit')} alt="" /><span>Оракул</span>
-        </button>
-      </div>
+      {homeSections.map(({ title, items }) => (
+        <section className="home-group" key={title} aria-label={title}>
+          <h2>{title}</h2>
+          <div className="feature-grid">
+            {items.map(([id, label, card]) => (
+              <button className="feature" type="button" key={id} onClick={() => navigate(id)}>
+                <img src={cardImage(card)} alt="" loading="lazy" /><span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
       <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
-    </div>
+    </main>
   );
 }
 
@@ -67,6 +77,8 @@ function App() {
   const openHistory = () => navigate('history');
   const openSettings = () => navigate('settings');
   const openNatal = () => navigate('natal');
+  const openGuests = () => navigate('guest-natal');
+  const openDates = () => navigate('dates');
   const profileKey = JSON.stringify([Boolean(account.token), account.profile?.id, account.profile?.birthdayDate,
     account.profile?.birthTime, account.profile?.birthPlace]);
 
@@ -92,7 +104,14 @@ function App() {
           : <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
       <div key={'natal' + profileKey} hidden={screen !== 'natal'}>
-        <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings} />
+        <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings}
+          openGuests={openGuests} openDates={openDates} />
+      </div>
+      <div key={'guests' + profileKey} hidden={screen !== 'guest-natal'}>
+        {account.token || screen === 'guest-natal' ? <GuestNatal account={account} openAccount={openAccount} /> : null}
+      </div>
+      <div key={'dates' + profileKey} hidden={screen !== 'dates'}>
+        {account.token || screen === 'dates' ? <ImportantDates account={account} openAccount={openAccount} openNatal={openNatal} /> : null}
       </div>
       {['horoscope', 'compatibility'].map(kind => (
         <div key={kind + profileKey} hidden={screen !== kind}>
@@ -117,7 +136,7 @@ function App() {
         <ProfileSettings key={account.profile.id} account={account} openAccount={openAccount} openNatal={openNatal} />}
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
         {destinations.map(([id, name, icon]) => (
-          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : screen) ? 'page' : undefined} onClick={() => navigate(id)}>
+          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : ['guest-natal', 'dates'].includes(screen) ? 'natal' : screen) ? 'page' : undefined} onClick={() => navigate(id)}>
             <span aria-hidden="true">{icon}</span>{name}
           </button>
         ))}

@@ -37,7 +37,7 @@ function birthdayAge(value, today) {
   return today.getFullYear() - year - Number(beforeBirthday);
 }
 
-function CityField({ value, change, disabled }) {
+export function CityField({ id = 'profile-place', value, change, disabled }) {
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState(null);
   const query = search.trim();
@@ -56,8 +56,8 @@ function CityField({ value, change, disabled }) {
   }, [query, disabled]);
 
   return <>
-    <label htmlFor="profile-place">Город рождения</label>
-    <input id="profile-place" name="birthPlace" value={value} placeholder="Например, Уфа, Россия"
+    <label htmlFor={id}>Город рождения</label>
+    <input id={id} name="birthPlace" value={value} placeholder="Например, Уфа, Россия"
       autoComplete="off" disabled={disabled} onChange={event => {
         setSearch(event.target.value);
         change(event.target.value);
