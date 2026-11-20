@@ -1,0 +1,47 @@
+name: AstroOrbi Android preview
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'client/public/tarot/**'
+      - '.github/workflows/mobile-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Prepare the native project
+        working-directory: mobile
+        run: |
+          npm ci
+          npm run build
+          npx --no-install cap add android
+      - name: Build and verify the APK
+        working-directory: mobile/android
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-android-preview
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
