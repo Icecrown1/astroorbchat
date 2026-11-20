@@ -5,16 +5,18 @@
  *  - нет активной подписки сейчас (любой — включая реферальную/админскую);
  *  - subscriptions.paymentProvider не из платных (yookassa / ton / stars / dodo);
  *  - нет завершённых подписочных платежей ЮKassa (subscription / renewal / upgrade);
- *  - нет подтверждённых подписочных платежей GRAM (таблица payments).
+ *  - нет подтверждённых подписочных платежей GRAM (таблица payments);
+ *  - нет оплаченных звёздами подписок (payment_event_log, provider 'stars', payload t=sub/subonce).
  * Подписка, выданная админом/dev или реферальной наградой, оплатой не считается.
+ * Цены акции — в Stars: оплата внутри Telegram только звёздами.
  */
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { db } from "../db";
-import { payments, subscriptions, yookassaPayments } from "@shared/schema";
+import { paymentEventLog, payments, subscriptions, yookassaPayments } from "@shared/schema";
 import {
   FIRST_MONTH_DISCOUNT_PCT,
-  SUBSCRIPTION_PRICES_PER_MONTH,
-  firstMonthPromoRub,
+  STARS_SUB_PRICES,
+  firstMonthPromoStars,
 } from "@shared/subscriptionPrices";
 
 const PAID_PROVIDERS = ["yookassa", "ton", "stars", "dodo"];
@@ -61,13 +63,24 @@ export async function isFirstMonthOfferEligible(userId: string): Promise<boolean
     .limit(1);
   if (paidGram.length) return false;
 
+  const paidStars = await db
+    .select({ id: paymentEventLog.id })
+    .from(paymentEventLog)
+    .where(sql`${paymentEventLog.provider} = 'stars'
+      and ${paymentEventLog.payload}->'message'->'successful_payment'->>'invoice_payload' like ${'%"u":"' + userId + '"%'}
+      and ${paymentEventLog.payload}->'message'->'successful_payment'->>'invoice_payload' like '%"t":"sub%'`)
+    .limit(1);
+  if (paidStars.length) return false;
+
   return true;
 }
 
+/** Цены акции в Stars: full — обычная месячная цена, promo — первый месяц со скидкой */
 export function firstMonthOfferPrices() {
   return {
     discountPct: FIRST_MONTH_DISCOUNT_PCT,
-    standard: { full: SUBSCRIPTION_PRICES_PER_MONTH.standard[1], promo: firstMonthPromoRub("standard") },
-    premium: { full: SUBSCRIPTION_PRICES_PER_MONTH.premium[1], promo: firstMonthPromoRub("premium") },
+    currency: "XTR" as const,
+    standard: { full: STARS_SUB_PRICES.standard, promo: firstMonthPromoStars("standard") },
+    premium: { full: STARS_SUB_PRICES.premium, promo: firstMonthPromoStars("premium") },
   };
 }

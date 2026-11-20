@@ -92,9 +92,9 @@ export function FirstMonthOfferButton({ enabled }: { enabled: boolean }) {
             {std && (
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 {ru ? (
-                  <>Standard за <span className="font-semibold text-[hsl(var(--solar-gold))]">{std.promo} ₽</span> вместо <span className="line-through">{std.full} ₽</span></>
+                  <>Standard за <span className="font-semibold text-[hsl(var(--solar-gold))]">{std.promo} ⭐</span> вместо <span className="line-through">{std.full} ⭐</span></>
                 ) : (
-                  <>Standard for <span className="font-semibold text-[hsl(var(--solar-gold))]">{std.promo} ₽</span> instead of <span className="line-through">{std.full} ₽</span></>
+                  <>Standard for <span className="font-semibold text-[hsl(var(--solar-gold))]">{std.promo} ⭐</span> instead of <span className="line-through">{std.full} ⭐</span></>
                 )}
               </span>
             )}

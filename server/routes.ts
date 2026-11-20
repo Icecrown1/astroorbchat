@@ -40,7 +40,8 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import dayjs from 'dayjs';
 import { ORB_PACKS, getOrbPack, getOrbPackByOrbs } from "@shared/orbPacks";
-import { SUBSCRIPTION_PRICES_PER_MONTH, PERIOD_LABEL_RU, STARS_SUB_PRICES, subscriptionRub, upgradeRub, starsForRub, normalizePaidTier, firstMonthPromoRub, FIRST_MONTH_DISCOUNT_PCT, FIRST_MONTH_PROMO_CODE, type PeriodMonths } from "@shared/subscriptionPrices";
+import { SUBSCRIPTION_PRICES_PER_MONTH, PERIOD_LABEL_RU, STARS_SUB_PRICES, subscriptionRub, upgradeRub, starsForRub, subscriptionStars, upgradeStars, firstMonthPromoStars, normalizePaidTier, firstMonthPromoRub, FIRST_MONTH_DISCOUNT_PCT, FIRST_MONTH_PROMO_CODE, type PeriodMonths } from "@shared/subscriptionPrices";
+import { externalPaymentsEnabled, EXTERNAL_PAYMENT_DISABLED_BODY } from "./lib/paymentPolicy";
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 
@@ -3008,6 +3009,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/ton/create", requireAuth, async (req, res) => {
+    // Внутри Telegram цифровые товары — только за Stars (server/lib/paymentPolicy.ts)
+    if (!externalPaymentsEnabled()) return res.status(410).json(EXTERNAL_PAYMENT_DISABLED_BODY);
     const fs = await import('fs');
     const logData = `\n\n[${new Date().toISOString()}] TON_CREATE REQUEST\nUserID: ${(req as any).userId}\nBody: ${JSON.stringify(req.body, null, 2)}\n`;
     fs.appendFileSync('/tmp/ton-debug.log', logData);
@@ -3533,6 +3536,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dailyDelta = (PREMIUM_MONTHLY - STANDARD_MONTHLY) / 30;
         result.upgradePrice = Math.max(1, Math.ceil(remainingDays * dailyDelta));
         result.upgradeStarsBonus = 300; // 550 - 250
+        // Та же цена апгрейда в Stars, что выставит /api/payments/stars/create-subscription
+        result.upgradeStarsPrice = { 1: upgradeStars(remainingDays, 1), 6: upgradeStars(remainingDays, 6), 12: upgradeStars(remainingDays, 12) };
       }
 
       return res.json({ ok: true, data: result });
@@ -3543,6 +3548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/payments/yookassa/create", requireAuth, async (req, res) => {
+    // Внутри Telegram цифровые товары — только за Stars (server/lib/paymentPolicy.ts)
+    if (!externalPaymentsEnabled()) return res.status(410).json(EXTERNAL_PAYMENT_DISABLED_BODY);
     let yookassaPayment: any = null; // Declare here so it's accessible in catch block
     
     try {
@@ -4092,9 +4099,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Star-подписка (30 дней, автопродление на стороне Telegram)
   // Подписка за Stars. mode=new (1 мес → recurring 30 дней; 6/12 → разовый инвойс),
-  // mode=renew (продление на N мес), mode=upgrade (Standard→Premium: доплата + N мес). Цена = ceil(₽).
+  // mode=renew (продление на N мес), mode=upgrade (Standard→Premium: доплата + N мес),
+  // mode=first_month (акция −50%: разовый счёт на 1 месяц, только для тех, кто ещё не платил).
+  // Цены — shared/subscriptionPrices (subscriptionStars / upgradeStars / firstMonthPromoStars).
   app.post("/api/payments/stars/create-subscription", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).userId;
@@ -4103,7 +4111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mode = String(req.body?.mode || 'new');
       if (tier !== 'standard' && tier !== 'premium') return res.status(400).json({ ok: false, error: "invalid_tier" });
       if (![1, 6, 12].includes(periodMonths)) return res.status(400).json({ ok: false, error: "invalid_period" });
-      if (!['new', 'renew', 'upgrade'].includes(mode)) return res.status(400).json({ ok: false, error: "invalid_mode" });
+      if (!['new', 'renew', 'upgrade', 'first_month'].includes(mode)) return res.status(400).json({ ok: false, error: "invalid_mode" });
       const months = periodMonths as PeriodMonths;
 
       const { createStarsSubscriptionLink, createStarsInvoiceLink } = await import("./lib/telegramStars");
@@ -4111,8 +4119,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subActive = !!sub && sub.status === 'active' && new Date(sub.currentPeriodEnd) > new Date();
       const rank = (t: string) => (t === 'pro' || t === 'premium' ? 2 : t === 'standard' ? 1 : 0);
 
-      // Новая месячная — recurring (Telegram продлевает сам)
-      if (mode === 'new' && months === 1) {
+      // Акция «первый месяц −50%»: разовый счёт на 1 месяц, право решает сервер
+      if (mode === 'first_month') {
+        const { isFirstMonthOfferEligible } = await import("./lib/firstMonthOffer");
+        if (!(await isFirstMonthOfferEligible(userId))) return res.status(409).json({ ok: false, error: "offer_not_available" });
+        const stars = firstMonthPromoStars(tier);
+        const name = tier === 'premium' ? 'Premium' : 'Standard';
+        // payload Telegram — не длиннее 128 байт: только нужные поля
+        const payload = JSON.stringify({ t: 'subonce', u: userId, tier, m: 1, mode: 'new', rub: stars, pr: 1 });
+        const link = await createStarsInvoiceLink({
+          title: `${name}: 1-й месяц −${FIRST_MONTH_DISCOUNT_PCT}%`, // Telegram: заголовок до 32 символов
+          description: `Подписка ${name} на 1 месяц со скидкой ${FIRST_MONTH_DISCOUNT_PCT}%. Без автопродления.`,
+          payload,
+          stars,
+        });
+        return res.json({ ok: true, link, stars, recurring: false });
+      }
+
+      // Новая месячная — recurring (Telegram продлевает сам). Исключение: активен тариф выше
+      // (Premium покупает Standard) — тогда разовый счёт, Standard стартует после текущего периода.
+      const scheduleAfterHigher = subActive && rank(sub!.tier) > rank(tier);
+      if (mode === 'new' && months === 1 && !scheduleAfterHigher) {
         if (subActive && sub!.paymentProvider === 'stars' && rank(sub!.tier) >= rank(tier)) {
           return res.status(409).json({ ok: false, error: "stars_subscription_active" });
         }
@@ -4121,11 +4148,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let rub = 0;
+      let stars = 0;
       let title = '';
       let description = '';
       let ext: PeriodMonths | 0 = months;
       if (mode === 'new') {
         rub = subscriptionRub(tier, months);
+        stars = subscriptionStars(tier, months);
         title = `Astro Orb ${tier === 'premium' ? 'Premium' : 'Standard'} — ${PERIOD_LABEL_RU[months]}`;
         description = subActive && rank(sub!.tier) > rank(tier)
           ? `Подписка ${tier === 'premium' ? 'Premium' : 'Standard'} на ${PERIOD_LABEL_RU[months]}, стартует после окончания текущей`
@@ -4134,19 +4163,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!subActive) return res.status(400).json({ ok: false, error: "no_active_subscription" });
         const curTier = normalizePaidTier(sub!.tier);
         rub = subscriptionRub(curTier, months);
+        stars = subscriptionStars(curTier, months);
         title = `Продление ${curTier === 'premium' ? 'Premium' : 'Standard'} — ${PERIOD_LABEL_RU[months]}`;
         description = `Подписка продлится на ${PERIOD_LABEL_RU[months]} от текущей даты окончания`;
       } else {
         if (!subActive || sub!.tier !== 'standard') return res.status(400).json({ ok: false, error: "no_standard_to_upgrade" });
         const remainingDays = Math.ceil(Math.max(0, new Date(sub!.currentPeriodEnd).getTime() - Date.now()) / 86400000);
         rub = upgradeRub(remainingDays) + (months > 1 ? subscriptionRub('premium', months) : 0);
+        stars = upgradeStars(remainingDays, months);
         ext = months > 1 ? months : 0;
         title = months > 1 ? `Premium: апгрейд + ${PERIOD_LABEL_RU[months]}` : 'Апгрейд до Premium';
         description = months > 1
           ? `Доплата за ${remainingDays} дн. текущего периода + Premium на ${PERIOD_LABEL_RU[months]}`
           : `Доплата за ${remainingDays} оставшихся дней, дата окончания не меняется`;
       }
-      const stars = starsForRub(rub);
       const payload = JSON.stringify({ t: 'subonce', u: userId, tier, m: months, mode, ext, rub });
       const link = await createStarsInvoiceLink({ title, description, payload, stars });
       return res.json({ ok: true, link, stars, recurring: false });
@@ -4275,6 +4305,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ chat_id: chatId, text: "Поддержка по оплатам Astro Orb: опишите проблему, приложите дату и сумму — ответим и при необходимости вернём звёзды. Контакт: @AstroOrbSupport" }),
+          });
+        }
+      } else if (text && /^\/terms(@\w+)?$/.test(text.trim())) {
+        const chatId = update.message.chat?.id;
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (chatId && botToken) {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              disable_web_page_preview: true,
+              text:
+                "Условия AstroOrbi\n\n" +
+                "• Подписки и пакеты звёзд оплачиваются только Telegram Stars.\n" +
+                "• Подписка на 1 месяц продлевается автоматически каждые 30 дней. Отменить — в Telegram: Настройки → Мои звёзды.\n" +
+                "• Подписки на 6 и 12 месяцев и пакеты звёзд — разовая оплата, без автопродления.\n" +
+                "• Проблема с оплатой или нужен возврат — напишите /paysupport.\n\n" +
+                "Политика конфиденциальности: https://astroorbi.com/privacy",
+            }),
           });
         }
       }
@@ -4581,9 +4631,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         getExpiryNotificationMessage,
       } = await import('./lib/subscriptionRenewal');
 
-      // 1. Process auto-renewals
-      const renewalSubscriptions = await getSubscriptionsForRenewal(storage);
-      console.log('[CRON] Found', renewalSubscriptions.length, 'subscriptions for renewal');
+      // 1. Process auto-renewals (списания с сохранённых карт ЮKassa).
+      // Пока карта отключена (оплата внутри Telegram — только Stars), не списываем:
+      // такие подписки доживают оплаченный срок, а напоминания просят продлить звёздами.
+      const cardRenewals = externalPaymentsEnabled();
+      const renewalSubscriptions = cardRenewals ? await getSubscriptionsForRenewal(storage) : [];
+      console.log('[CRON] Found', renewalSubscriptions.length, 'subscriptions for renewal', cardRenewals ? '' : '(card auto-renew disabled)');
 
       for (const sub of renewalSubscriptions) {
         results.renewals.processed++;
@@ -4605,7 +4658,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const daysUntilExpiry = getDaysUntilExpiry(sub.currentPeriodEnd);
-          const message = getExpiryNotificationMessage(daysUntilExpiry, sub.tier, sub.autoRenew, 'ru');
+          // Автопродление реально только у star-подписки (Telegram списывает сам) или у карты, если она включена
+          const renewsItself = !!sub.autoRenew && (sub.paymentProvider === 'stars' || cardRenewals);
+          const message = getExpiryNotificationMessage(daysUntilExpiry, sub.tier, renewsItself, 'ru');
           
           // Get user's Telegram ID for notification
           const user = await storage.getUser(sub.userId);
@@ -4616,15 +4671,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const telegramMessage = `${message.title}\n\n${message.message}`;
               
               try {
-                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chat_id: user.tgId,
-                    text: telegramMessage,
-                    parse_mode: 'HTML',
-                  }),
-                });
+                // Кнопка ведёт прямо на экран подписки (оплата — звёздами Telegram)
+                const { sendPush, getBotDeepLink } = await import('./lib/reengagement');
+                const link = await getBotDeepLink('subscribe');
+                const sent = await sendPush(String(user.tgId), telegramMessage, renewsItself ? '✨ Открыть AstroOrbi' : '⭐ Продлить подписку', link);
+                if (sent === 'error') throw new Error('sendPush failed');
                 
                 results.notifications.sent++;
                 

@@ -202,14 +202,14 @@ export function getExpiryNotificationMessage(
   hasAutoRenew: boolean,
   locale: 'ru' | 'en' = 'ru'
 ): { title: string; message: string } {
-  const tierName = tier === 'pro' ? 'Pro' : 'Standard';
+  const tierName = tier === 'pro' ? 'Premium' : 'Standard';
   
   if (locale === 'ru') {
     if (daysUntilExpiry === 0) {
       return {
         title: 'Подписка истекла',
         message: hasAutoRenew 
-          ? `Ваша подписка ${tierName} истекла. Автопродление не удалось - пожалуйста, обновите способ оплаты.`
+          ? `Ваша подписка ${tierName} истекла: автопродление не прошло. Продлите её в приложении, чтобы вернуть все функции.`
           : `Ваша подписка ${tierName} истекла. Продлите её, чтобы продолжить пользоваться всеми возможностями.`,
       };
     }
@@ -229,7 +229,7 @@ export function getExpiryNotificationMessage(
     return {
       title: 'Subscription expired',
       message: hasAutoRenew
-        ? `Your ${tierName} subscription has expired. Auto-renewal failed - please update your payment method.`
+        ? `Your ${tierName} subscription has expired: auto-renewal didn't go through. Renew it in the app to get all features back.`
         : `Your ${tierName} subscription has expired. Renew it to continue enjoying all features.`,
     };
   }

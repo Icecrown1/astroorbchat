@@ -4,7 +4,6 @@ import { queryClient } from './lib/queryClient';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { trackPage, installClickTracking } from '@/lib/analytics';
 import { initTelegram, consumePendingPaymentFromStartParam, consumeTrialFromStartParam, consumePushRouteFromStartParam } from '@/lib/telegram';
@@ -35,8 +34,6 @@ import Legal from '@/pages/Legal';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import LeadMagnet from '@/pages/LeadMagnet';
 import FeedbackSheet from '@/components/FeedbackSheet';
-
-const manifestUrl = `${window.location.origin}/.well-known/tonconnect-manifest.json`;
 
 function Router() {
   const { isAuthenticated, user } = useAuth();
@@ -168,15 +165,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LocaleProvider>
-        <TonConnectUIProvider manifestUrl={manifestUrl}>
-          <TooltipProvider>
-            <EnergySyncProvider>
-              <Toaster />
-              <Router />
-              <FeedbackSheet />
-            </EnergySyncProvider>
-          </TooltipProvider>
-        </TonConnectUIProvider>
+        <TooltipProvider>
+          <EnergySyncProvider>
+            <Toaster />
+            <Router />
+            <FeedbackSheet />
+          </EnergySyncProvider>
+        </TooltipProvider>
       </LocaleProvider>
     </QueryClientProvider>
   );

@@ -34,9 +34,19 @@ export function starsForRub(rub: number): number {
   return Math.max(1, Math.ceil(rub));
 }
 
+/** Цена подписки в Stars: 1 месяц — 200/400 ⭐ (как у recurring-подписки), 6/12 мес — ceil(₽ за период) */
+export function subscriptionStars(tier: PaidTier, months: PeriodMonths): number {
+  return months === 1 ? STARS_SUB_PRICES[tier] : starsForRub(subscriptionRub(tier, months));
+}
+
+/** Доплата за апгрейд Standard → Premium в Stars (+ N месяцев Premium, если период 6/12) */
+export function upgradeStars(remainingDays: number, months: PeriodMonths): number {
+  return starsForRub(upgradeRub(remainingDays)) + (months > 1 ? subscriptionStars('premium', months) : 0);
+}
+
 /**
  * Акция «первый месяц −50%»: для тех, кто ещё ни разу не платил за подписку.
- * Только оплата картой (ЮKassa) и только период 1 месяц; автопродление — уже по полной цене.
+ * Разовый счёт в Stars на 1 месяц (100/200 ⭐ вместо 200/400 ⭐), без автопродления.
  * Право на скидку решает сервер (server/lib/firstMonthOffer.ts), клиент лишь показывает цены.
  */
 export const FIRST_MONTH_DISCOUNT_PCT = 50;
@@ -44,4 +54,8 @@ export const FIRST_MONTH_PROMO_CODE = 'first_month_50';
 
 export function firstMonthPromoRub(tier: PaidTier): number {
   return Math.floor((SUBSCRIPTION_PRICES_PER_MONTH[tier][1] * (100 - FIRST_MONTH_DISCOUNT_PCT)) / 100);
+}
+
+export function firstMonthPromoStars(tier: PaidTier): number {
+  return Math.round((STARS_SUB_PRICES[tier] * (100 - FIRST_MONTH_DISCOUNT_PCT)) / 100);
 }
