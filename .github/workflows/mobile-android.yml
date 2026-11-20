@@ -40,6 +40,7 @@ jobs:
           npm run build
           npx --no-install cap add android
           npm run prepare:android
+          sed -i "s|mavenCentral()|maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }|g"             android/build.gradle node_modules/@capacitor/android/capacitor/build.gradle
       - name: Build and verify the APK
         working-directory: mobile/android
         run: |
