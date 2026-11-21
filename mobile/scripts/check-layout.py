@@ -75,10 +75,8 @@ def check_paper(page, selector):
     clip = dict(x=floor(sample[0]), y=floor(sample[1]), width=3, height=3)
     ink = art.screenshot()
     paper = page.screenshot(clip=clip)
-    art.evaluate("img => img.style.visibility = 'hidden'")
-    assert page.screenshot(clip=clip) == paper, f"Visible paper rectangle: {selector}"
-    art.evaluate("img => img.style.visibility = ''")
     art.evaluate("img => img.style.opacity = '0'")
+    assert page.screenshot(clip=clip) == paper, f"Visible paper rectangle: {selector}"
     assert art.screenshot() != ink, f"Artwork disappeared: {selector}"
     art.evaluate("img => img.style.opacity = ''")
 
