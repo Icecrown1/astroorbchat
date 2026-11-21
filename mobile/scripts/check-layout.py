@@ -1,6 +1,9 @@
 """Exercise the installed web bundle at phone sizes, using a synthetic account."""
 from contextlib import contextmanager
 from functools import partial
+from hashlib import sha256
+from math import floor
+import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from shutil import which
@@ -39,12 +42,45 @@ def natal_fixture():
 
 
 def reading_fixture(spread):
-    ids = {"three": ["star", "moon", "sun"], "daily": ["ace-of-cups"]}[spread]
+    ids = {"three": ["four-of-wands", "moon", "sun"], "daily": ["ace-of-cups"],
+           "celtic": ["fool", "ten-of-wands", "lovers", "star", "death", "emperor", "tower",
+                      "queen-of-cups", "wheel-of-fortune", "knight-of-swords"]}[spread]
     return dict(id=spread, spread=spread, createdAt="2026-11-21T08:00:00Z",
-                cards=[dict(cardId=c, reversed=False, position=i) for i, c in enumerate(ids)],
-                interpretation={"cards": [{"text": s} for s in (
-                    "Прислушайся к своей интуиции.", "Дай себе время отделить ощущения от фактов.",
-                    "Выбери один простой шаг на сегодня.")] })
+                cards=[dict(cardId=c, reversed=i == 1, position=i) for i, c in enumerate(ids)],
+                interpretation={"synthesis": "Общий смысл расклада.", "cards": [
+                    {"text": f"Трактовка для позиции {i + 1}."} for i in range(len(ids))]})
+
+
+def check_deck():
+    deck = (MOBILE.parent / "shared/tarot.ts").read_text()
+    ids = re.findall(r"\{ id: '([a-z-]+)', suit:", deck)
+    assert len(set(ids)) == len(ids) == 78
+    for card in ids:
+        source = MOBILE.parent / "client/public/tarot" / f"{card}.webp"
+        expected = sha256(source.read_bytes()).digest()
+        assert any(sha256(f.read_bytes()).digest() == expected
+                   for f in (MOBILE / "dist/assets").glob(f"{card}-*.webp")), card
+
+
+def check_paper(page, selector):
+    # Sample inside the actual artwork (object-fit: contain can leave an empty gutter).
+    art = page.locator(selector)
+    art.evaluate("img => img.decode()")
+    sample = art.evaluate("""img => {
+      const box = img.getBoundingClientRect();
+      const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight);
+      const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+      return [box.x + (box.width - w) / 2 + .10*w, box.y + (box.height - h) / 2 + .06*h];
+    }""")
+    clip = dict(x=floor(sample[0]), y=floor(sample[1]), width=3, height=3)
+    ink = art.screenshot()
+    paper = page.screenshot(clip=clip)
+    art.evaluate("img => img.style.visibility = 'hidden'")
+    assert page.screenshot(clip=clip) == paper, f"Visible paper rectangle: {selector}"
+    art.evaluate("img => img.style.visibility = ''")
+    art.evaluate("img => img.style.opacity = '0'")
+    assert art.screenshot() != ink, f"Artwork disappeared: {selector}"
+    art.evaluate("img => img.style.opacity = ''")
 
 
 def exercise(page, url):
@@ -60,7 +96,7 @@ def exercise(page, url):
         else:
             data = {"/api/mobile/auth/exchange": {"token": "local-test"},
                     "/api/user/me": PROFILE, "/api/tarot/history": [],
-                    "/api/tarot/status": {"costs": {"three": 3}, "dailyDone": False},
+                    "/api/tarot/status": {"costs": {"three": 3, "celtic": 10}, "dailyDone": False},
                     "/api/natal/me": natal_fixture()}[path]
         route.fulfill(json={"ok": True, "data": data},
                       headers={"Access-Control-Allow-Origin": "*", "Content-Type": "application/json"})
@@ -83,9 +119,13 @@ def exercise(page, url):
     capture("01-home")
     nav("Инструменты")
     capture("02-tools")
+    check_paper(page, ".index-row:visible img[src*=hand]")
     tool("Матрица судьбы")
     page.locator("#birthday").fill("1998-06-07")
     button("Рассчитать матрицу").click()
+    ticks = page.locator(".matrix-plate:visible .age-tick")
+    assert ticks.all_text_contents() == list(map(str, range(80)))
+    assert page.locator(".matrix-plate:visible .decade").all_text_contents() == list(map(str, range(0, 80, 10)))
     node = page.locator(".matrix-plate:visible").get_by_role("button").nth(1)
     node.click()
     assert node.get_attribute("aria-pressed") == "true"
@@ -108,6 +148,7 @@ def exercise(page, url):
     dial = page.locator(".sky-dial:visible")
     dial.wait_for()
     capture("04-natal")
+    check_paper(page, ".front-art:visible[src*=moon]")
     dial.get_by_role("button", name="Плутон").click()
     assert page.get_by_label("Выбрать планету").input_value() == "Pluto"
     button("Дома").click()
@@ -127,19 +168,50 @@ def exercise(page, url):
     assert not draws and page.locator("#tarot-question").input_value() == question
     button("Сделать расклад · 3 ★").click()
     button("Списать 3 ★").click()
-    page.locator(".three-cards:visible button").nth(1).click()
-    assert page.locator(".card-meaning:visible h3").inner_text() == "Луна"
+    meanings = page.locator(".card-meaning:visible")
+    meanings.first.wait_for()
+    assert meanings.locator("h3").all_text_contents() == ["Четвёрка Жезлов", "Луна", "Солнце"]
+    assert meanings.locator("p").all_text_contents() == [
+        f"Трактовка для позиции {i}." for i in range(1, 4)]
     capture("05-tarot")
+    page.locator(".three-cards:visible button").first.click()
+    viewer = page.get_by_role("dialog")
+    viewer.wait_for()
+    assert "/four-of-wands-" in viewer.locator("img").get_attribute("src")
+    assert viewer.bounding_box() == {"x": 0, "y": 0, "width": 390, "height": 844}
+    capture("11-four-of-wands")
+    button("Следующая карта").click()
+    assert viewer.get_by_role("heading").inner_text() == "Луна"
+    assert viewer.locator("img.reversed").count() == 1
+    page.go_back()
+    viewer.wait_for(state="hidden")
+    assert meanings.count() == 3
+    page.locator(".three-cards:visible button").last.click()
+    button("Закрыть карту").click()
+    viewer.wait_for(state="hidden")
     assert draws == ["three"]
     button("Выбрать другой расклад").click()
     page.select_option("#online-spread", "daily")
     page.locator(".online-spread:visible button[type=submit]").click()
     page.locator(".one-card:visible").wait_for()
     capture("10-daily")
+    button("Выбрать другой расклад").click()
+    page.select_option("#online-spread", "celtic")
+    page.locator("#tarot-question").fill(question)
+    button("Сделать расклад · 10 ★").click()
+    button("Списать 10 ★").click()
+    page.locator(".many-cards:visible").wait_for()
+    assert meanings.count() == 10
+    assert meanings.last.locator("p").inner_text() == "Трактовка для позиции 10."
     button("Офлайн").click()
     button("Три карты").click()
     button("Вытянуть три карты").click()
     assert page.locator(".three-cards:visible button").count() == 3
+    assert meanings.count() == 3
+    page.locator(".three-cards:visible button").first.click()
+    page.keyboard.press("Escape")
+    viewer.wait_for(state="hidden")
+    assert button("Офлайн").get_attribute("aria-pressed") == "true"
     nav("Профиль")
     page.get_by_role("button", name="История раскладов").click()
     page.locator("details:visible summary").last.click()
@@ -154,6 +226,7 @@ def exercise(page, url):
 
 
 if __name__ == "__main__":
+    check_deck()
     SCREENS.mkdir(exist_ok=True)
     with serve_bundle() as address, sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=which("google-chrome") or which("chromium"))

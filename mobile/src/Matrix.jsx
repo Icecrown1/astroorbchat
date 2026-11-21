@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import { calcMatrixFromISO, parseReadingV2 } from '../../shared/matrix';
 import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
 import { MatrixPlate } from './MatrixPlate';
-import { TarotFace } from './SpreadGallery';
+import { CardButton } from './CardViewer';
 import { Frontispiece } from './Editorial';
 import { onlineRequest } from './onlineApi';
 import { ChartViewport } from './ChartViewport';
@@ -16,7 +16,7 @@ function Arcana({ title, number, description }) {
   const card = arcanaMetaByN(number);
   return (
     <article className="arcana">
-      <TarotFace cardId={arcanaCardId(number)} />
+      <CardButton cards={[{ cardId: arcanaCardId(number), label: title }]} />
       <div>
         <p className="zone">{title}</p>
         <h3>{number} · {card.ru}</h3>

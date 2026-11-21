@@ -27,9 +27,10 @@ function ServerReading({ reading, open }) {
         const title = interpretation?.cards?.[i]?.title || '';
         return card ? title.replace(card.nameEn, '').replace('(' + card.nameRu + ')', '').replace(card.nameRu, '').replace(/^[\s:·—–-]+/, '').trim() : title;
       })}
-      descriptions={Array.isArray(interpretation?.cards) ? interpretation.cards.map(section => section?.text) : []} />
-    {interpretation?.intro && <p>{interpretation.intro}</p>}
-    {interpretation?.synthesis && <div className="reading-section"><h3>Общий смысл</h3><p>{interpretation.synthesis}</p></div>}
+      descriptions={Array.isArray(interpretation?.cards) ? interpretation.cards.map(section => section?.text) : []}>
+      {interpretation?.intro && <p>{interpretation.intro}</p>}
+      {interpretation?.synthesis && <div className="reading-section"><h3>Общий смысл</h3><p>{interpretation.synthesis}</p></div>}
+    </SpreadGallery>
     {interpretation?.advice && <div className="reading-section"><h3>Совет</h3><p>{interpretation.advice}</p></div>}
   </div>;
   const date = <time dateTime={reading.createdAt}>{dateFormat.format(new Date(reading.createdAt))}</time>;

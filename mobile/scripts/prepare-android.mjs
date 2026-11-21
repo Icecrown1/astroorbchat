@@ -85,7 +85,7 @@ const designVariant = `
 android.buildTypes {
     design {
         initWith android.buildTypes.debug
-        applicationIdSuffix ".design"
+        applicationIdSuffix ".reader"
         matchingFallbacks = ["debug"]
         signingConfig android.signingConfigs.debug
     }
@@ -96,9 +96,9 @@ const designValues = new URL('../android/app/src/design/res/values/', import.met
 await mkdir(designValues, { recursive: true });
 await writeFile(new URL('strings.xml', designValues), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AstroOrbi Дизайн</string>
-    <string name="title_activity_main">AstroOrbi Дизайн</string>
-    <string name="package_name">${config.appId}.design</string>
-    <string name="custom_url_scheme">${config.appId}.design</string>
+    <string name="app_name">AstroOrbi Карты</string>
+    <string name="title_activity_main">AstroOrbi Карты</string>
+    <string name="package_name">${config.appId}.reader</string>
+    <string name="custom_url_scheme">${config.appId}.reader</string>
 </resources>
 `);

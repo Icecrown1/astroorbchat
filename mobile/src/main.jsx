@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Frontispiece, IndexRow, NavIcon, plate } from './Editorial';
+import { Frontispiece, IndexRow, NavIcon, PlateInk, plate } from './Editorial';
 import editorialHero from './art/card-of-day.webp';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
+import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
 import { Natal } from './Natal';
 import { GuestNatal } from './GuestNatal';
@@ -71,6 +72,7 @@ function Stars({ profile, openAccount }) {
 
 function App() {
   const [route, setRoute] = useState({ screen: 'home', depth: 0 });
+  const [viewer, setViewer] = useState(null);
   const [tarotMode, setTarotMode] = useState('daily');
   const [tarotSource, setTarotSource] = useState(null);
   const { screen, depth } = route;
@@ -91,7 +93,9 @@ function App() {
     window.history.replaceState({ astroOrbi: true, screen: 'home', depth: 0 }, '');
     function restore(event) {
       if (!event.state?.astroOrbi) return;
-      setRoute(event.state);
+      const { viewer: restoredViewer, ...destination } = event.state;
+      setViewer(restoredViewer ?? null);
+      setRoute(destination);
       if (event.state.tarotMode) setTarotMode(event.state.tarotMode);
       setTarotSource(event.state.tarotSource ?? null);
     }
@@ -109,6 +113,14 @@ function App() {
     };
   }, []);
 
+  function openCards(cards, index) {
+    const current = { ...route, astroOrbi: true, tarotMode, tarotSource };
+    const nextViewer = { cards, index };
+    window.history.replaceState(current, '');
+    window.history.pushState({ ...current, viewer: nextViewer }, '');
+    setViewer(nextViewer);
+  }
+
   function navigate(next, mode, requestedSource) {
     if (mode) setTarotMode(mode);
     if (requestedSource) setTarotSource(requestedSource);
@@ -124,7 +136,8 @@ function App() {
   }
 
   return (
-    <div className="page" data-screen={screen}>
+    <CardViewerContext.Provider value={openCards}><div className="page" data-screen={screen}>
+      <PlateInk />
       <header className="app-header">
         {depth > 0 && !destinations.some(([id]) => id === screen) && <button type="button" className="back-button" aria-label="Назад"
           disabled={screen === 'settings' && account.busy} onClick={() => window.history.back()}>←</button>}
@@ -186,7 +199,8 @@ function App() {
           </button>
         ))}
       </nav>
-    </div>
+      {viewer && <CardViewer viewer={viewer} onDismiss={() => window.history.back()} />}
+    </div></CardViewerContext.Provider>
   );
 }
 

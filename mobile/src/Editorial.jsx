@@ -1,5 +1,15 @@
 const plates = import.meta.glob('./art/plates/*.webp', { eager: true, import: 'default' });
 
+// Luminance is measured in sRGB. The pale paper becomes transparent while dark ink and velvet stay opaque.
+export function PlateInk() {
+  return <svg width="0" height="0" aria-hidden="true" focusable="false" style={{ position: 'absolute' }}>
+    <defs><filter id="plate-ink" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -0.85 -2.86 -0.29 0 3.64" />
+      <feComposite in2="SourceGraphic" operator="in" />
+    </filter></defs>
+  </svg>;
+}
+
 export function plate(name) {
   return plates[`./art/plates/${name}.webp`];
 }

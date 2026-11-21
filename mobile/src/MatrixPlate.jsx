@@ -1,5 +1,12 @@
 import { buildNodes } from '../../client/src/components/MatrixOctagram';
 
+// Birth is at the left vertex. Each eighth of the circle spans ten years.
+const ages = Array.from({ length: 80 }, (_, age) => {
+  const angle = Math.PI + age * Math.PI / 40;
+  const radius = age % 2 === 0 ? 186 : 178;
+  return { age, x: 200 + radius * Math.cos(angle), y: 200 + radius * Math.sin(angle) };
+});
+
 const paths = [
   ['a','b','c','d','a'], ['rodTL','rodTR','rodBR','rodBL','rodTL'],
   ['a','c'], ['b','d'], ['rodBL','loveEntry','e','moneyEntry','rodBR'],
@@ -16,10 +23,10 @@ export function MatrixPlate({ core, selected, onSelect }) {
     </g>
     {paths.map((ids,i) => <polyline key={i} points={ids.map(id => `${byId[id].x},${byId[id].y}`).join(' ')}
       fill="none" stroke={i === 0 || i === 4 ? '#a33220' : '#716046'} strokeWidth={i<2 ? 1.7 : 1.2} strokeDasharray={i===2 || i===3 ? '4 3' : undefined} />)}
-    {core.ageDecades.map((p,i) => {
-      const angle=Math.PI+i*Math.PI/4;
-      return <text key={p.age} x={200+181*Math.cos(angle)} y={200+181*Math.sin(angle)} className="age-tick">{p.age}</text>;
-    })}
+    <g aria-label="Возраст в годах">
+      {ages.map(({ age, x, y }) => <text key={age} x={x} y={y}
+        className={'age-tick' + (age % 10 === 0 ? ' decade' : age % 5 === 0 ? ' midway' : '')}>{age}</text>)}
+    </g>
     {nodes.map(n => {
       const active=selected===n.id;
       return <g key={n.id} className="matrix-point" role="button" tabIndex="0" aria-pressed={active}
