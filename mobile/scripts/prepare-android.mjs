@@ -85,7 +85,7 @@ const designVariant = `
 android.buildTypes {
     design {
         initWith android.buildTypes.debug
-        applicationIdSuffix ".engravings"
+        applicationIdSuffix ".cross"
         matchingFallbacks = ["debug"]
         signingConfig android.signingConfigs.debug
     }
@@ -96,9 +96,9 @@ const designValues = new URL('../android/app/src/design/res/values/', import.met
 await mkdir(designValues, { recursive: true });
 await writeFile(new URL('strings.xml', designValues), `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AstroOrbi Гравюры</string>
-    <string name="title_activity_main">AstroOrbi Гравюры</string>
-    <string name="package_name">${config.appId}.engravings</string>
-    <string name="custom_url_scheme">${config.appId}.engravings</string>
+    <string name="app_name">AstroOrbi Крест</string>
+    <string name="title_activity_main">AstroOrbi Крест</string>
+    <string name="package_name">${config.appId}.cross</string>
+    <string name="custom_url_scheme">${config.appId}.cross</string>
 </resources>
 `);

@@ -83,6 +83,47 @@ def check_paper(page, selector):
     art.evaluate("img => img.style.opacity = ''")
 
 
+def check_celtic_cross(page):
+    board = page.get_by_role("group", name="Схема Кельтского креста")
+    board.wait_for()
+    cards = board.get_by_role("button")
+    assert cards.count() == 10
+    assert cards.locator(".position-label").all_text_contents() == list(map(str, range(1, 11)))
+    for width in (390, 320, 360):
+        page.set_viewport_size({"width": width, "height": 844})
+        board.evaluate("el => el.scrollIntoView({block:'center', behavior:'instant'})")
+        boxes = [card.bounding_box() for card in cards.all()]
+        xs = [box["x"] + box["width"] / 2 for box in boxes]
+        ys = [box["y"] + box["height"] / 2 for box in boxes]
+        assert all(box["width"] >= 44 and box["height"] >= 44 for box in boxes)
+        assert board.evaluate("el => el.scrollWidth <= el.clientWidth && document.documentElement.scrollWidth <= innerWidth")
+        assert xs[3] < xs[0] < xs[5] < xs[6] and max(xs[6:]) - min(xs[6:]) < 1
+        assert ys[4] < ys[0] < ys[1] < ys[2] and abs(ys[3] - ys[5]) < 1
+        assert ys[9] < ys[8] < ys[7] < ys[6]
+        assert boxes[1]["width"] > boxes[1]["height"] and boxes[0]["width"] < boxes[0]["height"]
+        assert abs(xs[0] - xs[1]) < 6 and boxes[0]["y"] + boxes[0]["height"] > boxes[1]["y"]
+        if width == 390:
+            board.locator("img").evaluate_all("imgs => Promise.all(imgs.map(img => img.decode()))")
+            board.screenshot(path=SCREENS / "12-celtic-cross.png")
+        if width == 320:
+            for i, card in enumerate(cards.all()):
+                # The upper half of the first card remains exposed above the crossing card.
+                box = boxes[i]
+                card.tap(position={"x": box["width"] / 2, "y": 12 if i == 0 else box["height"] / 2})
+                viewer = page.get_by_role("dialog")
+                assert viewer.locator(".viewer-paging span").inner_text() == f"{i + 1} из 10"
+                assert viewer.locator("header span").inner_text().startswith(f"{i + 1}. ")
+                assert viewer.locator("img.reversed").count() == int(i == 1)
+                viewer.get_by_role("button", name="Закрыть карту").click()
+                viewer.wait_for(state="hidden")
+    page.set_viewport_size({"width": 390, "height": 844})
+    face = cards.first.locator(".tarot-face")
+    assert face.evaluate("el => getComputedStyle(el).animationName") == "tarot-float"
+    page.emulate_media(reduced_motion="reduce")
+    assert face.evaluate("el => getComputedStyle(el).animationName === 'none' && getComputedStyle(el).boxShadow !== 'none'")
+    page.emulate_media(reduced_motion="no-preference")
+
+
 def exercise(page, url):
     draws, errors = [], []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
@@ -201,7 +242,8 @@ def exercise(page, url):
     page.locator("#tarot-question").fill(question)
     button("Сделать расклад · 10 ★").click()
     button("Списать 10 ★").click()
-    page.locator(".many-cards:visible").wait_for()
+    check_celtic_cross(page)
+    assert draws == ["three", "daily", "celtic"]
     assert meanings.count() == 10
     assert meanings.last.locator("p").inner_text() == "Трактовка для позиции 10."
     button("Офлайн").click()

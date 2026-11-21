@@ -3,14 +3,17 @@ import { CardButton } from './CardViewer';
 
 export function SpreadGallery({ cards, spread, labels, descriptions = [], titles = [], keywords = [], children }) {
   if (!cards?.length) return children ?? null;
-  const positions = cards.map(({ cardId, reversed }, i) => ({
-    cardId, reversed, label: labels?.[i] ?? TAROT_SPREADS[spread]?.positions[i]?.[0] ?? `Карта ${i + 1}`,
-  }));
+  const celtic = spread === 'celtic' && cards.length === TAROT_SPREADS.celtic.cards;
+  const positions = cards.map(({ cardId, reversed }, i) => {
+    const label = labels?.[i] ?? TAROT_SPREADS[spread]?.positions[i]?.[0] ?? `Карта ${i + 1}`;
+    return { cardId, reversed, label: celtic ? `${i + 1}. ${label}` : label };
+  });
+  const layout = celtic ? 'celtic-cross' : cards.length === 1 ? 'one-card' : cards.length === 3 ? 'three-cards' : 'many-cards';
 
   return <section className="spread-gallery" aria-label="Карты расклада">
-    <div className={`card-table ${cards.length === 1 ? 'one-card' : cards.length === 3 ? 'three-cards' : 'many-cards'}`}>
+    <div className={`card-table ${layout}`} role="group" aria-label={celtic ? 'Схема Кельтского креста' : 'Карты на столе'}>
       {positions.map(({ label }, i) => <CardButton key={i} cards={positions} index={i}>
-        <span className="position-label">{label}</span>
+        <span className="position-label" aria-hidden="true">{celtic ? i + 1 : label}</span>
       </CardButton>)}
     </div>
     {children}
