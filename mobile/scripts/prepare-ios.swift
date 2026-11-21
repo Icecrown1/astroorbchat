@@ -28,7 +28,7 @@ func writeBrandImage(at path: String, markSize: CGFloat, transparent: Bool) thro
     }
     let bitmap = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
-        bitsPerSample: 8, samplesPerPixel: transparent ? 4 : 3, hasAlpha: transparent,
+        bitsPerSample: 8, samplesPerPixel: transparent ? 4 : 3, hasAlpha: transparent, isPlanar: false,
         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
     )!
     NSGraphicsContext.saveGraphicsState()
