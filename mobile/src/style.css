@@ -60,13 +60,25 @@ label {font-weight:600;font-size:.93rem}
 .tile-couple img,.tile-owl img {height:83%;bottom:-12%;object-position:center 35%}
 .tile-sun img,.tile-matrix img {width:83%;height:111%;object-fit:contain;bottom:-26%;right:-10%}
 .tile-sun strong,.tile-matrix strong {max-width:67%}
-.ad-placeholder {
-  display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.35rem .75rem;
-  min-height:64px; padding:.8rem; border:1px dashed var(--rule); border-radius:8px;
-  color:var(--muted); background:#f3e6d1;
+/* The two ad formats share a fullscreen stage in the Android ad preview. */
+.ad-preview-screen {
+  position:fixed; inset:0; margin:0; width:100%; max-width:none; height:100%; height:100dvh; max-height:none;
+  padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));
+  border:0; color:var(--ink); background:var(--paper) url('./art/plates/grain.webp'); background-blend-mode:multiply;
 }
-.ad-placeholder span {font-size:.72rem; letter-spacing:.04em; padding:.1rem .42rem; border:1px solid var(--rule); border-radius:4px}
-.ad-placeholder strong {font:400 1.02rem var(--display)}
+.ad-preview-screen[open] {display:grid;grid-template-rows:auto 1fr auto;overflow:auto;gap:1rem}
+.ad-preview-screen header,.ad-preview-screen footer,.ad-scene {width:min(100%,29rem);margin-inline:auto}
+.ad-preview-screen header {display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:.87rem}
+.ad-preview-screen header button {width:44px;height:44px;border-radius:50%;border-color:var(--rule);color:var(--ink);background:transparent;font-size:1.5rem;line-height:1}
+.ad-scene {align-content:center;text-align:center}
+.ad-scene img {width:min(62%,29vh);mix-blend-mode:multiply}
+.ad-scene h2 {margin:.7rem auto;max-width:15ch}
+.ad-preview-screen footer {display:grid;gap:.55rem;text-align:center}
+.rewarded-advice {display:grid;grid-template-columns:4.5rem 1fr;gap:1rem;align-items:center;padding:.85rem 0;border-block:1px solid var(--rule)}
+.rewarded-advice button {padding:0;background:transparent;border:0}
+.rewarded-advice small {color:var(--deep);font-weight:700}
+.ad-preview-screen progress {width:100%;height:6px;accent-color:var(--red)}
+.ad-preview-screen footer p {font-size:.9rem;color:var(--muted)}
 .catalog-link {display:flex;align-items:center;justify-content:space-between;background:transparent;color:var(--red);font:700 1.15rem var(--display);border-bottom:1px solid var(--rule);border-radius:0;padding-inline:.15rem}
 .frontispiece {position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;border-bottom:1px solid var(--rule);margin:0 calc(0px - var(--edge));padding:1rem var(--edge)}
 .front-art {position:absolute;right:0;z-index:-1;mix-blend-mode:multiply;pointer-events:none}

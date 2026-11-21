@@ -83,7 +83,7 @@ const appGradle = new URL('../android/app/build.gradle', import.meta.url);
 let gradle = await readFile(appGradle, 'utf8');
 for (const [type, suffix, label] of [
   ['design', 'cross', 'AstroOrbi Крест'],
-  ['adPreview', 'adpreview', 'AstroOrbi Реклама'],
+  ['adPreview', 'adformats', 'AstroOrbi Ролики'],
 ]) {
   const variant = `
 android.buildTypes {

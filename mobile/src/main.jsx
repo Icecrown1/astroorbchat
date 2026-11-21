@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Frontispiece, IndexRow, NavIcon, PlateInk, plate } from './Editorial';
 import editorialHero from './art/card-of-day.webp';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
+import { AdPreview, RewardedAdvice } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
 import { Natal } from './Natal';
@@ -29,13 +30,7 @@ const tools = [
 ];
 const featured = tools.slice(1, 5);
 
-function AdPlaceholder() {
-  return <aside className="ad-placeholder" aria-label="Реклама">
-    <span>Реклама</span><strong>Тестовый баннер</strong>
-  </aside>;
-}
-
-function Home({ navigate, online, hasDaily, ad }) {
+function Home({ navigate, online, hasDaily }) {
   return <div className="home">
     <section className="daily-cover" style={{ backgroundImage: `url(${editorialHero})` }}>
       <h1>Карта<br />дня</h1>
@@ -48,18 +43,14 @@ function Home({ navigate, online, hasDaily, ad }) {
         <img src={plate(art)} alt="" /><strong>{name}</strong>
       </button>)}</div>
     <button className="catalog-link" type="button" onClick={() => navigate('tools')}>Все инструменты <span aria-hidden="true">→</span></button>
-    {ad}
   </div>;
 }
 
-function Tools({ navigate, ad }) {
+function Tools({ navigate }) {
   return <section className="tarot-screen">
     <Frontispiece title="Инструменты" art="sphere" />
     <div className="illustrated-index">{tools.map(([id, name, description, art]) =>
-      <React.Fragment key={id}>
-        <IndexRow title={name} description={description} art={art} onClick={() => navigate(id)} />
-        {id === 'natal' && ad}
-      </React.Fragment>)}</div>
+      <IndexRow key={id} title={name} description={description} art={art} onClick={() => navigate(id)} />)}</div>
     <IndexRow title="История раскладов" art="books" onClick={() => navigate('history')} />
   </section>;
 }
@@ -90,9 +81,41 @@ function App() {
   const readings = useReadings();
   const account = useAccount();
   const accessTier = account.profile?.tier ?? account.profile?.billingTier;
-  const ad = import.meta.env.MODE === 'ad-preview' && (account.token === null || accessTier === 'free')
-    ? <AdPlaceholder /> : null;
+  const adEligible = import.meta.env.MODE === 'ad-preview' && (account.token === null || accessTier === 'free');
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
+  const [adType, setAdType] = useState(null);
+  const previousScreen = useRef(screen);
+  const readingCompleted = useRef(false);
+  const lastAd = useRef(-Infinity);
+  const grantReward = useRef(null);
+
+  function showAd(type, onEarn) {
+    if (!adEligible || window.history.state?.adOverlay) return;
+    grantReward.current = onEarn ?? null;
+    lastAd.current = performance.now();
+    window.history.pushState({ ...window.history.state, adOverlay: true }, '');
+    setAdType(type);
+  }
+
+  // Show an interstitial only on leaving a completed reading, including Android Back.
+  useLayoutEffect(() => {
+    const leftTarot = previousScreen.current === 'tarot' && screen !== 'tarot';
+    previousScreen.current = screen;
+    if (!leftTarot) return;
+    if (readingCompleted.current && performance.now() - lastAd.current >= 120_000) {
+      showAd('interstitial');
+    }
+    readingCompleted.current = false;
+  }, [screen, adEligible]);
+
+  function onReadingComplete() {
+    if (adEligible && window.history.state?.screen === 'tarot') readingCompleted.current = true;
+  }
+
+  const rewardName = 'Дополнительная карта совета';
+  const scope = `${account.profile?.id ?? 'guest'}.${source}`;
+  const dailyReward = adEligible ? entry => <RewardedAdvice key={scope + entry.id} entry={entry} scope={scope}
+    onWatch={grant => showAd('rewarded', grant)} /> : undefined;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
   const openSettings = () => navigate('settings');
@@ -106,7 +129,11 @@ function App() {
     window.history.replaceState({ astroOrbi: true, screen: 'home', depth: 0 }, '');
     function restore(event) {
       if (!event.state?.astroOrbi) return;
-      const { viewer: restoredViewer, ...destination } = event.state;
+      const { viewer: restoredViewer, adOverlay, ...destination } = event.state;
+      // A cancelled or finished reward cannot replay through browser Forward.
+      if (adOverlay) window.history.replaceState(destination, '');
+      grantReward.current = null;
+      setAdType(null);
       setViewer(restoredViewer ?? null);
       setRoute(destination);
       if (event.state.tarotMode) setTarotMode(event.state.tarotMode);
@@ -160,8 +187,8 @@ function App() {
         </button>
       </header>
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
-      {screen === 'home' && <Home ad={ad} navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
-      {screen === 'tools' && <Tools ad={ad} navigate={navigate} />}
+      {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
+      {screen === 'tools' && <Tools navigate={navigate} />}
       {screen === 'stars' && <Stars profile={account.profile} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <Frontispiece title="Таро" art="hand" />
@@ -170,8 +197,8 @@ function App() {
           <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
         </div>
         {source === 'online'
-          ? <OnlineTarot dailyAd={ad} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
-          : <Tarot dailyAd={ad} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
+          ? <OnlineTarot onReadingComplete={onReadingComplete} dailyReward={dailyReward} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
+          : <Tarot onReadingComplete={onReadingComplete} dailyReward={dailyReward} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
       <div key={'natal' + profileKey} hidden={screen !== 'natal'}>
         <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings}
@@ -212,6 +239,8 @@ function App() {
           </button>
         ))}
       </nav>
+      {adType && adEligible && <AdPreview rewarded={adType === 'rewarded'}
+        rewardName={rewardName} onEarn={grantReward.current} onDismiss={() => window.history.back()} />}
       {viewer && <CardViewer viewer={viewer} onDismiss={() => window.history.back()} />}
     </div></CardViewerContext.Provider>
   );

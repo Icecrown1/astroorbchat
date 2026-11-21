@@ -268,7 +268,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
   );
 }
 
-export function OnlineTarot({ account, openAccount, openHistory, initialSpread, dailyAd }) {
+export function OnlineTarot({ account, openAccount, openHistory, initialSpread, onReadingComplete, dailyReward }) {
   const { token, profile, tarotStatus, busy, error, draw, refresh } = account;
   const [opened, setOpened] = useState(() =>
     account.latest?.spread === initialSpread && initialSpread !== 'daily' ? account.latest : null);
@@ -284,12 +284,17 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread, 
     {!profile && busy && <p role="status">Загружаем профиль…</p>}
     {opened ? <>
       <ServerReading key={opened.id} reading={opened} open />
-      {opened.spread === 'daily' && dailyAd}
+      {opened.spread === 'daily' && dailyReward?.(opened)}
       <button className="secondary-button" type="button" onClick={() => setOpened(null)}>Выбрать другой расклад</button>
     </> : profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
       draw={async data => {
         const result = await draw(data);
-        if (result) { setNextSpread(data.spread); setOpened(result); window.scrollTo(0, 0); }
+        if (result) {
+          if (data.spread === 'daily') onReadingComplete();
+          setNextSpread(data.spread);
+          setOpened(result);
+          window.scrollTo(0, 0);
+        }
       }} />}
     {error && <>
       <p role="alert">{error}</p>

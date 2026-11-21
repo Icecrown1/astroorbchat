@@ -158,31 +158,51 @@ def exercise(page, url, ad_preview=False):
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), f"Overflow on {name}"
         page.screenshot(path=SCREENS / f"{name}.png")
 
-    slot = page.get_by_role("complementary", name="Реклама")
+    offer = button("Посмотреть рекламу и открыть карту совета")
+    ad = page.locator(".ad-preview-screen[open]")
     page.goto(url)
     page.get_by_role("heading", name="Карта дня").wait_for()
-    assert slot.count() == int(ad_preview)
+    assert not page.locator(".ad-placeholder").count() and not ad.count()
     if ad_preview:
         page.set_viewport_size({"width": 320, "height": 740})
-        slot.scroll_into_view_if_needed()
-        assert slot.bounding_box()["height"] >= 50
-        capture("ad-home-320")
-        page.set_viewport_size({"width": 390, "height": 844})
-        nav("Инструменты")
-        slot.wait_for()
-        assert slot.evaluate("el => el.previousElementSibling.innerText.includes('Натальная карта')")
-        slot.scroll_into_view_if_needed()
-        capture("ad-catalog")
         tool("Таро")
-        assert slot.count() == 0
         button("Вытянуть карту дня").click()
-        slot.wait_for()
-        assert page.locator(".card-meaning").last.evaluate(
-            "el => !!(el.compareDocumentPosition(document.querySelector('.ad-placeholder')) & Node.DOCUMENT_POSITION_FOLLOWING)")
+        offer.wait_for()
         page.locator(".one-card:visible button").click()
-        assert page.get_by_role("dialog").locator(".ad-placeholder").count() == 0
+        assert not ad.count()
         button("Закрыть карту").click()
+        page.get_by_role("dialog").wait_for(state="hidden")
+        # Hardware Back leaves the completed reading; the ad dismisses to the desired page.
+        page.go_back()
+        ad.get_by_role("heading", name="Межстраничная реклама").wait_for()
+        assert ad.bounding_box() == {"x": 0, "y": 0, "width": 320, "height": 740}
+        capture("ad-interstitial")
+        button("Продолжить").click()
+        ad.wait_for(state="hidden")
+        assert page.locator(".page").get_attribute("data-screen") == "tools"
+        tool("Таро")
+        offer.click()
+        capture("ad-rewarded")
+        page.go_back()
+        ad.wait_for(state="hidden")
+        assert offer.is_visible() and not page.locator(".rewarded-advice").count()
+        offer.click()
+        ad.get_by_text("Награда получена", exact=True).wait_for(timeout=12000)
+        button("Продолжить").click()
+        ad.wait_for(state="hidden")
+        bonus = page.locator(".rewarded-advice h3")
+        name = bonus.inner_text()
+        assert name != page.locator(".card-meaning h3").inner_text()
+        assert not offer.count()
+        button("Три карты").click()
+        button("Вытянуть три карты").click()
         nav("Главная")
+        assert not ad.count()
+        tool("Таро")
+        button("Карта дня").click()
+        assert bonus.inner_text() == name
+        nav("Главная")
+        page.set_viewport_size({"width": 390, "height": 844})
     capture("01-home")
     nav("Инструменты")
     capture("02-tools")
@@ -208,9 +228,9 @@ def exercise(page, url, ad_preview=False):
     capture("03-profile")
     if ad_preview:
         nav("Главная")
-        assert slot.count() == 0
+        assert not ad.count() and not offer.count()
         nav("Инструменты")
-        assert slot.count() == 0
+        assert not ad.count() and not offer.count()
         nav("Профиль")
     page.get_by_role("button", name="Данные рождения").click()
     page.get_by_role("heading", name="Настройки профиля").wait_for()
@@ -268,7 +288,7 @@ def exercise(page, url, ad_preview=False):
     page.select_option("#online-spread", "daily")
     page.locator(".online-spread:visible button[type=submit]").click()
     page.locator(".one-card:visible").wait_for()
-    assert slot.count() == 0
+    assert not ad.count() and not offer.count()
     capture("10-daily")
     button("Выбрать другой расклад").click()
     page.select_option("#online-spread", "celtic")
@@ -311,17 +331,20 @@ def exercise(page, url, ad_preview=False):
             nav("Профиль")
             with page.expect_response(lambda reply: "/api/tarot/status" in reply.url):
                 button("Обновить").click()
+            tool("Таро")
+            button("С ИИ").click()
+            page.select_option("#online-spread", "daily")
+            assert not offer.count() and not ad.count()
+            page.locator(".online-spread:visible button[type=submit]").click()
+            page.locator(".one-card:visible").wait_for()
+            assert offer.count() == int(expected)
+            if expected:
+                offer.click()
+                button("Закрыть без награды").click()
+                ad.wait_for(state="hidden")
+                assert offer.is_visible()
             nav("Главная")
-            assert slot.count() == int(expected)
-        tool("Таро")
-        button("С ИИ").click()
-        page.select_option("#online-spread", "daily")
-        assert slot.count() == 0
-        page.locator(".online-spread:visible button[type=submit]").click()
-        slot.wait_for()
-        assert slot.evaluate("el => el.previousElementSibling.matches('.reading-edition')")
-        slot.scroll_into_view_if_needed()
-        capture("ad-daily-reading")
+            assert not ad.count()
     assert not errors, errors
 
 

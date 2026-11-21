@@ -56,8 +56,8 @@ jobs:
           ad_apk=app/build/outputs/apk/adPreview/app-adPreview.apk
           "$build_tools/apksigner" verify "$ad_apk"
           "$build_tools/aapt" dump badging "$ad_apk" > "$RUNNER_TEMP/orbi-ad-badging.txt"
-          grep -F "package: name='app.astroorbi.preview.adpreview'" "$RUNNER_TEMP/orbi-ad-badging.txt"
-          grep -F "application-label:'AstroOrbi Реклама'" "$RUNNER_TEMP/orbi-ad-badging.txt"
+          grep -F "package: name='app.astroorbi.preview.adformats'" "$RUNNER_TEMP/orbi-ad-badging.txt"
+          grep -F "application-label:'AstroOrbi Ролики'" "$RUNNER_TEMP/orbi-ad-badging.txt"
       - uses: actions/upload-artifact@v6
         with:
           name: astroorbi-ad-preview

@@ -87,7 +87,7 @@ function Reading({ entry }) {
     keywords={entry.cards.map(({ cardId, reversed }) => getTarotCard(cardId).kw[reversed ? 1 : 0])} />;
 }
 
-export function Tarot({ readings, mode, setMode, dailyAd }) {
+export function Tarot({ readings, mode, setMode, onReadingComplete, dailyReward }) {
   const entry = mode === 'daily' ? readings.daily : readings.lastSpread;
 
   return (
@@ -104,11 +104,11 @@ export function Tarot({ readings, mode, setMode, dailyAd }) {
       )}
       <div aria-live="polite">{entry && <Reading entry={entry} />}</div>
       {(mode === 'three' || !entry) && (
-        <button type="button" onClick={() => readings.create(mode)}>
+        <button type="button" onClick={() => { readings.create(mode); onReadingComplete(); }}>
           {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть три карты'}
         </button>
       )}
-      {mode === 'daily' && entry && dailyAd}
+      {mode === 'daily' && entry && dailyReward?.(entry)}
       {readings.storageError && <p role="alert">Не удалось сохранить расклад на устройстве.</p>}
     </section>
   );
