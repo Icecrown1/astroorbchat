@@ -97,7 +97,10 @@ function App() {
     if (!adEligible || window.history.state?.adOverlay) return;
     grantReward.current = onEarn ?? null;
     lastAd.current = performance.now();
-    window.history.pushState({ ...window.history.state, adOverlay: true }, '');
+    const current = window.history.state;
+    const returnRoute = current.screen === 'tarot' ? { ...current, tarotMode, tarotSource } : current;
+    window.history.replaceState(returnRoute, '');
+    window.history.pushState({ ...returnRoute, adOverlay: true }, '');
     setAdType({ type, title, remaining });
   }
 
