@@ -1,0 +1,13 @@
+{
+  "appId": "app.astroorbi.preview",
+  "appName": "AstroOrbi",
+  "webDir": "dist",
+  "backgroundColor": "#faecd6",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "auto",
+      "style": "LIGHT"
+    }
+  }
+}

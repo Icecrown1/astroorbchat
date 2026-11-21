@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
 
 interface Planet {
   name: string;
@@ -110,7 +109,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
 
   useEffect(() => {
     if (!planets || planets.length === 0) return;
-    const drawKey = JSON.stringify([planets, aspects, angles]);
+    const drawKey = JSON.stringify([planets, aspects, angles, houses]);
     if (drawKey === lastDrawKeyRef.current) return; // те же данные — не мигаем
     lastDrawKeyRef.current = drawKey;
     const canvas = canvasRef.current;
@@ -443,7 +442,7 @@ export function ChartCanvas({ planets, aspects, angles, houses, className, onPla
       width={400}
       height={400}
       onClick={handleClick}
-      className={cn('w-full h-auto cursor-pointer', className)}
+      className={['w-full h-auto cursor-pointer', className].filter(Boolean).join(' ')}
       data-testid="canvas-natal-chart"
     />
       </div>

@@ -1,0 +1,24 @@
+{
+  "name": "astroorbi-mobile",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "sync": "npm run build && cap sync",
+    "prepare:android": "node scripts/prepare-android.mjs"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2",
+    "vite": "7.3.8"
+  }
+}
