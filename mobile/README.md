@@ -19,12 +19,15 @@ npm run dev
 npm run build
 npx cap add android
 npm run prepare:android
-npx cap add ios
+npx cap add ios --packagemanager SPM
+swift scripts/prepare-ios.swift
 ```
 
 Для дальнейших изменений используйте `npm run sync`. Команды `npx cap open android` и `npx cap open ios` открывают проекты в Android Studio и Xcode соответственно. Для сборки под iOS нужен macOS с Xcode. Платформенные каталоги в этом прототипе генерируются из зафиксированных версий пакетов. До первой ручной правки нативных проектов их следует добавить в Git.
 
 Идентификатор `app.astroorbi.preview` предназначен для локального тестирования. Серверные аккаунты, платежи и рекламные SDK — следующие этапы.
+
+Для iOS CI публикует архив `astroorbi-ios-simulator` с `App.app`. После распаковки установите его на запущенный симулятор командой `xcrun simctl install booted App.app`. Для установки на физический iPhone нужна сборка с подписью Apple Developer. Для Android CI публикует отладочный APK. Обновления поверх предыдущей сборки требуют одинаковых идентификатора приложения и ключа подписи.
 
 ## Профиль и серверное Таро
 
