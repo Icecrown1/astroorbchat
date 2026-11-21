@@ -55,7 +55,7 @@ function Tools({ navigate }) {
 
 function Stars({ profile, openAccount }) {
   return <section className="tarot-screen">
-    <Frontispiece title={<>Звёзды<br />и подписка</>} art="sphere" scene />
+    <Frontispiece title={<>Звёзды и<br />подписка</>} art="sphere" scene />
     <section className="ledger"><h2>Баланс</h2>
       {profile?.orbs != null && <strong className="balance-number">{Number(profile.orbs).toLocaleString('ru-RU')} ✶</strong>}
       <p>Звёзды тратятся на разборы. На кнопке каждого платного разбора указана его стоимость.</p>

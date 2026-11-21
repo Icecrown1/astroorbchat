@@ -89,7 +89,7 @@ def exercise(page, url):
     node = page.locator(".matrix-plate:visible").get_by_role("button").nth(1)
     node.click()
     assert node.get_attribute("aria-pressed") == "true"
-    page.locator(".matrix-plate:visible").scroll_into_view_if_needed()
+    page.locator(".matrix-plate:visible").evaluate("svg => svg.scrollIntoView({block:'center'})")
     capture("06-matrix")
     button("Увеличить схему").click()
     assert page.locator(".chart-size-zoomed:visible").count() == 1
@@ -157,6 +157,6 @@ if __name__ == "__main__":
     SCREENS.mkdir(exist_ok=True)
     with serve_bundle() as address, sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=which("google-chrome") or which("chromium"))
-        page = browser.new_page(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        page = browser.new_page(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, locale="ru-RU")
         exercise(page, address)
         browser.close()
