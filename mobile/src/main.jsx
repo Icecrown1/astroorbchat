@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { cardImage } from './cards';
-import brandIcon from '../../client/public/brand/favicon.svg?url';
+import editorialHero from './art/card-of-day.webp';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { ProfileSettings } from './ProfileSettings';
@@ -15,8 +15,7 @@ import './style.css';
 
 const destinations = [
   ['home', 'Главная', '✦'],
-  ['tarot', 'Таро', '◇'],
-  ['natal', 'Натальная', '☉'],
+  ['tools', 'Инструменты', '▦'],
   ['account', 'Профиль', '◉'],
 ];
 
@@ -34,42 +33,61 @@ const homeSections = [
   { title: 'О близких', items: [
     ['compatibility', 'Совместимость', 'lovers'],
     ['guest-natal', 'Карты близких', 'two-of-cups'],
+    ['pair', 'Матрица пары', 'lovers'],
   ] },
 ];
 
+const featured = [
+  ['compatibility', 'Совместимость', 'lovers'], ['oracle', 'Оракул', 'hermit'],
+  ['natal', 'Натальная карта', 'sun'], ['matrix', 'Матрица судьбы', 'star'],
+];
+
+function ToolTiles({ items, navigate }) {
+  return <div className="feature-grid">{items.map(([id, label, card]) => (
+    <button className="feature" type="button" key={id} onClick={() => navigate(id)}>
+      <span>{label}</span><img src={cardImage(card)} alt="" loading="lazy" />
+    </button>
+  ))}</div>;
+}
+
 function Home({ navigate, online, hasDaily }) {
-  return (
-    <div className="home">
-      <section className="hero home-hero">
-        <img src={cardImage('moon')} alt="" className="cover" />
-        <div className="intro">
-          <h1>Карта дня</h1>
-          <p>{online ? 'На что сегодня стоит обратить внимание?' : 'Вытяни карту дня. Она доступна офлайн и без входа.'}</p>
-          <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
-            {hasDaily && !online ? 'Посмотреть карту' : 'Открыть карту дня'}
-          </button>
-        </div>
-      </section>
-      {!online && <section className="profile-card start-options" aria-label="Подключение аккаунта">
-        <div><h2>Уже пользуешься AstroOrbi в Telegram?</h2>
-          <p>Подключи аккаунт, чтобы открыть свои карты, историю и баланс.</p></div>
-        <button type="button" className="secondary-button" onClick={() => navigate('account')}>Подключить аккаунт</button>
-      </section>}
-      {homeSections.map(({ title, items }) => (
-        <section className="home-group" key={title} aria-label={title}>
-          <h2>{title}</h2>
-          <div className="feature-grid">
-            {items.map(([id, label, card]) => (
-              <button className="feature" type="button" key={id} onClick={() => navigate(id)}>
-                <img src={cardImage(card)} alt="" loading="lazy" /><span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-      <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
+  return <div className="home">
+    <section className="hero home-hero editorial-hero" style={{ backgroundImage: `url(${editorialHero})` }}>
+      <div className="intro">
+        <h1>Карта<br />дня</h1>
+        <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
+          {hasDaily && !online ? 'Посмотреть карту' : 'Открыть бесплатно'} <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </section>
+    <ToolTiles items={featured} navigate={navigate} />
+    <button className="secondary-button" type="button" onClick={() => navigate('tools')}>Все инструменты →</button>
+  </div>;
+}
+
+function Tools({ navigate }) {
+  return <section className="tarot-screen">
+    <h1>Инструменты</h1>
+    <ToolTiles items={ [['tarot', 'Таро', 'moon']] } navigate={navigate} />
+    {homeSections.map(({ title, items }) => <section className="home-group" key={title}>
+      <h2>{title}</h2><ToolTiles items={items} navigate={navigate} />
+    </section>)}
+    <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
+  </section>;
+}
+
+function Stars({ profile, openAccount }) {
+  return <section className="tarot-screen">
+    <h1>Звёзды и подписка</h1>
+    <div className="profile-card">
+      <h2>{profile?.orbs != null ? `Баланс · ${Number(profile.orbs).toLocaleString('ru-RU')} ★` : 'Баланс звёзд'}</h2>
+      <p>Звёзды списываются за платные разборы. Стоимость указана рядом с кнопкой запуска расчёта.</p>
+      {!profile && <button type="button" onClick={openAccount}>Открыть профиль</button>}
     </div>
-  );
+    <div className="profile-card"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате.</p></div>
+    <div className="profile-card"><h2>Подписка</h2><p>Standard · 250 ★ в месяц</p><p>Premium · 550 ★ в месяц и доступ к соляру</p>
+      <p>Управление подпиской доступно в AstroOrbi в Telegram.</p></div>
+  </section>;
 }
 
 function App() {
@@ -131,11 +149,15 @@ function App() {
       <header className="app-header">
         {depth > 0 && screen !== 'home' && <button type="button" className="back-button" aria-label="Назад"
           disabled={screen === 'settings' && account.busy} onClick={() => window.history.back()}>←</button>}
-        <img src={brandIcon} alt="" className="app-mark" />
-        <span>AstroOrbi</span>
+        <span className="editorial-wordmark">Astro<b>Orbi</b></span>
+        <button className="star-balance" type="button" onClick={() => navigate('stars')} aria-label="Звёзды и подписка">
+          <span aria-hidden="true">✦</span> {account.profile?.orbs != null ? Number(account.profile.orbs).toLocaleString('ru-RU') : 'Звёзды'}
+        </button>
       </header>
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
+      {screen === 'tools' && <Tools navigate={navigate} />}
+      {screen === 'stars' && <Stars profile={account.profile} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <h1>Таро</h1>
         <div className="mode-switch" aria-label="Вариант расклада">
@@ -167,7 +189,7 @@ function App() {
       <div key={'oracle' + Boolean(account.token)} hidden={screen !== 'oracle'}>
         <Oracle account={account} openAccount={openAccount} openNatal={openNatal} />
       </div>
-      <div hidden={screen !== 'matrix'}><Matrix account={account} openAccount={openAccount} /></div>
+      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={screen === 'pair' ? 'pair' : 'matrix'} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
       {screen === 'history' && <section className="tarot-screen">
         <h1>История</h1>
         <AccountHistory account={account} />
@@ -180,7 +202,7 @@ function App() {
         <ProfileSettings key={account.profile.id} account={account} openAccount={openAccount} openNatal={openNatal} />}
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
         {destinations.map(([id, name, icon]) => (
-          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : ['guest-natal', 'dates'].includes(screen) ? 'natal' : screen) ? 'page' : undefined} onClick={() => navigate(id)}>
+          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : screen === 'home' || screen === 'account' ? screen : 'tools') ? 'page' : undefined} onClick={() => navigate(id)}>
             <span aria-hidden="true">{icon}</span><span className="nav-label">{name}</span>
           </button>
         ))}

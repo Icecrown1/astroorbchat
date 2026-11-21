@@ -84,7 +84,7 @@ export function GuestNatal({ account, openAccount }) {
       }
       const user = await refreshProfile(token);
       if (!['standard', 'premium'].includes(user.tier ?? user.billingTier)) throw new Error('Для новой карты нужна подписка.');
-      if (!Number.isFinite(Number(user.orbs)) || Number(user.orbs) < price) throw new Error('На балансе недостаточно орбов.');
+      if (!Number.isFinite(Number(user.orbs)) || Number(user.orbs) < price) throw new Error('На балансе недостаточно звёзд.');
       let chart;
       try {
         chart = await onlineRequest('/api/natal/external', { token, data });
@@ -166,7 +166,7 @@ export function GuestNatal({ account, openAccount }) {
         <label htmlFor="guest-natal-time">Время рождения</label>
         <input id="guest-natal-time" type="time" name="birthTime" disabled={busy || Boolean(unknown)} />
         <CityField id="guest-natal-city" required value={city} change={setCity} disabled={busy || Boolean(unknown)} />
-        <button type="submit" disabled={busy || Boolean(unknown)}>{busy ? 'Подождите…' : `Построить карту · ${price} орб.`}</button>
+        <button type="submit" disabled={busy || Boolean(unknown)}>{busy ? 'Подождите…' : `Построить карту · ${price} ★`}</button>
       </form>}
       {charts && needsSubscription && <p>Новые карты доступны с подпиской. Сохранённые можно открывать бесплатно.</p>}
     </>}

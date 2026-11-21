@@ -94,7 +94,7 @@ export function NatalReadings({ planet, houseNumber, account, savedHouses }) {
           throw new Error('Для нового разбора нужна подписка.');
         }
         const balance = Number(user.orbs);
-        if (!Number.isFinite(balance) || balance < cost) throw new Error('На балансе недостаточно орбов.');
+        if (!Number.isFinite(balance) || balance < cost) throw new Error('На балансе недостаточно звёзд.');
       }
 
       const path = kind === 'house' ? 'house-influence' : 'planet-interpretation';
@@ -159,7 +159,7 @@ export function NatalReadings({ planet, houseNumber, account, savedHouses }) {
       <summary>Подробный разбор планеты</summary>
       <Reading reading={personal.detailed} kind="detailed" />
     </details> : !needsSubscription && <button type="button" disabled={busy || Boolean(unconfirmed)} onClick={() => open('detailed')}>
-      {pending === 'detailed' ? 'Готовим разбор…' : `Подробный разбор планеты · ${cost} орба`}
+      {pending === 'detailed' ? 'Готовим разбор…' : `Подробный разбор планеты · ${cost} ★`}
     </button>}
     {pastHouse ? <details key={planet} className="natal-detail" open={openedHouse === planet}>
       <summary>Сохранённый разбор влияния дома</summary>
@@ -169,7 +169,7 @@ export function NatalReadings({ planet, houseNumber, account, savedHouses }) {
         {pending === 'saved' ? 'Проверяем…' : 'Проверить сохранённые разборы домов'}
       </button> :
       <button type="button" className="secondary-button" disabled={busy || Boolean(unconfirmed)} onClick={() => open('house')}>
-        {pending === 'house' ? 'Готовим разбор…' : `Разобрать влияние дома · ${cost} орба`}
+        {pending === 'house' ? 'Готовим разбор…' : `Разобрать влияние дома · ${cost} ★`}
       </button>)}
     {needsSubscription && !personal.detailed && <p>Новый подробный разбор доступен с подпиской.</p>}
     {errors[planet] && <p role="alert">{errors[planet]}</p>}

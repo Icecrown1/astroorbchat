@@ -82,7 +82,7 @@ function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
         {!hasCost && !needsSubscription && <p>Стоимость недоступна. Обнови историю и баланс.</p>}
       </>}
       <button type="submit" disabled={busy || (paid && (!hasCost || needsSubscription || !question.trim()))}>
-        {busy ? 'Подождите…' : paid ? (hasCost ? `Сделать расклад · ${cost} орб.` : 'Сделать расклад') :
+        {busy ? 'Подождите…' : paid ? (hasCost ? `Сделать расклад · ${cost} ★` : 'Сделать расклад') :
           status?.dailyDone ? 'Открыть карту дня' : 'Карта дня с ИИ-разбором'}
       </button>
     </form>
@@ -252,7 +252,7 @@ export function Account({ account, openHistory, openSettings, openOffline }) {
         {profile && <div className="profile-card">
           <h2>{profile.name}</h2>
           <p>Тариф · {tiers[profile.billingTier] || profile.billingTier}</p>
-          {profile.orbs != null && <p>Баланс · {profile.orbs}</p>}
+          {profile.orbs != null && <p>Баланс · {Number(profile.orbs).toLocaleString('ru-RU')} ★</p>}
         </div>}
         {profile && <BirthDetails profile={profile} openSettings={openSettings} busy={busy} />}
         <button className="secondary-button" type="button" onClick={openHistory}>История раскладов</button>

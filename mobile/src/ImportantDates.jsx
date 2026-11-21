@@ -83,7 +83,7 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
         }
         const balance = Number(user.orbs);
         if (!Number.isFinite(balance) || balance < readingCost) {
-          throw new Error('На балансе недостаточно орбов.');
+          throw new Error('На балансе недостаточно звёзд.');
         }
         const event = readingEvent;
         let reply;
@@ -167,7 +167,7 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
         meta={fullDateFormat.format(new Date(readingEvent.date))}>
         {result ? <ReadingText text={result.interpretation} /> : <>
           {eligible ? <button type="button" disabled={busy || uncertain} onClick={requestReading}>
-            {readingBusy ? 'Готовим разбор…' : `Получить ИИ-разбор · до ${readingCost} орбов`}
+            {readingBusy ? 'Готовим разбор…' : `Получить ИИ-разбор · до ${readingCost} ★`}
           </button> : <p>Новый разбор доступен с подпиской.</p>}
           {uncertain && <button type="button" className="secondary-button" disabled={busy} onClick={checkBalance}>Проверить баланс</button>}
         </>}

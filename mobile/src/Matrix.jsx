@@ -52,8 +52,8 @@ function MatrixResult({ core, title, centerTitle = 'Центр — зона ко
   );
 }
 
-export function Matrix({ account, openAccount }) {
-  const [mode, setMode] = useState(null);
+export function Matrix({ account, openAccount, initialMode = null }) {
+  const [mode, setMode] = useState(initialMode);
   const source = mode ?? (account.token ? 'account' : 'date');
   const accountKey = account.profile?.id ? account.profile.id + account.profile.birthdayDate : Boolean(account.token);
   const [date, setDate] = useState('');
@@ -200,7 +200,7 @@ function AccountMatrix({ account, openAccount, guest }) {
           }
           const balance = Number(user.orbs);
           if (!Number.isFinite(balance) || balance < currentCost) {
-            throw new Error('На балансе недостаточно орбов.');
+            throw new Error('На балансе недостаточно звёзд.');
           }
         }
         let reply;
@@ -217,7 +217,7 @@ function AccountMatrix({ account, openAccount, guest }) {
             throw new Error('Ответ не получен. Проверь, сохранился ли разбор, и обнови баланс перед повтором.');
           }
           if (failure.code === 'subscription_required') throw new Error('Для нового разбора нужна подписка.');
-          if (failure.code === 'insufficient_orbs') throw new Error('На балансе недостаточно орбов.');
+          if (failure.code === 'insufficient_orbs') throw new Error('На балансе недостаточно звёзд.');
           throw failure;
         }
         setMatrix({
@@ -255,7 +255,7 @@ function AccountMatrix({ account, openAccount, guest }) {
                 if (!busy && !mustCheck) setOwnError(false);
               }} disabled={Boolean(pending)}>
                 <span>{sectionNames[item.id]}</span>
-                <small>{item.content ? 'Сохранён' : item.free ? 'Бесплатно' : `${sectionCost(item)} орб.`}</small>
+                <small>{item.content ? 'Сохранён' : item.free ? 'Бесплатно' : `${sectionCost(item)} ★`}</small>
               </button>
               {selected === item.id && <article className="result-card forecast-result" aria-label={sectionNames[item.id]}>
                 {section.content && <MatrixReading content={section.content} />}
@@ -264,7 +264,7 @@ function AccountMatrix({ account, openAccount, guest }) {
                   <button type="button" onClick={generate} disabled={busy || mustCheck}>
                     {pending === section.id ? 'Готовим разбор…' :
                       section.outdated ? 'Обновить разбор бесплатно' :
-                      cost > 0 ? `Получить разбор · ${cost} орб.` : 'Получить бесплатный разбор'}
+                      cost > 0 ? `Получить разбор · ${cost} ★` : 'Получить бесплатный разбор'}
                   </button>
                 )}
                 {ownError && error && <p role="alert">{error}</p>}
@@ -395,7 +395,7 @@ function RelatedMatrices({ kind, account, openAccount }) {
           }
           const balance = Number(user.orbs);
           if (!Number.isFinite(balance) || balance < cost) {
-            throw new Error('На балансе недостаточно орбов.');
+            throw new Error('На балансе недостаточно звёзд.');
           }
         }
 
@@ -413,7 +413,7 @@ function RelatedMatrices({ kind, account, openAccount }) {
             throw new Error('Ответ не получен. Проверь сохранённые расчёты и баланс перед повтором.');
           }
           if (failure.code === 'subscription_required') throw new Error('Для нового расчёта нужна подписка.');
-          if (failure.code === 'insufficient_orbs') throw new Error('На балансе недостаточно орбов.');
+          if (failure.code === 'insufficient_orbs') throw new Error('На балансе недостаточно звёзд.');
           throw failure;
         }
         setOpened(response);
@@ -469,7 +469,7 @@ function RelatedMatrices({ kind, account, openAccount }) {
         {needsSubscription && !existing && <p>С подпиской можно добавить новый расчёт.</p>}
         <button type="submit" disabled={!valid || busy || Boolean(unconfirmed) || (needsSubscription && !existing)}>
           {pending ? 'Загружаем…' : existing ? 'Открыть сохранённый расчёт' :
-            isGuest ? `Построить матрицу · ${cost} орб.` : `Получить разбор пары · ${cost} орб.`}
+            isGuest ? `Построить матрицу · ${cost} ★` : `Получить разбор пары · ${cost} ★`}
         </button>
       </form>}
     </>}

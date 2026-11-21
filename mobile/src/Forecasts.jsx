@@ -1,3 +1,4 @@
+import { StarConfirmation } from './StarConfirmation';
 import { useState } from 'react';
 import { onlineRequest } from './onlineApi';
 import { ResultCard } from './ResultCard';
@@ -132,6 +133,8 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
     });
   }
 
+  const [confirmation, setConfirmation] = useState(null);
+
   function generate(event) {
     event.preventDefault();
     if (!profile || mustCheck || needsSubscription || missingBirthplace || busy) return;
@@ -151,11 +154,18 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
       }
     }
 
+    setConfirmation(data);
+  }
+
+  function confirmReading() {
+    if (!confirmation || busy) return;
+    const data = confirmation;
+    setConfirmation(null);
     run(async () => {
       const current = await refreshProfile(token);
       if ((current.tier ?? current.billingTier) === 'free') throw new Error('Для разбора нужна подписка.');
       if (!Number.isFinite(Number(current.orbs)) || Number(current.orbs) < cost) {
-        throw new Error('На балансе недостаточно орбов.');
+        throw new Error('На балансе недостаточно звёзд.');
       }
 
       const path = horoscope ? periods[period].path : '/api/astrology/compatibility';
@@ -188,7 +198,7 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
           {horoscope ? <div className="mode-switch forecast-period" aria-label="Период прогноза">
             {Object.entries(periods).map(([id, item]) => (
               <button key={id} type="button" disabled={busy} aria-pressed={id === period}
-                onClick={() => { setPeriod(id); setResult(null); }}>{item.name}</button>
+                onClick={() => { setConfirmation(null); setPeriod(id); setResult(null); }}>{item.name}</button>
             ))}
           </div> : <PartnerFields busy={busy} />}
           {needsSubscription && <p>Для нового разбора нужна подписка.</p>}
@@ -197,10 +207,12 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
             <button type="button" className="secondary-button" onClick={openSettings}>Настройки профиля</button>
           </>}
           <button type="submit" disabled={busy || mustCheck || needsSubscription || missingBirthplace}>
-            {busy ? 'Подождите…' : `${horoscope ? 'Получить прогноз' : 'Рассчитать совместимость'} · ${cost} орб.`}
+            {busy ? 'Подождите…' : `${horoscope ? 'Получить прогноз' : 'Рассчитать совместимость'} · ${cost} ★`}
           </button>
         </form> : <button type="button" disabled={busy} onClick={account.refresh}>Загрузить профиль</button>}
         {validation && <p role="alert">{validation}</p>}
+        {confirmation && <StarConfirmation title={horoscope ? 'Гороскоп' : 'Совместимость'} balance={profile?.orbs} cost={cost}
+          onCancel={() => setConfirmation(null)} onConfirm={confirmReading} busy={busy} />}
         {error && <p role="alert">{error}</p>}
         {needsNatal && <button className="secondary-button" type="button" onClick={openNatal}>Открыть натальную карту</button>}
         {result && <ResultCard title={horoscope ? 'Твой прогноз' : 'Разбор совместимости'}

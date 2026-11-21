@@ -1,3 +1,4 @@
+import { StarConfirmation } from './StarConfirmation';
 import { useState } from 'react';
 import { translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
@@ -62,7 +63,7 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
         const user = await refreshProfile(token);
         if ((user.tier ?? user.billingTier) !== 'premium') throw new Error('Для нового соляра нужен Premium.');
         if (Number(user.orbs) < solarCost || !Number.isFinite(Number(user.orbs))) {
-          throw new Error('На балансе недостаточно орбов.');
+          throw new Error('На балансе недостаточно звёзд.');
         }
       }
       let reply;
@@ -107,7 +108,7 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
         <p>{checked.cached ? 'Соляр уже сохранён в аккаунте.' : 'Для этого года и города нужен новый расчёт.'}</p>
         {requiresPremium ? <p>Новый соляр доступен по тарифу Premium.</p> :
           <button type="button" disabled={busy} onClick={openSolar}>
-            {checked.cached ? 'Открыть сохранённый соляр · бесплатно' : `Рассчитать соляр · ${solarCost} орб.`}
+            {checked.cached ? 'Открыть сохранённый соляр · бесплатно' : `Рассчитать соляр · ${solarCost} ★`}
           </button>}
       </div>}
       {error && <p role="alert">{error}</p>}
@@ -143,15 +144,24 @@ export function Oracle({ account, openAccount, openNatal }) {
     });
   }
 
+  const [confirmation, setConfirmation] = useState(null);
+
   function ask(event) {
     event.preventDefault();
     const text = question.trim();
     if (text.length < 10 || !profile || mustCheck || needsSubscription || busy) return;
+    setConfirmation(text);
+  }
+
+  function confirmReading() {
+    if (!confirmation || busy) return;
+    const text = confirmation;
+    setConfirmation(null);
     run(async () => {
       const current = await refreshProfile(token);
       if ((current.tier ?? current.billingTier) === 'free') throw new Error('Для Оракула нужна подписка.');
       if (Number(current.orbs) < oracleCost || !Number.isFinite(Number(current.orbs))) {
-        throw new Error('На балансе недостаточно орбов.');
+        throw new Error('На балансе недостаточно звёзд.');
       }
       try {
         const { answer } = await onlineRequest('/api/astrology/ask', { token, data: { question: text, locale: 'ru' } });
@@ -180,10 +190,12 @@ export function Oracle({ account, openAccount, openNatal }) {
           rows={4} minLength={10} maxLength={1000} required disabled={busy} />
         {needsSubscription && <p>Для нового ответа нужна подписка.</p>}
         <button type="submit" disabled={busy || !profile || mustCheck || needsSubscription || question.trim().length < 10}>
-          {busy ? 'Подождите…' : 'Задать вопрос · 0,5 орб.'}
+          {busy ? 'Подождите…' : 'Задать вопрос · 0,5 ★'}
         </button>
       </form>
-      {error && <p role="alert">{error}</p>}
+      {confirmation && <StarConfirmation title={'Вопрос Оракулу'} balance={profile?.orbs} cost={oracleCost}
+          onCancel={() => setConfirmation(null)} onConfirm={confirmReading} busy={busy} />}
+        {error && <p role="alert">{error}</p>}
       {!profile && !busy && <button className="secondary-button" type="button" onClick={account.refresh}>Загрузить профиль</button>}
       {needsNatal && <NatalPrompt openNatal={openNatal} />}
       {result && <ResultCard title={result.question} eyebrow="Ответ Оракула"><ReadingText text={result.answer} /></ResultCard>}

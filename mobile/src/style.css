@@ -300,3 +300,67 @@ header { margin-bottom: 1.3rem; }
   .app-nav .nav-label { font-size: .7rem; }
   .arcana { padding: .75rem; gap: .7rem; }
 }
+
+/* AstroOrbi editorial palette */
+:root {
+  color-scheme: light;
+  --paper: #f8edda;
+  --surface: #fff6e6;
+  --ink: #231a15;
+  --muted: #624d3e;
+  --rule: #a58c74;
+  --red: #ad2213;
+  --red-tint: #f3d8c8;
+  background: var(--paper);
+  color: var(--ink);
+}
+body { background: radial-gradient(ellipse at 50% 0, #fff7e9, var(--paper) 70%); }
+h1,h2,.editorial-wordmark { font-family: Georgia, serif; }
+.editorial-wordmark { font-size: clamp(1.5rem, 7vw, 2.25rem); font-weight: 600; }
+.editorial-wordmark b { color: var(--red); }
+.app-header { gap: .45rem; margin-bottom: .7rem; }
+.star-balance { margin-left: auto; width: auto; min-height: 2.75rem; padding: 0 .7rem; border-radius: 2rem; }
+.star-balance span { color: var(--red); }
+button { background: var(--red); color: #fff9ee; }
+:focus-visible { outline-color: var(--red); }
+.secondary-button,.back-button,.star-balance,.mode-switch button,.planet-tabs button,
+.matrix-section-list > button { background: var(--surface); color: var(--ink); border: 1px solid var(--rule); }
+.mode-switch button[aria-pressed="true"],.planet-tabs button[aria-pressed="true"],
+.matrix-section-list > button[aria-expanded="true"] { color: #fff9ee; background: var(--red); border-color: var(--red); }
+.mode-switch { background: #ecddc6; }
+.profile-card,.online-spread,.arcana,details,.empty-panel,.result-card,.tarot-empty,.forecast-topic,
+.dates-list li,.dates-list time,.chart-viewport,.matrix-board,.natal-wheel {
+  background: var(--surface); border-color: var(--rule); color: var(--ink); box-shadow: none;
+}
+input,.online-spread textarea,.online-spread select { background: var(--surface); border-color: var(--rule); color: var(--ink); }
+.profile-card p,.arcana p,summary time,.result-meta,.result-body p,.dates-list p,.matrix-hint { color: var(--muted); }
+.arcana .zone,.arcana .key,.result-eyebrow,.reading-section h3,.date-event-button,.forecast-score strong { color: var(--red); }
+.matrix-section-list small { color: inherit; }
+.result-heading { border-color: var(--rule); }
+.page p[role="alert"],.page p[role="status"] { background: var(--red-tint); border-color: #ba7867; color: #762317; }
+.app-nav { grid-template-columns: repeat(3,minmax(0,1fr)); background: var(--paper); border-color: var(--rule); box-shadow: 0 .35rem 1.05rem #53311b20; }
+.app-nav button { color: var(--ink); }
+.app-nav button[aria-current] { background: var(--red-tint); color: var(--red); box-shadow: none; }
+.editorial-hero { background-color: var(--paper); background-size: cover; background-position: center right; min-height: clamp(16rem,72vw,24rem); border-color: var(--rule); }
+.editorial-hero::after { background: linear-gradient(90deg,#f8edda 4%,#f8eddae8 25%,transparent 65%); }
+.editorial-hero .intro { align-self: center; padding: 1rem; }
+.editorial-hero h1 { font-size: clamp(2.7rem,12vw,5.25rem); }
+.editorial-hero .intro button { min-width: 0; padding-inline: .65rem; font-size: clamp(.78rem,3vw,.98rem); }
+.feature-grid { gap: .55rem; }
+.feature,.home .feature { border: 1px solid var(--rule); background: var(--surface); min-height: 8rem; color: var(--ink); box-shadow: none; aspect-ratio: auto; }
+.feature img { width: 66%; inset: 0 0 0 auto; filter: grayscale(1) sepia(.25); object-position: center 32%; }
+.feature::after,.home .feature::after { background: linear-gradient(90deg,var(--surface) 24%,#fff6e6a6 66%,transparent); }
+.feature span,.home .feature span { inset: .65rem .5rem auto .65rem; font: 600 clamp(.98rem,4vw,1.35rem)/1.05 Georgia,serif; text-shadow: 0 0 5px var(--surface); overflow-wrap: anywhere; }
+.hero:not(.editorial-hero) { background: var(--paper); }
+.hero:not(.editorial-hero)::after { background: linear-gradient(90deg,var(--paper) 24%,#f8eddaaa 53%,transparent); }
+.hero:not(.editorial-hero) .cover { filter: grayscale(1) sepia(.25); }
+.hero:not(.editorial-hero) .intro p { color: var(--ink); }
+.date-event-button[aria-pressed="true"] { color: #74190f; }
+.star-confirmation { display: grid; gap: .65rem; }
+.star-confirmation dl { margin: 0; }
+.star-confirmation dl div { display: flex; justify-content: space-between; padding: .55rem 0; border-bottom: 1px dashed var(--rule); }
+.star-confirmation dd { margin: 0; font-weight: 700; }
+.matrix-board .matrix-node circle:nth-of-type(2) { fill: var(--surface); stroke: var(--red); }
+.matrix-board .matrix-node text { fill: var(--ink); }
+.matrix-board .matrix-node-active circle:nth-of-type(2) { fill: var(--red); }
+.matrix-board .matrix-node-active text { fill: white; }
