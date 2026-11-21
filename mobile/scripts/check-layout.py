@@ -55,8 +55,10 @@ def check_deck():
     deck = (MOBILE.parent / "shared/tarot.ts").read_text()
     ids = re.findall(r"\{ id: '([a-z-]+)', suit:", deck)
     assert len(set(ids)) == len(ids) == 78
+    art = MOBILE / "src/art/deck"
+    assert {p.stem for p in art.glob("*.webp")} == set(ids)
     for card in ids:
-        source = MOBILE.parent / "client/public/tarot" / f"{card}.webp"
+        source = art / f"{card}.webp"
         expected = sha256(source.read_bytes()).digest()
         assert any(sha256(f.read_bytes()).digest() == expected
                    for f in (MOBILE / "dist/assets").glob(f"{card}-*.webp")), card
@@ -177,6 +179,7 @@ def exercise(page, url):
     viewer.wait_for()
     assert "/four-of-wands-" in viewer.locator("img").get_attribute("src")
     assert viewer.bounding_box() == {"x": 0, "y": 0, "width": 390, "height": 844}
+    assert viewer.locator("img").evaluate("async img => { await img.decode(); return img.naturalWidth === 768 && img.naturalHeight === 1152 }")
     capture("11-four-of-wands")
     button("Следующая карта").click()
     assert viewer.get_by_role("heading").inner_text() == "Луна"
@@ -213,7 +216,13 @@ def exercise(page, url):
     nav("Профиль")
     page.get_by_role("button", name="История раскладов").click()
     page.locator("details:visible summary").last.click()
-    assert page.locator("details[open] .spread-gallery:visible").count() == 1
+    saved = page.locator("details[open] .spread-gallery:visible")
+    assert saved.count() == 1
+    saved.locator(".card-button").first.click()
+    viewer.wait_for()
+    assert viewer.locator("img").evaluate("async img => { await img.decode(); return img.naturalWidth === 768 }")
+    button("Закрыть карту").click()
+    viewer.wait_for(state="hidden")
     for width in (320, 360, 430):
         page.set_viewport_size({"width": width, "height": 740})
         nav("Главная")

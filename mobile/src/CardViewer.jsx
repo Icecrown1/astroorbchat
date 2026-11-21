@@ -1,8 +1,8 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { getTarotCard } from '../../shared/tarot';
 
-const pictures = import.meta.glob('../../client/public/tarot/*.webp', { eager: true, query: '?url', import: 'default' });
-const cardPicture = id => pictures[`../../client/public/tarot/${id}.webp`];
+const pictures = import.meta.glob('./art/deck/*.webp', { eager: true, query: '?url', import: 'default' });
+const cardPicture = id => pictures[`./art/deck/${id}.webp`];
 
 export const CardViewerContext = createContext(null);
 

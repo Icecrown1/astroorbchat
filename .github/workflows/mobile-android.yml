@@ -50,8 +50,8 @@ jobs:
           design_apk=app/build/outputs/apk/design/app-design.apk
           "$build_tools/apksigner" verify "$design_apk"
           "$build_tools/aapt" dump badging "$design_apk" > "$RUNNER_TEMP/orbi-design-badging.txt"
-          grep -F "package: name='app.astroorbi.preview.reader'" "$RUNNER_TEMP/orbi-design-badging.txt"
-          grep -F "application-label:'AstroOrbi Карты'" "$RUNNER_TEMP/orbi-design-badging.txt"
+          grep -F "package: name='app.astroorbi.preview.engravings'" "$RUNNER_TEMP/orbi-design-badging.txt"
+          grep -F "application-label:'AstroOrbi Гравюры'" "$RUNNER_TEMP/orbi-design-badging.txt"
       - uses: actions/upload-artifact@v6
         with:
           name: astroorbi-android-preview
