@@ -44,12 +44,23 @@ jobs:
       - name: Build and verify the APK
         working-directory: mobile/android
         run: |
-          ./gradlew --no-daemon assembleDebug
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
+          ./gradlew --no-daemon assembleDebug assembleDesign
+          build_tools="$ANDROID_HOME/build-tools/35.0.0"
+          "$build_tools/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
+          design_apk=app/build/outputs/apk/design/app-design.apk
+          "$build_tools/apksigner" verify "$design_apk"
+          "$build_tools/aapt" dump badging "$design_apk" > "$RUNNER_TEMP/orbi-design-badging.txt"
+          grep -F "package: name='app.astroorbi.preview.design'" "$RUNNER_TEMP/orbi-design-badging.txt"
+          grep -F "application-label:'AstroOrbi Дизайн'" "$RUNNER_TEMP/orbi-design-badging.txt"
       - uses: actions/upload-artifact@v6
         with:
           name: astroorbi-android-preview
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-design-preview
+          path: mobile/android/app/build/outputs/apk/design/app-design.apk
           if-no-files-found: error
       - name: Check mobile screens and reading interactions
         run: |

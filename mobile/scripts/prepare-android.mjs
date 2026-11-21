@@ -77,3 +77,28 @@ public class MainActivity extends BridgeActivity {
     }
 }
 `);
+
+// Install the visual review build next to an existing preview signed by an earlier CI runner.
+const appGradle = new URL('../android/app/build.gradle', import.meta.url);
+const gradle = await readFile(appGradle, 'utf8');
+const designVariant = `
+android.buildTypes {
+    design {
+        initWith android.buildTypes.debug
+        applicationIdSuffix ".design"
+        matchingFallbacks = ["debug"]
+        signingConfig android.signingConfigs.debug
+    }
+}
+`;
+if (!gradle.includes(designVariant.trim())) await writeFile(appGradle, gradle + designVariant);
+const designValues = new URL('../android/app/src/design/res/values/', import.meta.url);
+await mkdir(designValues, { recursive: true });
+await writeFile(new URL('strings.xml', designValues), `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AstroOrbi Дизайн</string>
+    <string name="title_activity_main">AstroOrbi Дизайн</string>
+    <string name="package_name">${config.appId}.design</string>
+    <string name="custom_url_scheme">${config.appId}.design</string>
+</resources>
+`);
