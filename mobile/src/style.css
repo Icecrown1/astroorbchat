@@ -74,6 +74,12 @@ label {font-weight:600;font-size:.93rem}
 .ad-scene img {width:min(62%,29vh);mix-blend-mode:multiply}
 .ad-scene h2 {margin:.7rem auto;max-width:15ch}
 .ad-preview-screen footer {display:grid;gap:.55rem;text-align:center}
+.reward-unlock {display:flex;justify-content:space-between;align-items:center;gap:.7rem;text-align:left;width:100%;color:var(--deep);background:var(--wash);border:1px solid var(--rule)}
+.reward-count {display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.reward-count svg {width:22px;height:20px}
+.preview-shop {display:grid;gap:.65rem;border-top:1px solid var(--rule);padding-top:1rem}
+.shop-options {display:flex;flex-wrap:wrap;gap:.4rem}
+.shop-options button {flex:auto}
 .rewarded-advice {display:grid;grid-template-columns:4.5rem 1fr;gap:1rem;align-items:center;padding:.85rem 0;border-block:1px solid var(--rule)}
 .rewarded-advice button {padding:0;background:transparent;border:0}
 .rewarded-advice small {color:var(--deep);font-weight:700}

@@ -4,7 +4,9 @@ import { Frontispiece, IndexRow, NavIcon, PlateInk, plate } from './Editorial';
 import editorialHero from './art/card-of-day.webp';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
-import { AdPreview, RewardedAdvice } from './AdPreview';
+import { PreviewRewards } from './RewardUnlock';
+import { PreviewShop } from './PreviewShop';
+import { AdPreview } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
 import { Natal } from './Natal';
@@ -66,7 +68,9 @@ function Stars({ profile, openAccount }) {
     <section className="ledger"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате рождения.</p></section>
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
-      <p>Это ежемесячное пополнение баланса. Управлять подпиской можно в AstroOrbi в Telegram.</p>
+      <p>Это ежемесячное пополнение баланса.</p>
+      {import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+        <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
 }
@@ -89,12 +93,12 @@ function App() {
   const lastAd = useRef(-Infinity);
   const grantReward = useRef(null);
 
-  function showAd(type, onEarn) {
+  function showAd(type, onEarn, title, remaining = 0) {
     if (!adEligible || window.history.state?.adOverlay) return;
     grantReward.current = onEarn ?? null;
     lastAd.current = performance.now();
     window.history.pushState({ ...window.history.state, adOverlay: true }, '');
-    setAdType(type);
+    setAdType({ type, title, remaining });
   }
 
   // Show an interstitial only on leaving a completed reading, including Android Back.
@@ -112,10 +116,8 @@ function App() {
     if (adEligible && window.history.state?.screen === 'tarot') readingCompleted.current = true;
   }
 
-  const rewardName = 'Дополнительная карта совета';
-  const scope = `${account.profile?.id ?? 'guest'}.${source}`;
-  const dailyReward = adEligible ? entry => <RewardedAdvice key={scope + entry.id} entry={entry} scope={scope}
-    onWatch={grant => showAd('rewarded', grant)} /> : undefined;
+  const rewards = adEligible ? { owner: account.profile?.id ?? 'guest',
+    watch: (title, remaining, credit) => showAd('rewarded', credit, title, remaining) } : null;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
   const openSettings = () => navigate('settings');
@@ -176,7 +178,7 @@ function App() {
   }
 
   return (
-    <CardViewerContext.Provider value={openCards}><div className="page" data-screen={screen}>
+    <CardViewerContext.Provider value={openCards}><PreviewRewards.Provider value={rewards}><div className="page" data-screen={screen}>
       <PlateInk />
       <header className="app-header">
         {depth > 0 && !destinations.some(([id]) => id === screen) && <button type="button" className="back-button" aria-label="Назад"
@@ -197,8 +199,8 @@ function App() {
           <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
         </div>
         {source === 'online'
-          ? <OnlineTarot onReadingComplete={onReadingComplete} dailyReward={dailyReward} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
-          : <Tarot onReadingComplete={onReadingComplete} dailyReward={dailyReward} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
+          ? <OnlineTarot onReadingComplete={onReadingComplete} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
+          : <Tarot onReadingComplete={onReadingComplete} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
       <div key={'natal' + profileKey} hidden={screen !== 'natal'}>
         <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings}
@@ -212,7 +214,7 @@ function App() {
       </div>
       {['horoscope', 'compatibility'].map(kind => (
         <div key={kind + profileKey} hidden={screen !== kind}>
-          <Forecasts kind={kind} account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
+          <Forecasts active={screen === kind} kind={kind} account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
         </div>
       ))}
       <div key={'solar' + profileKey} hidden={screen !== 'solar'}>
@@ -239,10 +241,10 @@ function App() {
           </button>
         ))}
       </nav>
-      {adType && adEligible && <AdPreview rewarded={adType === 'rewarded'}
-        rewardName={rewardName} onEarn={grantReward.current} onDismiss={() => window.history.back()} />}
+      {adType && adEligible && <AdPreview rewarded={adType.type === 'rewarded'}
+        rewardName={adType.title} remaining={adType.remaining} onEarn={grantReward.current} onDismiss={() => window.history.back()} />}
       {viewer && <CardViewer viewer={viewer} onDismiss={() => window.history.back()} />}
-    </div></CardViewerContext.Provider>
+    </div></PreviewRewards.Provider></CardViewerContext.Provider>
   );
 }
 

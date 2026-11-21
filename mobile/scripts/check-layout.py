@@ -137,7 +137,8 @@ def exercise(page, url, ad_preview=False):
             draws.append(spread)
             data = reading_fixture(spread)
         else:
-            data = {"/api/mobile/auth/exchange": {"token": "local-test"},
+            data = {"/api/public/sign-horoscope/aries": {"intro": "Проверенный дневной прогноз"},
+                    "/api/mobile/auth/exchange": {"token": "local-test"},
                     "/api/user/me": profile, "/api/tarot/history": [],
                     "/api/tarot/status": {"costs": {"three": 3, "celtic": 10}, "dailyDone": False},
                     "/api/natal/me": natal_fixture()}[path]
@@ -158,8 +159,18 @@ def exercise(page, url, ad_preview=False):
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), f"Overflow on {name}"
         page.screenshot(path=SCREENS / f"{name}.png")
 
-    offer = button("Посмотреть рекламу и открыть карту совета")
+    def unlock(title, remaining):
+        return button(f"{title}. Осталось просмотров: {remaining}")
+
+    offer = unlock("Карта пояснения", 1)
     ad = page.locator(".ad-preview-screen[open]")
+    def watch(title, remaining):
+        unlock(title, remaining).click()
+        finished = "Награда получена" if remaining == 1 else f"Просмотр засчитан · осталось {remaining - 1}"
+        ad.get_by_text(finished, exact=True).wait_for(timeout=12000)
+        button("Продолжить").click()
+        ad.wait_for(state="hidden")
+
     page.goto(url)
     page.get_by_role("heading", name="Карта дня").wait_for()
     assert not page.locator(".ad-placeholder").count() and not ad.count()
@@ -167,7 +178,7 @@ def exercise(page, url, ad_preview=False):
         page.set_viewport_size({"width": 320, "height": 740})
         tool("Таро")
         button("Вытянуть карту дня").click()
-        offer.wait_for()
+        assert not offer.count()
         page.locator(".one-card:visible button").click()
         assert not ad.count()
         button("Закрыть карту").click()
@@ -181,6 +192,8 @@ def exercise(page, url, ad_preview=False):
         ad.wait_for(state="hidden")
         assert page.locator(".page").get_attribute("data-screen") == "tools"
         tool("Таро")
+        button("Три карты").click()
+        button("Вытянуть три карты").click()
         offer.click()
         capture("ad-rewarded")
         page.go_back()
@@ -192,15 +205,46 @@ def exercise(page, url, ad_preview=False):
         ad.wait_for(state="hidden")
         bonus = page.locator(".rewarded-advice h3")
         name = bonus.inner_text()
-        assert name != page.locator(".card-meaning h3").inner_text()
+        assert name not in page.locator(".card-meaning h3").all_text_contents()
         assert not offer.count()
-        button("Три карты").click()
-        button("Вытянуть три карты").click()
         nav("Главная")
         assert not ad.count()
         tool("Таро")
-        button("Карта дня").click()
+        button("Три карты").click()
         assert bonus.inner_text() == name
+
+        tool("Гороскоп")
+        button("Месяц").click()
+        watch("Гороскоп на месяц", 3)
+        page.reload()
+        tool("Гороскоп")
+        button("Месяц").click()
+        watch("Гороскоп на месяц", 2)
+        watch("Гороскоп на месяц", 1)
+        page.get_by_role("heading", name="Гороскоп на месяц").wait_for()
+        button("Неделя").click()
+        watch("Гороскоп на неделю", 2)
+        watch("Гороскоп на неделю", 1)
+        page.get_by_role("heading", name="Гороскоп на неделю").wait_for()
+        button("День").click()
+        watch("Гороскоп на день", 1)
+        page.get_by_text("Проверенный дневной прогноз", exact=True).wait_for()
+
+        tool("Натальная карта")
+        page.get_by_text("Пример натальной карты", exact=True).click()
+        watch("Разбор планеты · Солнце", 1)
+        button("Дома").click()
+        watch("Разбор дома · 1-й дом", 1)
+        page.get_by_role("heading", name="1-й дом", exact=True).wait_for()
+        button("Звёзды и подписка").click()
+        button("65 ★").click()
+        button("Отмена").click()
+        assert not page.get_by_text("Тестовая покупка подтверждена", exact=False).count()
+        for product in ("Standard · 1 месяц", "140 ★"):
+            button(product).click()
+            button("Подтвердить тестовую покупку").click()
+            page.get_by_role("status").filter(has_text="Тестовая покупка подтверждена").wait_for()
+        assert not draws
         nav("Главная")
         page.set_viewport_size({"width": 390, "height": 844})
     capture("01-home")
@@ -301,7 +345,7 @@ def exercise(page, url, ad_preview=False):
     assert meanings.last.locator("p").inner_text() == "Трактовка для позиции 10."
     button("Офлайн").click()
     button("Три карты").click()
-    button("Вытянуть три карты").click()
+    button("Сделать новый расклад" if ad_preview else "Вытянуть три карты").click()
     assert page.locator(".three-cards:visible button").count() == 3
     assert meanings.count() == 3
     page.locator(".three-cards:visible button").first.click()
@@ -331,18 +375,13 @@ def exercise(page, url, ad_preview=False):
             nav("Профиль")
             with page.expect_response(lambda reply: "/api/tarot/status" in reply.url):
                 button("Обновить").click()
-            tool("Таро")
-            button("С ИИ").click()
-            page.select_option("#online-spread", "daily")
-            assert not offer.count() and not ad.count()
-            page.locator(".online-spread:visible button[type=submit]").click()
-            page.locator(".one-card:visible").wait_for()
-            assert offer.count() == int(expected)
+            tool("Гороскоп")
+            assert unlock("Гороскоп на день", 1).count() == int(expected)
             if expected:
-                offer.click()
+                unlock("Гороскоп на день", 1).click()
                 button("Закрыть без награды").click()
                 ad.wait_for(state="hidden")
-                assert offer.is_visible()
+                assert unlock("Гороскоп на день", 1).is_visible()
             nav("Главная")
             assert not ad.count()
     assert not errors, errors

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { SkyDial, planetGlyph } from './SkyDial';
 import { Frontispiece } from './Editorial';
 import { translatePlanet, translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
 import { ReadingText } from './ReadingText';
 import { ChartViewport } from './ChartViewport';
+import { PreviewRewards } from './RewardUnlock';
+import { RewardPlanet, RewardHouse } from './RewardReadings';
 import { NatalReadings } from './NatalReadings';
 
 function positionLabel(placement) {
@@ -31,7 +33,7 @@ function planetHouse(position, cusps) {
   return index === -1 ? null : index + 1;
 }
 
-export function NatalWheel({ chart, account, guest = false }) {
+export function NatalWheel({ chart, account, guest = false, example = false }) {
   const [selected, setSelected] = useState('Sun');
   const [view, setView] = useState('planets');
   const [houseNumber, setHouseNumber] = useState(1);
@@ -79,6 +81,8 @@ export function NatalWheel({ chart, account, guest = false }) {
             </select></label>
             <p aria-live="polite">{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p></div>
           </div>
+          {import.meta.env.MODE === 'ad-preview' && (!guest || example) && <RewardPlanet planet={current}
+            position={positionLabel(current)} house={currentHouse} example={example} />}
           {!guest && <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />}
         </div>
       </div>
@@ -94,6 +98,8 @@ export function NatalWheel({ chart, account, guest = false }) {
         <div aria-live="polite">
           {members.length === 0 && <p>В этом доме нет планет.</p>}
         </div>
+        {import.meta.env.MODE === 'ad-preview' && (!guest || example) && <RewardHouse number={houseNumber}
+          cusp={cusp} members={members} example={example} />}
         {members.length > 0 && <div className="planet-tabs" role="group" aria-label="Разборы планет в этом доме">
           {members.map(planet => <button key={planet.name} type="button" onClick={() => selectPlanet(planet.name)}>
             {translatePlanet(planet.name, 'ru')}
@@ -111,6 +117,7 @@ export function NatalWheel({ chart, account, guest = false }) {
 }
 
 export function Natal({ account, openAccount, openSettings, openGuests, openDates, active }) {
+  const canPreview = useContext(PreviewRewards);
   const { token, profile, run, busy, error } = account;
   const [result, setResult] = useState(null);
   const canBuild = Boolean(profile?.birthPlace && profile?.birthdayDate);
@@ -138,6 +145,14 @@ export function Natal({ account, openAccount, openSettings, openGuests, openDate
   return (
     <section className="tarot-screen">
       <Frontispiece title={<>Натальная<br />карта</>} art="moon" />
+      {canPreview && (!token || (profile && !canBuild)) && <details className="natal-interpretation">
+        <summary>Пример натальной карты</summary>
+        <NatalWheel guest example chart={{ data: { planets: {
+          Sun: { longitude: 70, sign: 'Gemini', degree_in_sign: 10 },
+          Moon: { longitude: 149, sign: 'Leo', degree_in_sign: 29 },
+          Venus: { longitude: 114, sign: 'Cancer', degree_in_sign: 24 },
+        }, houses: { cusps: Array.from({ length: 12 }, (_, i) => i * 30) } } }} />
+      </details>}
       {!token ? <div className="profile-card">
         <p>Войди, чтобы открыть карту своего аккаунта.</p>
         <button type="button" onClick={openAccount}>Подключить профиль</button>

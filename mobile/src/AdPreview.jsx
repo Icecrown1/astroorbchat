@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { drawCards, getTarotCard } from '../../shared/tarot';
+import { RewardUnlock } from './RewardUnlock';
 import { CardButton } from './CardViewer';
 import { plate } from './Editorial';
 
 const duration = 5000;
 
-export function AdPreview({ rewarded, onEarn, onDismiss, rewardName }) {
+export function AdPreview({ rewarded, onEarn, onDismiss, rewardName, remaining }) {
   const element = useRef(null);
   const closing = useRef(false);
   const earned = useRef(false);
@@ -69,36 +70,27 @@ export function AdPreview({ rewarded, onEarn, onDismiss, rewardName }) {
     <footer>
       {rewarded && <>
         <progress max={duration} value={elapsed} aria-label="Просмотр ролика" />
-        <p>{done ? 'Награда получена' : `До награды · ${Math.ceil((duration - elapsed) / 1000)} сек.`}</p>
+        <p>{done ? (remaining ? `Просмотр засчитан · осталось ${remaining}` : 'Награда получена') : `До награды · ${Math.ceil((duration - elapsed) / 1000)} сек.`}</p>
       </>}
       <button type="button" onClick={close}>{rewarded && !done ? 'Закрыть без награды' : 'Продолжить'}</button>
     </footer>
   </dialog>;
 }
 
-export function RewardedAdvice({ entry, scope, onWatch }) {
-  const storageKey = `astroorbi.advice.v1.${scope}`;
-  const [bonus, setBonus] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
-      return saved?.readingId === entry.id ? getTarotCard(saved.cardId) : null;
-    } catch { return null; }
-  });
-
-  function grant() {
-    const drawn = drawCards(2).find(card => card.cardId !== entry.cards[0].cardId);
-    const card = getTarotCard(drawn.cardId);
-    setBonus(card);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify({ readingId: entry.id, cardId: card.id }));
-    } catch { /* The reward is still available in this reading. */ }
-  }
-
-  if (!bonus) return <button type="button" className="secondary-button" onClick={() => onWatch(grant)}>
-    Посмотреть рекламу и открыть карту совета
-  </button>;
-  return <section className="rewarded-advice">
-    <CardButton cards={[{ cardId: bonus.id, label: 'Карта совета' }]} />
-    <div><small>Карта совета</small><h3>{bonus.nameRu}</h3><p>{bonus.kw[0]}</p></div>
-  </section>;
+export function ClarifyingCard({ entry, source, earnedOnly = false }) {
+  const title = 'Карта пояснения';
+  return <RewardUnlock id={`tarot:${source}:${entry.id}`} title={title} earnedOnly={earnedOnly}
+    makeReward={() => drawCards(4).find(card => !entry.cards.some(drawn => drawn.cardId === card.cardId)).cardId}>
+    {cardId => {
+      const card = getTarotCard(cardId);
+      if (!card) return null;
+      return <section className="rewarded-advice">
+        <CardButton cards={[{ cardId, label: title }]} />
+        <div><small>{title}</small><h3>{card.nameRu}</h3><p>{card.kw[0]}</p>
+          <p>{({ wands: 'Какое действие связывает три карты расклада?', cups: 'Какое чувство объединяет три карты?',
+            swords: 'Какую мысль в раскладе стоит перепроверить?', pentacles: 'Какой практический шаг следует из расклада?',
+            major: 'Какая общая тема повторяется в трёх картах?' })[card.suit]}</p></div>
+      </section>;
+    }}
+  </RewardUnlock>;
 }

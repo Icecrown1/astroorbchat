@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { drawCards, getTarotCard, TAROT_SPREADS } from '../../shared/tarot';
+import { ClarifyingCard } from './AdPreview';
 import { SpreadGallery } from './SpreadGallery';
 import { plate } from './Editorial';
 
@@ -87,7 +88,7 @@ function Reading({ entry }) {
     keywords={entry.cards.map(({ cardId, reversed }) => getTarotCard(cardId).kw[reversed ? 1 : 0])} />;
 }
 
-export function Tarot({ readings, mode, setMode, onReadingComplete, dailyReward }) {
+export function Tarot({ readings, mode, setMode, onReadingComplete }) {
   const entry = mode === 'daily' ? readings.daily : readings.lastSpread;
 
   return (
@@ -103,12 +104,12 @@ export function Tarot({ readings, mode, setMode, onReadingComplete, dailyReward 
         </div>
       )}
       <div aria-live="polite">{entry && <Reading entry={entry} />}</div>
+      {import.meta.env.MODE === 'ad-preview' && mode === 'three' && entry && <ClarifyingCard entry={entry} source="offline" />}
       {(mode === 'three' || !entry) && (
         <button type="button" onClick={() => { readings.create(mode); onReadingComplete(); }}>
           {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть три карты'}
         </button>
       )}
-      {mode === 'daily' && entry && dailyReward?.(entry)}
       {readings.storageError && <p role="alert">Не удалось сохранить расклад на устройстве.</p>}
     </section>
   );
@@ -131,6 +132,7 @@ export function History({ entries, openTarot }) {
             <time dateTime={entry.createdAt}>{dateFormat.format(new Date(entry.createdAt))}</time>
           </summary>
           <Reading entry={entry} />
+          {import.meta.env.MODE === 'ad-preview' && entry.kind === 'three' && <ClarifyingCard entry={entry} source="offline" earnedOnly />}
         </details>
       ))}
     </section>

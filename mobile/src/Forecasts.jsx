@@ -1,6 +1,8 @@
 import { Frontispiece, plate } from './Editorial';
 import { StarConfirmation } from './StarConfirmation';
-import { useState } from 'react';
+import { PreviewRewards } from './RewardUnlock';
+import { RewardHoroscope } from './RewardReadings';
+import { useContext, useState } from 'react';
 import { onlineRequest } from './onlineApi';
 import { ResultCard } from './ResultCard';
 import { CityField } from './ProfileSettings';
@@ -110,9 +112,10 @@ function PartnerFields({ busy, profile }) {
   </>;
 }
 
-export function Forecasts({ kind, account, openAccount, openNatal, openSettings }) {
+export function Forecasts({ kind, active, account, openAccount, openNatal, openSettings }) {
   const { token, profile, busy, error, run, refreshProfile } = account;
   const horoscope = kind === 'horoscope';
+  const rewardedForecast = Boolean(useContext(PreviewRewards)) && horoscope;
   const title = horoscope ? 'Гороскоп' : 'Совместимость';
   const [period, setPeriod] = useState('day');
   const [result, setResult] = useState(null);
@@ -192,21 +195,25 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
     });
   }
 
-  const Result = horoscope ? HoroscopeResult : CompatibilityResult;
-  return (
-    <section className="tarot-screen">
-      <Frontispiece title={title} art={horoscope ? "lion" : "couple"} scene={!horoscope} />
-      {!token ? <div className="profile-card">
-        <p>Войди, чтобы получить разбор и сохранить его в аккаунте.</p>
-        <button type="button" onClick={openAccount}>Подключить профиль</button>
-      </div> : <>
-        {profile ? <form className="online-spread" onSubmit={generate}>
-          {horoscope ? <div className="mode-switch forecast-period" aria-label="Период прогноза">
+  const periodPicker = <div className="mode-switch forecast-period" aria-label="Период прогноза">
             {Object.entries(periods).map(([id, item]) => (
               <button key={id} type="button" disabled={busy} aria-pressed={id === period}
                 onClick={() => { setConfirmation(null); setPeriod(id); setResult(null); }}>{item.name}</button>
             ))}
-          </div> : <PartnerFields busy={busy} profile={profile} />}
+          </div>;
+  const Result = horoscope ? HoroscopeResult : CompatibilityResult;
+  return (
+    <section className="tarot-screen">
+      <Frontispiece title={title} art={horoscope ? "lion" : "couple"} scene={!horoscope} />
+      {rewardedForecast && active && <div className="online-spread">
+        {periodPicker}<RewardHoroscope period={period} />
+      </div>}
+      {!token ? <div className="profile-card">
+        <p>Войди, чтобы получить разбор и сохранить его в аккаунте.</p>
+        <button type="button" onClick={openAccount}>Подключить профиль</button>
+      </div> : <>
+        {profile ? !rewardedForecast && <form className="online-spread" onSubmit={generate}>
+          {horoscope ? periodPicker : <PartnerFields busy={busy} profile={profile} />}
           {needsSubscription && <p>Для нового разбора нужна подписка.</p>}
           {missingBirthplace && <>
             <p>Сначала укажи свой город рождения.</p>
