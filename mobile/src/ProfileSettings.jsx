@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Frontispiece, IndexRow } from './Editorial';
 import { onlineRequest } from './onlineApi';
 
 const day = 24 * 60 * 60 * 1000;
@@ -189,7 +190,7 @@ export function ProfileSettings({ account, openAccount, openNatal }) {
 
   return <section className="tarot-screen">
     <button className="secondary-button" type="button" disabled={busy} onClick={openAccount}>К профилю</button>
-    <h1>Настройки профиля</h1>
+    <Frontispiece title="Настройки профиля" art="sun" />
     <form className="online-spread" onSubmit={save}>
       <h2>Данные рождения</h2>
       <p>Профиль можно менять раз в 30 дней.{daysRemaining > 0 && ` До следующего изменения — ${daysRemaining} дн.`}</p>
@@ -231,10 +232,6 @@ export function BirthDetails({ profile, openSettings, busy }) {
   const fields = profileFields(profile);
   const date = new Date(fields.birthdayDate);
   const showDate = Number.isFinite(date.getTime()) && (fields.birthPlace || birthdayAge(fields.birthdayDate, new Date()) > 0);
-  return <div className="profile-card">
-    <h2>Данные рождения</h2>
-    <p>{[showDate && dateFormat.format(date), fields.birthTime, fields.birthPlace].filter(Boolean).join(' · ') ||
-      'Добавь данные рождения для персональных расчётов.'}</p>
-    <button type="button" className="secondary-button" disabled={busy} onClick={openSettings}>Настройки профиля</button>
-  </div>;
+  const description = [showDate && dateFormat.format(date), fields.birthTime, fields.birthPlace].filter(Boolean).join(' · ');
+  return <IndexRow title="Данные рождения" description={description || 'Заполнить профиль'} art="sun" onClick={openSettings} disabled={busy} />;
 }

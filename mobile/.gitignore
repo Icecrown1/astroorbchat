@@ -3,3 +3,4 @@ dist/
 # Prototype shells are generated from the locked Capacitor templates.
 android/
 ios/
+layout-preview/

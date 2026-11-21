@@ -1,3 +1,4 @@
+import { Frontispiece } from './Editorial';
 import { StarConfirmation } from './StarConfirmation';
 import { useState } from 'react';
 import { translateSign } from '../../client/src/lib/astroTranslations';
@@ -87,7 +88,7 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
   }
 
   return <section className="tarot-screen">
-    <h1>Соляр</h1>
+    <Frontispiece title="Соляр" art="sun" />
     {!token ? <SignInPrompt openAccount={openAccount} /> : <>
       {incomplete ? <div className="profile-card">
         <p>Для соляра нужны точное время и город рождения.</p>
@@ -182,7 +183,7 @@ export function Oracle({ account, openAccount, openNatal }) {
   }
 
   return <section className="tarot-screen">
-    <h1>Оракул</h1>
+    <Frontispiece title="Оракул" art="owl" scene />
     {!token ? <SignInPrompt openAccount={openAccount} /> : <>
       <form className="online-spread" onSubmit={ask}>
         <label htmlFor="oracle-question">Твой вопрос</label>

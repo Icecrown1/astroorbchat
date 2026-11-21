@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { cardImage } from './cards';
+import { Frontispiece, IndexRow, NavIcon, plate } from './Editorial';
 import editorialHero from './art/card-of-day.webp';
 import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
@@ -13,80 +13,59 @@ import { Oracle, Solar } from './AnnualAndOracle';
 import { Matrix } from './Matrix';
 import './style.css';
 
-const destinations = [
-  ['home', 'Главная', '✦'],
-  ['tools', 'Инструменты', '▦'],
-  ['account', 'Профиль', '◉'],
+const destinations = [['home', 'Главная'], ['tools', 'Инструменты'], ['account', 'Профиль']];
+const tools = [
+  ['tarot', 'Таро', 'Карта дня и расклады', 'hand'],
+  ['compatibility', 'Совместимость', 'Разбор отношений по данным рождения', 'couple'],
+  ['oracle', 'Оракул', 'Ответ на твой вопрос', 'owl'],
+  ['natal', 'Натальная карта', 'Планеты и дома в момент рождения', 'sun'],
+  ['matrix', 'Матрица судьбы', 'Арканы по дате рождения', 'matrix'],
+  ['pair', 'Матрица пары', 'Сильные стороны и задачи союза', 'rings'],
+  ['horoscope', 'Гороскоп', 'Прогноз на день, неделю или месяц', 'lion'],
+  ['dates', 'Важные даты', 'События личного календаря', 'glass'],
+  ['solar', 'Соляр', 'Личный прогноз на год', 'sphere'],
+  ['guest-natal', 'Карты близких', 'Натальные карты семьи и друзей', 'portrait'],
 ];
-
-const homeSections = [
-  { title: 'О себе', items: [
-    ['natal', 'Натальная карта', 'sun'],
-    ['matrix', 'Матрица судьбы', 'star'],
-  ] },
-  { title: 'Прогнозы и подсказки', items: [
-    ['horoscope', 'Гороскоп', 'wheel-of-fortune'],
-    ['dates', 'Важные даты', 'high-priestess'],
-    ['solar', 'Соляр', 'temperance'],
-    ['oracle', 'Оракул', 'hermit'],
-  ] },
-  { title: 'О близких', items: [
-    ['compatibility', 'Совместимость', 'lovers'],
-    ['guest-natal', 'Карты близких', 'two-of-cups'],
-    ['pair', 'Матрица пары', 'lovers'],
-  ] },
-];
-
-const featured = [
-  ['compatibility', 'Совместимость', 'lovers'], ['oracle', 'Оракул', 'hermit'],
-  ['natal', 'Натальная карта', 'sun'], ['matrix', 'Матрица судьбы', 'star'],
-];
-
-function ToolTiles({ items, navigate }) {
-  return <div className="feature-grid">{items.map(([id, label, card]) => (
-    <button className="feature" type="button" key={id} onClick={() => navigate(id)}>
-      <span>{label}</span><img src={cardImage(card)} alt="" loading="lazy" />
-    </button>
-  ))}</div>;
-}
+const featured = tools.slice(1, 5);
 
 function Home({ navigate, online, hasDaily }) {
   return <div className="home">
-    <section className="hero home-hero editorial-hero" style={{ backgroundImage: `url(${editorialHero})` }}>
-      <div className="intro">
-        <h1>Карта<br />дня</h1>
-        <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
-          {hasDaily && !online ? 'Посмотреть карту' : 'Открыть бесплатно'} <span aria-hidden="true">→</span>
-        </button>
-      </div>
+    <section className="daily-cover" style={{ backgroundImage: `url(${editorialHero})` }}>
+      <h1>Карта<br />дня</h1>
+      <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
+        {hasDaily && !online ? 'Посмотреть карту' : 'Открыть бесплатно'} <span aria-hidden="true">→</span>
+      </button>
     </section>
-    <ToolTiles items={featured} navigate={navigate} />
-    <button className="secondary-button" type="button" onClick={() => navigate('tools')}>Все инструменты →</button>
+    <div className="cover-grid">{featured.map(([id, name, , art]) =>
+      <button key={id} type="button" className={'cover-tile tile-' + art} onClick={() => navigate(id)}>
+        <img src={plate(art)} alt="" /><strong>{name}</strong>
+      </button>)}</div>
+    <button className="catalog-link" type="button" onClick={() => navigate('tools')}>Все инструменты <span aria-hidden="true">→</span></button>
   </div>;
 }
 
 function Tools({ navigate }) {
   return <section className="tarot-screen">
-    <h1>Инструменты</h1>
-    <ToolTiles items={ [['tarot', 'Таро', 'moon']] } navigate={navigate} />
-    {homeSections.map(({ title, items }) => <section className="home-group" key={title}>
-      <h2>{title}</h2><ToolTiles items={items} navigate={navigate} />
-    </section>)}
-    <button className="secondary-button" type="button" onClick={() => navigate('history')}>История раскладов</button>
+    <Frontispiece title="Инструменты" art="sphere" />
+    <div className="illustrated-index">{tools.map(([id, name, description, art]) =>
+      <IndexRow key={id} title={name} description={description} art={art} onClick={() => navigate(id)} />)}</div>
+    <IndexRow title="История раскладов" art="books" onClick={() => navigate('history')} />
   </section>;
 }
 
 function Stars({ profile, openAccount }) {
   return <section className="tarot-screen">
-    <h1>Звёзды и подписка</h1>
-    <div className="profile-card">
-      <h2>{profile?.orbs != null ? `Баланс · ${Number(profile.orbs).toLocaleString('ru-RU')} ★` : 'Баланс звёзд'}</h2>
-      <p>Звёзды списываются за платные разборы. Стоимость указана рядом с кнопкой запуска расчёта.</p>
+    <Frontispiece title={<>Звёзды<br />и подписка</>} art="sphere" scene />
+    <section className="ledger"><h2>Баланс</h2>
+      {profile?.orbs != null && <strong className="balance-number">{Number(profile.orbs).toLocaleString('ru-RU')} ✶</strong>}
+      <p>Звёзды тратятся на разборы. На кнопке каждого платного разбора указана его стоимость.</p>
       {!profile && <button type="button" onClick={openAccount}>Открыть профиль</button>}
-    </div>
-    <div className="profile-card"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате.</p></div>
-    <div className="profile-card"><h2>Подписка</h2><p>Standard · 250 ★ в месяц</p><p>Premium · 550 ★ в месяц и доступ к соляру</p>
-      <p>Управление подпиской доступно в AstroOrbi в Telegram.</p></div>
+    </section>
+    <section className="ledger"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате рождения.</p></section>
+    <section className="ledger"><h2>Что даёт подписка</h2>
+      <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
+      <p>Это ежемесячное пополнение баланса. Управлять подпиской можно в AstroOrbi в Telegram.</p>
+    </section>
   </section>;
 }
 
@@ -145,11 +124,11 @@ function App() {
   }
 
   return (
-    <div className="page">
+    <div className="page" data-screen={screen}>
       <header className="app-header">
-        {depth > 0 && screen !== 'home' && <button type="button" className="back-button" aria-label="Назад"
+        {depth > 0 && !destinations.some(([id]) => id === screen) && <button type="button" className="back-button" aria-label="Назад"
           disabled={screen === 'settings' && account.busy} onClick={() => window.history.back()}>←</button>}
-        <span className="editorial-wordmark">Astro<b>Orbi</b></span>
+        <span className="editorial-wordmark">Astro<b>Orbi</b><i aria-hidden="true">✶</i></span>
         <button className="star-balance" type="button" onClick={() => navigate('stars')} aria-label="Звёзды и подписка">
           <span aria-hidden="true">✦</span> {account.profile?.orbs != null ? Number(account.profile.orbs).toLocaleString('ru-RU') : 'Звёзды'}
         </button>
@@ -159,7 +138,7 @@ function App() {
       {screen === 'tools' && <Tools navigate={navigate} />}
       {screen === 'stars' && <Stars profile={account.profile} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
-        <h1>Таро</h1>
+        <Frontispiece title="Таро" art="hand" />
         <div className="mode-switch" aria-label="Вариант расклада">
           <button type="button" aria-pressed={source === 'online'} onClick={() => setTarotSource('online')}>С ИИ</button>
           <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
@@ -191,19 +170,19 @@ function App() {
       </div>
       <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={screen === 'pair' ? 'pair' : 'matrix'} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
       {screen === 'history' && <section className="tarot-screen">
-        <h1>История</h1>
+        <Frontispiece title="История раскладов" art="books" />
         <AccountHistory account={account} />
         <History entries={readings.entries} openTarot={() => navigate('tarot')} />
       </section>}
       {(screen === 'account' || (screen === 'settings' && !account.profile)) &&
         <Account account={account} openHistory={openHistory} openSettings={openSettings}
-          openOffline={() => navigate('tarot', 'daily', 'offline')} />}
+          openStars={() => navigate('stars')} openOffline={() => navigate('tarot', 'daily', 'offline')} />}
       {screen === 'settings' && account.profile &&
         <ProfileSettings key={account.profile.id} account={account} openAccount={openAccount} openNatal={openNatal} />}
       <nav className="app-nav" aria-label="Разделы AstroOrbi">
-        {destinations.map(([id, name, icon]) => (
-          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (screen === 'settings' ? 'account' : screen === 'home' || screen === 'account' ? screen : 'tools') ? 'page' : undefined} onClick={() => navigate(id)}>
-            <span aria-hidden="true">{icon}</span><span className="nav-label">{name}</span>
+        {destinations.map(([id, name]) => (
+          <button key={id} type="button" disabled={screen === 'settings' && account.busy} aria-current={id === (['settings','stars','history'].includes(screen) ? 'account' : screen === 'home' || screen === 'account' ? screen : 'tools') ? 'page' : undefined} onClick={() => navigate(id)}>
+            <NavIcon name={id} /><span className="nav-label">{name}</span>
           </button>
         ))}
       </nav>

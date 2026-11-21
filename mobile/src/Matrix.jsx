@@ -1,8 +1,9 @@
 import { Fragment, useState } from 'react';
 import { calcMatrixFromISO, parseReadingV2 } from '../../shared/matrix';
 import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
-import { MatrixOctagram } from '../../client/src/components/MatrixOctagram';
-import { cardImage } from './cards';
+import { MatrixPlate } from './MatrixPlate';
+import { TarotFace } from './SpreadGallery';
+import { Frontispiece } from './Editorial';
 import { onlineRequest } from './onlineApi';
 import { ChartViewport } from './ChartViewport';
 
@@ -15,7 +16,7 @@ function Arcana({ title, number, description }) {
   const card = arcanaMetaByN(number);
   return (
     <article className="arcana">
-      <img src={cardImage(arcanaCardId(number))} alt="" />
+      <TarotFace cardId={arcanaCardId(number)} />
       <div>
         <p className="zone">{title}</p>
         <h3>{number} · {card.ru}</h3>
@@ -36,7 +37,7 @@ function MatrixResult({ core, title, centerTitle = 'Центр — зона ко
       <h2>{heading}</h2>
       <p className="matrix-hint">Нажми на число, чтобы узнать его значение.</p>
       <ChartViewport className="matrix-board" label="Схема матрицы судьбы">
-        <MatrixOctagram core={core} zone="all" onNodeTap={setSelected} activeNodeId={nodeId} label="Схема матрицы судьбы" />
+        <MatrixPlate core={core} selected={nodeId} onSelect={setSelected} />
       </ChartViewport>
       <div aria-live="polite">
         <Arcana
@@ -73,14 +74,8 @@ export function Matrix({ account, openAccount, initialMode = null }) {
 
   return (
     <section className="matrix-screen">
-      <section className="hero">
-        <img src={cardImage('star')} alt="" className="cover" />
-        <div className="intro">
-          <h1>Матрица<br/>судьбы</h1>
-          <p>Построй свою матрицу по дате рождения и исследуй её арканы.</p>
-        </div>
-      </section>
-      <div className="mode-switch" role="group" aria-label="Режим матрицы">
+      <Frontispiece title={source === 'pair' ? 'Матрица пары' : 'Матрица судьбы'} art={source === 'pair' ? 'couple' : 'portrait'} scene />
+      <div className="mode-switch matrix-modes" role="group" aria-label="Режим матрицы">
         <button type="button" aria-pressed={source === 'account'} onClick={() => setMode('account')}>Моя матрица</button>
         <button type="button" aria-pressed={source === 'guest'} onClick={() => setMode('guest')}>Для близких</button>
         <button type="button" aria-pressed={source === 'pair'} onClick={() => setMode('pair')}>Матрица пары</button>

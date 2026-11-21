@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChartCanvas } from '../../client/src/components/ChartCanvas';
+import { SkyDial, planetGlyph } from './SkyDial';
+import { Frontispiece } from './Editorial';
 import { translatePlanet, translateSign } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
 import { ReadingText } from './ReadingText';
@@ -61,8 +62,8 @@ export function NatalWheel({ chart, account, guest = false }) {
 
   return <>
     <ChartViewport className="natal-wheel" label="Колесо натальной карты">
-      <ChartCanvas planets={planets} aspects={data.aspects ?? []} angles={data.angles}
-        houses={data.houses} onPlanetClick={selectPlanet} />
+      <SkyDial planets={planets} aspects={data.aspects} angles={data.angles}
+        cusps={validHouses ? cusps : null} selected={current.name} house={view === 'houses' ? houseNumber : null} onSelect={selectPlanet} />
     </ChartViewport>
     {validHouses && <div className="mode-switch" role="group" aria-label="Разделы натальной карты">
       <button type="button" aria-pressed={view === 'planets'} onClick={() => setView('planets')}>Планеты</button>
@@ -70,32 +71,27 @@ export function NatalWheel({ chart, account, guest = false }) {
     </div>}
     <div hidden={view !== 'planets'}>
       <div className="tarot-screen">
-        <div className="planet-tabs" role="group" aria-label="Планеты">
-          {planets.map(planet => (
-            <button key={planet.name} type="button" aria-pressed={current.name === planet.name}
-              onClick={() => selectPlanet(planet.name)}>{translatePlanet(planet.name, 'ru')}</button>
-          ))}
-        </div>
-        <div className="profile-card">
-          <div aria-live="polite">
-            <h2>{translatePlanet(current.name, 'ru')}</h2>
-            <p>{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p>
+        <div className="celestial-object">
+          <div className="object-selector">
+            <span className="object-seal" aria-hidden="true">{planetGlyph[current.name] || '✶'}︎</span>
+            <div><label>Планета<select aria-label="Выбрать планету" value={current.name} onChange={e => selectPlanet(e.target.value)}>
+              {planets.map(p => <option key={p.name} value={p.name}>{translatePlanet(p.name, 'ru')}</option>)}
+            </select></label>
+            <p aria-live="polite">{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p></div>
           </div>
           {!guest && <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />}
         </div>
       </div>
     </div>
     {validHouses && view === 'houses' && <>
-      <div className="planet-tabs" role="group" aria-label="Номер дома">
-        {cusps.map((_, index) => (
-          <button key={index} type="button" aria-label={`${index + 1}-й дом`} aria-pressed={houseNumber === index + 1}
-            onClick={() => setHouseNumber(index + 1)}>{index + 1}</button>
-        ))}
-      </div>
-      <div className="profile-card">
+      <div className="celestial-object">
+        <div className="object-selector">
+          <span className="object-seal" aria-hidden="true">{houseNumber}</span>
+          <div><label>Дом<select aria-label="Выбрать дом" value={houseNumber} onChange={e => setHouseNumber(Number(e.target.value))}>
+            {cusps.map((_, i) => <option key={i} value={i + 1}>{i + 1}-й дом</option>)}
+          </select></label><p>{positionLabel({ sign: zodiacSigns[Math.floor(cusp / 30)], degree_in_sign: cusp % 30 })}</p></div>
+        </div>
         <div aria-live="polite">
-          <h2>{houseNumber}-й дом</h2>
-          <p>{positionLabel({ sign: zodiacSigns[Math.floor(cusp / 30)], degree_in_sign: cusp % 30 })}</p>
           {members.length === 0 && <p>В этом доме нет планет.</p>}
         </div>
         {members.length > 0 && <div className="planet-tabs" role="group" aria-label="Разборы планет в этом доме">
@@ -141,7 +137,7 @@ export function Natal({ account, openAccount, openSettings, openGuests, openDate
 
   return (
     <section className="tarot-screen">
-      <h1>Натальная карта</h1>
+      <Frontispiece title={<>Натальная<br />карта</>} art="moon" />
       {!token ? <div className="profile-card">
         <p>Войди, чтобы открыть карту своего аккаунта.</p>
         <button type="button" onClick={openAccount}>Подключить профиль</button>

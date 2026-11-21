@@ -1,3 +1,4 @@
+import { Frontispiece } from './Editorial';
 import { useEffect, useRef, useState } from 'react';
 import { translatePlanet, translateSign, translateSignPrepositional } from '../../client/src/lib/astroTranslations';
 import { onlineRequest } from './onlineApi';
@@ -132,8 +133,8 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
     if (!uncertain) setReadingError('');
   }
 
-  if (!token) return <section className="profile-card">
-    <h1>Важные даты</h1>
+  if (!token) return <section className="tarot-screen">
+    <Frontispiece title="Важные даты" art="glass" />
     <p>Подключи профиль, чтобы открыть календарь по натальной карте.</p>
     <button type="button" onClick={openAccount}>Подключить профиль</button>
   </section>;
@@ -142,7 +143,7 @@ export function ImportantDates({ account, openAccount, openNatal, guestId }) {
     (filter === 'lunar' ? event.type !== 'planet_transit' : event.type === 'planet_transit'));
 
   return <section className="tarot-screen">
-    {guestId ? <h2>Важные даты</h2> : <h1>Важные даты</h1>}
+    {guestId ? <h2>Важные даты</h2> : <Frontispiece title="Важные даты" art="glass" />}
     <form className="online-spread" onSubmit={load}>
       <label htmlFor={guestId ? 'guest-dates-period' : 'dates-period'}>Период</label>
       <select id={guestId ? 'guest-dates-period' : 'dates-period'} value={period} disabled={busy} onChange={event => {

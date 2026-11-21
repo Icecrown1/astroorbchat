@@ -1,3 +1,4 @@
+import { Frontispiece, plate } from './Editorial';
 import { StarConfirmation } from './StarConfirmation';
 import { useState } from 'react';
 import { onlineRequest } from './onlineApi';
@@ -76,10 +77,14 @@ function savedForecast(row) {
   }
 }
 
-function PartnerFields({ busy }) {
+function PartnerFields({ busy, profile }) {
   const [time, setTime] = useState('');
   const [city, setCity] = useState('');
+  const ownDetails = [dateLabel(profile.birthdayDate), profile.birthTime, profile.birthPlace].filter(Boolean).join(' · ');
   return <>
+    <div className="person-line"><img src={plate('portrait')} alt="" /><div><small>Твой профиль</small>
+      <strong>{profile.name || 'Твои данные'}</strong><p>{ownDetails}</p></div></div>
+    <fieldset className="partner-fields"><legend>Данные партнёра</legend>
     <label htmlFor="partner-name">Имя</label>
     <input id="partner-name" name="name" required maxLength={80} disabled={busy} />
     <label htmlFor="partner-date">Дата рождения</label>
@@ -97,6 +102,7 @@ function PartnerFields({ busy }) {
       </div>
     </details>
     {!time && <p className="matrix-hint">Если время неизвестно, расчёт будет на 12:00.</p>}
+    </fieldset>
     <label htmlFor="relationship-type">Тип связи</label>
     <select id="relationship-type" name="relationshipType" disabled={busy}>
       {Object.entries(relations).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -189,7 +195,7 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
   const Result = horoscope ? HoroscopeResult : CompatibilityResult;
   return (
     <section className="tarot-screen">
-      <h1>{title}</h1>
+      <Frontispiece title={title} art={horoscope ? "lion" : "couple"} scene={!horoscope} />
       {!token ? <div className="profile-card">
         <p>Войди, чтобы получить разбор и сохранить его в аккаунте.</p>
         <button type="button" onClick={openAccount}>Подключить профиль</button>
@@ -200,7 +206,7 @@ export function Forecasts({ kind, account, openAccount, openNatal, openSettings 
               <button key={id} type="button" disabled={busy} aria-pressed={id === period}
                 onClick={() => { setConfirmation(null); setPeriod(id); setResult(null); }}>{item.name}</button>
             ))}
-          </div> : <PartnerFields busy={busy} />}
+          </div> : <PartnerFields busy={busy} profile={profile} />}
           {needsSubscription && <p>Для нового разбора нужна подписка.</p>}
           {missingBirthplace && <>
             <p>Сначала укажи свой город рождения.</p>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { drawCards, getTarotCard, TAROT_SPREADS } from '../../shared/tarot';
-import { cardImage } from './cards';
+import { SpreadGallery } from './SpreadGallery';
+import { plate } from './Editorial';
 
 const storageKey = 'astroorbi.readings.v1';
 const threePositions = [
@@ -78,28 +79,12 @@ export function useReadings() {
 }
 
 function Reading({ entry }) {
-  return (
-    <ol className="reading" aria-label={entry.kind === 'daily' ? 'Карта дня' : 'Расклад на три карты'}>
-      {entry.cards.map(({ cardId, reversed }, index) => {
-        const card = getTarotCard(cardId);
-        const [position, prompt] = entry.kind === 'daily'
-          ? ['Тема дня', 'Где сегодня ты замечаешь эту тему?']
-          : threePositions[index];
-        return (
-          <li className="arcana" key={cardId}>
-            <img className={reversed ? 'reversed-card' : undefined} src={cardImage(cardId)} alt="" />
-            <div>
-              <p className="zone">{position}</p>
-              <h3>{card.nameRu}</h3>
-              {reversed && <p>Перевёрнутая карта</p>}
-              <p className="key">{card.kw[reversed ? 1 : 0]}</p>
-              <p>{prompt}</p>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  const positions = entry.kind === 'daily'
+    ? [['Тема дня', 'Где сегодня ты замечаешь эту тему?']]
+    : threePositions;
+  return <SpreadGallery key={entry.id} cards={entry.cards} spread={entry.kind}
+    labels={positions.map(([label]) => label)} descriptions={positions.map(([, prompt]) => prompt)}
+    keywords={entry.cards.map(({ cardId, reversed }) => getTarotCard(cardId).kw[reversed ? 1 : 0])} />;
 }
 
 export function Tarot({ readings, mode, setMode }) {
@@ -113,7 +98,7 @@ export function Tarot({ readings, mode, setMode }) {
       </div>
       {!entry && (
         <div className="tarot-empty">
-          <img src={cardImage(mode === 'daily' ? 'sun' : 'high-priestess')} alt="" />
+          <img src={plate('hand')} alt="" />
           <p>{mode === 'daily' ? 'Твоя карта откроется один раз за день.' : 'Подумай о ситуации. Три карты подскажут вопросы, с которых можно начать.'}</p>
         </div>
       )}

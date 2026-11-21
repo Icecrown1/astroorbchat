@@ -1,3 +1,4 @@
+import { Frontispiece } from './Editorial';
 import { useState } from 'react';
 import { CityField } from './ProfileSettings';
 import { NatalWheel } from './Natal';
@@ -121,7 +122,7 @@ export function GuestNatal({ account, openAccount }) {
   }
 
   return <section className="tarot-screen">
-    <h1>Карты близких</h1>
+    <Frontispiece title="Карты близких" art="couple" scene />
     {!token ? <div className="profile-card">
       <p>Подключи профиль, чтобы открыть карты из общего аккаунта.</p>
       <button type="button" onClick={openAccount}>Подключить профиль</button>
