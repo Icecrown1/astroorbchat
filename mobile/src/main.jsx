@@ -29,7 +29,13 @@ const tools = [
 ];
 const featured = tools.slice(1, 5);
 
-function Home({ navigate, online, hasDaily }) {
+function AdPlaceholder() {
+  return <aside className="ad-placeholder" aria-label="Реклама">
+    <span>Реклама</span><strong>Тестовый баннер</strong>
+  </aside>;
+}
+
+function Home({ navigate, online, hasDaily, ad }) {
   return <div className="home">
     <section className="daily-cover" style={{ backgroundImage: `url(${editorialHero})` }}>
       <h1>Карта<br />дня</h1>
@@ -42,14 +48,18 @@ function Home({ navigate, online, hasDaily }) {
         <img src={plate(art)} alt="" /><strong>{name}</strong>
       </button>)}</div>
     <button className="catalog-link" type="button" onClick={() => navigate('tools')}>Все инструменты <span aria-hidden="true">→</span></button>
+    {ad}
   </div>;
 }
 
-function Tools({ navigate }) {
+function Tools({ navigate, ad }) {
   return <section className="tarot-screen">
     <Frontispiece title="Инструменты" art="sphere" />
     <div className="illustrated-index">{tools.map(([id, name, description, art]) =>
-      <IndexRow key={id} title={name} description={description} art={art} onClick={() => navigate(id)} />)}</div>
+      <React.Fragment key={id}>
+        <IndexRow title={name} description={description} art={art} onClick={() => navigate(id)} />
+        {id === 'natal' && ad}
+      </React.Fragment>)}</div>
     <IndexRow title="История раскладов" art="books" onClick={() => navigate('history')} />
   </section>;
 }
@@ -79,6 +89,9 @@ function App() {
   const [offline, setOffline] = useState(() => !navigator.onLine);
   const readings = useReadings();
   const account = useAccount();
+  const accessTier = account.profile?.tier ?? account.profile?.billingTier;
+  const ad = import.meta.env.MODE === 'ad-preview' && (account.token === null || accessTier === 'free')
+    ? <AdPlaceholder /> : null;
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
@@ -147,8 +160,8 @@ function App() {
         </button>
       </header>
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
-      {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
-      {screen === 'tools' && <Tools navigate={navigate} />}
+      {screen === 'home' && <Home ad={ad} navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
+      {screen === 'tools' && <Tools ad={ad} navigate={navigate} />}
       {screen === 'stars' && <Stars profile={account.profile} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <Frontispiece title="Таро" art="hand" />
@@ -157,8 +170,8 @@ function App() {
           <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
         </div>
         {source === 'online'
-          ? <OnlineTarot account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
-          : <Tarot readings={readings} mode={tarotMode} setMode={setTarotMode} />}
+          ? <OnlineTarot dailyAd={ad} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
+          : <Tarot dailyAd={ad} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
       <div key={'natal' + profileKey} hidden={screen !== 'natal'}>
         <Natal active={screen === 'natal'} account={account} openAccount={openAccount} openSettings={openSettings}

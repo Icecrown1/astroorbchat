@@ -1,4 +1,5 @@
 """Exercise the installed web bundle at phone sizes, using a synthetic account."""
+import argparse
 from contextlib import contextmanager
 from functools import partial
 from hashlib import sha256
@@ -19,8 +20,8 @@ PROFILE = dict(id="test", name="Саша", birthdayDate="1998-06-07", birthTime=
 
 
 @contextmanager
-def serve_bundle():
-    handler = partial(SimpleHTTPRequestHandler, directory=MOBILE / "dist")
+def serve_bundle(directory=MOBILE / "dist"):
+    handler = partial(SimpleHTTPRequestHandler, directory=directory)
     with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -124,7 +125,8 @@ def check_celtic_cross(page):
     page.emulate_media(reduced_motion="no-preference")
 
 
-def exercise(page, url):
+def exercise(page, url, ad_preview=False):
+    profile = PROFILE.copy()
     draws, errors = [], []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
 
@@ -136,7 +138,7 @@ def exercise(page, url):
             data = reading_fixture(spread)
         else:
             data = {"/api/mobile/auth/exchange": {"token": "local-test"},
-                    "/api/user/me": PROFILE, "/api/tarot/history": [],
+                    "/api/user/me": profile, "/api/tarot/history": [],
                     "/api/tarot/status": {"costs": {"three": 3, "celtic": 10}, "dailyDone": False},
                     "/api/natal/me": natal_fixture()}[path]
         route.fulfill(json={"ok": True, "data": data},
@@ -156,7 +158,31 @@ def exercise(page, url):
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), f"Overflow on {name}"
         page.screenshot(path=SCREENS / f"{name}.png")
 
+    slot = page.get_by_role("complementary", name="Реклама")
     page.goto(url)
+    page.get_by_role("heading", name="Карта дня").wait_for()
+    assert slot.count() == int(ad_preview)
+    if ad_preview:
+        page.set_viewport_size({"width": 320, "height": 740})
+        slot.scroll_into_view_if_needed()
+        assert slot.bounding_box()["height"] >= 50
+        capture("ad-home-320")
+        page.set_viewport_size({"width": 390, "height": 844})
+        nav("Инструменты")
+        slot.wait_for()
+        assert slot.evaluate("el => el.previousElementSibling.innerText.includes('Натальная карта')")
+        slot.scroll_into_view_if_needed()
+        capture("ad-catalog")
+        tool("Таро")
+        assert slot.count() == 0
+        button("Вытянуть карту дня").click()
+        slot.wait_for()
+        assert page.locator(".card-meaning").last.evaluate(
+            "el => !!(el.compareDocumentPosition(document.querySelector('.ad-placeholder')) & Node.DOCUMENT_POSITION_FOLLOWING)")
+        page.locator(".one-card:visible button").click()
+        assert page.get_by_role("dialog").locator(".ad-placeholder").count() == 0
+        button("Закрыть карту").click()
+        nav("Главная")
     capture("01-home")
     nav("Инструменты")
     capture("02-tools")
@@ -180,6 +206,12 @@ def exercise(page, url):
     button("Войти").click()
     page.get_by_role("heading", name=PROFILE["name"]).wait_for()
     capture("03-profile")
+    if ad_preview:
+        nav("Главная")
+        assert slot.count() == 0
+        nav("Инструменты")
+        assert slot.count() == 0
+        nav("Профиль")
     page.get_by_role("button", name="Данные рождения").click()
     page.get_by_role("heading", name="Настройки профиля").wait_for()
     nav("Профиль")
@@ -236,6 +268,7 @@ def exercise(page, url):
     page.select_option("#online-spread", "daily")
     page.locator(".online-spread:visible button[type=submit]").click()
     page.locator(".one-card:visible").wait_for()
+    assert slot.count() == 0
     capture("10-daily")
     button("Выбрать другой расклад").click()
     page.select_option("#online-spread", "celtic")
@@ -271,14 +304,41 @@ def exercise(page, url):
         capture(f"home-{width}")
         tool("Совместимость")
         capture(f"compatibility-{width}")
+    if ad_preview:
+        for tier, billing, expected in [("premium", "premium", False), ("standard", "free", False),
+                                        ("free", "free", True)]:
+            profile.update(tier=tier, billingTier=billing)
+            nav("Профиль")
+            with page.expect_response(lambda reply: "/api/tarot/status" in reply.url):
+                button("Обновить").click()
+            nav("Главная")
+            assert slot.count() == int(expected)
+        tool("Таро")
+        button("С ИИ").click()
+        page.select_option("#online-spread", "daily")
+        assert slot.count() == 0
+        page.locator(".online-spread:visible button[type=submit]").click()
+        slot.wait_for()
+        assert slot.evaluate("el => el.previousElementSibling.matches('.reading-edition')")
+        slot.scroll_into_view_if_needed()
+        capture("ad-daily-reading")
     assert not errors, errors
 
 
 if __name__ == "__main__":
     check_deck()
     SCREENS.mkdir(exist_ok=True)
-    with serve_bundle() as address, sync_playwright() as playwright:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ad-preview", action="store_true")
+    ad_preview = parser.parse_args().ad_preview
+    directory = MOBILE / ("android/app/src/adPreview/assets/public" if ad_preview else "dist")
+    with serve_bundle(directory) as address, sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=which("google-chrome") or which("chromium"))
         page = browser.new_page(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, locale="ru-RU")
-        exercise(page, address)
+        if ad_preview:
+            with serve_bundle() as standard:
+                page.goto(standard)
+                page.locator(".daily-cover").wait_for()
+                assert page.locator(".ad-placeholder").count() == 0
+        exercise(page, address, ad_preview)
         browser.close()

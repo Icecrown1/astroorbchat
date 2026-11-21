@@ -87,7 +87,7 @@ function Reading({ entry }) {
     keywords={entry.cards.map(({ cardId, reversed }) => getTarotCard(cardId).kw[reversed ? 1 : 0])} />;
 }
 
-export function Tarot({ readings, mode, setMode }) {
+export function Tarot({ readings, mode, setMode, dailyAd }) {
   const entry = mode === 'daily' ? readings.daily : readings.lastSpread;
 
   return (
@@ -108,6 +108,7 @@ export function Tarot({ readings, mode, setMode }) {
           {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть три карты'}
         </button>
       )}
+      {mode === 'daily' && entry && dailyAd}
       {readings.storageError && <p role="alert">Не удалось сохранить расклад на устройстве.</p>}
     </section>
   );

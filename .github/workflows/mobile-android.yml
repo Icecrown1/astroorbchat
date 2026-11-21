@@ -40,11 +40,12 @@ jobs:
           npm run build
           npx --no-install cap add android
           npm run prepare:android
+          npm run build -- --mode ad-preview --outDir android/app/src/adPreview/assets/public --emptyOutDir
           sed -i "s|mavenCentral()|maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }|g"             android/build.gradle node_modules/@capacitor/android/capacitor/build.gradle
       - name: Build and verify the APK
         working-directory: mobile/android
         run: |
-          ./gradlew --no-daemon assembleDebug assembleDesign
+          ./gradlew --no-daemon assembleDebug assembleDesign assembleAdPreview
           build_tools="$ANDROID_HOME/build-tools/35.0.0"
           "$build_tools/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
           design_apk=app/build/outputs/apk/design/app-design.apk
@@ -52,6 +53,16 @@ jobs:
           "$build_tools/aapt" dump badging "$design_apk" > "$RUNNER_TEMP/orbi-design-badging.txt"
           grep -F "package: name='app.astroorbi.preview.cross'" "$RUNNER_TEMP/orbi-design-badging.txt"
           grep -F "application-label:'AstroOrbi Крест'" "$RUNNER_TEMP/orbi-design-badging.txt"
+          ad_apk=app/build/outputs/apk/adPreview/app-adPreview.apk
+          "$build_tools/apksigner" verify "$ad_apk"
+          "$build_tools/aapt" dump badging "$ad_apk" > "$RUNNER_TEMP/orbi-ad-badging.txt"
+          grep -F "package: name='app.astroorbi.preview.adpreview'" "$RUNNER_TEMP/orbi-ad-badging.txt"
+          grep -F "application-label:'AstroOrbi Реклама'" "$RUNNER_TEMP/orbi-ad-badging.txt"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-ad-preview
+          path: mobile/android/app/build/outputs/apk/adPreview/app-adPreview.apk
+          if-no-files-found: error
       - uses: actions/upload-artifact@v6
         with:
           name: astroorbi-android-preview
@@ -66,7 +77,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/orbi-browser"
           "$RUNNER_TEMP/orbi-browser/bin/pip" -q install playwright==1.56.0
-          "$RUNNER_TEMP/orbi-browser/bin/python" mobile/scripts/check-layout.py
+          "$RUNNER_TEMP/orbi-browser/bin/python" mobile/scripts/check-layout.py --ad-preview
       - uses: actions/upload-artifact@v6
         if: always()
         with:

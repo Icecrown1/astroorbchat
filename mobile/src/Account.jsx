@@ -87,7 +87,8 @@ function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
 
 export function useAccount() {
   const [code, setCode] = useState('');
-  const [token, setToken] = useState(null);
+  // undefined while the device is checking for a saved session, null for a confirmed guest.
+  const [token, setToken] = useState(native ? undefined : null);
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
   const [latest, setLatest] = useState(null);
@@ -169,7 +170,10 @@ export function useAccount() {
     if (!native) return;
     run(async () => {
       const saved = await SecureStorage.get(sessionKey, false, false);
-      if (typeof saved !== 'string' || !saved) return;
+      if (typeof saved !== 'string' || !saved) {
+        setToken(null);
+        return;
+      }
       setToken(saved);
       await loadAccount(saved);
     });
@@ -264,7 +268,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
   );
 }
 
-export function OnlineTarot({ account, openAccount, openHistory, initialSpread }) {
+export function OnlineTarot({ account, openAccount, openHistory, initialSpread, dailyAd }) {
   const { token, profile, tarotStatus, busy, error, draw, refresh } = account;
   const [opened, setOpened] = useState(() =>
     account.latest?.spread === initialSpread && initialSpread !== 'daily' ? account.latest : null);
@@ -280,6 +284,7 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread }
     {!profile && busy && <p role="status">Загружаем профиль…</p>}
     {opened ? <>
       <ServerReading key={opened.id} reading={opened} open />
+      {opened.spread === 'daily' && dailyAd}
       <button className="secondary-button" type="button" onClick={() => setOpened(null)}>Выбрать другой расклад</button>
     </> : profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
       draw={async data => {
