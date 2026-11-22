@@ -176,9 +176,9 @@ function App() {
     function returned() {
       if (active && window.history.state?.screen !== 'stars') navigateRef.current('stars');
     }
-    const listener = playCatalog.addListener('paymentReturn', returned);
+    const listener = playCatalog.addListener('paymentReturn', returned).catch(() => null);
     playCatalog.consumeReturn().then(result => { if (result.returning) returned(); }).catch(() => {});
-    return () => { active = false; listener.then(handle => handle.remove()).catch(() => {}); };
+    return () => { active = false; listener.then(handle => handle?.remove()).catch(() => {}); };
   }, []);
 
   function onReadingComplete() {

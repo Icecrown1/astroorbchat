@@ -1,0 +1,115 @@
+// Android instrumentation of this app's debug WebView on a disposable emulator.
+// Use Android for installation, system Back, deep links, screenshots and ad dismissal.
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { setTimeout as pause } from 'node:timers/promises';
+import assert from 'node:assert/strict';
+
+const pkg='app.astroorbi.mobile', out='device-results', results={};
+mkdirSync(out,{recursive:true});
+const adb=(...args)=>execFileSync('adb',args,{timeout:60000,encoding:'utf8'}).trim();
+const snap=name=>writeFileSync(join(out,name+'.png'),execFileSync('adb',['exec-out','screencap','-p'],{maxBuffer:16e6}));
+function record(name,value) {
+  results[name]=value;
+  writeFileSync(join(out,'scenarios.json'),JSON.stringify(results,null,2));
+  console.log(name,JSON.stringify(value));
+}
+let socket,seq=0;
+const pending=new Map();
+async function connect() {
+  socket?.close();
+  for(let i=0;i<50;i++) {
+    try {
+      const pid=adb('shell','pidof','-s',pkg);
+      adb('forward','tcp:19227','localabstract:webview_devtools_remote_'+pid);
+      const pages=await (await fetch('http://localhost:19227/json/list')).json();
+      const page=pages.find(p=>p.type==='page' && /localhost/.test(p.url));
+      if(!page) throw Error('WebView warming up');
+      const sock=new WebSocket(page.webSocketDebuggerUrl);
+      await new Promise((resolve,reject)=>{sock.onopen=resolve;sock.onerror=reject;});
+      socket=sock;
+      sock.onmessage=e=>{const message=JSON.parse(e.data);pending.get(message.id)?.(message);};
+      return;
+    } catch { await pause(600); }
+  }
+  throw Error('Application WebView unavailable');
+}
+async function js(expression) {
+  const id=++seq;
+  const reply=await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{pending.delete(id);reject(Error('WebView response timeout'));},10000);
+    pending.set(id,m=>{clearTimeout(timer);pending.delete(id);resolve(m);});
+    socket.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}));
+  });
+  if(reply.error || reply.result?.exceptionDetails) throw Error('WebView evaluation failed');
+  return reply.result.result.value;
+}
+async function until(fn,label,ms=15000) {
+  const end=Date.now()+ms;
+  do { if(await fn())return; await pause(250); } while(Date.now()<end);
+  throw Error(label);
+}
+const visible="el=>el.getClientRects().length && !el.disabled";
+const buttons=`[...document.querySelectorAll('button')].filter(${visible})`;
+const click=async text=>until(()=>js(`(()=>{const e=${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(text)} || b.getAttribute('aria-label')===${JSON.stringify(text)});if(!e)return false;e.scrollIntoView({block:'center'});e.click();return true})()`),'button '+text);
+const selector=async q=>until(()=>js(`[...document.querySelectorAll(${JSON.stringify(q)})].some(${visible})`),'visible '+q);
+const clickSel=async q=>{await selector(q);await js(`[...document.querySelectorAll(${JSON.stringify(q)})].find(${visible}).click()`);};
+const page=async s=>selector('.page[data-screen="'+s+'"]');
+const launch=()=>adb('shell','am','start','-W','-n',adb('shell','cmd','package','resolve-activity','--brief',pkg).split('\n').at(-1));
+async function step(name,fn) {
+  try { await fn();record(name,'pass'); }
+  catch(e) { record(name,String(e.message).slice(0,180)); }
+  try {snap(name);} catch {}
+}
+const pick=async (screen,title)=>{await click('Инструменты');await page('tools');
+  await js(`[...document.querySelectorAll('.illustrated-index button')].find(b=>b.innerText.split('\\n')[0].trim()===${JSON.stringify(title)} || b.innerText.startsWith(${JSON.stringify(title)})).click()`);
+  await page(screen);};
+const readout=async()=>js('document.body.innerText');
+try {
+  adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
+  adb('shell','settings','put','system','screen_off_timeout','1800000');
+  record('pageBytes',Number(adb('shell','getconf','PAGE_SIZE')));
+  adb('install',join(process.env.RUNNER_TEMP,'candidate-6.apk'));launch();await connect();
+  await step('v6-first-draw',async()=>{await click('Открыть бесплатно →');await click('Вытянуть карту дня');await selector('.one-card button');});
+  adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-7.apk'));launch();await connect();
+  await step('upgrade',async()=>{await page('home');assert.match(await readout(),/Посмотреть карту/);});
+  await step('home-small-font130',async()=>{
+    adb('shell','wm','size','720x1280');adb('shell','wm','density','320');adb('shell','settings','put','system','font_scale','1.3');
+    adb('shell','am','force-stop',pkg);launch();await connect();await page('home');
+    assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));});
+  await step('tarot-fullscreen',async()=>{await pick('tarot','Таро');await clickSel('.one-card button');await selector('dialog[open] img');snap('card-full-size');adb('shell','input','keyevent','4');await selector('.one-card button');});
+  await step('three-cards',async()=>{await click('Три карты');await click('Вытянуть три карты');await selector('.three-cards button');assert.equal(await js("document.querySelectorAll('.three-cards button').length"),3);});
+  await step('rewarded-sdk',async()=>{
+    await selector('.reward-unlock');await until(()=>js("Boolean(document.querySelector('.reward-unlock[aria-label]'))"),'test ads disabled or ad configuration unavailable',12000);
+    let shown=false;
+    for(let i=0;i<4 && !shown;i++) {
+      await clickSel('.reward-unlock');await pause(2500);
+      shown=/AdActivity/.test(adb('shell','dumpsys','activity','activities').split('\n').filter(s=>/ResumedActivity|topResumedActivity/.test(s)).join(' '));
+      if(!shown)await pause(3500);
+    }
+    if(!shown)throw Error('Test ad did not open; no earned callback observed');
+    snap('sdk-test-ad');await pause(40000);
+    for(let i=0;i<4;i++){
+      adb('shell','input','keyevent','4');await pause(1500);
+      if(await js("Boolean(document.querySelector('.rewarded-advice'))"))return;
+      // Only the system Back button is used to avoid tapping an advertisement.
+    }
+    throw Error('Rewarded test ad opened; earned/dismiss result unconfirmed');
+  });
+  adb('shell','am','force-stop',pkg);launch();await connect();
+  for (const [key,title] of [['compatibility','Совместимость'],['oracle','Оракул'],['natal','Натальная карта'],['matrix','Матрица судьбы'],['horoscope','Гороскоп'],['dates','Важные даты'],['solar','Соляр']]) {
+    await step(key,async()=>{await pick(key,title);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));});
+  }
+  await step('profile-keyboard',async()=>{await click('Профиль');await selector('#link-code');
+    await js("document.querySelector('#link-code').focus()");assert.ok(await js("document.activeElement.id==='link-code'"));});
+  await step('cold-return',async()=>{
+    adb('shell','am','force-stop',pkg);adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d','astroorbi-internal://payment-return',pkg);
+    await connect();await page('stars');assert.doesNotMatch(await readout(),/Платёж подтверждён/);});
+  await step('offline-back',async()=>{
+    adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');
+    await click('Главная');await pick('tarot','Таро');await selector('.one-card button');
+    adb('shell','input','keyevent','4');await page('tools');
+  });
+} finally {socket?.close();}
+if(Object.entries(results).some(([k,v])=>k!=='pageBytes'&&v!=='pass'))process.exitCode=1;

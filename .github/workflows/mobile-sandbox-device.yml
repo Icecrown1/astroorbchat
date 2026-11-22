@@ -41,6 +41,9 @@ jobs:
             npx --no-install cap add android
             npm run prepare:android
             PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
+            sed -i "s|mavenCentral()|maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }|g" \
+              android/build.gradle node_modules/@capacitor/android/capacitor/build.gradle \
+              node_modules/@aparajita/capacitor-secure-storage/android/build.gradle
             cd android
             bash gradlew :app:assembleDebug
             bash gradlew --stop
@@ -60,7 +63,7 @@ jobs:
           heap-size: 512M
           profile: pixel_6
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none -skin 720x1280
-          script: python3 mobile/play-internal/device-smoke.py
+          script: node mobile/play-internal/webview-device.mjs
       - if: always()
         uses: actions/upload-artifact@v6
         with:
