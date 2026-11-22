@@ -192,12 +192,13 @@ try {
   writeFileSync(join(out,'sdk-callbacks.txt'),sdkLog());
   await step('native-dismiss-before-earn',async()=>{
     await freshReading();adb('logcat','-c');
-    adb('shell','run-as',pkg,'touch','files/qa-dismiss-next-ad');
+    adb('shell','run-as',pkg,'touch','files/qa-dismiss-next-ad','files/qa-replay-closing-back');
     for(let i=0;i<5 && !sdkLog().includes('Android finishes SDK activity');i++) {
       await clickSel('.reward-unlock[aria-label]');await pause(3500);
     }
     await until(()=>sdkLog().includes('SDK dismissed earned=false'),'SDK early-dismiss callback',10000);
     await mainResumed();await page('tarot');await selector('.reward-unlock[aria-label]');
+    assert.ok(sdkLog().includes('Replay closing Back on host'));
     assert.ok(!sdkLog().includes('SDK earned'));
     assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
   });
