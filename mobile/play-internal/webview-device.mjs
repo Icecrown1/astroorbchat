@@ -73,6 +73,7 @@ async function closeTestAd() {
   } catch {
     // Animated test creatives may never report an idle accessibility tree.
   }
+  if(!foreground().includes('AdActivity')) return;
   const close=xml.match(/<node\b[^>]*(?:(?:content-desc|text)="(?:Close|Close ad|Close video|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
   const bounds=close?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if(bounds) {
@@ -170,8 +171,9 @@ try {
     for(let i=0;i<4 && adIsShowing();i++) {await closeTestAd();await pause(1300);}
     assert.ok(!adIsShowing(),'interstitial dismissed');await page('home');
   });
-  await step('rewarded-early-dismiss',async()=>{
-    await freshReading();
+  const sdkLog=()=>adb('logcat','-d','-s','AstroAdQA:I','*:S');
+  await step('rewarded-system-back',async()=>{
+    await freshReading();adb('logcat','-c');
     for(let i=0;i<5 && !adIsShowing();i++) {
       await clickSel('.reward-unlock[aria-label]');await pause(1000);
       if(!adIsShowing())await pause(2700);
@@ -180,11 +182,14 @@ try {
     // Attempt early dismissal only on the verified Google SDK activity.
     adb('shell','input','keyevent','4');await pause(700);
     for(let i=0;i<3 && adIsShowing();i++) {await closeTestAd();await pause(700);}
-    assert.ok(!adIsShowing(),'test creative permits early dismissal');
-    await page('tarot');await selector('.reward-unlock[aria-label]');
-    assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
+    assert.ok(!adIsShowing(),'test creative dismissed');
+    await until(()=>/SDK dismissed earned=(true|false)/.test(sdkLog()),'SDK dismissal event',6000);
+    const earned=sdkLog().includes('SDK dismissed earned=true');
+    await page('tarot');
+    await selector(earned ? '.rewarded-advice' : '.reward-unlock[aria-label]');
+    assert.equal(await js("Boolean(document.querySelector('.rewarded-advice'))"),earned);
+    console.log('Android Back: SDK reward before dismissal',earned);
   });
-  const sdkLog=()=>adb('logcat','-d','-s','AstroAdQA:I','*:S');
   writeFileSync(join(out,'sdk-callbacks.txt'),sdkLog());
   await step('native-dismiss-before-earn',async()=>{
     await freshReading();adb('logcat','-c');
