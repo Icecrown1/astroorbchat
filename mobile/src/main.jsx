@@ -8,7 +8,7 @@ import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
 import { playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
 import { MobileCardShop } from './MobileCardShop';
-import { PlayStoreStatus } from './PlayStoreStatus';
+import { onlineRequest } from './onlineApi';
 import { AdPreview } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
@@ -72,8 +72,8 @@ function Stars({ account, openAccount }) {
     <section className="ledger"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате рождения.</p></section>
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
-      <p>Это ежемесячное пополнение баланса.</p>
-      {playInternal ? <><MobileCardShop key={profile?.id} account={account} /><PlayStoreStatus /></> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      <p>Одна покупка даёт доступ на месяц. Автопродления нет.</p>
+      {playInternal ? <MobileCardShop key={profile?.id} account={account} /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
@@ -90,6 +90,22 @@ function App() {
   const account = useAccount();
   const accessTier = account.profile?.tier ?? account.profile?.billingTier;
   const adEligible = rewardsEnabled && (account.token === null || accessTier === 'free');
+  const [testAds, setTestAds] = useState(false);
+  useEffect(() => {
+    if (!playInternal) return;
+    let generation = 0;
+    async function refresh() {
+      if (document.hidden) return;
+      const current = ++generation;
+      try {
+        const config = await onlineRequest('/api/mobile/config');
+        if (generation === current) setTestAds(config.testAds === true);
+      } catch { if (generation === current) setTestAds(false); }
+    }
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    return () => { generation++; document.removeEventListener('visibilitychange', refresh); };
+  }, []);
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
   const [adType, setAdType] = useState(null);
   const previousScreen = useRef(screen);
@@ -103,7 +119,7 @@ function App() {
   rewardOwner.current = adEligible ? (account.profile?.id ?? 'guest') : null;
 
   useEffect(() => {
-    if (!playInternal || !adEligible) return;
+    if (!playInternal || !adEligible || !testAds) return;
     function prepare() {
       if (!document.hidden) playAds.prepare().catch(() => {});
     }
@@ -114,12 +130,12 @@ function App() {
       window.removeEventListener('online', prepare);
       document.removeEventListener('visibilitychange', prepare);
     };
-  }, [adEligible]);
+  }, [adEligible, testAds]);
 
   function showAd(type, onEarn, title, remaining = 0) {
     if (!adEligible || window.history.state?.adOverlay) return;
     if (playInternal) {
-      if (nativeAdPending.current) return;
+      if (!testAds || nativeAdPending.current) return;
       nativeAdPending.current = true;
       const owner = rewardOwner.current;
       setAdNotice('');
@@ -169,6 +185,7 @@ function App() {
   }
 
   const rewards = adEligible ? { owner: account.profile?.id ?? 'guest',
+    adFree: playInternal && !testAds,
     watch: (title, remaining, credit) => showAd('rewarded', credit, title, remaining) } : null;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');

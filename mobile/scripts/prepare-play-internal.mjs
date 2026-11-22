@@ -29,7 +29,7 @@ await replaceIn('src/main/AndroidManifest.xml', [
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="astroorbi" android:host="payment-return" />
+                <data android:scheme="astroorbi-internal" android:host="payment-return" />
             </intent-filter>
         </activity>`],
   ['android:allowBackup="true"', 'android:allowBackup="false"'],
@@ -43,3 +43,6 @@ await replaceIn('src/main/java/' + config.appId.replaceAll('.', '/') + '/MainAct
 const target = new URL('src/main/java/app/astroorbi/store/', app);
 await mkdir(target, { recursive: true });
 for (const name of ['PlayAds.java', 'PlayCatalog.java']) await copyFile(new URL(name, files), new URL(name, target));
+await replaceIn('src/main/java/app/astroorbi/store/PlayCatalog.java', [
+  ['"astroorbi://payment-return"', '"astroorbi-internal://payment-return"'],
+]);

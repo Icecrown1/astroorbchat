@@ -1,11 +1,12 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
-const apiOrigin = new URL(import.meta.env.VITE_ASTROORBI_API_URL || 'https://astroorbiapp.com');
+export const apiOrigin = new URL(import.meta.env.VITE_ASTROORBI_API_URL || 'https://astroorbiapp.com');
 if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) {
   throw new Error('AstroOrbi API must use HTTPS.');
 }
 
 const messages = {
+  internal_ai_unavailable: 'ИИ-разборы в тестовой среде пока отключены. Доступны офлайн-Таро и матрица по дате.',
   NATAL_INCOMPLETE: 'Добавь точное время и место рождения в профиле.',
   SUBSCRIPTION_REQUIRED: 'Для этого раздела нужна подписка.',
   INSUFFICIENT_ORBS: 'На балансе недостаточно звёзд.',
@@ -19,12 +20,13 @@ const messages = {
   premium_required: 'Этот расклад доступен по тарифу Premium.',
   insufficient_orbs: 'Для расклада не хватает звёзд.',
   question_required: 'Добавь вопрос к раскладу.',
-  invalid_code: 'Код истёк или уже использован. Получи новый в Telegram.',
+  invalid_code: 'Код истёк или уже использован. Получи новый код входа.',
   mobile_login_unavailable: 'Вход сейчас недоступен. Попробуй позже.',
 };
 
 export async function onlineRequest(path, { token, data, envelope = false, method = data ? 'POST' : 'GET' } = {}) {
   const url = new URL(path, apiOrigin.origin).href;
+  if (new URL(url).origin !== apiOrigin.origin) throw new Error('Invalid API origin');
   const headers = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (data) headers['Content-Type'] = 'application/json';

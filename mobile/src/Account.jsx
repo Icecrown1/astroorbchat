@@ -1,4 +1,4 @@
-import { rewardsEnabled } from './playInternal';
+import { playInternal, rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
@@ -7,18 +7,19 @@ import { Frontispiece, IndexRow, plate } from './Editorial';
 import { ClarifyingCard } from './AdPreview';
 import { SpreadGallery } from './SpreadGallery';
 import { StarConfirmation } from './StarConfirmation';
-import { onlineRequest } from './onlineApi';
+import { apiOrigin, onlineRequest } from './onlineApi';
 import { BirthDetails } from './ProfileSettings';
+import { ReportReading } from './ReportReading';
 
 const tiers = { free: 'Бесплатный', standard: 'Standard', premium: 'Premium' };
 const spreads = { daily: 'Карта дня', three: 'Три карты', yesno: 'Да / Нет', celtic: 'Кельтский крест', trial: 'Пробный расклад' };
 const native = Capacitor.isNativePlatform();
-const sessionKey = 'astroorbi.mobile.session';
+const sessionKey = 'astroorbi.mobile.session.' + apiOrigin.hostname;
 const onlineSpreads = ['daily', 'yesno', 'three', 'celtic'];
 const verdicts = { yes: 'Да', no: 'Нет', maybe: 'Пока неясно' };
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' });
 
-function ServerReading({ reading, open }) {
+function ServerReading({ reading, open, token }) {
   const interpretation = reading.interpretation;
   const body = <div className="server-reading">
     {reading.question && <blockquote>{reading.question}</blockquote>}
@@ -35,6 +36,7 @@ function ServerReading({ reading, open }) {
     </SpreadGallery>
     {rewardsEnabled && !open && reading.spread === 'three' && <ClarifyingCard entry={reading} source="online" earnedOnly />}
     {interpretation?.advice && <div className="reading-section"><h3>Совет</h3><p>{interpretation.advice}</p></div>}
+    <ReportReading token={token} kind="tarot" reading={reading} />
   </div>;
   const date = <time dateTime={reading.createdAt}>{dateFormat.format(new Date(reading.createdAt))}</time>;
   if (open) return <article className="reading-edition"><h2>{spreads[reading.spread] || 'Расклад'}</h2>{date}{body}</article>;
@@ -238,13 +240,13 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
       {!token ? (
         <>
           <form className="profile-card account-connect" onSubmit={signIn}>
-            <h2>Войти через Telegram</h2>
-            <ol className="connect-steps">
+            <h2>{playInternal ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
+            {playInternal ? <p>Введите одноразовый код из тестовой среды. Код действует 5 минут.</p> : <ol className="connect-steps">
               <li>Открой AstroOrbi в Telegram.</li>
               <li>В настройках найди «Мобильное приложение» и получи код входа.</li>
               <li>Вставь код сюда в течение 5 минут.</li>
-            </ol>
-            <label htmlFor="link-code">Код из Telegram</label>
+            </ol>}
+            <label htmlFor="link-code">{playInternal ? 'Тестовый код' : 'Код из Telegram'}</label>
             <input id="link-code" value={code} onChange={event => setCode(event.target.value)} required
               autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy}
               aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'account-status' : undefined} />
@@ -286,7 +288,7 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread, 
   return <>
     {!profile && busy && <p role="status">Загружаем профиль…</p>}
     {opened ? <>
-      <ServerReading key={opened.id} reading={opened} open />
+      <ServerReading key={opened.id} reading={opened} open token={token} />
       {rewardsEnabled && opened.spread === 'three' && <ClarifyingCard entry={opened} source="online" />}
       <button className="secondary-button" type="button" onClick={() => setOpened(null)}>Выбрать другой расклад</button>
     </> : profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
@@ -313,7 +315,7 @@ export function AccountHistory({ account }) {
     <section className="tarot-screen">
       <h2>Из аккаунта</h2>
       {!account.history.length && <p className="empty-panel">В аккаунте пока нет раскладов.</p>}
-      {account.history.map(reading => <ServerReading key={reading.id} reading={reading} />)}
+      {account.history.map(reading => <ServerReading key={reading.id} reading={reading} token={account.token} />)}
     </section>
   );
 }
