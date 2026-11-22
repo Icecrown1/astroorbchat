@@ -1,6 +1,8 @@
 package app.astroorbi.store;
 
 import android.app.Activity;
+import android.os.Bundle;
+import com.google.ads.mediation.admob.AdMobAdapter;
 import androidx.annotation.NonNull;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -49,9 +51,12 @@ public class PlayAds extends Plugin {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         if (!fresh(interstitialAt)) interstitial = null;
         if (!fresh(rewardedAt)) rewarded = null;
+        Bundle privacy = new Bundle();
+        privacy.putString("npa", "1");
+        AdRequest request = new AdRequest.Builder().addNetworkExtrasBundle(AdMobAdapter.class, privacy).build();
         if (interstitial == null && !loadingInterstitial) {
             loadingInterstitial = true;
-            InterstitialAd.load(activity, INTERSTITIAL, new AdRequest.Builder().build(), new InterstitialAdLoadCallback() {
+            InterstitialAd.load(activity, INTERSTITIAL, request, new InterstitialAdLoadCallback() {
                 @Override public void onAdLoaded(@NonNull InterstitialAd ad) {
                     interstitial = ad; interstitialAt = now(); loadingInterstitial = false;
                 }
@@ -60,7 +65,7 @@ public class PlayAds extends Plugin {
         }
         if (rewarded == null && !loadingRewarded) {
             loadingRewarded = true;
-            RewardedAd.load(activity, REWARDED, new AdRequest.Builder().build(), new RewardedAdLoadCallback() {
+            RewardedAd.load(activity, REWARDED, request, new RewardedAdLoadCallback() {
                 @Override public void onAdLoaded(@NonNull RewardedAd ad) {
                     rewarded = ad; rewardedAt = now(); loadingRewarded = false;
                 }

@@ -14,9 +14,9 @@ export async function registerMobileInternalRoutes(app: Express, aiEnabled: bool
   const shared = express();
   await registerRoutes(shared);
   const serve: RequestHandler = (req, res, next) => shared(req, res, next);
-  app.get('/api/mobile/config', (_req, res) => {
+  app.get('/api/mobile/config', (req, res) => {
     res.set('Cache-Control', 'no-store').json({ ok: true, data: {
-      testAds: process.env.ANDROID_INTERNAL_TEST_ADS === '1',
+      testAds: req.query.build === '7' ? process.env.ANDROID_S7_TEST_ADS !== '0' : process.env.ANDROID_INTERNAL_TEST_ADS === '1',
     } });
   });
   app.post('/api/mobile/content-reports', requireAuth, async (req, res, next) => {

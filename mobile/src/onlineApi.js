@@ -6,6 +6,7 @@ if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password)
 }
 
 const messages = {
+  pending_order_deletion: 'Сначала завершите сверку тестового заказа. Для удаления обратитесь в поддержку с номером заказа.',
   internal_ai_unavailable: 'ИИ-разборы в тестовой среде пока отключены. Доступны офлайн-Таро и матрица по дате.',
   NATAL_INCOMPLETE: 'Добавь точное время и место рождения в профиле.',
   SUBSCRIPTION_REQUIRED: 'Для этого раздела нужна подписка.',

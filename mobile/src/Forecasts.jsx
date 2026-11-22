@@ -4,6 +4,7 @@ import { PreviewRewards } from './RewardUnlock';
 import { RewardHoroscope } from './RewardReadings';
 import { useContext, useState } from 'react';
 import { onlineRequest } from './onlineApi';
+import { ReportExcerpt } from './ReportReading';
 import { ResultCard } from './ResultCard';
 import { CityField } from './ProfileSettings';
 
@@ -115,7 +116,8 @@ function PartnerFields({ busy, profile }) {
 export function Forecasts({ kind, active, account, openAccount, openNatal, openSettings }) {
   const { token, profile, busy, error, run, refreshProfile } = account;
   const horoscope = kind === 'horoscope';
-  const rewardedForecast = Boolean(useContext(PreviewRewards)) && horoscope;
+  const rewardAccess = useContext(PreviewRewards);
+  const rewardedForecast = rewardAccess && !rewardAccess.paid && horoscope;
   const title = horoscope ? 'Гороскоп' : 'Совместимость';
   const [period, setPeriod] = useState('day');
   const [result, setResult] = useState(null);
@@ -206,7 +208,7 @@ export function Forecasts({ kind, active, account, openAccount, openNatal, openS
     <section className="tarot-screen">
       <Frontispiece title={title} art={horoscope ? "lion" : "couple"} scene={!horoscope} />
       {rewardedForecast && active && <div className="online-spread">
-        {periodPicker}<RewardHoroscope period={period} />
+        {periodPicker}<RewardHoroscope period={period} token={token} />
       </div>}
       {!token ? <div className="profile-card">
         <p>Войди, чтобы получить разбор и сохранить его в аккаунте.</p>
@@ -229,14 +231,14 @@ export function Forecasts({ kind, active, account, openAccount, openNatal, openS
         {error && <p role="alert">{error}</p>}
         {needsNatal && <button className="secondary-button" type="button" onClick={openNatal}>Открыть натальную карту</button>}
         {result && <ResultCard title={horoscope ? 'Твой прогноз' : 'Разбор совместимости'}
-          eyebrow={horoscope ? periods[period].name : 'Совместимость'}><Result report={result} /></ResultCard>}
+          eyebrow={horoscope ? periods[period].name : 'Совместимость'}><Result report={result} /><ReportExcerpt token={token} kind={horoscope ? 'forecast' : 'compatibility'} text={horoscope ? result : result.analysis} /></ResultCard>}
         <button className="secondary-button" type="button" disabled={busy} onClick={checkHistory}>
           {mustCheck ? 'Проверить историю и баланс' : 'Загрузить историю'}
         </button>
         {history?.length === 0 && <p>В истории пока ничего нет.</p>}
         {history?.map(row => <details key={row.id}>
           <summary>{horoscope ? periods[row.period]?.name ?? 'Прогноз' : row.partnerName} · {dateLabel(row.startDate || row.createdAt)}</summary>
-          <div className="server-reading"><Result report={horoscope ? savedForecast(row) : row} /></div>
+          <div className="server-reading"><Result report={horoscope ? savedForecast(row) : row} /><ReportExcerpt token={token} kind={horoscope ? 'forecast' : 'compatibility'} text={horoscope ? savedForecast(row) : row.analysis} /></div>
         </details>)}
       </>}
     </section>

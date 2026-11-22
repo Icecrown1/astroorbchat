@@ -65,6 +65,8 @@ async function main() {
     const { getUserOrbs, getUserTier } = await import('./lib/energy');
     const app = express();
     app.use(express.json({ limit: '32kb' }));
+    const { registerSandboxCare } = await import('./mobileSandboxCare');
+    await registerSandboxCare(app);
     app.get('/', (_req, res) => res.type('text').send('AstroOrbi Android sandbox'));
     const aiKey = process.env.ANDROID_INTERNAL_OPENAI_KEY;
     // Only the dedicated sandbox credential may send requests. Without it, the
@@ -101,6 +103,14 @@ async function main() {
     // The notification only identifies the order. Settlement re-fetches it from the test merchant.
     app.post('/webhooks/yookassa', async (req, res) => {
       const { event, object } = req.body ?? {};
+      if (event === 'refund.succeeded') {
+        if (typeof object?.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(object.id)) return res.sendStatus(400);
+        try {
+          const { recordSandboxRefund } = await import('./mobileShop');
+          await recordSandboxRefund(object.id);
+          return res.sendStatus(200);
+        } catch { return res.sendStatus(503); }
+      }
       if (!['payment.succeeded', 'payment.canceled'].includes(event) ||
           object?.test !== true || object?.metadata?.kind !== 'subscription_mobile' ||
           typeof object.id !== 'string' || typeof object.metadata.internalPaymentId !== 'string') {

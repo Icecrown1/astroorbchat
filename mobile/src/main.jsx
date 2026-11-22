@@ -98,7 +98,7 @@ function App() {
       if (document.hidden) return;
       const current = ++generation;
       try {
-        const config = await onlineRequest('/api/mobile/config');
+        const config = await onlineRequest('/api/mobile/config?build=7');
         if (generation === current) setTestAds(config.testAds === true);
       } catch { if (generation === current) setTestAds(false); }
     }
@@ -110,7 +110,7 @@ function App() {
   const [adType, setAdType] = useState(null);
   const previousScreen = useRef(screen);
   const readingCompleted = useRef(false);
-  const lastAd = useRef(-Infinity);
+  const lastAd = useRef(Number(sessionStorage.getItem('astroorbi.last-test-ad')) || 0);
   const grantReward = useRef(null);
 
   const [adNotice, setAdNotice] = useState('');
@@ -140,7 +140,8 @@ function App() {
       const owner = rewardOwner.current;
       setAdNotice('');
       playAds.show({ type }).then(({ earned }) => {
-        lastAd.current = performance.now();
+        lastAd.current = Date.now();
+        sessionStorage.setItem('astroorbi.last-test-ad', String(lastAd.current));
         if (earned && owner !== null && owner === rewardOwner.current) onEarn?.();
       }).catch(() => {
         if (type === 'rewarded') setAdNotice('Ролик пока не загрузился. Попробуй ещё раз чуть позже.');
@@ -148,7 +149,7 @@ function App() {
       return;
     }
     grantReward.current = onEarn ?? null;
-    lastAd.current = performance.now();
+    lastAd.current = Date.now();
     const current = window.history.state;
     const returnRoute = current.screen === 'tarot' ? { ...current, tarotMode, tarotSource } : current;
     window.history.replaceState(returnRoute, '');
@@ -161,7 +162,7 @@ function App() {
     const leftTarot = previousScreen.current === 'tarot' && screen !== 'tarot';
     previousScreen.current = screen;
     if (!leftTarot) return;
-    if (readingCompleted.current && performance.now() - lastAd.current >= 120_000) {
+    if (readingCompleted.current && screen !== 'stars' && screen !== 'settings' && Date.now() - lastAd.current >= 120_000) {
       showAd('interstitial');
     }
     readingCompleted.current = false;
@@ -184,8 +185,9 @@ function App() {
     if (adEligible && window.history.state?.screen === 'tarot') readingCompleted.current = true;
   }
 
-  const rewards = adEligible ? { owner: account.profile?.id ?? 'guest',
-    adFree: playInternal && !testAds,
+  const paid = ['standard', 'premium', 'pro'].includes(accessTier);
+  const rewards = (adEligible || (playInternal && paid)) ? { owner: account.profile?.id ?? 'guest', paid,
+    adFree: playInternal && (paid || !testAds),
     watch: (title, remaining, credit) => showAd('rewarded', credit, title, remaining) } : null;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
@@ -290,10 +292,10 @@ function App() {
       <div key={'solar' + profileKey} hidden={screen !== 'solar'}>
         <Solar account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
       </div>
-      <div key={'oracle' + Boolean(account.token)} hidden={screen !== 'oracle'}>
+      <div key={'oracle' + profileKey} hidden={screen !== 'oracle'}>
         <Oracle account={account} openAccount={openAccount} openNatal={openNatal} />
       </div>
-      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={screen === 'pair' ? 'pair' : 'matrix'} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
+      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={profileKey + (screen === 'pair' ? 'pair' : 'matrix')} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
       {screen === 'history' && <section className="tarot-screen">
         <Frontispiece title="История раскладов" art="books" />
         <AccountHistory account={account} />

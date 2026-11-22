@@ -184,6 +184,16 @@ export function useAccount() {
     });
   }, []);
 
+  function deleteProfile() {
+    return run(async () => {
+      await onlineRequest('/api/mobile/account', { token, method: 'DELETE', data: { confirmation: 'DELETE' } });
+      const prefix = 'astroorbi.reward.v1:' + profile.id + ':';
+      for (const key of Object.keys(localStorage)) if (key.startsWith(prefix)) localStorage.removeItem(key);
+      clearAccount();
+      if (native) await SecureStorage.remove(sessionKey, false);
+    });
+  }
+
   function signOut() {
     run(async () => {
       if (native) {
@@ -226,7 +236,7 @@ export function useAccount() {
   }
 
   return {
-    code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, draw,
+    code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, deleteProfile, draw,
     refresh: () => run(() => loadAccount(token)), refreshProfile,
     mergeProfile: changes => setProfile(previous => ({ ...previous, ...changes })),
   };
@@ -234,6 +244,7 @@ export function useAccount() {
 
 export function Account({ account, openHistory, openSettings, openOffline, openStars }) {
   const { token, profile, code, setCode, signIn, signOut, refresh, busy, error } = account;
+  const [deleting, setDeleting] = useState(false);
   return (
     <section className="tarot-screen">
       <Frontispiece title="Профиль" art="portrait" scene />
@@ -269,6 +280,16 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
         </div>
       </>}
       {error && <p id="account-status" role="alert">{error}</p>}
+      {playInternal && <section className="profile-card">
+        <p>Астрологические разборы предназначены для развлечения.</p>
+        <a href={new URL('/mobile/privacy', apiOrigin).href} target="_blank" rel="noreferrer">Конфиденциальность</a>
+        {' · '}<a href="mailto:Icecrown@astroorbi.com">Поддержка</a>
+        {profile && <><p>Номер тестового профиля: {profile.id}</p>
+          {deleting ? <><p>Удалить профиль Android, историю, звёзды и завершённые тестовые заказы? Восстановить их в приложении нельзя.</p>
+            <button type="button" disabled={busy} onClick={() => { setDeleting(false); account.deleteProfile(); }}>Подтвердить удаление</button>
+            <button type="button" disabled={busy} onClick={() => setDeleting(false)}>Отмена</button></> :
+            <button type="button" className="secondary-button" onClick={() => setDeleting(true)}>Удалить тестовый профиль</button>}</>}
+      </section>}
     </section>
   );
 }
@@ -295,7 +316,7 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread, 
       draw={async data => {
         const result = await draw(data);
         if (result) {
-          if (data.spread === 'daily') onReadingComplete();
+          onReadingComplete();
           setNextSpread(data.spread);
           setOpened(result);
           window.scrollTo(0, 0);

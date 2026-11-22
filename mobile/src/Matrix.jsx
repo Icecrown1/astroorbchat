@@ -6,6 +6,7 @@ import { arcanaCardId, arcanaMetaByN } from '../../shared/matrixArcanaMeta';
 import { MatrixPlate } from './MatrixPlate';
 import { CardButton } from './CardViewer';
 import { Frontispiece } from './Editorial';
+import { ReportExcerpt } from './ReportReading';
 import { onlineRequest } from './onlineApi';
 import { ChartViewport } from './ChartViewport';
 
@@ -284,7 +285,7 @@ function AccountMatrix({ account, openAccount, guest }) {
                 <small>{item.content ? 'Сохранён' : item.free ? 'Бесплатно' : `${sectionCost(item)} ★`}</small>
               </button>
               {selected === item.id && <article className="result-card forecast-result" aria-label={sectionNames[item.id]}>
-                {section.content && <MatrixReading content={section.content} />}
+                {section.content && <><MatrixReading content={section.content} /><ReportExcerpt token={token} kind="matrix" text={section.content} /></>}
                 {needsSubscription && <p>Новый разбор доступен с подпиской. Сохранённые разборы можно читать на любом тарифе.</p>}
                 {(!section.content || section.outdated) && !needsSubscription && (
                   <button type="button" onClick={generate} disabled={busy || mustCheck}>
@@ -324,7 +325,7 @@ function samePerson(row, person) {
 
 const birthDateLabel = value => value.split('-').reverse().join('.');
 
-function PairResult({ result, ownName }) {
+function PairResult({ result, ownName, token }) {
   const reading = parseReadingV2(result.reading);
   return <div className="matrix-screen">
     <p>{ownName || 'Ты'} и {result.partnerName} · {birthDateLabel(result.partnerBirthDate)}</p>
@@ -348,6 +349,7 @@ function PairResult({ result, ownName }) {
           <ol>{reading.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>
         </div>}
       </> : <p>{result.reading}</p>}
+      <ReportExcerpt token={token} kind="matrix" text={result.reading} />
     </section>
   </div>;
 }
@@ -469,7 +471,7 @@ function RelatedMatrices({ kind, account, openAccount }) {
         refreshList();
       }}>К списку расчётов</button>
       {isGuest ? <AccountMatrix key={opened.id} guest={opened} account={account} openAccount={openAccount} />
-        : <PairResult result={opened} ownName={profile?.name} />}
+        : <PairResult result={opened} ownName={profile?.name} token={token} />}
     </> : <>
       <h2>{heading}</h2>
       {rows?.length > 0 && <div className="matrix-section-list" aria-label="Сохранённые расчёты">

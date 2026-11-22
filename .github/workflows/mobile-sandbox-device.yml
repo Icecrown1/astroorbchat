@@ -1,0 +1,60 @@
+name: Android sandbox device checks
+on:
+  push:
+    branches: [mobile/android-sandbox-sprints-2-7]
+    paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-sandbox-device.yml']
+permissions:
+  contents: read
+jobs:
+  device:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VITE_ASTROORBI_API_URL: https://astro-orbi-android-sandbox.replit.app
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build candidate and upgrade baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/baseline" 37a1d74abfb4621f28978991ffd536f1af6168a8
+          for code in 6 7; do
+            directory="$GITHUB_WORKSPACE"
+            if [[ "$code" == 6 ]]; then directory="$RUNNER_TEMP/baseline"; fi
+            cd "$directory/mobile"
+            npm ci --no-audit
+            npm run build -- --mode play-internal
+            npx --no-install cap add android
+            npm run prepare:android
+            PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
+            cd android
+            bash gradlew :app:assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/candidate-$code.apk"
+          done
+      - name: Allow runner access to KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_6
+          script: python3 mobile/play-internal/device-smoke.py
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: emulator-observations
+          path: device-results/

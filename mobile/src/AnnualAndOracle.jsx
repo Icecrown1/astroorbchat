@@ -1,4 +1,4 @@
-import { ReportReading } from './ReportReading';
+import { ReportReading, ReportExcerpt } from './ReportReading';
 import { Frontispiece } from './Editorial';
 import { StarConfirmation } from './StarConfirmation';
 import { useState } from 'react';
@@ -120,7 +120,7 @@ export function Solar({ account, openAccount, openNatal, openSettings }) {
         eyebrow={result.cached ? 'Сохранённый соляр' : 'Прогноз на год'}
         meta={[result.location, dateLabel(result.solar?.date)].filter(Boolean).join(' · ')}>
         {result.solar?.sign && <p>Солнце · {translateSign(result.solar.sign, 'ru')}</p>}
-        <ReadingText text={result.interpretation} />
+        <ReadingText text={result.interpretation} /><ReportExcerpt token={token} kind="solar" text={result.interpretation} />
       </ResultCard>}
     </>}
   </section>;
