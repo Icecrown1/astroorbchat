@@ -276,7 +276,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
       <Frontispiece title="Профиль" art="portrait" scene />
       {!token ? (
         <>
-          {authPilot ? <PilotAccess account={account} openGuest={openOffline}/> : mechanics ? <form className="profile-card" onSubmit={signIn}>
+          {authPilot ? <PilotAccess key="sign-in" account={account} openGuest={openOffline}/> : mechanics ? <form className="profile-card" onSubmit={signIn}>
             <button disabled={busy}>Открыть тестовый профиль</button>
           </form> : <form className="profile-card account-connect" onSubmit={signIn}>
             <h2>{playInternal ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
@@ -294,7 +294,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
           {!authPilot && <button className="secondary-button" type="button" onClick={openOffline} disabled={busy}>Открыть офлайн-Таро</button>}
         </>
       ) : <>
-        {authPilot && profile && <PilotAccess account={account} linking/>}
+        {authPilot && profile && <PilotAccess key="link-email" account={account} linking/>}
         {profile && <div className="identity-line">
           <h2>{profile.name}</h2><span>{tiers[profile.billingTier] || profile.billingTier}</span>
         </div>}
