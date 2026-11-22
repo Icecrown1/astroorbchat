@@ -38,6 +38,10 @@ await replaceIn('src/main/AndroidManifest.xml', [
 ]);
 await replaceIn('src/main/res/values/strings.xml', [[new RegExp(config.appId.replaceAll('.', '\\.'), 'g'), id]]);
 await replaceIn('src/main/java/' + config.appId.replaceAll('.', '/') + '/MainActivity.java', [
+  ['WebView webView =', `com.getcapacitor.PluginHandle ads = getBridge() == null ? null : getBridge().getPlugin("PlayAds");
+                if (ads != null && ads.getInstance() instanceof app.astroorbi.store.PlayAds
+                        && ((app.astroorbi.store.PlayAds) ads.getInstance()).consumesAdBack()) return;
+                WebView webView =`],
   ['super.onCreate(savedInstanceState);', 'registerPlugin(app.astroorbi.store.PlayAds.class);\n        registerPlugin(app.astroorbi.store.PlayCatalog.class);\n        super.onCreate(savedInstanceState);'],
 ]);
 const target = new URL('src/main/java/app/astroorbi/store/', app);

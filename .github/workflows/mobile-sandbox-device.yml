@@ -1,7 +1,7 @@
 name: Android sandbox device checks
 on:
   push:
-    branches: [mobile/android-sandbox-sprints-2-7]
+    branches: [mobile/android-sandbox-ad-return]
     paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-sandbox-device.yml']
 permissions:
   contents: read
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [google_apis, google_apis_ps16k]
+        target: [google_apis_ps16k]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -31,17 +31,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git worktree add --detach "$RUNNER_TEMP/baseline" 7d759c732a623980519d658cb3fdb0d43a6f186e
-          for code in 7 8; do
+          git worktree add --detach "$RUNNER_TEMP/baseline" a5c1760c9041c962c89cf331a636233687727e96
+          for code in 8 9; do
             directory="$GITHUB_WORKSPACE"
-            if [[ "$code" == 7 ]]; then directory="$RUNNER_TEMP/baseline"; fi
+            if [[ "$code" == 8 ]]; then directory="$RUNNER_TEMP/baseline"; fi
             cd "$directory/mobile"
             npm ci --no-audit
             npm run build -- --mode play-internal
             npx --no-install cap add android
             npm run prepare:android
             PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
-            if [[ "$code" == 8 ]]; then
+            if [[ "$code" == 9 ]]; then
               src=android/app/src/main/java/app/astroorbi/store
               cp play-internal/qa/AdLifecycle.java "$src/"
               sed -i '/void prepare(PluginCall call) {/a\        AdLifecycle.install(getActivity().getApplication());' "$src/PlayAds.java"

@@ -64,6 +64,7 @@ const click=text=>tap(`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(
 const selector=async q=>until(()=>js(`[...document.querySelectorAll(${JSON.stringify(q)})].some(${visible})`),'visible '+q);
 const clickSel=q=>tap(`[...document.querySelectorAll(${JSON.stringify(q)})].find(${visible})`);
 const foreground=()=>adb('shell','dumpsys','activity','activities').split('\n').find(line=>line.includes('topResumedActivity=')) || '';
+const mainResumed = () => until(() => foreground().includes(pkg + '/app.astroorbi.preview.MainActivity'), 'MainActivity did not resume after ad dismissal', 6000);
 async function closeTestAd() {
   if(!foreground().includes('AdActivity')) return;
   let xml='';
@@ -76,6 +77,7 @@ async function closeTestAd() {
   if(!foreground().includes('AdActivity')) return;
   const close=xml.match(/<node\b[^>]*(?:(?:content-desc|text)="(?:Close|Close ad|Close video|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
   const bounds=close?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if(!foreground().includes('AdActivity')) return;
   if(bounds) {
     adb('shell','input','tap',String(Math.floor((+bounds[1]+ +bounds[3])/2)),String(Math.floor((+bounds[2]+ +bounds[4])/2)));
   } else if(foreground().includes('AdActivity')) adb('shell','input','keyevent','4');
@@ -98,8 +100,9 @@ try {
   adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
   adb('shell','settings','put','system','screen_off_timeout','1800000');
   record('pageBytes',Number(adb('shell','getconf','PAGE_SIZE')));
-  adb('install',join(process.env.RUNNER_TEMP,'candidate-7.apk'));launch();await connect();
-  await step('v7-first-draw',async()=>{
+  assert.equal(results.pageBytes,16384);
+  adb('install',join(process.env.RUNNER_TEMP,'candidate-8.apk'));launch();await connect();
+  await step('v8-first-draw',async()=>{
     for(const label of ['Открыть бесплатно →','Вытянуть карту дня']) {
       const button=`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(label)})`;
       await until(()=>js(`Boolean(${button})`),'baseline button '+label);
@@ -107,7 +110,7 @@ try {
     }
     await selector('.one-card button');
   });
-  adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-8.apk'));launch();await connect();
+  adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-9.apk'));launch();await connect();
   await step('upgrade',async()=>{await page('home');assert.match(await readout(),/Посмотреть карту/);});
   await step('home-small-font130',async()=>{
     adb('shell','wm','size','720x1280');adb('shell','wm','density','320');adb('shell','settings','put','system','font_scale','1.3');
@@ -121,7 +124,7 @@ try {
     await until(()=>foreground().includes('AdActivity'),'No test ad shown after one request',18000);
     snap('sdk-test-ad');await pause(42000);
     for(let i=0;i<3 && foreground().includes('AdActivity');i++) {await closeTestAd();await pause(1600);}
-    assert.ok(foreground().includes(pkg),'app resumed after test ad');
+    await mainResumed();
     await selector('.rewarded-advice');
   });
   if(results['rewarded-sdk']==='pass')await step('reward-rotation-restart',async()=>{
@@ -151,20 +154,20 @@ try {
     adb('shell','input','keyevent','4');await page('tools');
   });
   adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');
-  async function freshReading() {
+  async function freshReading(requireReward = true) {
     adb('shell','am','force-stop',pkg);launch();await connect();await pick('tarot','Таро');
     await click('Три карты');
     await tap(`${buttons}.find(b=>['Сделать новый расклад','Вытянуть три карты'].includes(b.innerText.trim()))`);
     await selector('.three-cards button');
-    await selector('.reward-unlock[aria-label]');
+    if(requireReward) await selector('.reward-unlock[aria-label]');
   }
   const adIsShowing=()=>foreground().includes('AdActivity');
   await step('interstitial-on-exit',async()=>{
-    await freshReading();await pause(14000);await click('Главная');
+    await freshReading(false);await pause(14000);await click('Главная');
     await until(adIsShowing,'interstitial not served',8000);
     await pause(2500);snap('interstitial-test-ad');
     for(let i=0;i<4 && adIsShowing();i++) {await closeTestAd();await pause(1300);}
-    assert.ok(!adIsShowing(),'interstitial dismissed');await page('home');
+    await mainResumed();await page('home');
   });
   const sdkLog=()=>adb('logcat','-d','-s','AstroAdQA:I','*:S');
   await step('rewarded-system-back',async()=>{
@@ -180,6 +183,7 @@ try {
     assert.ok(!adIsShowing(),'test creative dismissed');
     await until(()=>/SDK dismissed earned=(true|false)/.test(sdkLog()),'SDK dismissal event',6000);
     const earned=sdkLog().includes('SDK dismissed earned=true');
+    await mainResumed();
     await page('tarot');
     await selector(earned ? '.rewarded-advice' : '.reward-unlock[aria-label]');
     assert.equal(await js("Boolean(document.querySelector('.rewarded-advice'))"),earned);
@@ -193,7 +197,7 @@ try {
       await clickSel('.reward-unlock[aria-label]');await pause(3500);
     }
     await until(()=>sdkLog().includes('SDK dismissed earned=false'),'SDK early-dismiss callback',10000);
-    await page('tarot');await selector('.reward-unlock[aria-label]');
+    await mainResumed();await page('tarot');await selector('.reward-unlock[aria-label]');
     assert.ok(!sdkLog().includes('SDK earned'));
     assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
   });

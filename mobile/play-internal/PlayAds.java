@@ -33,6 +33,11 @@ public class PlayAds extends Plugin {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private PluginCall waitingReward;
     private int rewardGeneration;
+    // Android can deliver the Back used to close AdActivity to the host as it regains focus.
+    private long ignoreBackUntil;
+    public boolean consumesAdBack() {
+        return showing || now() < ignoreBackUntil;
+    }
     private final Runnable loadTimeout = () -> {
         rewardGeneration++;
         loadingRewarded = false;
@@ -145,6 +150,7 @@ public class PlayAds extends Plugin {
             result.put("earned", false);
             FullScreenContentCallback listener = new FullScreenContentCallback() {
                 @Override public void onAdDismissedFullScreenContent() {
+                    ignoreBackUntil = now() + android.view.ViewConfiguration.getDoubleTapTimeout();
                     showing = false;
                     call.resolve(result);
                     preload();
