@@ -1,7 +1,7 @@
 name: Android sandbox device checks
 on:
   push:
-    branches: [mobile/android-sandbox-ad-return]
+    branches: [mobile/android-sandbox-ad-return, mobile/android-sandbox-interstitial-qa]
     paths: ['mobile/**', 'shared/**', '.github/workflows/mobile-sandbox-device.yml']
 permissions:
   contents: read
@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      INTERSTITIAL_ONLY: ${{ github.ref_name == 'mobile/android-sandbox-interstitial-qa' && '1' || '0' }}
       VITE_ASTROORBI_API_URL: https://astro-orbi-android-sandbox.replit.app
     steps:
       - uses: actions/checkout@v6
@@ -33,6 +34,7 @@ jobs:
           set -euo pipefail
           git worktree add --detach "$RUNNER_TEMP/baseline" a5c1760c9041c962c89cf331a636233687727e96
           for code in 8 9; do
+            if [[ "$INTERSTITIAL_ONLY" == 1 && "$code" == 8 ]]; then continue; fi
             directory="$GITHUB_WORKSPACE"
             if [[ "$code" == 8 ]]; then directory="$RUNNER_TEMP/baseline"; fi
             cd "$directory/mobile"
@@ -43,6 +45,7 @@ jobs:
             PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
             if [[ "$code" == 9 ]]; then
               src=android/app/src/main/java/app/astroorbi/store
+              sed -i '/interstitial = ad; interstitialAt/a\                    android.util.Log.i("AstroAdQA", "Interstitial ready");' "$src/PlayAds.java"
               cp play-internal/qa/AdLifecycle.java "$src/"
               sed -i '/void prepare(PluginCall call) {/a\        AdLifecycle.install(getActivity().getApplication());' "$src/PlayAds.java"
               sed -i '/void onAdDismissedFullScreenContent() {/a\                    android.util.Log.i("AstroAdQA", "SDK dismissed earned=" + result.optBoolean("earned"));' "$src/PlayAds.java"

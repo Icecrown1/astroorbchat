@@ -96,6 +96,49 @@ const pick=async (screen,title)=>{await click('Инструменты');await pa
   await tap(`[...document.querySelectorAll('.illustrated-index button')].find(b=>b.innerText.split('\\n')[0].trim()===${JSON.stringify(title)} || b.innerText.startsWith(${JSON.stringify(title)}))`);
   await page(screen);};
 const readout=async()=>js('document.body.innerText');
+async function checkInterstitialExit() {
+  adb('wait-for-device');
+  adb('shell','input','keyevent','KEYCODE_WAKEUP');
+  adb('shell','wm','dismiss-keyguard');
+  adb('shell','settings','put','system','screen_off_timeout','1800000');
+  record('pageBytes', Number(adb('shell','getconf','PAGE_SIZE')));
+  assert.equal(results.pageBytes,16384);
+  adb('install',join(process.env.RUNNER_TEMP,'candidate-9.apk'));
+  for (const mode of ['close','back']) {
+    await step('interstitial-'+mode,async () => {
+      // Each trial starts a new guest session on this disposable emulator.
+      adb('shell','pm','clear',pkg);
+      adb('logcat','-c');
+      adb('shell','am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-n',pkg+'/app.astroorbi.preview.MainActivity');
+      await mainResumed();
+      await connect();
+      await page('home');
+      await pick('tarot','Таро');
+      await click('Три карты');
+      await click('Вытянуть три карты');
+      await until(()=>js("document.querySelectorAll('.three-cards button').length===3"),'reading incomplete');
+      const log=()=>adb('logcat','-d','-s','AstroAdQA:I','*:S');
+      await until(()=>log().includes('Interstitial ready'),'no Google test interstitial loaded',45000);
+      await click('Главная');
+      await until(()=>foreground().includes('AdActivity'),'Google AdActivity not shown');
+      snap('ad-'+mode);
+      if(mode==='back') adb('shell','input','keyevent','4');
+      for(let i=0;i<4 && foreground().includes('AdActivity');i++) {
+        await pause(1500);await closeTestAd();
+      }
+      await until(()=>log().includes('SDK dismissed earned=false'),'missing SDK dismissal');
+      await mainResumed();await page('home');
+      await pause(2000);await mainResumed();await page('home');
+      snap('home-'+mode);
+      await click('Инструменты');await page('tools');await mainResumed();
+      writeFileSync(join(out,'interstitial-'+mode+'.txt'),log()+'\n'+foreground());
+    });
+    if(results['interstitial-'+mode]!=='pass') {
+      writeFileSync(join(out,'diagnostics-'+mode+'.txt'),adb('logcat','-d','-s','AstroAdQA:I','ActivityTaskManager:I','AndroidRuntime:E','*:S'));
+    }
+  }
+}
+async function checkFullSuite() {
 try {
   adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
   adb('shell','settings','put','system','screen_off_timeout','1800000');
@@ -204,4 +247,9 @@ try {
   });
   writeFileSync(join(out,'sdk-early-dismiss.txt'),sdkLog());
 } finally {socket?.close();}
+}
+try {
+  if (process.env.INTERSTITIAL_ONLY === '1') await checkInterstitialExit();
+  else await checkFullSuite();
+} finally { socket?.close(); }
 if(Object.entries(results).some(([k,v])=>k!=='pageBytes'&&v!=='pass'))process.exitCode=1;
