@@ -66,8 +66,13 @@ const clickSel=q=>tap(`[...document.querySelectorAll(${JSON.stringify(q)})].find
 const foreground=()=>adb('shell','dumpsys','activity','activities').split('\n').find(line=>line.includes('topResumedActivity=')) || '';
 async function closeTestAd() {
   if(!foreground().includes('AdActivity')) return;
-  adb('shell','uiautomator','dump','/sdcard/astro-ad-window.xml');
-  const xml=adb('shell','cat','/sdcard/astro-ad-window.xml');
+  let xml='';
+  try {
+    adb('shell','uiautomator','dump','/sdcard/astro-ad-window.xml');
+    xml=adb('shell','cat','/sdcard/astro-ad-window.xml');
+  } catch {
+    // Animated test creatives may never report an idle accessibility tree.
+  }
   const close=xml.match(/<node\b[^>]*(?:(?:content-desc|text)="(?:Close|Close ad|Close video|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
   const bounds=close?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if(bounds) {
