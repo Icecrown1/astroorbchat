@@ -1,0 +1,18 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Тестовая Mini App · AstroOrbi</title>
+<style>body{max-width:34rem;margin:2rem auto;padding:0 1rem;font:17px/1.55 system-ui;background:#fffaf2;color:#30221b}input,button,output{display:block;font:inherit;padding:.5rem;margin:.6rem 0;max-width:100%;overflow-wrap:anywhere}button{cursor:pointer}</style>
+<h1>Тестовая Mini App</h1><p>Войдите кодом проверяющего Android-песочницы. Для этой вкладки будет создан отдельный синтетический профиль. Оставьте вкладку открытой во время проверки.</p>
+<form id="login"><label>Код проверяющего <input id="secret" type="password" autocomplete="off" required></label><button>Войти в песочницу</button></form>
+<section id="tools" hidden><button id="issue">Получить код входа в APK</button><output id="link"></output><p>Адрес изолированного тестового ящика</p><output id="email"></output><button id="read">Посмотреть код из тестового письма</button><output id="mail"></output></section><p id="status" role="status"></p>
+<script>
+let session;
+const el=id=>document.getElementById(id);
+async function request(path,data){
+ const r=await fetch('/api/mobile/'+path,{method:data?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json',...(session?{Authorization:'Bearer '+session}:{})},body:data&&JSON.stringify(data)});
+ if(!r.ok)throw Error('Запрос не выполнен ('+r.status+').');return (await r.json()).data;
+}
+function action(fn){return async e=>{e.preventDefault();e.target.disabled=true;try{el('status').textContent='';await fn()}catch(err){el('status').textContent=err.message}finally{e.target.disabled=false}}}
+el('login').onsubmit=action(async()=>{session=(await request('auth/exchange',{code:el('secret').value.trim()})).token;el('secret').value='';const box=await request('pilot/test-inbox');el('email').textContent=box.email;el('login').hidden=true;el('tools').hidden=false;});
+el('issue').onclick=action(async()=>{el('link').textContent=(await request('pilot/issue',{})).code});
+el('read').onclick=action(async()=>{el('mail').textContent=(await request('pilot/test-inbox')).code||'Свежего письма пока нет.'});
+</script></html>

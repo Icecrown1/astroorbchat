@@ -6,7 +6,7 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
-import { mechanics, playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
+import { authPilot, mechanics, playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
 import { MobileCardShop } from './MobileCardShop';
 import { onlineRequest } from './onlineApi';
 import { AdPreview } from './AdPreview';
@@ -274,6 +274,7 @@ function App() {
         </button>
       </header>
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
+      {authPilot && screen==='home' && !account.token && <button className="secondary-button" onClick={openAccount}>Войти по почте или коду Mini App</button>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}
       {screen === 'stars' && <Stars account={account} openAccount={openAccount} />}

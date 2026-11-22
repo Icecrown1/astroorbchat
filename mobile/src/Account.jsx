@@ -1,4 +1,5 @@
-import { mechanics, playInternal, rewardsEnabled } from './playInternal';
+import { PilotAccess } from './PilotAccess';
+import { authPilot, mechanics, playInternal, rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
@@ -144,6 +145,12 @@ export function useAccount() {
 
     run(async () => {
       const session = await onlineRequest('/api/mobile/auth/exchange', { data: { code: code.trim() } });
+      await acceptSession(session.token);
+    });
+  }
+
+  async function acceptSession(value) {
+      const session={token:value};
       setCode('');
       setToken(session.token);
       let stored = true;
@@ -156,7 +163,6 @@ export function useAccount() {
       }
       await loadAccount(session.token);
       if (!stored) setError('Вход выполнен. Сохранить его на телефоне не удалось.');
-    });
   }
 
   async function refreshProfile(sessionToken) {
@@ -194,6 +200,13 @@ export function useAccount() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!authPilot || !token) return;
+    const refresh = () => { if (!document.hidden) run(() => refreshProfile(token)); };
+    document.addEventListener('visibilitychange',refresh);
+    return () => document.removeEventListener('visibilitychange',refresh);
+  },[token]);
+
   function deleteProfile() {
     return run(async () => {
       await onlineRequest('/api/mobile/account', { token, method: 'DELETE', data: { confirmation: 'DELETE' } });
@@ -207,6 +220,7 @@ export function useAccount() {
 
   function signOut() {
     run(async () => {
+      if(authPilot) await onlineRequest('/api/mobile/pilot/logout',{token,data:{}});
       if (mechanics) localStorage.setItem('mechanics-guest','1');
       if (native && !mechanics) {
         try {
@@ -248,7 +262,7 @@ export function useAccount() {
   }
 
   return {
-    code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, deleteProfile, draw,
+    code, setCode, token, profile, history, latest, tarotStatus, busy, error, run, signIn, signOut, deleteProfile, draw, acceptSession,
     refresh: () => run(() => loadAccount(token)), refreshProfile,
     mergeProfile: changes => setProfile(previous => ({ ...previous, ...changes })),
   };
@@ -262,7 +276,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
       <Frontispiece title="Профиль" art="portrait" scene />
       {!token ? (
         <>
-          {mechanics ? <form className="profile-card" onSubmit={signIn}>
+          {authPilot ? <PilotAccess account={account} openGuest={openOffline}/> : mechanics ? <form className="profile-card" onSubmit={signIn}>
             <button disabled={busy}>Открыть тестовый профиль</button>
           </form> : <form className="profile-card account-connect" onSubmit={signIn}>
             <h2>{playInternal ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
@@ -277,9 +291,10 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
               aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'account-status' : undefined} />
             <button type="submit" disabled={busy}>{busy ? 'Подключаем…' : 'Войти'}</button>
           </form>}
-          <button className="secondary-button" type="button" onClick={openOffline} disabled={busy}>Открыть офлайн-Таро</button>
+          {!authPilot && <button className="secondary-button" type="button" onClick={openOffline} disabled={busy}>Открыть офлайн-Таро</button>}
         </>
       ) : <>
+        {authPilot && profile && <PilotAccess account={account} linking/>}
         {profile && <div className="identity-line">
           <h2>{profile.name}</h2><span>{tiers[profile.billingTier] || profile.billingTier}</span>
         </div>}
@@ -298,7 +313,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
         <p>Астрологические разборы предназначены для развлечения.</p>
         <a href={new URL('/mobile/privacy', apiOrigin).href} target="_blank" rel="noreferrer">Конфиденциальность</a>
         {' · '}<a href="mailto:Icecrown@astroorbi.com">Поддержка</a>
-        {profile && <><p>Номер тестового профиля: {profile.id}</p>
+        {profile && !authPilot && <><p>Номер тестового профиля: {profile.id}</p>
           {deleting ? <><p>Удалить профиль Android, историю, звёзды и завершённые тестовые заказы? Восстановить их в приложении нельзя.</p>
             <button type="button" disabled={busy} onClick={() => { setDeleting(false); account.deleteProfile(); }}>Подтвердить удаление</button>
             <button type="button" disabled={busy} onClick={() => setDeleting(false)}>Отмена</button></> :

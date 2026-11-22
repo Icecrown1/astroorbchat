@@ -41,7 +41,14 @@ async function main() {
   const { eq, sql } = await import('drizzle-orm');
   const { digestMobileCode, registerMobileLogin } = await import('./mobileLogin');
 
-  if (process.argv.includes('--sandbox-ops')) {
+  if (process.argv.includes('--auth-pilot')) {
+    const mode=process.argv[process.argv.indexOf('--auth-pilot')+1];
+    if(mode!=='on' && mode!=='off') throw Error('Expected on or off');
+    const { setPilot }=await import('./androidAuthPilot');
+    await setPilot(pool as unknown as pg.Pool,mode==='on');
+    console.log('Android auth pilot '+mode);
+    await pool.end();
+  } else if (process.argv.includes('--sandbox-ops')) {
     const { sandboxOperation } = await import('./mobileSandboxOps');
     console.log(JSON.stringify(await sandboxOperation(process.argv.slice(process.argv.indexOf('--sandbox-ops') + 1))));
     await pool.end();
@@ -78,6 +85,9 @@ async function main() {
       next();
     });
     app.use(express.json({ limit: '32kb' }));
+    const { registerPilot } = await import('./androidAuthPilot');
+    await registerPilot(app,pool as unknown as pg.Pool);
+    app.get('/mobile/auth-pilot', (_req,res)=>res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'"}).sendFile('mobile/play-internal/public/auth-pilot.html',{root:process.cwd()}));
     const { registerSandboxCare } = await import('./mobileSandboxCare');
     await registerSandboxCare(app);
     app.get('/', (_req, res) => res.type('text').send('AstroOrbi Android sandbox'));
