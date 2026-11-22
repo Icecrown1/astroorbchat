@@ -166,9 +166,11 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  constructor(private readonly connection: Pick<typeof db, 'select' | 'insert' | 'update'> = db) {}
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await this.connection.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
@@ -191,7 +193,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
-    const [user] = await db
+    const [user] = await this.connection
       .update(users)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -204,7 +206,7 @@ export class DatabaseStorage implements IStorage {
     // У пользователя может быть несколько строк (истёкшая + новая): без ORDER BY Postgres
     // отдаёт произвольную, причём после UPDATE «первой» часто становится старая —
     // выдача писала в одну строку, а чтение попадало в другую. Берём с самым поздним концом.
-    const [subscription] = await db
+    const [subscription] = await this.connection
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.userId, userId))
@@ -214,7 +216,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
-    const [subscription] = await db
+    const [subscription] = await this.connection
       .insert(subscriptions)
       .values(insertSubscription)
       .returning();
@@ -222,7 +224,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSubscription(id: string, data: Partial<Subscription>): Promise<Subscription | undefined> {
-    const [subscription] = await db
+    const [subscription] = await this.connection
       .update(subscriptions)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(subscriptions.id, id))
@@ -664,12 +666,12 @@ export class DatabaseStorage implements IStorage {
 
   // Referral reward operations
   async createReferralReward(reward: InsertReferralReward): Promise<ReferralReward> {
-    const [newReward] = await db.insert(referralRewards).values(reward).returning();
+    const [newReward] = await this.connection.insert(referralRewards).values(reward).returning();
     return newReward;
   }
 
   async getReferralRewardsByReferrerId(referrerId: string): Promise<ReferralReward[]> {
-    return await db
+    return await this.connection
       .select()
       .from(referralRewards)
       .where(eq(referralRewards.referrerId, referrerId))

@@ -2481,7 +2481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[HISTORY] yookassa sync ${p.id}: yk=${yk.status} paid=${yk.paid} age=${Math.round(ageMs / 60000)}m`);
             if (yk.status === 'succeeded' && yk.paid) {
               await activateSucceededYookassaPayment(p, yk, storage);
-            } else if (yk.status === 'canceled' || (yk.status === 'pending' && ageMs > ABANDON_MS)) {
+            } else if (yk.status === 'canceled' || (p.kind !== 'subscription_mobile' && yk.status === 'pending' && ageMs > ABANDON_MS)) {
               // canceled — отменён ЮKassa; pending старше 15 мин — пользователь ушёл со страницы оплаты
               await storage.updateYookassaPayment(p.id, { status: 'canceled' });
             }
@@ -3975,7 +3975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get internal payment record
       const dbPayment = await storage.getYookassaPaymentByInternalId(validated.paymentId);
-      if (!dbPayment) {
+      if (!dbPayment || dbPayment.kind === 'subscription_mobile') {
         console.error('[YooKassa Check] Payment not found:', validated.paymentId);
         return res.status(404).json({ ok: false, error: "Payment not found" });
       }

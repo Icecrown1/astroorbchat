@@ -40,7 +40,7 @@ export function registerMobileLogin(app: Express) {
         .where(and(eq(mobileLinkCodes.digest, digest(code)), sql`${mobileLinkCodes.expiresAt} > now()`))
         .returning({ userId: mobileLinkCodes.userId });
       if (!match) return res.status(400).json({ ok: false, error: 'invalid_code' });
-      return res.json({ ok: true, data: { token: generateToken(match.userId, 8 * 60 * 60) } });
+      return res.json({ ok: true, data: { token: generateToken(match.userId, 8 * 60 * 60, 'mobile') } });
     } catch {
       return res.status(503).json({ ok: false, error: 'mobile_login_unavailable' });
     }

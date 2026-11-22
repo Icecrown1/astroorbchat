@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerMobileShop } from "./mobileShop";
 import { registerMobileLogin } from "./mobileLogin";
 import { setupVite, serveStatic, log } from "./vite";
 const app = express();
@@ -21,7 +22,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse && !path.startsWith("/api/mobile/auth/")) {
+      if (capturedJsonResponse && !path.startsWith("/api/mobile/")) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -61,6 +62,7 @@ app.use((req, res, next) => {
   });
 
   registerMobileLogin(app);
+  registerMobileShop(app);
   const server = await registerRoutes(app);
 
   // Run payment reconciliation every 2 hours to catch any missed webhook activations

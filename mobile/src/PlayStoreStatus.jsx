@@ -26,7 +26,7 @@ export function PlayStoreStatus() {
   }
   return <section className="preview-shop">
     <h3>Магазин Google Play</h3>
-    <p>Внутренний тест каталога. Можно проверить доступность пакетов и подписок. Оплата пока закрыта.</p>
+    <p>Внутренний тест каталога. Можно проверить доступность пакетов и подписок. Покупки через Google Play Billing пока закрыты.</p>
     <button type="button" disabled={busy} onClick={check}>{busy ? 'Запрашиваем товары…' : 'Проверить товары в Google Play'}</button>
     {error && <p role="alert">{error}</p>}
     {found && <dl aria-live="polite">{products.map(([id, name]) => <div key={id}>

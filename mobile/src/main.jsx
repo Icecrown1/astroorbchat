@@ -6,7 +6,8 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
-import { playInternal, rewardsEnabled, playAds } from './playInternal';
+import { playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
+import { MobileCardShop } from './MobileCardShop';
 import { PlayStoreStatus } from './PlayStoreStatus';
 import { AdPreview } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
@@ -59,7 +60,8 @@ function Tools({ navigate }) {
   </section>;
 }
 
-function Stars({ profile, openAccount }) {
+function Stars({ account, openAccount }) {
+  const profile = account.profile;
   return <section className="tarot-screen">
     <Frontispiece title={<>Звёзды и<br />подписка</>} art="sphere" scene />
     <section className="ledger"><h2>Баланс</h2>
@@ -71,7 +73,7 @@ function Stars({ profile, openAccount }) {
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
       <p>Это ежемесячное пополнение баланса.</p>
-      {playInternal ? <PlayStoreStatus /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      {playInternal ? <><MobileCardShop key={profile?.id} account={account} /><PlayStoreStatus /></> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
@@ -148,6 +150,19 @@ function App() {
     }
     readingCompleted.current = false;
   }, [screen, adEligible]);
+
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  useEffect(() => {
+    if (!playInternal) return;
+    let active = true;
+    function returned() {
+      if (active && window.history.state?.screen !== 'stars') navigateRef.current('stars');
+    }
+    const listener = playCatalog.addListener('paymentReturn', returned);
+    playCatalog.consumeReturn().then(result => { if (result.returning) returned(); }).catch(() => {});
+    return () => { active = false; listener.then(handle => handle.remove()).catch(() => {}); };
+  }, []);
 
   function onReadingComplete() {
     if (adEligible && window.history.state?.screen === 'tarot') readingCompleted.current = true;
@@ -229,7 +244,7 @@ function App() {
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}
-      {screen === 'stars' && <Stars profile={account.profile} openAccount={openAccount} />}
+      {screen === 'stars' && <Stars account={account} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <Frontispiece title="Таро" art="hand" />
         <div className="mode-switch" aria-label="Вариант расклада">

@@ -25,6 +25,13 @@ await replaceIn('build.gradle', [
   ['dependencies {', "dependencies {\n    implementation 'com.google.android.gms:play-services-ads:24.9.0'\n    implementation 'com.android.billingclient:billing:8.3.0'"],
 ]);
 await replaceIn('src/main/AndroidManifest.xml', [
+  ['</activity>', `    <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="astroorbi" android:host="payment-return" />
+            </intent-filter>
+        </activity>`],
   ['android:allowBackup="true"', 'android:allowBackup="false"'],
   ['<activity', '<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713" />\n        <activity'],
   ['android:name=".MainActivity"', 'android:name="' + config.appId + '.MainActivity"'],

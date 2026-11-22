@@ -22,6 +22,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ ok: false, error: 'User not found' });
   }
 
+  res.locals.authChannel = payload.channel;
   (req as any).user = user;
   (req as any).userId = user.id;
 
