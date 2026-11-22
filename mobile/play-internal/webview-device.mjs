@@ -63,6 +63,17 @@ async function tap(expression) {
 const click=text=>tap(`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(text)} || b.getAttribute('aria-label')===${JSON.stringify(text)})`);
 const selector=async q=>until(()=>js(`[...document.querySelectorAll(${JSON.stringify(q)})].some(${visible})`),'visible '+q);
 const clickSel=q=>tap(`[...document.querySelectorAll(${JSON.stringify(q)})].find(${visible})`);
+const foreground=()=>adb('shell','dumpsys','activity','activities').split('\n').find(line=>line.includes('topResumedActivity=')) || '';
+async function closeTestAd() {
+  if(!foreground().includes('AdActivity')) return;
+  adb('shell','uiautomator','dump','/sdcard/astro-ad-window.xml');
+  const xml=adb('shell','cat','/sdcard/astro-ad-window.xml');
+  const close=xml.match(/<node\b[^>]*(?:content-desc="(?:Close|Close ad|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
+  const bounds=close?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if(bounds) {
+    adb('shell','input','tap',String(Math.floor((+bounds[1]+ +bounds[3])/2)),String(Math.floor((+bounds[2]+ +bounds[4])/2)));
+  } else if(foreground().includes('AdActivity')) adb('shell','input','keyevent','4');
+}
 const page=async s=>selector('.page[data-screen="'+s+'"]');
 const launch=()=>adb('shell','am','start','-W','-n',adb('shell','cmd','package','resolve-activity','--brief',pkg).split('\n').at(-1));
 async function step(name,fn) {
@@ -82,7 +93,14 @@ try {
   adb('shell','settings','put','system','screen_off_timeout','1800000');
   record('pageBytes',Number(adb('shell','getconf','PAGE_SIZE')));
   adb('install',join(process.env.RUNNER_TEMP,'candidate-6.apk'));launch();await connect();
-  await step('v6-first-draw',async()=>{await click('Открыть бесплатно →');await click('Вытянуть карту дня');await selector('.one-card button');});
+  await step('v6-first-draw',async()=>{
+    for(const label of ['Открыть бесплатно →','Вытянуть карту дня']) {
+      const button=`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(label)})`;
+      await until(()=>js(`Boolean(${button})`),'baseline button '+label);
+      await js(`${button}.click()`);
+    }
+    await selector('.one-card button');
+  });
   adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-7.apk'));launch();await connect();
   await step('upgrade',async()=>{await page('home');assert.match(await readout(),/Посмотреть карту/);});
   await step('home-small-font130',async()=>{
@@ -100,20 +118,29 @@ try {
       if(!shown)await pause(3500);
     }
     if(!shown)throw Error('Test ad did not open; no earned callback observed');
-    snap('sdk-test-ad');await pause(40000);
-    for(let i=0;i<4;i++){
-      adb('shell','input','keyevent','4');await pause(1500);
-      if(await js("Boolean(document.querySelector('.rewarded-advice'))"))return;
-      // Only the system Back button is used to avoid tapping an advertisement.
-    }
-    throw Error('Rewarded test ad opened; earned/dismiss result unconfirmed');
+    snap('sdk-test-ad');await pause(42000);
+    for(let i=0;i<3 && foreground().includes('AdActivity');i++) {await closeTestAd();await pause(1600);}
+    assert.ok(foreground().includes(pkg),'app resumed after test ad');
+    await selector('.rewarded-advice');
+  });
+  if(results['rewarded-sdk']==='pass')await step('reward-rotation-restart',async()=>{
+    const caption=()=>js("document.querySelector('.rewarded-advice h3')?.textContent");
+    const initial=await caption();assert.ok(initial);
+    adb('shell','settings','put','system','accelerometer_rotation','0');
+    try {
+      adb('shell','settings','put','system','user_rotation','1');
+      await until(()=>js('innerWidth>innerHeight'),'landscape');assert.equal(await caption(),initial);
+    } finally {adb('shell','settings','put','system','user_rotation','0');}
+    adb('shell','am','force-stop',pkg);launch();await connect();await pick('tarot','Таро');await click('Три карты');
+    await selector('.rewarded-advice');assert.equal(await caption(),initial);
   });
   adb('shell','am','force-stop',pkg);launch();await connect();
   for (const [key,title] of [['compatibility','Совместимость'],['oracle','Оракул'],['natal','Натальная карта'],['matrix','Матрица судьбы'],['horoscope','Гороскоп'],['dates','Важные даты'],['solar','Соляр']]) {
     await step(key,async()=>{await pick(key,title);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));});
   }
   await step('profile-keyboard',async()=>{await click('Профиль');await selector('#link-code');
-    await js("document.querySelector('#link-code').focus()");assert.ok(await js("document.activeElement.id==='link-code'"));});
+    await clickSel('#link-code');assert.ok(await js("document.activeElement.id==='link-code'"));
+    await until(()=>/m(?:InputShown|IsInputViewShown)=true/.test(adb('shell','dumpsys','input_method')),'Android IME shown',6000);});
   await step('cold-return',async()=>{
     adb('shell','am','force-stop',pkg);adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d','astroorbi-internal://payment-return',pkg);
     await connect();await page('stars');assert.doesNotMatch(await readout(),/Платёж подтверждён/);});
