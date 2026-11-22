@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { playCatalog } from './playInternal';
+import { androidSandbox, playCatalog } from './playInternal';
 import { onlineRequest } from './onlineApi';
 
 const shopPath = '/api/mobile/shop';
 const messages = {
-  mobile_login_needed: 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
+  mobile_login_needed: androidSandbox ? 'Войди заново по тестовому коду.' : 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
   shop_unavailable: 'Магазин пока недоступен. Попробуй обновить статус позже.',
   invalid_order: 'Проверь тариф и адрес для чека.',
   price_changed: 'Цена изменилась. Обнови статус и подтверди новую сумму.',
@@ -39,7 +39,7 @@ export function MobileCardShop({ account }) {
     try {
       const [info, location] = await Promise.all([
         onlineRequest(shopPath, { token }),
-        playCatalog.region().catch(() => ({ russianStore: false })),
+        androidSandbox ? { russianStore: true } : playCatalog.region().catch(() => ({ russianStore: false })),
       ]);
       let last = info.order;
       if (last?.status === 'pending') last = await onlineRequest(shopPath + '/orders/' + last.id, { token });
@@ -76,7 +76,7 @@ export function MobileCardShop({ account }) {
     setBusy(true);
     setMessage('');
     try {
-      if (!(await playCatalog.region()).russianStore) {
+      if (!androidSandbox && !(await playCatalog.region()).russianStore) {
         setRegion(false);
         return;
       }

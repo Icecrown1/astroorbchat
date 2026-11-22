@@ -1,6 +1,11 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
-const apiOrigin = new URL(import.meta.env.VITE_ASTROORBI_API_URL || 'https://astroorbiapp.com');
+const sandbox = import.meta.env.MODE === 'android-sandbox';
+const configuredOrigin = import.meta.env.VITE_ASTROORBI_API_URL;
+const apiOrigin = new URL(sandbox ? configuredOrigin : (configuredOrigin || 'https://astroorbiapp.com'));
+if (sandbox && ['astroorbiapp.com', 'astro-orb-chat.replit.app', 'astroorbi.com'].includes(apiOrigin.hostname)) {
+  throw new Error('Android sandbox must use its own API.');
+}
 if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) {
   throw new Error('AstroOrbi API must use HTTPS.');
 }
@@ -19,7 +24,7 @@ const messages = {
   premium_required: 'Этот расклад доступен по тарифу Premium.',
   insufficient_orbs: 'Для расклада не хватает звёзд.',
   question_required: 'Добавь вопрос к раскладу.',
-  invalid_code: 'Код истёк или уже использован. Получи новый в Telegram.',
+  invalid_code: sandbox ? 'Код истёк или уже использован. Запроси новый тестовый код.' : 'Код истёк или уже использован. Получи новый в Telegram.',
   mobile_login_unavailable: 'Вход сейчас недоступен. Попробуй позже.',
 };
 

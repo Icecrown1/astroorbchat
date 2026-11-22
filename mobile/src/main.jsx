@@ -6,7 +6,7 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
-import { playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
+import { androidSandbox, playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
 import { MobileCardShop } from './MobileCardShop';
 import { PlayStoreStatus } from './PlayStoreStatus';
 import { AdPreview } from './AdPreview';
@@ -73,7 +73,7 @@ function Stars({ account, openAccount }) {
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
       <p>Это ежемесячное пополнение баланса.</p>
-      {playInternal ? <><MobileCardShop key={profile?.id} account={account} /><PlayStoreStatus /></> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      {playInternal || androidSandbox ? <><MobileCardShop key={profile?.id} account={account} />{playInternal && <PlayStoreStatus />}</> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
@@ -154,7 +154,7 @@ function App() {
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
   useEffect(() => {
-    if (!playInternal) return;
+    if (!playInternal && !androidSandbox) return;
     let active = true;
     function returned() {
       if (active && window.history.state?.screen !== 'stars') navigateRef.current('stars');

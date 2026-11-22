@@ -6,6 +6,7 @@ const files = new URL('../play-internal/', import.meta.url);
 const config = JSON.parse(await readFile(new URL('../capacitor.config.json', import.meta.url)));
 const id = process.env.PLAY_APPLICATION_ID || 'app.astroorbi.mobile';
 const version = Number(process.env.PLAY_VERSION_CODE || 1);
+const paymentScheme = process.env.ASTROORBI_ANDROID_SANDBOX === '1' ? 'astroorbi-test' : 'astroorbi';
 if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(id)) throw Error('Invalid Play application ID');
 if (!Number.isInteger(version) || version < 1 || version > 2100000000) throw Error('Invalid Play versionCode');
 
@@ -29,7 +30,7 @@ await replaceIn('src/main/AndroidManifest.xml', [
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="astroorbi" android:host="payment-return" />
+                <data android:scheme="${paymentScheme}" android:host="payment-return" />
             </intent-filter>
         </activity>`],
   ['android:allowBackup="true"', 'android:allowBackup="false"'],
@@ -43,3 +44,12 @@ await replaceIn('src/main/java/' + config.appId.replaceAll('.', '/') + '/MainAct
 const target = new URL('src/main/java/app/astroorbi/store/', app);
 await mkdir(target, { recursive: true });
 for (const name of ['PlayAds.java', 'PlayCatalog.java']) await copyFile(new URL(name, files), new URL(name, target));
+if (paymentScheme !== 'astroorbi') {
+  await replaceIn('src/main/java/app/astroorbi/store/PlayCatalog.java', [
+    ['"astroorbi://payment-return"', `"${paymentScheme}://payment-return"`],
+  ]);
+  await replaceIn('src/main/res/values/strings.xml', [
+    ['>AstroOrbi<', '>AstroOrbi Test<'],
+    ['>AstroOrbi<', '>AstroOrbi Test<'],
+  ]);
+}

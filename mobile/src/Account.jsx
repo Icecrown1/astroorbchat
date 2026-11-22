@@ -1,4 +1,4 @@
-import { rewardsEnabled } from './playInternal';
+import { androidSandbox, rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
@@ -159,6 +159,10 @@ export function useAccount() {
   }
 
   async function loadAccount(sessionToken) {
+    if (androidSandbox) {
+      await refreshProfile(sessionToken);
+      return;
+    }
     const [user, readings] = await Promise.all([
       onlineRequest('/api/user/me', { token: sessionToken }),
       onlineRequest('/api/tarot/history', { token: sessionToken }),
@@ -238,13 +242,13 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
       {!token ? (
         <>
           <form className="profile-card account-connect" onSubmit={signIn}>
-            <h2>Войти через Telegram</h2>
-            <ol className="connect-steps">
+            <h2>{androidSandbox ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
+            {androidSandbox ? <p>Вставь одноразовый тестовый код в течение 5 минут.</p> : <ol className="connect-steps">
               <li>Открой AstroOrbi в Telegram.</li>
               <li>В настройках найди «Мобильное приложение» и получи код входа.</li>
               <li>Вставь код сюда в течение 5 минут.</li>
-            </ol>
-            <label htmlFor="link-code">Код из Telegram</label>
+            </ol>}
+            <label htmlFor="link-code">{androidSandbox ? 'Тестовый код' : 'Код из Telegram'}</label>
             <input id="link-code" value={code} onChange={event => setCode(event.target.value)} required
               autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy}
               aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'account-status' : undefined} />

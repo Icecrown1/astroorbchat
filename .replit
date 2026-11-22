@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
-run = "npm run dev"
+run = "npm run android:sandbox"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -7,8 +7,8 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+build = ["npm", "ci", "--include=dev"]
+run = ["npm", "run", "android:sandbox"]
 
 [[ports]]
 localPort = 5000
@@ -16,6 +16,7 @@ externalPort = 80
 
 [env]
 PORT = "5000"
+YOOKASSA_TEST_MODE = "true"
 
 [workflows]
 runButton = "Project"
@@ -35,12 +36,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "npm run android:sandbox"
 waitForPort = 5000
-
-[agent]
-integrations = ["javascript_database:1.0.0", "javascript_openai_ai_integrations:1.0.0"]
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 20000
