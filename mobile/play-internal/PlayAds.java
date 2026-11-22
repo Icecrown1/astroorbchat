@@ -35,6 +35,16 @@ public class PlayAds extends Plugin {
     private int rewardGeneration;
     // Android can deliver the Back used to close AdActivity to the host as it regains focus.
     private long ignoreBackUntil;
+    private boolean waitingForHostResume;
+    private void guardDismissalBack() {
+        ignoreBackUntil = now() + android.view.ViewConfiguration.getDoubleTapTimeout();
+    }
+    @Override protected void handleOnResume() {
+        if (waitingForHostResume) {
+            waitingForHostResume = false;
+            guardDismissalBack();
+        }
+    }
     public boolean consumesAdBack() {
         return showing || now() < ignoreBackUntil;
     }
@@ -90,6 +100,7 @@ public class PlayAds extends Plugin {
     }
 
     @Override protected void handleOnPause() {
+        waitingForHostResume = false;
         finishWait("AD_INACTIVE");
     }
 
@@ -150,7 +161,8 @@ public class PlayAds extends Plugin {
             result.put("earned", false);
             FullScreenContentCallback listener = new FullScreenContentCallback() {
                 @Override public void onAdDismissedFullScreenContent() {
-                    ignoreBackUntil = now() + android.view.ViewConfiguration.getDoubleTapTimeout();
+                    waitingForHostResume = !activity.hasWindowFocus();
+                    guardDismissalBack();
                     showing = false;
                     call.resolve(result);
                     preload();

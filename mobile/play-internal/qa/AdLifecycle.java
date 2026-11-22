@@ -28,6 +28,14 @@ public class AdLifecycle implements Application.ActivityLifecycleCallbacks {
             });
         }
     }
+    // Reproduce a duplicate host Back callback deterministically, only for the marked emulator case.
+    public static void replayClosingBack(androidx.activity.ComponentActivity host) {
+        if (new File(host.getFilesDir(), "qa-replay-closing-back").delete()) {
+            Log.i("AstroAdQA", "Replay closing Back on host");
+            host.getOnBackPressedDispatcher().onBackPressed();
+        }
+    }
+
     @Override public void onActivityCreated(Activity a, Bundle b) {}
     @Override public void onActivityStarted(Activity a) {}
     @Override public void onActivityPaused(Activity a) {}

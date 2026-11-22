@@ -46,6 +46,7 @@ jobs:
               cp play-internal/qa/AdLifecycle.java "$src/"
               sed -i '/void prepare(PluginCall call) {/a\        AdLifecycle.install(getActivity().getApplication());' "$src/PlayAds.java"
               sed -i '/void onAdDismissedFullScreenContent() {/a\                    android.util.Log.i("AstroAdQA", "SDK dismissed earned=" + result.optBoolean("earned"));' "$src/PlayAds.java"
+              sed -i '/call.resolve(result);/a\                    AdLifecycle.replayClosingBack(getActivity());' "$src/PlayAds.java"
               sed -i 's/reward -> result.put("earned", true)/reward -> { android.util.Log.i("AstroAdQA", "SDK earned"); result.put("earned", true); }/' "$src/PlayAds.java"
             fi
             sed -i "s|mavenCentral()|maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }|g" \
