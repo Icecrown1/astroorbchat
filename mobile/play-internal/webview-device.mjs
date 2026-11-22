@@ -68,7 +68,7 @@ async function closeTestAd() {
   if(!foreground().includes('AdActivity')) return;
   adb('shell','uiautomator','dump','/sdcard/astro-ad-window.xml');
   const xml=adb('shell','cat','/sdcard/astro-ad-window.xml');
-  const close=xml.match(/<node\b[^>]*(?:content-desc="(?:Close|Close ad|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
+  const close=xml.match(/<node\b[^>]*(?:(?:content-desc|text)="(?:Close|Close ad|Close video|Dismiss|Закрыть)"|resource-id="[^"]*[:/]close_button")[^>]*>/i)?.[0];
   const bounds=close?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if(bounds) {
     adb('shell','input','tap',String(Math.floor((+bounds[1]+ +bounds[3])/2)),String(Math.floor((+bounds[2]+ +bounds[4])/2)));
@@ -148,6 +148,36 @@ try {
     adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');
     await click('Главная');await pick('tarot','Таро');await selector('.one-card button');
     adb('shell','input','keyevent','4');await page('tools');
+  });
+  adb('shell','svc','wifi','enable');adb('shell','svc','data','enable');
+  async function freshReading() {
+    adb('shell','am','force-stop',pkg);launch();await connect();await pick('tarot','Таро');
+    await click('Три карты');
+    await tap(`${buttons}.find(b=>['Сделать новый расклад','Вытянуть три карты'].includes(b.innerText.trim()))`);
+    await selector('.three-cards button');
+    await selector('.reward-unlock[aria-label]');
+  }
+  const adIsShowing=()=>foreground().includes('AdActivity');
+  await step('interstitial-on-exit',async()=>{
+    await freshReading();await pause(14000);await click('Главная');
+    await until(adIsShowing,'interstitial not served',8000);
+    await pause(2500);snap('interstitial-test-ad');
+    for(let i=0;i<4 && adIsShowing();i++) {await closeTestAd();await pause(1300);}
+    assert.ok(!adIsShowing(),'interstitial dismissed');await page('home');
+  });
+  await step('rewarded-early-dismiss',async()=>{
+    await freshReading();
+    for(let i=0;i<5 && !adIsShowing();i++) {
+      await clickSel('.reward-unlock[aria-label]');await pause(1000);
+      if(!adIsShowing())await pause(2700);
+    }
+    assert.ok(adIsShowing(),'rewarded test ad shown');
+    // Attempt early dismissal only on the verified Google SDK activity.
+    adb('shell','input','keyevent','4');await pause(700);
+    for(let i=0;i<3 && adIsShowing();i++) {await closeTestAd();await pause(700);}
+    assert.ok(!adIsShowing(),'test creative permits early dismissal');
+    await page('tarot');await selector('.reward-unlock[aria-label]');
+    assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
   });
 } finally {socket?.close();}
 if(Object.entries(results).some(([k,v])=>k!=='pageBytes'&&v!=='pass'))process.exitCode=1;
