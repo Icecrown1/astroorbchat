@@ -1,4 +1,4 @@
-import { rewardsEnabled } from './playInternal';
+import { playInternal, rewardsEnabled } from './playInternal';
 import { RewardUnlock } from './RewardUnlock';
 import { Fragment, useState } from 'react';
 import { calcMatrixFromISO, parseReadingV2 } from '../../shared/matrix';
@@ -261,7 +261,7 @@ function AccountMatrix({ account, openAccount, guest }) {
   }
 
   if (!token) return <div className="profile-card">
-    <p>Подключи профиль, чтобы открыть матрицу по своей дате рождения и разборы из Telegram.</p>
+    <p>{playInternal ? 'Войди в тестовый профиль, чтобы открыть свою матрицу и сохранённые разборы.' : 'Подключи профиль, чтобы открыть матрицу по своей дате рождения и разборы из Telegram.'}</p>
     <button type="button" onClick={openAccount}>Подключить профиль</button>
   </div>;
 

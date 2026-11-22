@@ -252,7 +252,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
         <>
           <form className="profile-card account-connect" onSubmit={signIn}>
             <h2>{playInternal ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
-            {playInternal ? <p>Введите одноразовый код из тестовой среды. Код действует 5 минут.</p> : <ol className="connect-steps">
+            {playInternal ? <p>Введите код Android-песочницы. Обычный код действует 5 минут. Для проверки Google используйте код из инструкции App access.</p> : <ol className="connect-steps">
               <li>Открой AstroOrbi в Telegram.</li>
               <li>В настройках найди «Мобильное приложение» и получи код входа.</li>
               <li>Вставь код сюда в течение 5 минут.</li>

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { playCatalog } from './playInternal';
+import { playCatalog, playInternal } from './playInternal';
 import { onlineRequest } from './onlineApi';
 
 const shopPath = '/api/mobile/shop';
 const messages = {
-  mobile_login_needed: 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
+  mobile_login_needed: playInternal ? 'Для покупки войди ещё раз по коду тестового профиля Android.' : 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
   shop_unavailable: 'Магазин пока недоступен. Попробуй обновить статус позже.',
   invalid_order: 'Проверь тариф и адрес для чека.',
   price_changed: 'Цена изменилась. Обнови статус и подтверди новую сумму.',

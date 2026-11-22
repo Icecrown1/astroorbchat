@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Frontispiece, IndexRow } from './Editorial';
 import { onlineRequest } from './onlineApi';
+import { playInternal } from './playInternal';
 
 const day = 24 * 60 * 60 * 1000;
 const genders = { female: 'Женский', male: 'Мужской', other: 'Другое' };
@@ -218,13 +219,13 @@ export function ProfileSettings({ account, openAccount, openNatal }) {
     {profile.birthdayDate && profile.birthPlace && <button className="secondary-button" type="button" disabled={busy} onClick={openNatal}>
       Открыть натальную карту
     </button>}
-    <section className="profile-card" aria-label="Напоминания в Telegram">
+    {!playInternal && <section className="profile-card" aria-label="Напоминания в Telegram">
       <h2>Напоминания в Telegram</h2>
       <button className="secondary-button" type="button" role="switch" aria-checked={reminders}
         disabled={busy} aria-label="Напоминания в Telegram" onClick={changeReminders}>
         {pending === 'reminders' ? 'Сохраняем…' : reminders ? 'Включены' : 'Выключены'}
       </button>
-    </section>
+    </section>}
   </section>;
 }
 
