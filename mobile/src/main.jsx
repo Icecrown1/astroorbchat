@@ -6,7 +6,7 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
-import { playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
+import { mechanics, playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
 import { MobileCardShop } from './MobileCardShop';
 import { onlineRequest } from './onlineApi';
 import { AdPreview } from './AdPreview';
@@ -37,6 +37,7 @@ const featured = tools.slice(1, 5);
 
 function Home({ navigate, online, hasDaily }) {
   return <div className="home">
+    {mechanics && <p>Тест механик · профиль на устройстве, примеры ИИ-ответов и покупок</p>}
     <section className="daily-cover" style={{ backgroundImage: `url(${editorialHero})` }}>
       <h1>Карта<br />дня</h1>
       <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
@@ -73,7 +74,7 @@ function Stars({ account, openAccount }) {
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
       <p>Одна покупка даёт доступ на месяц. Автопродления нет.</p>
-      {playInternal ? <MobileCardShop key={profile?.id} account={account} /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      {mechanics ? (profile ? <PreviewShop account={account} /> : <button onClick={openAccount}>Войти в тестовый магазин</button>) : playInternal ? <MobileCardShop key={profile?.id} account={account} /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
@@ -120,7 +121,7 @@ function App() {
   useLayoutEffect(() => { rewardScreen.current++; }, [route, viewer, tarotMode, tarotSource, adEligible, testAds, account.profile?.id]);
 
   useEffect(() => {
-    if (!playInternal || !adEligible || !testAds) return;
+    if (mechanics || !playInternal || !adEligible || !testAds) return;
     function prepare() {
       if (!document.hidden) playAds.prepare().catch(() => {});
     }
@@ -135,7 +136,7 @@ function App() {
 
   async function showAd(type, onEarn, title, remaining = 0, button) {
     if (!adEligible || window.history.state?.adOverlay) return;
-    if (playInternal) {
+    if (playInternal && !mechanics) {
       if (!testAds) return;
       if (nativeAdPending.current) {
         if (type === 'rewarded') throw Object.assign(new Error(), { code: 'AD_BUSY' });

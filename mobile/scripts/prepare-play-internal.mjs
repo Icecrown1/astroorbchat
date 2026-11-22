@@ -4,7 +4,8 @@ import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 const app = new URL('../android/app/', import.meta.url);
 const files = new URL('../play-internal/', import.meta.url);
 const config = JSON.parse(await readFile(new URL('../capacitor.config.json', import.meta.url)));
-const id = process.env.PLAY_APPLICATION_ID || 'app.astroorbi.mobile';
+const mechanics = process.argv.includes('--mechanics');
+const id = mechanics ? 'app.astroorbi.mechanics' : process.env.PLAY_APPLICATION_ID || 'app.astroorbi.mobile';
 const version = Number(process.env.PLAY_VERSION_CODE || 1);
 if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(id)) throw Error('Invalid Play application ID');
 if (!Number.isInteger(version) || version < 1 || version > 2100000000) throw Error('Invalid Play versionCode');
@@ -29,7 +30,7 @@ await replaceIn('src/main/AndroidManifest.xml', [
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="astroorbi-internal" android:host="payment-return" />
+                <data android:scheme="${mechanics ? 'astroorbi-mechanics' : 'astroorbi-internal'}" android:host="payment-return" />
             </intent-filter>
         </activity>`],
   ['android:allowBackup="true"', 'android:allowBackup="false"'],
@@ -44,9 +45,12 @@ await replaceIn('src/main/java/' + config.appId.replaceAll('.', '/') + '/MainAct
                 WebView webView =`],
   ['super.onCreate(savedInstanceState);', 'registerPlugin(app.astroorbi.store.PlayAds.class);\n        registerPlugin(app.astroorbi.store.PlayCatalog.class);\n        super.onCreate(savedInstanceState);'],
 ]);
+if (mechanics) {
+  await replaceIn('src/main/res/values/strings.xml', [[/>AstroOrbi</g, '>AstroOrbi Механики<']]);
+}
 const target = new URL('src/main/java/app/astroorbi/store/', app);
 await mkdir(target, { recursive: true });
 for (const name of ['PlayAds.java', 'PlayCatalog.java']) await copyFile(new URL(name, files), new URL(name, target));
 await replaceIn('src/main/java/app/astroorbi/store/PlayCatalog.java', [
-  ['"astroorbi://payment-return"', '"astroorbi-internal://payment-return"'],
+  ['"astroorbi://payment-return"', JSON.stringify((mechanics ? 'astroorbi-mechanics' : 'astroorbi-internal') + '://payment-return')],
 ]);

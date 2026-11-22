@@ -26,6 +26,10 @@ const messages = {
 };
 
 export async function onlineRequest(path, { token, data, envelope = false, method = data ? 'POST' : 'GET' } = {}) {
+  if (import.meta.env.MODE === 'mechanics') {
+    const { mechanicsRequest } = await import('./mechanicsDemo');
+    return mechanicsRequest(path, { data, method, envelope });
+  }
   const url = new URL(path, apiOrigin.origin).href;
   if (new URL(url).origin !== apiOrigin.origin) throw new Error('Invalid API origin');
   const headers = { Accept: 'application/json' };

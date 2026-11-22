@@ -1,4 +1,4 @@
-import { playInternal, rewardsEnabled } from './playInternal';
+import { mechanics, playInternal, rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
@@ -132,6 +132,11 @@ export function useAccount() {
 
   function signIn(event) {
     event.preventDefault();
+    if (mechanics) {
+      localStorage.removeItem('mechanics-guest');
+      run(async () => { setToken('demo'); await loadAccount('demo'); });
+      return;
+    }
     if (!/^[A-Za-z0-9_-]{22}$/.test(code.trim())) {
       setError('Проверь, что код скопирован целиком.');
       return;
@@ -172,6 +177,11 @@ export function useAccount() {
   }
 
   useEffect(() => {
+    if (mechanics) {
+      if (localStorage.getItem('mechanics-guest')) setToken(null);
+      else run(async () => { setToken('demo'); await loadAccount('demo'); });
+      return;
+    }
     if (!native) return;
     run(async () => {
       const saved = await SecureStorage.get(sessionKey, false, false);
@@ -189,14 +199,16 @@ export function useAccount() {
       await onlineRequest('/api/mobile/account', { token, method: 'DELETE', data: { confirmation: 'DELETE' } });
       const prefix = 'astroorbi.reward.v1:' + profile.id + ':';
       for (const key of Object.keys(localStorage)) if (key.startsWith(prefix)) localStorage.removeItem(key);
+      if (mechanics) localStorage.setItem('mechanics-guest','1');
       clearAccount();
-      if (native) await SecureStorage.remove(sessionKey, false);
+      if (native && !mechanics) await SecureStorage.remove(sessionKey, false);
     });
   }
 
   function signOut() {
     run(async () => {
-      if (native) {
+      if (mechanics) localStorage.setItem('mechanics-guest','1');
+      if (native && !mechanics) {
         try {
           await SecureStorage.remove(sessionKey, false);
         } catch {
@@ -250,7 +262,9 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
       <Frontispiece title="Профиль" art="portrait" scene />
       {!token ? (
         <>
-          <form className="profile-card account-connect" onSubmit={signIn}>
+          {mechanics ? <form className="profile-card" onSubmit={signIn}>
+            <button disabled={busy}>Открыть тестовый профиль</button>
+          </form> : <form className="profile-card account-connect" onSubmit={signIn}>
             <h2>{playInternal ? 'Войти в тестовый профиль' : 'Войти через Telegram'}</h2>
             {playInternal ? <p>Введите код Android-песочницы. Обычный код действует 5 минут. Для проверки Google используйте код из инструкции App access.</p> : <ol className="connect-steps">
               <li>Открой AstroOrbi в Telegram.</li>
@@ -262,7 +276,7 @@ export function Account({ account, openHistory, openSettings, openOffline, openS
               autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={busy}
               aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'account-status' : undefined} />
             <button type="submit" disabled={busy}>{busy ? 'Подключаем…' : 'Войти'}</button>
-          </form>
+          </form>}
           <button className="secondary-button" type="button" onClick={openOffline} disabled={busy}>Открыть офлайн-Таро</button>
         </>
       ) : <>
