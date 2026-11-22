@@ -8,6 +8,6 @@ export ANDROID_SANDBOX_DATABASE_URL="${DATABASE_URL:?Replit PostgreSQL binding i
 export ANDROID_SANDBOX_DATABASE_MARKER="$sandbox_project"
 export ANDROID_SANDBOX_ORIGIN="${ANDROID_SANDBOX_ORIGIN:-https://astro-orbi-android-sandbox.replit.app}"
 export JWT_SECRET="${JWT_SECRET:-${SESSION_SECRET:?Replit session secret is required}}"
-export MOBILE_RU_CHECKOUT_TESTERS="${MOBILE_RU_CHECKOUT_TESTERS:-900000000001}"
+export MOBILE_RU_CHECKOUT_TESTERS="${MOBILE_RU_CHECKOUT_TESTERS:-900000000001,900000000002}"
 export YOOKASSA_TEST_MODE=true
 exec npm run android:sandbox -- "$@"
