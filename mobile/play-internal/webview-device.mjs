@@ -184,5 +184,19 @@ try {
     await page('tarot');await selector('.reward-unlock[aria-label]');
     assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
   });
+  const sdkLog=()=>adb('logcat','-d','-s','AstroAdQA:I','*:S');
+  writeFileSync(join(out,'sdk-callbacks.txt'),sdkLog());
+  await step('native-dismiss-before-earn',async()=>{
+    await freshReading();adb('logcat','-c');
+    adb('shell','run-as',pkg,'touch','files/qa-dismiss-next-ad');
+    for(let i=0;i<5 && !sdkLog().includes('Android finishes SDK activity');i++) {
+      await clickSel('.reward-unlock[aria-label]');await pause(3500);
+    }
+    await until(()=>sdkLog().includes('SDK dismissed earned=false'),'SDK early-dismiss callback',10000);
+    await page('tarot');await selector('.reward-unlock[aria-label]');
+    assert.ok(!sdkLog().includes('SDK earned'));
+    assert.equal(await js("document.querySelectorAll('.rewarded-advice').length"),0);
+  });
+  writeFileSync(join(out,'sdk-early-dismiss.txt'),sdkLog());
 } finally {socket?.close();}
 if(Object.entries(results).some(([k,v])=>k!=='pageBytes'&&v!=='pass'))process.exitCode=1;
