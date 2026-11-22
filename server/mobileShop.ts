@@ -14,6 +14,7 @@ import { activateSubscriptionForUser } from './lib/paymentActivation';
 const kind = 'subscription_mobile';
 const path = '/api/mobile/shop';
 const returnUrl = 'https://astroorbiapp.com/mobile/payment-return';
+const sandbox = process.env.ASTROORBI_ANDROID_SANDBOX === '1';
 const orderInput = z.object({
   tier: z.enum(['standard', 'premium']),
   amount: z.number().int().positive(),
@@ -30,8 +31,9 @@ function hasAccess(sub: Awaited<ReturnType<typeof storage.getSubscription>>) {
 }
 
 function enabled(tgId: string) {
+  if (sandbox && process.env.ANDROID_INTERNAL_PURCHASES_DISABLED === '1') return false;
   return Boolean(process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY &&
-    process.env.YOOKASSA_TEST_MODE !== 'true' &&
+    (sandbox ? process.env.YOOKASSA_TEST_MODE === 'true' : process.env.YOOKASSA_TEST_MODE !== 'true') &&
     process.env.MOBILE_RU_CHECKOUT_TESTERS?.split(',').some(id => id.trim() === tgId));
 }
 
@@ -46,7 +48,7 @@ function publicOrder(row: YookassaPayment) {
 }
 
 export function matchesMobileOrder(row: YookassaPayment, payment: YooKassaPayment) {
-  return payment.test === false && !!payment.id &&
+  return payment.test === sandbox && !!payment.id &&
     (!row.yookassaPaymentId || row.yookassaPaymentId === payment.id) &&
     payment.metadata?.internalPaymentId === row.id && payment.metadata.userId === row.userId &&
     payment.metadata.kind === kind && payment.metadata.tier === row.tier &&
@@ -87,7 +89,7 @@ async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment
     }
     await activateSubscriptionForUser(store, {
       userId: row.userId, tier: row.tier as PaidTier, periodMonths: 1, source: 'yookassa',
-      meta: { autoRenew: false, paymentMethodId: null, amountRUB: row.amountRUB },
+      meta: { autoRenew: false, paymentMethodId: null, amountRUB: row.amountRUB, skipReferralBonus: sandbox },
     });
     await tx.update(yookassaPayments).set({ status: 'completed', completedAt: new Date(),
       yookassaPaymentId: paymentId }).where(eq(yookassaPayments.id, id));
@@ -102,7 +104,7 @@ class ShopError extends Error {
 export function registerMobileShop(app: Express) {
   app.get('/mobile/payment-return', (_req, res) => {
     res.set('Cache-Control', 'no-store').set('Referrer-Policy', 'no-referrer')
-      .send('<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AstroOrbi</title><main style="max-width:30rem;margin:15vh auto;padding:1rem;font:1.2rem system-ui"><h1>AstroOrbi</h1><p>Статус покупки можно проверить в разделе «Звёзды и подписка».</p><p><a href="astroorbi://payment-return">Вернуться в AstroOrbi</a></p></main></html>');
+      .send(`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AstroOrbi</title><main style="max-width:30rem;margin:15vh auto;padding:1rem;font:1.2rem system-ui"><h1>AstroOrbi</h1><p>Статус покупки можно проверить в разделе «Звёзды и подписка».</p>${sandbox ? '<p><a href="astroorbi-internal://payment-return">Открыть сборку из Google Play</a></p>' : ''}<p><a href="${sandbox ? 'astroorbi-test' : 'astroorbi'}://payment-return">${sandbox ? 'Открыть тестовый APK' : 'Вернуться в AstroOrbi'}</a></p></main></html>`);
   });
   app.use(path, requireAuth, (_req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -148,7 +150,8 @@ export function registerMobileShop(app: Express) {
       if (!row.yookassaPaymentId && Date.now() - row.createdAt.getTime() >= 23 * 3600_000) throw new ShopError(409, 'order_review');
       const payment = row.yookassaPaymentId ? await getPayment(row.yookassaPaymentId) : await createPayment({
         amount: row.amountRUB, description: 'AstroOrbi ' + (row.tier === 'premium' ? 'Premium' : 'Standard') + ' на 1 месяц',
-        returnUrl, customerEmail: input.email, idempotencyKey: row.idempotencyKey, bankCardOnly: true, savePaymentMethod: false,
+        returnUrl: sandbox ? new URL('/mobile/payment-return', process.env.ANDROID_SANDBOX_ORIGIN).href : returnUrl,
+        customerEmail: input.email, idempotencyKey: row.idempotencyKey, bankCardOnly: true, savePaymentMethod: false,
         metadata: { internalPaymentId: row.id, userId: row.userId, tier: row.tier, kind },
       });
       if (!matchesMobileOrder(row, payment)) throw Error('Provider order mismatch');

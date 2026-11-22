@@ -6,7 +6,7 @@ import { db } from './db';
 import { generateToken } from './lib/jwt';
 import { requireAuth } from './middleware/auth';
 
-const digest = (code: string) => createHash('sha256').update(code).digest('hex');
+export const digestMobileCode = (code: string) => createHash('sha256').update(code).digest('hex');
 const codeLifetimeSeconds = 300;
 
 export function registerMobileLogin(app: Express) {
@@ -15,7 +15,7 @@ export function registerMobileLogin(app: Express) {
     const userId: string = (req as typeof req & { userId: string }).userId;
     const code = randomBytes(16).toString('base64url');
     const values = {
-      digest: digest(code),
+      digest: digestMobileCode(code),
       expiresAt: sql`now() + ${codeLifetimeSeconds} * interval '1 second'`,
     };
     try {
@@ -37,7 +37,7 @@ export function registerMobileLogin(app: Express) {
     }
     try {
       const [match] = await db.delete(mobileLinkCodes)
-        .where(and(eq(mobileLinkCodes.digest, digest(code)), sql`${mobileLinkCodes.expiresAt} > now()`))
+        .where(and(eq(mobileLinkCodes.digest, digestMobileCode(code)), sql`${mobileLinkCodes.expiresAt} > now()`))
         .returning({ userId: mobileLinkCodes.userId });
       if (!match) return res.status(400).json({ ok: false, error: 'invalid_code' });
       return res.json({ ok: true, data: { token: generateToken(match.userId, 8 * 60 * 60, 'mobile') } });

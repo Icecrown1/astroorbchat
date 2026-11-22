@@ -9,6 +9,15 @@ on:
       - 'client/public/brand/**'
       - '.github/workflows/mobile-play-internal.yml'
   workflow_dispatch:
+    inputs:
+      version_code:
+        description: "New versionCode, greater than every upload in Play Console"
+        required: true
+        type: number
+      sign:
+        description: "Sign for the internal track with the registered upload key"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +31,8 @@ jobs:
         working-directory: mobile
     env:
       PLAY_APPLICATION_ID: ${{ vars.ASTROORBI_PLAY_APPLICATION_ID || 'app.astroorbi.mobile' }}
-      PLAY_VERSION_CODE: ${{ github.run_number }}
+      PLAY_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
+      VITE_ASTROORBI_API_URL: https://astro-orbi-android-sandbox.replit.app
     steps:
       - uses: actions/checkout@v6
         with:
@@ -64,12 +74,16 @@ jobs:
           android = '{http://schemas.android.com/apk/res/android}'
           assert doc.get('package') == os.environ['PLAY_APPLICATION_ID']
           assert doc.get(android + 'versionCode') == os.environ['PLAY_VERSION_CODE']
+          assert int(doc.find('uses-sdk').get(android + 'targetSdkVersion')) >= 36
           app = doc.find('application')
           assert app.get(android + 'debuggable', 'false') == 'false'
           assert app.find(f"meta-data[@{android}name='com.google.android.gms.ads.APPLICATION_ID']").get(android + 'value') == 'ca-app-pub-3940256099942544~3347511713'
           assert doc.find(f"uses-permission[@{android}name='com.android.vending.BILLING']") is not None
           with zipfile.ZipFile(sys.argv[2]) as archive:
               assert 'base/assets/public/index.html' in archive.namelist()
+              assert not any(n.endswith('.so') for n in archive.namelist()), 'Inspect new ELF files for 16 KB compatibility'
+              js = b''.join(archive.read(n) for n in archive.namelist() if n.startswith('base/assets/public/') and n.endswith('.js'))
+              assert os.environ['VITE_ASTROORBI_API_URL'].encode() in js and b'astroorbiapp.com' not in js
               assert not any(n.startswith('META-INF/') and n.endswith(('.RSA','.EC','.DSA')) for n in archive.namelist())
           PY
       - uses: actions/upload-artifact@v6
@@ -77,3 +91,47 @@ jobs:
           name: astroorbi-play-internal-unsigned
           path: mobile/AstroOrbi-Play-internal-unsigned.aab
           if-no-files-found: error
+
+  sign:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/mobile/play-internal-release' && inputs.sign
+    needs: bundle
+    runs-on: ubuntu-24.04
+    environment: play-internal
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: astroorbi-play-internal-unsigned
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify upload certificate and sign the verified bundle
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.PLAY_UPLOAD_STORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ vars.PLAY_UPLOAD_ALIAS }}
+          CERT_SHA256: ${{ vars.PLAY_UPLOAD_CERT_SHA256 }}
+          PREVIOUS_CODE: ${{ vars.PLAY_LAST_UPLOADED_CODE }}
+          CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          [[ "$PREVIOUS_CODE" =~ ^[0-9]+$ && "$CODE" =~ ^[1-9][0-9]*$ && "$CODE" -gt "$PREVIOUS_CODE" ]]
+          umask 077
+          ks="$RUNNER_TEMP/upload.keystore"
+          trap 'rm -f "$ks"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$ks"
+          keytool -exportcert -keystore "$ks" -storepass:env STORE_PASS -alias "$KEY_ALIAS" > upload.der
+          expected=$(printf '%s' "$CERT_SHA256" | tr -d ':' | tr 'A-F' 'a-f')
+          [[ "$(sha256sum upload.der | cut -d' ' -f1)" == "$expected" ]]
+          out="AstroOrbi-Play-internal-$CODE.aab"
+          jarsigner -keystore "$ks" -storepass:env STORE_PASS -keypass:env KEY_PASS -signedjar "$out" AstroOrbi-Play-internal-unsigned.aab "$KEY_ALIAS"
+          jarsigner -verify -keystore "$ks" -storepass:env STORE_PASS "$out" "$KEY_ALIAS" | grep -F 'jar verified.'
+          sha256sum "$out" > SHA256SUMS
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-play-internal-signed-${{ inputs.version_code }}
+          path: |
+            AstroOrbi-Play-internal-${{ inputs.version_code }}.aab
+            SHA256SUMS

@@ -8,7 +8,6 @@ import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
 import { playInternal, rewardsEnabled, playAds, playCatalog } from './playInternal';
 import { MobileCardShop } from './MobileCardShop';
-import { PlayStoreStatus } from './PlayStoreStatus';
 import { AdPreview } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
@@ -72,8 +71,8 @@ function Stars({ account, openAccount }) {
     <section className="ledger"><h2>Бесплатно</h2><p>Карта дня, базовая натальная карта и матрица по дате рождения.</p></section>
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
-      <p>Это ежемесячное пополнение баланса.</p>
-      {playInternal ? <><MobileCardShop key={profile?.id} account={account} /><PlayStoreStatus /></> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      <p>Одна покупка даёт доступ на месяц. Автопродления нет.</p>
+      {playInternal ? <MobileCardShop key={profile?.id} account={account} /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
