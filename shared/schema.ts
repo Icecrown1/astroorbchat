@@ -60,6 +60,12 @@ export const users = pgTable("users", {
   referralCodeIdx: index("users_referral_code_idx").on(table.referralCode),
 }));
 
+export const mobileLinkCodes = pgTable("mobile_link_codes", {
+  userId: varchar("user_id", { length: 255 }).primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  digest: varchar("digest", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   subscription: one(subscriptions, {
     fields: [users.id],

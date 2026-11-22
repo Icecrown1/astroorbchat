@@ -35,6 +35,32 @@ interface UserMeResponse {
   };
 }
 
+function MobileAccess({ locale }: { locale: Locale }) {
+  const [code, setCode] = useState('');
+  const ru = locale === 'ru';
+  const create = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/mobile/auth/code'),
+    onMutate: () => setCode(''),
+    onSuccess: response => setCode(response.data.code),
+  });
+
+  return (
+    <Card className="p-6 mb-4 space-y-3">
+      <h2 className="text-lg font-semibold">{ru ? 'Мобильное приложение' : 'Mobile app'}</h2>
+      <p className="text-sm text-muted-foreground">
+        {ru ? 'Введи одноразовый код в профиле AstroOrbi на телефоне. Код действует 5 минут.' :
+          'Enter the one-time code in your AstroOrbi profile on your phone. It expires in 5 minutes.'}
+      </p>
+      <Button type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+        {ru ? 'Получить код входа' : 'Get a sign-in code'}
+      </Button>
+      {code && <Input readOnly value={code} aria-label={ru ? 'Код входа' : 'Sign-in code'}
+        autoComplete="off" onFocus={event => event.currentTarget.select()} />}
+      {create.isError && <p role="alert">{ru ? 'Код пока недоступен. Попробуй позже.' : 'Code unavailable. Try again later.'}</p>}
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -160,6 +186,8 @@ export default function Settings() {
             <p className="text-muted-foreground">{t.settings.subtitle}</p>
           </div>
         </div>
+
+        <MobileAccess locale={locale} />
 
         <Card className="p-6">
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">

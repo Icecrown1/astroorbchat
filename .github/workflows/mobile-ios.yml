@@ -1,0 +1,51 @@
+name: AstroOrbi iOS preview
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'client/src/components/ChartCanvas.tsx'
+      - 'client/public/tarot/**'
+      - 'client/public/brand/**'
+      - '.github/workflows/mobile-ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Prepare AstroOrbi for iOS
+        working-directory: mobile
+        run: |
+          npm ci
+          npm run build
+          npx --no-install cap add ios --packagemanager SPM
+          swift scripts/prepare-ios.swift
+      - name: Build the iOS Simulator app
+        working-directory: mobile
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath ios-build \
+            CODE_SIGNING_ALLOWED=NO build
+          app=ios-build/Build/Products/Debug-iphonesimulator/App.app
+          test -f "$app/public/index.html"
+          test -f "$app/Assets.car"
+          ditto -c -k --keepParent "$app" astroorbi-ios-simulator.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-ios-simulator
+          path: mobile/astroorbi-ios-simulator.zip
+          if-no-files-found: error

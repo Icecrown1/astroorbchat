@@ -53,6 +53,7 @@ export interface CreatePaymentParams {
   customerPhone?: string; // Phone for receipt (alternative to email)
   metadata?: Record<string, any>;
   idempotencyKey?: string; // Idempotency key to prevent duplicate payments
+  bankCardOnly?: boolean;
   savePaymentMethod?: boolean; // Save payment method for recurring payments
 }
 
@@ -70,6 +71,7 @@ export interface YooKassaPayment {
   id: string;
   status: string;
   paid: boolean;
+  test: boolean;
   amount: {
     value: string;
     currency: string;
@@ -146,13 +148,14 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
       },
     };
 
+    if (params.bankCardOnly) paymentData.payment_method_data = { type: 'bank_card' };
+
     // Add save_payment_method for recurring payments (auto-renewal)
     if (params.savePaymentMethod) {
       paymentData.save_payment_method = true;
       console.log('[YooKassa] Payment will save payment method for recurring');
     }
 
-    console.log('[YooKassa] Payment data with receipt:', JSON.stringify(paymentData, null, 2));
 
     // Add idempotency key if provided to prevent duplicate payments
     // Pass as string directly (not as object) - SDK expects string value
@@ -165,19 +168,11 @@ export async function createPayment(params: CreatePaymentParams): Promise<YooKas
     console.log('[YooKassa] Payment created:', {
       id: payment.id,
       status: payment.status,
-      confirmationUrl: payment.confirmation?.confirmation_url,
     });
 
     return payment;
   } catch (error: any) {
-    console.error('[YooKassa] ========== ERROR CREATING PAYMENT ==========');
-    console.error('[YooKassa] Error message:', error.message);
-    console.error('[YooKassa] Error code:', error.code);
-    console.error('[YooKassa] Error type:', error.type);
-    console.error('[YooKassa] Full error:', JSON.stringify(error, null, 2));
-    console.error('[YooKassa] Response data:', error.response?.data);
-    console.error('[YooKassa] Response status:', error.response?.status);
-    console.error('[YooKassa] ===============================================');
+    console.error('[YooKassa] Payment creation failed:', error.code || error.response?.status);
     throw new Error(`Failed to create YooKassa payment: ${error.message}`);
   }
 }
@@ -201,7 +196,7 @@ export async function getPayment(paymentId: string): Promise<YooKassaPayment> {
 
     return payment;
   } catch (error: any) {
-    console.error('[YooKassa] Error getting payment:', error);
+    console.error('[YooKassa] Error getting payment:', error.code || error.response?.status);
     throw new Error(`Failed to get YooKassa payment: ${error.message}`);
   }
 }

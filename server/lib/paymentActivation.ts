@@ -152,6 +152,7 @@ export async function activateSucceededYookassaPayment(
     amountRUB: string | null;
   },
   ykPayment: {
+    id?: string;
     metadata?: Record<string, any>;
     payment_method?: { id: string; saved: boolean } | null;
   },
@@ -159,6 +160,12 @@ export async function activateSucceededYookassaPayment(
 ): Promise<ActivationResult> {
   if (dbPayment.status === 'completed') {
     return { activated: false, alreadyDone: true, message: 'Already completed' };
+  }
+
+  if (dbPayment.kind === 'subscription_mobile') {
+    // Webhooks, status polling and reconciliation must all verify and settle the same order.
+    const { settleMobileMonth } = await import('../mobileShop');
+    return settleMobileMonth(dbPayment.id, ykPayment.id);
   }
 
   const { SUBSCRIPTION_MONTHLY_ORBS } = await import('./energy');
