@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ReportExcerpt } from './ReportReading';
 import { onlineRequest } from './onlineApi';
 
 const cost = 2;
@@ -16,7 +17,7 @@ function hasReading(reading, type) {
   return typeof text === 'string' && Boolean(text.trim());
 }
 
-function Reading({ reading, kind }) {
+function Reading({ reading, kind, token }) {
   return <article className="result-body forecast-result">
     {reading.title && <h3>{reading.title}</h3>}
     {kind === 'house' ? <>
@@ -31,6 +32,7 @@ function Reading({ reading, kind }) {
         <ul>{values.map((value, index) => <li key={index}>{value}</li>)}</ul>
       </div>;
     })}
+    <ReportExcerpt token={token} kind={kind === 'house' ? 'house' : 'planet'} text={reading} />
   </article>;
 }
 
@@ -151,19 +153,19 @@ export function NatalReadings({ planet, houseNumber, account, savedHouses }) {
   if (!supportedPlanets.has(planet)) return null;
 
   return <div className="tarot-screen">
-    {personal.brief ? <Reading reading={personal.brief} kind="brief" /> :
+    {personal.brief ? <Reading token={token} reading={personal.brief} kind="brief" /> :
       <button type="button" className="secondary-button" disabled={busy} onClick={() => open('brief')}>
         {pending === 'brief' ? 'Загружаем…' : 'Краткий разбор · бесплатно'}
       </button>}
     {personal.detailed ? <details className="natal-detail" open>
       <summary>Подробный разбор планеты</summary>
-      <Reading reading={personal.detailed} kind="detailed" />
+      <Reading token={token} reading={personal.detailed} kind="detailed" />
     </details> : !needsSubscription && <button type="button" disabled={busy || Boolean(unconfirmed)} onClick={() => open('detailed')}>
       {pending === 'detailed' ? 'Готовим разбор…' : `Подробный разбор планеты · ${cost} ★`}
     </button>}
     {pastHouse ? <details key={planet} className="natal-detail" open={openedHouse === planet}>
       <summary>Сохранённый разбор влияния дома</summary>
-      <Reading reading={house} kind="house" />
+      <Reading token={token} reading={house} kind="house" />
     </details> : houseNumber && (needsSubscription ?
       <button type="button" className="secondary-button" disabled={busy} onClick={() => act('saved', refreshHouses)}>
         {pending === 'saved' ? 'Проверяем…' : 'Проверить сохранённые разборы домов'}

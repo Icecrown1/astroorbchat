@@ -39,7 +39,7 @@ function enabled(tgId: string) {
 
 function openOrder(userId: string) {
   return and(eq(yookassaPayments.userId, userId), eq(yookassaPayments.kind, kind),
-    inArray(yookassaPayments.status, ['pending', 'needs_review']));
+    inArray(yookassaPayments.status, ['pending', 'needs_review', 'refund_review']));
 }
 
 function publicOrder(row: YookassaPayment) {
@@ -74,7 +74,7 @@ async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment
     const [locked] = await tx.select().from(yookassaPayments).where(eq(yookassaPayments.id, id)).for('update');
     if (!locked || !matchesMobileOrder(locked, remote)) throw Error('Provider ID changed');
     if (locked.status === 'completed') return { activated: false, alreadyDone: true, message: 'Already completed' };
-    if (locked.status === 'needs_review') return { activated: false, alreadyDone: false, message: 'Awaiting support review' };
+    if (['needs_review','refund_review'].includes(locked.status)) return { activated: false, alreadyDone: false, message: 'Awaiting support review' };
     if (remote.status !== 'succeeded' || !remote.paid) {
       if (remote.status === 'canceled' && locked.status === 'pending') {
         await tx.update(yookassaPayments).set({ status: 'canceled' }).where(eq(yookassaPayments.id, id));
@@ -87,10 +87,11 @@ async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment
       await tx.update(yookassaPayments).set({ status: 'needs_review', yookassaPaymentId: paymentId }).where(eq(yookassaPayments.id, id));
       return { activated: false, alreadyDone: false, message: 'Conflicting active subscription' };
     }
-    await activateSubscriptionForUser(store, {
+    const activation = await activateSubscriptionForUser(store, {
       userId: row.userId, tier: row.tier as PaidTier, periodMonths: 1, source: 'yookassa',
       meta: { autoRenew: false, paymentMethodId: null, amountRUB: row.amountRUB, skipReferralBonus: sandbox },
     });
+    if (sandbox) await store.updateUser(row.userId, { orbsResetAt: activation.currentPeriodEnd });
     await tx.update(yookassaPayments).set({ status: 'completed', completedAt: new Date(),
       yookassaPaymentId: paymentId }).where(eq(yookassaPayments.id, id));
     return { activated: true, alreadyDone: false, message: 'Activated' };
@@ -99,6 +100,26 @@ async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment
 
 class ShopError extends Error {
   constructor(readonly status: number, code: string) { super(code); }
+}
+
+// A reversal requires the owner's policy on spent stars. Quarantine the order
+// without touching balances or a newer entitlement, even on webhook replay.
+export async function recordSandboxRefund(refundId: string) {
+  if (!sandbox) throw Error('Sandbox only');
+  const { readSandboxRefund } = await import('./lib/yookassa');
+  const refund = await readSandboxRefund(refundId);
+  if (refund?.id !== refundId || refund.status !== 'succeeded' || typeof refund.payment_id !== 'string' ||
+      refund.amount?.currency !== 'RUB' || !/^\d+\.\d{2}$/.test(refund.amount.value) || Number(refund.amount.value) <= 0)
+    throw Error('Unconfirmed refund');
+  const payment = await getPayment(refund.payment_id);
+  const id = payment.metadata?.internalPaymentId;
+  if (typeof id !== 'string' || payment.test !== true || payment.id !== refund.payment_id) throw Error('Unconfirmed payment');
+  await db.transaction(async tx => {
+    const [row] = await tx.select().from(yookassaPayments).where(eq(yookassaPayments.id, id)).for('update');
+    if (!row || row.kind !== kind || !matchesMobileOrder(row, payment) || Number(refund.amount.value) > Number(row.amountRUB))
+      throw Error('Refund mismatch');
+    await tx.update(yookassaPayments).set({ status:'refund_review', yookassaPaymentId:payment.id }).where(eq(yookassaPayments.id,id));
+  });
 }
 
 export function registerMobileShop(app: Express) {
@@ -135,7 +156,7 @@ export function registerMobileShop(app: Express) {
         await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for('update');
         const [pending] = await tx.select().from(yookassaPayments).where(openOrder(user.id)).limit(1);
         if (pending) {
-          if (pending.status === 'needs_review') throw new ShopError(409, 'order_review');
+          if (pending.status !== 'pending') throw new ShopError(409, 'order_review');
           if (pending.tier !== input.tier || Number(pending.amountRUB) !== input.amount) throw new ShopError(409, 'existing_order');
           return pending;
         }

@@ -4,6 +4,7 @@ import { CityField } from './ProfileSettings';
 import { NatalWheel } from './Natal';
 import { ImportantDates } from './ImportantDates';
 import { onlineRequest } from './onlineApi';
+import { playInternal } from './playInternal';
 
 const price = 20;
 
@@ -124,7 +125,7 @@ export function GuestNatal({ account, openAccount }) {
   return <section className="tarot-screen">
     <Frontispiece title="Карты близких" art="couple" scene />
     {!token ? <div className="profile-card">
-      <p>Подключи профиль, чтобы открыть карты из общего аккаунта.</p>
+      <p>{playInternal ? 'Войди в тестовый профиль, чтобы открыть сохранённые карты.' : 'Подключи профиль, чтобы открыть карты из общего аккаунта.'}</p>
       <button type="button" onClick={openAccount}>Подключить профиль</button>
     </div> : selected ? <>
       <button type="button" className="secondary-button" onClick={() => setSelected(null)} disabled={busy}>К списку карт</button>
@@ -139,7 +140,7 @@ export function GuestNatal({ account, openAccount }) {
       </button>
       {showDates && <ImportantDates key={selected.id} account={account} guestId={selected.id} />}
       {confirmRemoval ? <div className="profile-card">
-        <p>Удалить карту из общего аккаунта, в том числе из Telegram?</p>
+        <p>{playInternal ? 'Удалить эту карту из тестового профиля Android?' : 'Удалить карту из общего аккаунта, в том числе из Telegram?'}</p>
         <button type="button" onClick={remove} disabled={busy}>Удалить карту</button>
         <button type="button" className="secondary-button" onClick={() => setConfirmRemoval(false)} disabled={busy}>Отмена</button>
       </div> : <button className="secondary-button" type="button" disabled={busy} onClick={() => setConfirmRemoval(true)}>Удалить из сохранённых</button>}

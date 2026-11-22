@@ -201,6 +201,12 @@ export async function getPayment(paymentId: string): Promise<YooKassaPayment> {
   }
 }
 
+export async function readSandboxRefund(id: string) {
+  if (process.env.ASTROORBI_ANDROID_SANDBOX !== '1' || process.env.YOOKASSA_TEST_MODE !== 'true'
+    || !process.env.YOOKASSA_SECRET_KEY?.startsWith('test_')) throw Error('Test merchant required');
+  return (await getYooKassaClient()).getRefund(id);
+}
+
 /**
  * Check payment status by payment ID
  */

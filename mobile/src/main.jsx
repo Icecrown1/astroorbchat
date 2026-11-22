@@ -98,7 +98,7 @@ function App() {
       if (document.hidden) return;
       const current = ++generation;
       try {
-        const config = await onlineRequest('/api/mobile/config');
+        const config = await onlineRequest('/api/mobile/config?build=7');
         if (generation === current) setTestAds(config.testAds === true);
       } catch { if (generation === current) setTestAds(false); }
     }
@@ -110,13 +110,14 @@ function App() {
   const [adType, setAdType] = useState(null);
   const previousScreen = useRef(screen);
   const readingCompleted = useRef(false);
-  const lastAd = useRef(-Infinity);
+  const lastAd = useRef(Number(sessionStorage.getItem('astroorbi.last-test-ad')) || 0);
   const grantReward = useRef(null);
 
-  const [adNotice, setAdNotice] = useState('');
   const nativeAdPending = useRef(false);
   const rewardOwner = useRef(null);
   rewardOwner.current = adEligible ? (account.profile?.id ?? 'guest') : null;
+  const rewardScreen = useRef(0);
+  useLayoutEffect(() => { rewardScreen.current++; }, [route, viewer, tarotMode, tarotSource, adEligible, testAds, account.profile?.id]);
 
   useEffect(() => {
     if (!playInternal || !adEligible || !testAds) return;
@@ -132,23 +133,36 @@ function App() {
     };
   }, [adEligible, testAds]);
 
-  function showAd(type, onEarn, title, remaining = 0) {
+  async function showAd(type, onEarn, title, remaining = 0, button) {
     if (!adEligible || window.history.state?.adOverlay) return;
     if (playInternal) {
-      if (!testAds || nativeAdPending.current) return;
+      if (!testAds) return;
+      if (nativeAdPending.current) {
+        if (type === 'rewarded') throw Object.assign(new Error(), { code: 'AD_BUSY' });
+        return;
+      }
       nativeAdPending.current = true;
       const owner = rewardOwner.current;
-      setAdNotice('');
-      playAds.show({ type }).then(({ earned }) => {
-        lastAd.current = performance.now();
+      const requestedScreen = rewardScreen.current;
+      try {
+        if (type === 'rewarded') {
+          await playAds.loadReward();
+          if (document.hidden || requestedScreen !== rewardScreen.current ||
+              owner !== rewardOwner.current || !button?.isConnected || !button.getClientRects().length) return;
+        }
+        const { earned } = await playAds.show({ type });
+        lastAd.current = Date.now();
+        sessionStorage.setItem('astroorbi.last-test-ad', String(lastAd.current));
         if (earned && owner !== null && owner === rewardOwner.current) onEarn?.();
-      }).catch(() => {
-        if (type === 'rewarded') setAdNotice('Ролик пока не загрузился. Попробуй ещё раз чуть позже.');
-      }).finally(() => { nativeAdPending.current = false; });
+      } catch (error) {
+        if (type === 'rewarded' && requestedScreen === rewardScreen.current) throw error;
+      } finally {
+        nativeAdPending.current = false;
+      }
       return;
     }
     grantReward.current = onEarn ?? null;
-    lastAd.current = performance.now();
+    lastAd.current = Date.now();
     const current = window.history.state;
     const returnRoute = current.screen === 'tarot' ? { ...current, tarotMode, tarotSource } : current;
     window.history.replaceState(returnRoute, '');
@@ -161,7 +175,7 @@ function App() {
     const leftTarot = previousScreen.current === 'tarot' && screen !== 'tarot';
     previousScreen.current = screen;
     if (!leftTarot) return;
-    if (readingCompleted.current && performance.now() - lastAd.current >= 120_000) {
+    if (readingCompleted.current && screen !== 'stars' && screen !== 'settings' && Date.now() - lastAd.current >= 120_000) {
       showAd('interstitial');
     }
     readingCompleted.current = false;
@@ -175,18 +189,19 @@ function App() {
     function returned() {
       if (active && window.history.state?.screen !== 'stars') navigateRef.current('stars');
     }
-    const listener = playCatalog.addListener('paymentReturn', returned);
+    const listener = playCatalog.addListener('paymentReturn', returned).catch(() => null);
     playCatalog.consumeReturn().then(result => { if (result.returning) returned(); }).catch(() => {});
-    return () => { active = false; listener.then(handle => handle.remove()).catch(() => {}); };
+    return () => { active = false; listener.then(handle => handle?.remove()).catch(() => {}); };
   }, []);
 
   function onReadingComplete() {
     if (adEligible && window.history.state?.screen === 'tarot') readingCompleted.current = true;
   }
 
-  const rewards = adEligible ? { owner: account.profile?.id ?? 'guest',
-    adFree: playInternal && !testAds,
-    watch: (title, remaining, credit) => showAd('rewarded', credit, title, remaining) } : null;
+  const paid = ['standard', 'premium', 'pro'].includes(accessTier);
+  const rewards = (adEligible || (playInternal && paid)) ? { owner: account.profile?.id ?? 'guest', paid,
+    adFree: playInternal && (paid || !testAds),
+    watch: (title, remaining, credit, button) => showAd('rewarded', credit, title, remaining, button) } : null;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
   const openSettings = () => navigate('settings');
@@ -257,7 +272,6 @@ function App() {
           <span aria-hidden="true">✦</span> {account.profile?.orbs != null ? Number(account.profile.orbs).toLocaleString('ru-RU') : 'Звёзды'}
         </button>
       </header>
-      {adNotice && <button className="ad-notice" type="button" onClick={() => setAdNotice('')} aria-label={adNotice + ' Закрыть'}><span role="status">{adNotice}</span> ×</button>}
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}
@@ -290,10 +304,10 @@ function App() {
       <div key={'solar' + profileKey} hidden={screen !== 'solar'}>
         <Solar account={account} openAccount={openAccount} openNatal={openNatal} openSettings={openSettings} />
       </div>
-      <div key={'oracle' + Boolean(account.token)} hidden={screen !== 'oracle'}>
+      <div key={'oracle' + profileKey} hidden={screen !== 'oracle'}>
         <Oracle account={account} openAccount={openAccount} openNatal={openNatal} />
       </div>
-      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={screen === 'pair' ? 'pair' : 'matrix'} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
+      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={profileKey + (screen === 'pair' ? 'pair' : 'matrix')} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
       {screen === 'history' && <section className="tarot-screen">
         <Frontispiece title="История раскладов" art="books" />
         <AccountHistory account={account} />

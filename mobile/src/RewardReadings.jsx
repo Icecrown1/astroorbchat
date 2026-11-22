@@ -1,5 +1,6 @@
 import { MoonPhase, NextMoonQuarter, SearchMoonQuarter } from 'astronomy-engine';
 import { useEffect, useMemo, useState } from 'react';
+import { ReportExcerpt } from './ReportReading';
 import { onlineRequest } from './onlineApi';
 import { RewardUnlock } from './RewardUnlock';
 import { translatePlanet } from '../../client/src/lib/astroTranslations';
@@ -57,7 +58,8 @@ function LunarForecast({ period, startTime }) {
   const forecast = useMemo(() => {
     const start = new Date(startTime);
     const end = new Date(start);
-    if (period === 'week') end.setDate(end.getDate() + 7);
+    if (period === 'day') end.setDate(end.getDate() + 1);
+    else if (period === 'week') end.setDate(end.getDate() + 7);
     else end.setMonth(end.getMonth() + 1);
     const events = [];
     for (let q = SearchMoonQuarter(start); q.time.date < end; q = NextMoonQuarter(q)) {
@@ -78,7 +80,7 @@ function LunarForecast({ period, startTime }) {
 const signs = { aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак', leo: 'Лев', virgo: 'Дева',
   libra: 'Весы', scorpio: 'Скорпион', sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы' };
 
-function DailySign({ sign }) {
+function DailySign({ sign, token }) {
   const [report, setReport] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -92,15 +94,16 @@ function DailySign({ sign }) {
     return () => { active = false; };
   }, [sign, attempt]);
   return <article className="result-body"><h3>Гороскоп на день · {signs[sign]}</h3>
-    {failed ? <><p>Прогноз уже открыт. Проверь связь, чтобы загрузить текст.</p>
+    {failed ? <><p>Текст для знака сейчас недоступен. Ваш просмотр сохранён.</p>
+      <LunarForecast period="day" startTime={new Date().setHours(0, 0, 0, 0)} />
       <button type="button" onClick={() => setAttempt(n => n + 1)}>Повторить загрузку</button></> :
       report ? <><p>{report.intro}</p>
         {Object.entries({ work: 'Работа', love: 'Отношения', care: 'Забота о себе', advice: 'Совет' }).map(([key, heading]) =>
-          report[key] && <div key={key}><h4>{heading}</h4><p>{report[key]}</p></div>)}</> : <p role="status">Загружаем прогноз…</p>}
+          report[key] && <div key={key}><h4>{heading}</h4><p>{report[key]}</p></div>)}<ReportExcerpt token={token} kind="daily-sign" text={report} /></> : <p role="status">Загружаем прогноз…</p>}
   </article>;
 }
 
-export function RewardHoroscope({ period }) {
+export function RewardHoroscope({ period, token }) {
   const [sign, setSign] = useState('aries');
   const date = new Date();
   if (period === 'month') date.setDate(1);
@@ -115,7 +118,7 @@ export function RewardHoroscope({ period }) {
     </select></label>}
     <RewardUnlock id={`horoscope:${period}:${stamp}:${period === 'day' ? sign : ''}`}
       total={{ day: 1, week: 2, month: 3 }[period]} title={title}>
-      {() => period === 'day' ? <DailySign key={sign + stamp} sign={sign} /> :
+      {() => period === 'day' ? <DailySign key={sign + stamp} sign={sign} token={token} /> :
         <LunarForecast period={period} startTime={date.getTime()} />}
     </RewardUnlock>
   </>;

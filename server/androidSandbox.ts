@@ -36,12 +36,16 @@ async function main() {
   process.env.DATABASE_URL = databaseUrl;
   process.env.ASTROORBI_ANDROID_SANDBOX = '1';
   const { db, pool } = await import('./db');
-  const { storage } = await import('./storage');
+  const { storage, DatabaseStorage } = await import('./storage');
   const { mobileLinkCodes, users } = await import('@shared/schema');
-  const { sql } = await import('drizzle-orm');
+  const { eq, sql } = await import('drizzle-orm');
   const { digestMobileCode, registerMobileLogin } = await import('./mobileLogin');
 
-  if (process.argv.includes('--issue-code')) {
+  if (process.argv.includes('--sandbox-ops')) {
+    const { sandboxOperation } = await import('./mobileSandboxOps');
+    console.log(JSON.stringify(await sandboxOperation(process.argv.slice(process.argv.indexOf('--sandbox-ops') + 1))));
+    await pool.end();
+  } else if (process.argv.includes('--issue-code')) {
     const [created] = await db.insert(users).values({
       tgId: testerId,
       name: 'AstroOrbi Android Test',
@@ -60,11 +64,22 @@ async function main() {
     console.log(code);
     await pool.end();
   } else {
+    // Shared handlers write inputs and AI output to console. This standalone
+    // process instead emits only HTTP method/status for server failures.
+    for (const level of ['log','info','warn','error','debug'] as const) console[level] = () => {};
     const { registerMobileShop, settleMobileMonth } = await import('./mobileShop');
     const { requireAuth } = await import('./middleware/auth');
     const { getUserOrbs, getUserTier } = await import('./lib/energy');
     const app = express();
+    app.use((req, res, next) => {
+      res.on('finish', () => {
+        if (res.statusCode >= 500) process.stderr.write(`Android sandbox ${req.method} ${res.statusCode}\n`);
+      });
+      next();
+    });
     app.use(express.json({ limit: '32kb' }));
+    const { registerSandboxCare } = await import('./mobileSandboxCare');
+    await registerSandboxCare(app);
     app.get('/', (_req, res) => res.type('text').send('AstroOrbi Android sandbox'));
     const aiKey = process.env.ANDROID_INTERNAL_OPENAI_KEY;
     // Only the dedicated sandbox credential may send requests. Without it, the
@@ -76,23 +91,27 @@ async function main() {
     app.get('/api/health', (_req, res) => res.json({ ok: true, environment: 'android-sandbox', mobileApi: 'internal-v1', ai: Boolean(aiKey) }));
     app.post('/api/mobile/auth/code', (_req, res) => res.sendStatus(404));
     const { registerMobileReview } = await import('./mobileReview');
-    registerMobileReview(app);
+    await registerMobileReview(app);
     registerMobileLogin(app);
     registerMobileShop(app);
 
     app.get('/api/user/me', requireAuth, async (req, res, next) => {
       try {
         const user = (req as typeof req & { user: typeof users.$inferSelect }).user;
-        const [orbs, tier, subscription, chart] = await Promise.all([
-          getUserOrbs(storage, user.id),
-          getUserTier(storage, user.id),
-          storage.getSubscription(user.id),
-          storage.getNatalChart(user.id),
-        ]);
-        res.json({ ok: true, data: {
-          ...user, orbs: orbs.total, maxOrbs: orbs.maxOrbs, tier, billingTier: tier,
-          subscription, natalInitialized: Boolean(chart),
-        } });
+        const data = await db.transaction(async tx => {
+          await tx.select({id:users.id}).from(users).where(eq(users.id,user.id)).for('update');
+          const store = new DatabaseStorage(tx);
+          const subscription = await store.getSubscription(user.id);
+          if (subscription?.paymentProvider === 'yookassa' && !subscription.autoRenew && !subscription.scheduledTier
+              && subscription.currentPeriodEnd <= new Date()) {
+            await store.updateUser(user.id, { subscriptionOrbs:'0' });
+          }
+          const orbs = await getUserOrbs(store, user.id);
+          const tier = await getUserTier(store, user.id);
+          return { ...await store.getUser(user.id), orbs:orbs.total, maxOrbs:orbs.maxOrbs, tier, billingTier:tier,
+            subscription:await store.getSubscription(user.id), natalInitialized:Boolean(await store.getNatalChart(user.id)) };
+        });
+        res.json({ ok: true, data });
       } catch (error) {
         next(error);
       }
@@ -101,6 +120,14 @@ async function main() {
     // The notification only identifies the order. Settlement re-fetches it from the test merchant.
     app.post('/webhooks/yookassa', async (req, res) => {
       const { event, object } = req.body ?? {};
+      if (event === 'refund.succeeded') {
+        if (typeof object?.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(object.id)) return res.sendStatus(400);
+        try {
+          const { recordSandboxRefund } = await import('./mobileShop');
+          await recordSandboxRefund(object.id);
+          return res.sendStatus(200);
+        } catch { return res.sendStatus(503); }
+      }
       if (!['payment.succeeded', 'payment.canceled'].includes(event) ||
           object?.test !== true || object?.metadata?.kind !== 'subscription_mobile' ||
           typeof object.id !== 'string' || typeof object.metadata.internalPaymentId !== 'string') {
@@ -114,11 +141,15 @@ async function main() {
         res.sendStatus(503);
       }
     });
+    app.use(((error, _req, res, _next) => {
+      const status = error?.type === 'entity.too.large' ? 413 : error?.type === 'entity.parse.failed' ? 400 : 500;
+      res.status(status).json({ ok:false, error:'sandbox_request_failed' });
+    }) as express.ErrorRequestHandler);
     app.listen(Number(process.env.PORT ?? 5000), '0.0.0.0');
   }
 }
 
 void main().catch(() => {
-  console.error('Android sandbox startup failed. Check sandbox configuration and database identity.');
+  process.stderr.write('Android sandbox startup failed. Check sandbox configuration and database identity.\n');
   process.exit(1);
 });

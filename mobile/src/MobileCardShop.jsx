@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { playCatalog } from './playInternal';
+import { playCatalog, playInternal } from './playInternal';
 import { onlineRequest } from './onlineApi';
 
 const shopPath = '/api/mobile/shop';
 const messages = {
-  mobile_login_needed: 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
+  mobile_login_needed: playInternal ? 'Для покупки войди ещё раз по коду тестового профиля Android.' : 'Для покупки выйди из профиля и войди ещё раз по коду из Telegram.',
   shop_unavailable: 'Магазин пока недоступен. Попробуй обновить статус позже.',
   invalid_order: 'Проверь тариф и адрес для чека.',
   price_changed: 'Цена изменилась. Обнови статус и подтверди новую сумму.',
@@ -104,10 +104,13 @@ export function MobileCardShop({ account }) {
 
   if (!token || !profile?.id) return null;
   const pending = order?.status === 'pending';
-  const canPay = region && shop?.available && !shop.active && order?.status !== 'needs_review' &&
+  const review = ['needs_review', 'refund_review'].includes(order?.status);
+  const canPay = region && shop?.available && !shop.active && !review &&
     (pending || shop.prices);
   return <section className="preview-shop">
     <h3>Подписка на месяц</h3>
+    {order && <p>Номер заказа: {order.id}</p>}
+    {order?.status === 'refund_review' && <p>ЮKassa подтвердила возврат. Поддержка сверит тариф и остаток звёзд по номеру заказа.</p>}
     {order?.status === 'completed' && <p>Последняя покупка · {plan(order.tier)}, {order.amount} ₽. Платёж подтверждён.</p>}
     {order?.status === 'canceled' && <p>Последняя оплата отменена.</p>}
     {order?.status === 'needs_review' && <p>Платёж получен. Пока шла оплата, на аккаунте появилась другая подписка. Напиши в поддержку AstroOrbi и укажи номер заказа {order.id}.</p>}
