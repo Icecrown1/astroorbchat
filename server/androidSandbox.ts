@@ -6,13 +6,14 @@ async function main() {
   const origin = new URL(process.env.ANDROID_SANDBOX_ORIGIN ?? '');
   const databaseUrl = process.env.ANDROID_SANDBOX_DATABASE_URL;
   const databaseMarker = process.env.ANDROID_SANDBOX_DATABASE_MARKER;
-  const testerId = process.env.MOBILE_RU_CHECKOUT_TESTERS;
+  const testerIds = (process.env.MOBILE_RU_CHECKOUT_TESTERS ?? '').split(',').map(id => id.trim());
+  const testerId = testerIds[0];
   const key = process.env.YOOKASSA_SECRET_KEY;
 
   if (origin.protocol !== 'https:' || origin.origin !== origin.href.slice(0, -1) ||
       ['astroorbiapp.com', 'astro-orb-chat.replit.app', 'astroorbi.com'].includes(origin.hostname) ||
       !databaseUrl || !databaseMarker || databaseMarker.length < 32 ||
-      !testerId || !/^[1-9][0-9]{5,15}$/.test(testerId) ||
+      !testerIds.every(id => /^[1-9][0-9]{5,15}$/.test(id)) ||
       (process.env.JWT_SECRET?.length ?? 0) < 32 ||
       process.env.TELEGRAM_BOT_TOKEN || process.env.LEGACY_PAYMENTS === '1' ||
       process.env.YOOKASSA_TEST_MODE !== 'true' || (key && !key.startsWith('test_')) ||
@@ -96,6 +97,7 @@ async function main() {
       }
       try {
         await settleMobileMonth(object.metadata.internalPaymentId, object.id);
+      console.info('[Android sandbox] YooKassa notification verified', event, object.id);
         res.sendStatus(200);
       } catch {
         res.sendStatus(503);
