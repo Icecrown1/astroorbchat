@@ -113,10 +113,11 @@ function App() {
   const lastAd = useRef(Number(sessionStorage.getItem('astroorbi.last-test-ad')) || 0);
   const grantReward = useRef(null);
 
-  const [adNotice, setAdNotice] = useState('');
   const nativeAdPending = useRef(false);
   const rewardOwner = useRef(null);
   rewardOwner.current = adEligible ? (account.profile?.id ?? 'guest') : null;
+  const rewardScreen = useRef(0);
+  useLayoutEffect(() => { rewardScreen.current++; }, [route, viewer, tarotMode, tarotSource, adEligible, testAds, account.profile?.id]);
 
   useEffect(() => {
     if (!playInternal || !adEligible || !testAds) return;
@@ -132,20 +133,32 @@ function App() {
     };
   }, [adEligible, testAds]);
 
-  function showAd(type, onEarn, title, remaining = 0) {
+  async function showAd(type, onEarn, title, remaining = 0, button) {
     if (!adEligible || window.history.state?.adOverlay) return;
     if (playInternal) {
-      if (!testAds || nativeAdPending.current) return;
+      if (!testAds) return;
+      if (nativeAdPending.current) {
+        if (type === 'rewarded') throw Object.assign(new Error(), { code: 'AD_BUSY' });
+        return;
+      }
       nativeAdPending.current = true;
       const owner = rewardOwner.current;
-      setAdNotice('');
-      playAds.show({ type }).then(({ earned }) => {
+      const requestedScreen = rewardScreen.current;
+      try {
+        if (type === 'rewarded') {
+          await playAds.loadReward();
+          if (document.hidden || requestedScreen !== rewardScreen.current ||
+              owner !== rewardOwner.current || !button?.isConnected || !button.getClientRects().length) return;
+        }
+        const { earned } = await playAds.show({ type });
         lastAd.current = Date.now();
         sessionStorage.setItem('astroorbi.last-test-ad', String(lastAd.current));
         if (earned && owner !== null && owner === rewardOwner.current) onEarn?.();
-      }).catch(() => {
-        if (type === 'rewarded') setAdNotice('Ролик пока не загрузился. Попробуй ещё раз чуть позже.');
-      }).finally(() => { nativeAdPending.current = false; });
+      } catch (error) {
+        if (type === 'rewarded' && requestedScreen === rewardScreen.current) throw error;
+      } finally {
+        nativeAdPending.current = false;
+      }
       return;
     }
     grantReward.current = onEarn ?? null;
@@ -188,7 +201,7 @@ function App() {
   const paid = ['standard', 'premium', 'pro'].includes(accessTier);
   const rewards = (adEligible || (playInternal && paid)) ? { owner: account.profile?.id ?? 'guest', paid,
     adFree: playInternal && (paid || !testAds),
-    watch: (title, remaining, credit) => showAd('rewarded', credit, title, remaining) } : null;
+    watch: (title, remaining, credit, button) => showAd('rewarded', credit, title, remaining, button) } : null;
   const openAccount = () => navigate('account');
   const openHistory = () => navigate('history');
   const openSettings = () => navigate('settings');
@@ -259,7 +272,6 @@ function App() {
           <span aria-hidden="true">✦</span> {account.profile?.orbs != null ? Number(account.profile.orbs).toLocaleString('ru-RU') : 'Звёзды'}
         </button>
       </header>
-      {adNotice && <button className="ad-notice" type="button" onClick={() => setAdNotice('')} aria-label={adNotice + ' Закрыть'}><span role="status">{adNotice}</span> ×</button>}
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}

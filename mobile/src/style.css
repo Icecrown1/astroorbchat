@@ -311,9 +311,3 @@ details[open] > :not(summary) {margin-top:.7rem}
 .spread-choice img {width:100%;mix-blend-mode:multiply}
 .spread-choice select {background:transparent;border:0;border-bottom:1px solid var(--rule);border-radius:0;padding:.2rem 0;font:700 1.28rem var(--display)}
 .spread-choice p {margin-top:.3rem}
-
-.ad-notice {
-  position: fixed; inset-inline: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); z-index: 12;
-  max-width: 28rem; margin-inline: auto; padding: .8rem 1rem; border-radius: .8rem;
-  background: var(--ink); color: white; font-size: .9rem;
-}

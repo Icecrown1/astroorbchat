@@ -2,6 +2,8 @@ package app.astroorbi.store;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import com.google.ads.mediation.admob.AdMobAdapter;
 import androidx.annotation.NonNull;
 import com.getcapacitor.JSObject;
@@ -28,27 +30,72 @@ public class PlayAds extends Plugin {
     private RewardedAd rewarded;
     private boolean initializing, initialized, loadingInterstitial, loadingRewarded, showing;
     private long interstitialAt, rewardedAt;
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private PluginCall waitingReward;
+    private int rewardGeneration;
+    private final Runnable loadTimeout = () -> {
+        rewardGeneration++;
+        loadingRewarded = false;
+        finishWait("AD_TIMEOUT");
+    };
     private static long now() { return android.os.SystemClock.elapsedRealtime(); }
     private static boolean fresh(long loadedAt) { return now() - loadedAt < 55 * 60_000L; }
 
     @PluginMethod
     public void prepare(PluginCall call) {
         getActivity().runOnUiThread(() -> {
-            if (initialized) preload();
-            else if (!initializing) {
-                initializing = true;
-                MobileAds.initialize(getContext(), status -> getActivity().runOnUiThread(() -> {
-                    initialized = true;
-                    preload();
-                }));
-            }
+            startAds();
             call.resolve();
         });
     }
 
+    private void startAds() {
+        if (initialized) {
+            preload();
+        } else if (!initializing) {
+            initializing = true;
+            MobileAds.initialize(getContext(), status -> ui.post(() -> {
+                initialized = true;
+                preload();
+            }));
+        }
+    }
+
+    // The caller rechecks the active reading before presenting an asynchronously loaded ad.
+    @PluginMethod
+    public void loadReward(PluginCall call) {
+        ui.post(() -> {
+            Activity activity = getActivity();
+            if (activity == null || !activity.hasWindowFocus()) { call.reject("AD_INACTIVE", "AD_INACTIVE"); return; }
+            if (waitingReward != null || showing) { call.reject("AD_BUSY", "AD_BUSY"); return; }
+            if (rewarded != null && fresh(rewardedAt)) { call.resolve(); return; }
+            waitingReward = call;
+            ui.postDelayed(loadTimeout, 15000);
+            startAds();
+        });
+    }
+
+    private void finishWait(String error) {
+        ui.removeCallbacks(loadTimeout);
+        PluginCall call = waitingReward;
+        waitingReward = null;
+        if (call == null) return;
+        if (error == null) call.resolve();
+        else call.reject(error, error);
+    }
+
+    @Override protected void handleOnPause() {
+        finishWait("AD_INACTIVE");
+    }
+
+    @Override protected void handleOnDestroy() {
+        rewardGeneration++;
+        finishWait("AD_INACTIVE");
+    }
+
     private void preload() {
         Activity activity = getActivity();
-        if (activity.isFinishing() || activity.isDestroyed()) return;
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         if (!fresh(interstitialAt)) interstitial = null;
         if (!fresh(rewardedAt)) rewarded = null;
         Bundle privacy = new Bundle();
@@ -65,11 +112,18 @@ public class PlayAds extends Plugin {
         }
         if (rewarded == null && !loadingRewarded) {
             loadingRewarded = true;
+            final int generation = ++rewardGeneration;
             RewardedAd.load(activity, REWARDED, request, new RewardedAdLoadCallback() {
                 @Override public void onAdLoaded(@NonNull RewardedAd ad) {
+                    if (generation != rewardGeneration) return;
                     rewarded = ad; rewardedAt = now(); loadingRewarded = false;
+                    finishWait(null);
                 }
-                @Override public void onAdFailedToLoad(@NonNull LoadAdError error) { loadingRewarded = false; }
+                @Override public void onAdFailedToLoad(@NonNull LoadAdError error) {
+                    if (generation != rewardGeneration) return;
+                    loadingRewarded = false;
+                    finishWait("GMA_LOAD_" + error.getCode());
+                }
             });
         }
     }
@@ -79,10 +133,11 @@ public class PlayAds extends Plugin {
         getActivity().runOnUiThread(() -> {
             Activity activity = getActivity();
             boolean forReward = "rewarded".equals(call.getString("type"));
-            if (showing || !activity.hasWindowFocus() || !initialized) { call.reject("NOT_READY"); return; }
+            if (activity == null || !activity.hasWindowFocus()) { call.reject("AD_INACTIVE", "AD_INACTIVE"); return; }
+            if (showing || !initialized) { call.reject("NOT_READY", "NOT_READY"); return; }
             preload();
             if ((forReward && rewarded == null) || (!forReward && interstitial == null)) {
-                call.reject("NOT_READY");
+                call.reject("NOT_READY", "NOT_READY");
                 return;
             }
             showing = true;
@@ -96,7 +151,8 @@ public class PlayAds extends Plugin {
                 }
                 @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError error) {
                     showing = false;
-                    call.reject("SHOW_FAILED");
+                    String code = "GMA_SHOW_" + error.getCode();
+                    call.reject(code, code);
                     preload();
                 }
             };

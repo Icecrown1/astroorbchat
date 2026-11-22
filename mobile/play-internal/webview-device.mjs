@@ -98,8 +98,8 @@ try {
   adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
   adb('shell','settings','put','system','screen_off_timeout','1800000');
   record('pageBytes',Number(adb('shell','getconf','PAGE_SIZE')));
-  adb('install',join(process.env.RUNNER_TEMP,'candidate-6.apk'));launch();await connect();
-  await step('v6-first-draw',async()=>{
+  adb('install',join(process.env.RUNNER_TEMP,'candidate-7.apk'));launch();await connect();
+  await step('v7-first-draw',async()=>{
     for(const label of ['Открыть бесплатно →','Вытянуть карту дня']) {
       const button=`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(label)})`;
       await until(()=>js(`Boolean(${button})`),'baseline button '+label);
@@ -107,7 +107,7 @@ try {
     }
     await selector('.one-card button');
   });
-  adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-7.apk'));launch();await connect();
+  adb('install','-r',join(process.env.RUNNER_TEMP,'candidate-8.apk'));launch();await connect();
   await step('upgrade',async()=>{await page('home');assert.match(await readout(),/Посмотреть карту/);});
   await step('home-small-font130',async()=>{
     adb('shell','wm','size','720x1280');adb('shell','wm','density','320');adb('shell','settings','put','system','font_scale','1.3');
@@ -117,13 +117,8 @@ try {
   await step('three-cards',async()=>{await click('Три карты');await click('Вытянуть три карты');await selector('.three-cards button');assert.equal(await js("document.querySelectorAll('.three-cards button').length"),3);});
   await step('rewarded-sdk',async()=>{
     await selector('.reward-unlock');await until(()=>js("Boolean(document.querySelector('.reward-unlock[aria-label]'))"),'test ads disabled or ad configuration unavailable',12000);
-    let shown=false;
-    for(let i=0;i<4 && !shown;i++) {
-      await clickSel('.reward-unlock');await pause(2500);
-      shown=/AdActivity/.test(adb('shell','dumpsys','activity','activities').split('\n').filter(s=>/ResumedActivity|topResumedActivity/.test(s)).join(' '));
-      if(!shown)await pause(3500);
-    }
-    if(!shown)throw Error('Test ad did not open; no earned callback observed');
+    await clickSel('.reward-unlock');
+    await until(()=>foreground().includes('AdActivity'),'No test ad shown after one request',18000);
     snap('sdk-test-ad');await pause(42000);
     for(let i=0;i<3 && foreground().includes('AdActivity');i++) {await closeTestAd();await pause(1600);}
     assert.ok(foreground().includes(pkg),'app resumed after test ad');

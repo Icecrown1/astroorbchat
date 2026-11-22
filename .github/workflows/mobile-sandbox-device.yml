@@ -31,17 +31,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git worktree add --detach "$RUNNER_TEMP/baseline" 37a1d74abfb4621f28978991ffd536f1af6168a8
-          for code in 6 7; do
+          git worktree add --detach "$RUNNER_TEMP/baseline" 7d759c732a623980519d658cb3fdb0d43a6f186e
+          for code in 7 8; do
             directory="$GITHUB_WORKSPACE"
-            if [[ "$code" == 6 ]]; then directory="$RUNNER_TEMP/baseline"; fi
+            if [[ "$code" == 7 ]]; then directory="$RUNNER_TEMP/baseline"; fi
             cd "$directory/mobile"
             npm ci --no-audit
             npm run build -- --mode play-internal
             npx --no-install cap add android
             npm run prepare:android
             PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
-            if [[ "$code" == 7 ]]; then
+            if [[ "$code" == 8 ]]; then
               src=android/app/src/main/java/app/astroorbi/store
               cp play-internal/qa/AdLifecycle.java "$src/"
               sed -i '/void prepare(PluginCall call) {/a\        AdLifecycle.install(getActivity().getApplication());' "$src/PlayAds.java"
