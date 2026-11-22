@@ -60,8 +60,13 @@ export async function settleMobileMonth(id: string, providerId?: string) {
   if (!paymentId) throw Error('Awaiting provider ID');
   // Even a signed-in client or a webhook only supplies a locator. Verify with the merchant API.
   const remote = await getPayment(paymentId);
-  if (!matchesMobileOrder(row, remote)) throw Error('Provider order mismatch');
+  return settleVerifiedOrder(row, remote);
+}
 
+async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment) {
+  if (!matchesMobileOrder(row, remote)) throw Error('Provider order mismatch');
+  const { id } = row;
+  const paymentId = remote.id;
   return db.transaction(async tx => {
     await tx.select({ id: users.id }).from(users).where(eq(users.id, row.userId)).for('update');
     const [locked] = await tx.select().from(yookassaPayments).where(eq(yookassaPayments.id, id)).for('update');
@@ -134,7 +139,7 @@ export function registerMobileShop(app: Express) {
         }
         const store = new DatabaseStorage(tx);
         if (hasAccess(await store.getSubscription(user.id))) throw new ShopError(409, 'active_subscription');
-        const amount = prices(await isFirstMonthOfferEligible(user.id))[input.tier];
+        const amount = prices(await isFirstMonthOfferEligible(user.id, tx))[input.tier];
         if (input.amount !== amount) throw new ShopError(409, 'price_changed');
         const [created] = await tx.insert(yookassaPayments).values({ userId: user.id, kind,
           tier: input.tier, amountRUB: amount.toFixed(2), idempotencyKey: randomUUID(), status: 'pending' }).returning();
@@ -165,7 +170,7 @@ export function registerMobileShop(app: Express) {
         const payment = await getPayment(row.yookassaPaymentId);
         if (!matchesMobileOrder(row, payment)) throw Error('Provider order mismatch');
         if (payment.status === 'pending') checkout = payment.confirmation?.confirmation_url;
-        else if (payment.status === 'succeeded' || payment.status === 'canceled') await settleMobileMonth(row.id);
+        else if (payment.status === 'succeeded' || payment.status === 'canceled') await settleVerifiedOrder(row, payment);
       }
       const updated = await storage.getYookassaPaymentByInternalId(row.id);
       res.json({ ok: true, data: { ...publicOrder(updated!), checkout: enabled((req as any).user.tgId) ? checkout : undefined } });

@@ -21,8 +21,8 @@ import {
 
 const PAID_PROVIDERS = ["yookassa", "ton", "stars", "dodo"];
 
-export async function isFirstMonthOfferEligible(userId: string): Promise<boolean> {
-  const [sub] = await db
+export async function isFirstMonthOfferEligible(userId: string, connection: Pick<typeof db, 'select'> = db): Promise<boolean> {
+  const [sub] = await connection
     .select({
       status: subscriptions.status,
       currentPeriodEnd: subscriptions.currentPeriodEnd,
@@ -37,7 +37,7 @@ export async function isFirstMonthOfferEligible(userId: string): Promise<boolean
     if (sub.paymentProvider && PAID_PROVIDERS.includes(sub.paymentProvider)) return false;
   }
 
-  const paidCard = await db
+  const paidCard = await connection
     .select({ id: yookassaPayments.id })
     .from(yookassaPayments)
     .where(
@@ -50,7 +50,7 @@ export async function isFirstMonthOfferEligible(userId: string): Promise<boolean
     .limit(1);
   if (paidCard.length) return false;
 
-  const paidGram = await db
+  const paidGram = await connection
     .select({ id: payments.id })
     .from(payments)
     .where(
@@ -63,7 +63,7 @@ export async function isFirstMonthOfferEligible(userId: string): Promise<boolean
     .limit(1);
   if (paidGram.length) return false;
 
-  const paidStars = await db
+  const paidStars = await connection
     .select({ id: paymentEventLog.id })
     .from(paymentEventLog)
     .where(sql`${paymentEventLog.provider} = 'stars'
