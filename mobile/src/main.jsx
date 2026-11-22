@@ -6,6 +6,8 @@ import { Tarot, History, useReadings } from './Tarot';
 import { Account, AccountHistory, OnlineTarot, useAccount } from './Account';
 import { PreviewRewards } from './RewardUnlock';
 import { PreviewShop } from './PreviewShop';
+import { playInternal, rewardsEnabled, playAds } from './playInternal';
+import { PlayStoreStatus } from './PlayStoreStatus';
 import { AdPreview } from './AdPreview';
 import { CardViewer, CardViewerContext } from './CardViewer';
 import { ProfileSettings } from './ProfileSettings';
@@ -69,7 +71,7 @@ function Stars({ profile, openAccount }) {
     <section className="ledger"><h2>Что даёт подписка</h2>
       <dl><div><dt>Standard</dt><dd>+250 ★ в месяц</dd></div><div><dt>Premium</dt><dd>+550 ★ в месяц и соляр</dd></div></dl>
       <p>Это ежемесячное пополнение баланса.</p>
-      {import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
+      {playInternal ? <PlayStoreStatus /> : import.meta.env.MODE === 'ad-preview' ? <PreviewShop key={profile?.id ?? 'guest'} /> :
         <p>Управлять подпиской можно в AstroOrbi в Telegram.</p>}
     </section>
   </section>;
@@ -85,7 +87,7 @@ function App() {
   const readings = useReadings();
   const account = useAccount();
   const accessTier = account.profile?.tier ?? account.profile?.billingTier;
-  const adEligible = import.meta.env.MODE === 'ad-preview' && (account.token === null || accessTier === 'free');
+  const adEligible = rewardsEnabled && (account.token === null || accessTier === 'free');
   const source = tarotSource ?? (account.token ? 'online' : 'offline');
   const [adType, setAdType] = useState(null);
   const previousScreen = useRef(screen);
@@ -93,8 +95,40 @@ function App() {
   const lastAd = useRef(-Infinity);
   const grantReward = useRef(null);
 
+  const [adNotice, setAdNotice] = useState('');
+  const nativeAdPending = useRef(false);
+  const rewardOwner = useRef(null);
+  rewardOwner.current = adEligible ? (account.profile?.id ?? 'guest') : null;
+
+  useEffect(() => {
+    if (!playInternal || !adEligible) return;
+    function prepare() {
+      if (!document.hidden) playAds.prepare().catch(() => {});
+    }
+    prepare();
+    window.addEventListener('online', prepare);
+    document.addEventListener('visibilitychange', prepare);
+    return () => {
+      window.removeEventListener('online', prepare);
+      document.removeEventListener('visibilitychange', prepare);
+    };
+  }, [adEligible]);
+
   function showAd(type, onEarn, title, remaining = 0) {
     if (!adEligible || window.history.state?.adOverlay) return;
+    if (playInternal) {
+      if (nativeAdPending.current) return;
+      nativeAdPending.current = true;
+      const owner = rewardOwner.current;
+      setAdNotice('');
+      playAds.show({ type }).then(({ earned }) => {
+        lastAd.current = performance.now();
+        if (earned && owner !== null && owner === rewardOwner.current) onEarn?.();
+      }).catch(() => {
+        if (type === 'rewarded') setAdNotice('Ролик пока не загрузился. Попробуй ещё раз чуть позже.');
+      }).finally(() => { nativeAdPending.current = false; });
+      return;
+    }
     grantReward.current = onEarn ?? null;
     lastAd.current = performance.now();
     const current = window.history.state;
@@ -191,6 +225,7 @@ function App() {
           <span aria-hidden="true">✦</span> {account.profile?.orbs != null ? Number(account.profile.orbs).toLocaleString('ru-RU') : 'Звёзды'}
         </button>
       </header>
+      {adNotice && <button className="ad-notice" type="button" onClick={() => setAdNotice('')} aria-label={adNotice + ' Закрыть'}><span role="status">{adNotice}</span> ×</button>}
       {offline && <p className="offline-notice" role="status">Сейчас офлайн. Таро и расчёт матрицы по дате доступны.</p>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}

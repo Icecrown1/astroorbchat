@@ -1,3 +1,4 @@
+import { rewardsEnabled } from './playInternal';
 import { RewardUnlock } from './RewardUnlock';
 import { Fragment, useState } from 'react';
 import { calcMatrixFromISO, parseReadingV2 } from '../../shared/matrix';
@@ -76,7 +77,7 @@ function MatrixResult({ core, title, centerTitle = 'Центр — зона ко
           }[nodeId]}
         />
       </div>
-      {import.meta.env.MODE === 'ad-preview' && <RewardUnlock id={`matrix-practice:${number}`} title="Практика аркана">
+      {rewardsEnabled && <RewardUnlock id={`matrix-practice:${number}`} title="Практика аркана">
         {() => <article className="result-body"><h3>Практика · {arcanaMetaByN(number).ru}</h3><p>{arcanaPractice[number - 1]}</p></article>}
       </RewardUnlock>}
     </section>

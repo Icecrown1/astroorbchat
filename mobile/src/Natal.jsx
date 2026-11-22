@@ -1,3 +1,4 @@
+import { rewardsEnabled } from './playInternal';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { SkyDial, planetGlyph } from './SkyDial';
 import { Frontispiece } from './Editorial';
@@ -81,7 +82,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
             </select></label>
             <p aria-live="polite">{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p></div>
           </div>
-          {import.meta.env.MODE === 'ad-preview' && (!guest || example) && <RewardPlanet planet={current}
+          {rewardsEnabled && (!guest || example) && <RewardPlanet planet={current}
             position={positionLabel(current)} house={currentHouse} example={example} />}
           {!guest && <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />}
         </div>
@@ -98,7 +99,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
         <div aria-live="polite">
           {members.length === 0 && <p>В этом доме нет планет.</p>}
         </div>
-        {import.meta.env.MODE === 'ad-preview' && (!guest || example) && <RewardHouse number={houseNumber}
+        {rewardsEnabled && (!guest || example) && <RewardHouse number={houseNumber}
           cusp={cusp} members={members} example={example} />}
         {members.length > 0 && <div className="planet-tabs" role="group" aria-label="Разборы планет в этом доме">
           {members.map(planet => <button key={planet.name} type="button" onClick={() => selectPlanet(planet.name)}>

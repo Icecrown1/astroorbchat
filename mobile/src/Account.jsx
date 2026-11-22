@@ -1,3 +1,4 @@
+import { rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeychainAccess, SecureStorage } from '@aparajita/capacitor-secure-storage';
@@ -32,7 +33,7 @@ function ServerReading({ reading, open }) {
       {interpretation?.intro && <p>{interpretation.intro}</p>}
       {interpretation?.synthesis && <div className="reading-section"><h3>Общий смысл</h3><p>{interpretation.synthesis}</p></div>}
     </SpreadGallery>
-    {import.meta.env.MODE === 'ad-preview' && !open && reading.spread === 'three' && <ClarifyingCard entry={reading} source="online" earnedOnly />}
+    {rewardsEnabled && !open && reading.spread === 'three' && <ClarifyingCard entry={reading} source="online" earnedOnly />}
     {interpretation?.advice && <div className="reading-section"><h3>Совет</h3><p>{interpretation.advice}</p></div>}
   </div>;
   const date = <time dateTime={reading.createdAt}>{dateFormat.format(new Date(reading.createdAt))}</time>;
@@ -286,7 +287,7 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread, 
     {!profile && busy && <p role="status">Загружаем профиль…</p>}
     {opened ? <>
       <ServerReading key={opened.id} reading={opened} open />
-      {import.meta.env.MODE === 'ad-preview' && opened.spread === 'three' && <ClarifyingCard entry={opened} source="online" />}
+      {rewardsEnabled && opened.spread === 'three' && <ClarifyingCard entry={opened} source="online" />}
       <button className="secondary-button" type="button" onClick={() => setOpened(null)}>Выбрать другой расклад</button>
     </> : profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
       draw={async data => {

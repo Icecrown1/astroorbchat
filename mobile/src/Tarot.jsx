@@ -1,3 +1,4 @@
+import { rewardsEnabled } from './playInternal';
 import { useEffect, useState } from 'react';
 import { drawCards, getTarotCard, TAROT_SPREADS } from '../../shared/tarot';
 import { ClarifyingCard } from './AdPreview';
@@ -104,7 +105,7 @@ export function Tarot({ readings, mode, setMode, onReadingComplete }) {
         </div>
       )}
       <div aria-live="polite">{entry && <Reading entry={entry} />}</div>
-      {import.meta.env.MODE === 'ad-preview' && mode === 'three' && entry && <ClarifyingCard entry={entry} source="offline" />}
+      {rewardsEnabled && mode === 'three' && entry && <ClarifyingCard entry={entry} source="offline" />}
       {(mode === 'three' || !entry) && (
         <button type="button" onClick={() => { readings.create(mode); onReadingComplete(); }}>
           {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть три карты'}
@@ -132,7 +133,7 @@ export function History({ entries, openTarot }) {
             <time dateTime={entry.createdAt}>{dateFormat.format(new Date(entry.createdAt))}</time>
           </summary>
           <Reading entry={entry} />
-          {import.meta.env.MODE === 'ad-preview' && entry.kind === 'three' && <ClarifyingCard entry={entry} source="offline" earnedOnly />}
+          {rewardsEnabled && entry.kind === 'three' && <ClarifyingCard entry={entry} source="offline" earnedOnly />}
         </details>
       ))}
     </section>

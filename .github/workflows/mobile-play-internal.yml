@@ -1,0 +1,79 @@
+name: AstroOrbi Play internal bundle
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'shared/**'
+      - 'client/public/tarot/**'
+      - 'client/public/brand/**'
+      - '.github/workflows/mobile-play-internal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      PLAY_APPLICATION_ID: ${{ vars.ASTROORBI_PLAY_APPLICATION_ID || 'app.astroorbi.mobile' }}
+      PLAY_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;35.0.0'
+      - name: Build internal Android App Bundle
+        run: |
+          npm ci
+          npm run build -- --mode play-internal
+          npx --no-install cap add android
+          npm run prepare:android
+          node scripts/prepare-play-internal.mjs
+          sed -i "s|mavenCentral()|maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }|g" \
+            android/build.gradle node_modules/@capacitor/android/capacitor/build.gradle \
+            node_modules/@aparajita/capacitor-secure-storage/android/build.gradle
+          cd android
+          ./gradlew --no-daemon :app:bundleRelease
+          cp app/build/outputs/bundle/release/app-release.aab ../AstroOrbi-Play-internal-unsigned.aab
+      - name: Verify bundle manifest and packaged app
+        run: |
+          bundle=AstroOrbi-Play-internal-unsigned.aab
+          curl -fsSL --retry 3 https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar -o "$RUNNER_TEMP/bundletool.jar"
+          java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle="$bundle"
+          java -jar "$RUNNER_TEMP/bundletool.jar" dump manifest --bundle="$bundle" > "$RUNNER_TEMP/orbi-manifest.xml"
+          python3 - "$RUNNER_TEMP/orbi-manifest.xml" "$bundle" <<'PY'
+          import os, sys, zipfile, xml.etree.ElementTree as ET
+          doc = ET.parse(sys.argv[1]).getroot()
+          android = '{http://schemas.android.com/apk/res/android}'
+          assert doc.get('package') == os.environ['PLAY_APPLICATION_ID']
+          assert doc.get(android + 'versionCode') == os.environ['PLAY_VERSION_CODE']
+          app = doc.find('application')
+          assert app.get(android + 'debuggable', 'false') == 'false'
+          assert app.find(f"meta-data[@{android}name='com.google.android.gms.ads.APPLICATION_ID']").get(android + 'value') == 'ca-app-pub-3940256099942544~3347511713'
+          assert doc.find(f"uses-permission[@{android}name='com.android.vending.BILLING']") is not None
+          with zipfile.ZipFile(sys.argv[2]) as archive:
+              assert 'base/assets/public/index.html' in archive.namelist()
+              assert not any(n.startswith('META-INF/') and n.endswith(('.RSA','.EC','.DSA')) for n in archive.namelist())
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: astroorbi-play-internal-unsigned
+          path: mobile/AstroOrbi-Play-internal-unsigned.aab
+          if-no-files-found: error
