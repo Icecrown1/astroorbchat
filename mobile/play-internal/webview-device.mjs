@@ -35,16 +35,17 @@ async function connect() {
   }
   throw Error('Application WebView unavailable');
 }
-async function js(expression) {
+async function command(method,params) {
   const id=++seq;
   const reply=await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{pending.delete(id);reject(Error('WebView response timeout'));},10000);
     pending.set(id,m=>{clearTimeout(timer);pending.delete(id);resolve(m);});
-    socket.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}));
+    socket.send(JSON.stringify({id,method,params}));
   });
   if(reply.error || reply.result?.exceptionDetails) throw Error('WebView evaluation failed');
-  return reply.result.result.value;
+  return reply.result;
 }
+const js=async expression=>(await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true})).result.value;
 async function until(fn,label,ms=15000) {
   const end=Date.now()+ms;
   do { if(await fn())return; await pause(250); } while(Date.now()<end);
@@ -52,18 +53,28 @@ async function until(fn,label,ms=15000) {
 }
 const visible="el=>el.getClientRects().length && !el.disabled";
 const buttons=`[...document.querySelectorAll('button')].filter(${visible})`;
-const click=async text=>until(()=>js(`(()=>{const e=${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(text)} || b.getAttribute('aria-label')===${JSON.stringify(text)});if(!e)return false;e.scrollIntoView({block:'center'});e.click();return true})()`),'button '+text);
+async function tap(expression) {
+  let point;
+  await until(async()=>{point=await js(`(()=>{const e=${expression};if(!e)return null;e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);return point;},'tap target');
+  await command('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});
+  await command('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await pause(300);
+}
+const click=text=>tap(`${buttons}.find(b=>b.innerText.trim()===${JSON.stringify(text)} || b.getAttribute('aria-label')===${JSON.stringify(text)})`);
 const selector=async q=>until(()=>js(`[...document.querySelectorAll(${JSON.stringify(q)})].some(${visible})`),'visible '+q);
-const clickSel=async q=>{await selector(q);await js(`[...document.querySelectorAll(${JSON.stringify(q)})].find(${visible}).click()`);};
+const clickSel=q=>tap(`[...document.querySelectorAll(${JSON.stringify(q)})].find(${visible})`);
 const page=async s=>selector('.page[data-screen="'+s+'"]');
 const launch=()=>adb('shell','am','start','-W','-n',adb('shell','cmd','package','resolve-activity','--brief',pkg).split('\n').at(-1));
 async function step(name,fn) {
   try { await fn();record(name,'pass'); }
-  catch(e) { record(name,String(e.message).slice(0,180)); }
+  catch(e) {
+    const foreground=adb('shell','dumpsys','activity','activities').split('\n').find(v=>v.includes('topResumedActivity=')) || '';
+    record(name,(e.message+' '+foreground.trim()).slice(0,220));
+  }
   try {snap(name);} catch {}
 }
 const pick=async (screen,title)=>{await click('Инструменты');await page('tools');
-  await js(`[...document.querySelectorAll('.illustrated-index button')].find(b=>b.innerText.split('\\n')[0].trim()===${JSON.stringify(title)} || b.innerText.startsWith(${JSON.stringify(title)})).click()`);
+  await tap(`[...document.querySelectorAll('.illustrated-index button')].find(b=>b.innerText.split('\\n')[0].trim()===${JSON.stringify(title)} || b.innerText.startsWith(${JSON.stringify(title)}))`);
   await page(screen);};
 const readout=async()=>js('document.body.innerText');
 try {
@@ -78,7 +89,7 @@ try {
     adb('shell','wm','size','720x1280');adb('shell','wm','density','320');adb('shell','settings','put','system','font_scale','1.3');
     adb('shell','am','force-stop',pkg);launch();await connect();await page('home');
     assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));});
-  await step('tarot-fullscreen',async()=>{await pick('tarot','Таро');await clickSel('.one-card button');await selector('dialog[open] img');snap('card-full-size');adb('shell','input','keyevent','4');await selector('.one-card button');});
+  await step('tarot-fullscreen',async()=>{await pick('tarot','Таро');await clickSel('.one-card button');await selector('dialog[open] img');snap('card-full-size');adb('shell','input','keyevent','4');await until(()=>js("!document.querySelector('dialog[open]')"),'close card with Back');await page('tarot');});
   await step('three-cards',async()=>{await click('Три карты');await click('Вытянуть три карты');await selector('.three-cards button');assert.equal(await js("document.querySelectorAll('.three-cards button').length"),3);});
   await step('rewarded-sdk',async()=>{
     await selector('.reward-unlock');await until(()=>js("Boolean(document.querySelector('.reward-unlock[aria-label]'))"),'test ads disabled or ad configuration unavailable',12000);
