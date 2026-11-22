@@ -2,7 +2,8 @@
 set -eu
 
 sandbox_project='d0391cc8-ca98-4914-9251-e6113ee114e0'
-if [[ -n ${REPL_ID:-} && ${REPL_ID} != "$sandbox_project" ]]; then
+# Workspace IDs are available in development. Deployments must pass the database marker check.
+if [[ -n ${REPLIT_DEV_DOMAIN:-} && ${REPL_ID:-} != "$sandbox_project" ]]; then
   printf '%s\n' 'This launcher is restricted to AstroOrbi Android Sandbox.' >&2
   exit 1
 fi
