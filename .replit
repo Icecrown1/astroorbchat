@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "ci", "--include=dev"]
+build = ["bash", "-ec", "npm ci --include=dev && uv sync --frozen --python 3.11 && .venv/bin/python3 -c 'import swisseph'"]
 run = ["bash", "scripts/run-replit-android-sandbox.sh"]
 
 [[ports]]

@@ -10,4 +10,5 @@ export ANDROID_SANDBOX_ORIGIN="${ANDROID_SANDBOX_ORIGIN:-https://astro-orbi-andr
 export JWT_SECRET="${JWT_SECRET:-${SESSION_SECRET:?Replit session secret is required}}"
 export MOBILE_RU_CHECKOUT_TESTERS="${MOBILE_RU_CHECKOUT_TESTERS:-900000000001,900000000002}"
 export YOOKASSA_TEST_MODE=true
+export PATH="$PWD/.venv/bin:$PATH"
 exec npm run android:sandbox -- "$@"
