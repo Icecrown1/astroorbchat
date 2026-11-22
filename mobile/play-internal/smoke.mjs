@@ -21,6 +21,8 @@ const env = {
 };
 for (const key of ['TELEGRAM_BOT_TOKEN', 'LEGACY_PAYMENTS', 'YOOKASSA_SECRET_KEY', 'YOOKASSA_SHOP_ID', 'ANDROID_INTERNAL_OPENAI_KEY']) delete env[key];
 const args = ['--import', 'tsx', 'server/androidSandbox.ts'];
+const review = randomBytes(16).toString('base64url');
+env.ANDROID_REVIEW_CODE_SHA256 = createHash('sha256').update(review).digest('hex');
 const issue = () => execFileSync(process.execPath, [...args, '--issue-code'], {env, encoding:'utf8'}).trim();
 const server = spawn(process.execPath, args, { env, stdio: ['ignore', 'ignore', 'inherit'] });
 const closed = once(server, 'close');
@@ -65,6 +67,21 @@ try {
   const page = await request('/mobile/payment-return');
   assert.match(page, /astroorbi-internal:\/\/payment-return/);
   assert.match(page, /astroorbi-test:\/\/payment-return/);
+  token = (await request(exchange, {data:{code:review}})).data.token;
+  const firstReviewer = (await request('/api/user/me')).data;
+  assert.equal(firstReviewer.billingTier, 'premium');
+  assert.equal(Number(firstReviewer.orbs), 550);
+  assert.ok((await request('/api/tarot/history')).data.length);
+  const [answer] = (await request('/api/astrology/ask/history')).data;
+  assert.ok(answer.id);
+  const report = { kind:'oracle', id:answer.id };
+  for (let i=0; i<2; i++) assert.equal((await request('/api/mobile/content-reports', {data:report})).data.received, true);
+  assert.equal((await db.query("select count(*)::int as n from events where name='mobile_content_report' and user_id=$1", [firstReviewer.id])).rows[0].n, 1);
+  assert.equal((await request('/api/mobile/shop')).data.available, false);
+  token = (await request(exchange, {data:{code:review}})).data.token;
+  assert.notEqual((await request('/api/user/me')).data.id, firstReviewer.id);
+  await request('/api/mobile/content-reports', { data:report, status:404 });
+  assert.equal((await request('/api/mobile/config')).data.testAds, false);
   console.log('Passed: isolated login, expiry, replay, profile, catalog, history, matrices, cities, route restrictions and return links.');
 } finally {
   server.kill();

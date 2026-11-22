@@ -3,6 +3,10 @@ import { registerRoutes } from './routes';
 import { requireAuth } from './middleware/auth';
 import { recomputeIfProfileChanged } from './lib/natalService';
 import { storage } from './storage';
+import { db } from './db';
+import { aiQuestions, events, tarotReadings } from '@shared/schema';
+import { and, eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 
 // Forward exact HTTP methods and paths to the same handlers used by the app.
 // The child application is never mounted as a catch-all or opened on a port.
@@ -10,6 +14,29 @@ export async function registerMobileInternalRoutes(app: Express, aiEnabled: bool
   const shared = express();
   await registerRoutes(shared);
   const serve: RequestHandler = (req, res, next) => shared(req, res, next);
+  app.get('/api/mobile/config', (_req, res) => {
+    res.set('Cache-Control', 'no-store').json({ ok: true, data: {
+      testAds: process.env.ANDROID_INTERNAL_TEST_ADS === '1',
+    } });
+  });
+  app.post('/api/mobile/content-reports', requireAuth, async (req, res, next) => {
+    try {
+      const { kind, id } = req.body ?? {};
+      if (!['oracle', 'tarot'].includes(kind) || typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id)) {
+        return res.status(400).json({ ok: false, error: 'invalid_reading' });
+      }
+      const { userId } = req as typeof req & { userId: string };
+      const table = kind === 'oracle' ? aiQuestions : tarotReadings;
+      const [reading] = await db.select({ id: table.id }).from(table)
+        .where(and(eq(table.id, id), eq(table.userId, userId)));
+      if (!reading) return res.status(404).json({ ok: false, error: 'unknown_reading' });
+      const ref = kind + ':' + id;
+      const reportId = createHash('sha256').update('internal-report:' + userId + ':' + ref).digest('hex');
+      await db.insert(events).values({ id: reportId, userId, name: 'mobile_content_report', value: ref })
+        .onConflictDoNothing({ target: events.id });
+      res.json({ ok: true, data: { received: true } });
+    } catch (error) { next(error); }
+  });
   const generated: RequestHandler = (req, res, next) => {
     if (aiEnabled) return serve(req, res, next);
     return res.status(503).json({ ok: false, error: 'internal_ai_unavailable' });

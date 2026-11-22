@@ -75,6 +75,8 @@ async function main() {
     await registerMobileInternalRoutes(app, Boolean(aiKey));
     app.get('/api/health', (_req, res) => res.json({ ok: true, environment: 'android-sandbox', mobileApi: 'internal-v1', ai: Boolean(aiKey) }));
     app.post('/api/mobile/auth/code', (_req, res) => res.sendStatus(404));
+    const { registerMobileReview } = await import('./mobileReview');
+    registerMobileReview(app);
     registerMobileLogin(app);
     registerMobileShop(app);
 
@@ -106,7 +108,7 @@ async function main() {
       }
       try {
         await settleMobileMonth(object.metadata.internalPaymentId, object.id);
-      console.info('[Android sandbox] YooKassa notification verified', event, object.id);
+        console.info('[Android sandbox] YooKassa notification verified', event, object.id);
         res.sendStatus(200);
       } catch {
         res.sendStatus(503);

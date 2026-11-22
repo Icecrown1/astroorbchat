@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useRef, useState } from 'react';
 
 export const PreviewRewards = createContext(null);
 
@@ -6,10 +6,10 @@ export function RewardUnlock({ id, title, total = 1, makeReward, earnedOnly, chi
   const preview = useContext(PreviewRewards);
   if (!preview) return null;
   const storageKey = `astroorbi.reward.v1:${preview.owner}:${id}`;
-  return <Unlock key={storageKey} {...{ storageKey, title, total, makeReward, earnedOnly, children }} watch={preview.watch} />;
+  return <Unlock key={storageKey} {...{ storageKey, title, total, makeReward, earnedOnly, children }} watch={preview.watch} adFree={preview.adFree} />;
 }
 
-function Unlock({ storageKey, title, total, makeReward, earnedOnly, children, watch }) {
+function Unlock({ storageKey, title, total, makeReward, earnedOnly, children, watch, adFree }) {
   const [saved, setSaved] = useState(() => {
     try {
       const item = JSON.parse(localStorage.getItem(storageKey));
@@ -18,15 +18,19 @@ function Unlock({ storageKey, title, total, makeReward, earnedOnly, children, wa
     return { count: 0 };
   });
   const remaining = total - saved.count;
+  const credited = useRef(saved.count);
   if (!remaining) return children(saved.value);
   if (earnedOnly) return null;
 
   function credit() {
-    const next = { count: saved.count + 1 };
+    if (credited.current !== saved.count) return;
+    const next = { count: adFree ? total : saved.count + 1 };
     if (next.count === total && makeReward) next.value = makeReward();
+    credited.current = next.count;
     try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Still usable in this session. */ }
     setSaved(next);
   }
+  if (adFree) return <button className="reward-unlock" type="button" onClick={credit}>{title} · открыть без рекламы</button>;
   return <button className="reward-unlock" type="button" aria-label={`${title}. Осталось просмотров: ${remaining}`}
     onClick={() => watch(title, remaining - 1, credit)}>
     <span>{title}</span><span className="reward-count" aria-hidden="true">
