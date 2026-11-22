@@ -7,6 +7,10 @@ permissions:
   contents: read
 jobs:
   device:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [google_apis, google_apis_ps16k]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -39,6 +43,7 @@ jobs:
             PLAY_VERSION_CODE="$code" node scripts/prepare-play-internal.mjs
             cd android
             bash gradlew :app:assembleDebug
+            bash gradlew --stop
             cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/candidate-$code.apk"
           done
       - name: Allow runner access to KVM
@@ -49,12 +54,15 @@ jobs:
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 35
-          target: google_apis_ps16k
+          target: ${{ matrix.target }}
           arch: x86_64
+          ram-size: 4096M
+          heap-size: 512M
           profile: pixel_6
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none -skin 720x1280
           script: python3 mobile/play-internal/device-smoke.py
       - if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: emulator-observations
+          name: emulator-observations-${{ matrix.target }}
           path: device-results/

@@ -87,10 +87,11 @@ async function settleVerifiedOrder(row: YookassaPayment, remote: YooKassaPayment
       await tx.update(yookassaPayments).set({ status: 'needs_review', yookassaPaymentId: paymentId }).where(eq(yookassaPayments.id, id));
       return { activated: false, alreadyDone: false, message: 'Conflicting active subscription' };
     }
-    await activateSubscriptionForUser(store, {
+    const activation = await activateSubscriptionForUser(store, {
       userId: row.userId, tier: row.tier as PaidTier, periodMonths: 1, source: 'yookassa',
       meta: { autoRenew: false, paymentMethodId: null, amountRUB: row.amountRUB, skipReferralBonus: sandbox },
     });
+    if (sandbox) await store.updateUser(row.userId, { orbsResetAt: activation.currentPeriodEnd });
     await tx.update(yookassaPayments).set({ status: 'completed', completedAt: new Date(),
       yookassaPaymentId: paymentId }).where(eq(yookassaPayments.id, id));
     return { activated: true, alreadyDone: false, message: 'Activated' };

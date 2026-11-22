@@ -3,11 +3,16 @@ import type { Express } from 'express';
 import { aiQuestions, subscriptions, tarotReadings, users } from '@shared/schema';
 import { db } from './db';
 import { generateToken } from './lib/jwt';
+import { sql } from 'drizzle-orm';
+import { getTarotCard, TAROT_SPREADS } from '@shared/tarot';
 
 // Only registered in the marked internal database. Each reviewer gets a
 // private profile so that reviewers never share questions or profile edits.
-export function registerMobileReview(app: Express) {
-  const hash = process.env.ANDROID_REVIEW_CODE_SHA256;
+export async function registerMobileReview(app: Express) {
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS android_review_access (
+    slot text PRIMARY KEY CHECK (slot = 'review'), digest char(64) NOT NULL)`);
+  const stored = await db.execute(sql`SELECT digest FROM android_review_access WHERE slot='review'`);
+  const hash = process.env.ANDROID_REVIEW_CODE_SHA256 || String(stored.rows[0]?.digest || '');
   if (!hash) return;
   if (!/^[0-9a-f]{64}$/.test(hash)) throw Error('Invalid Android review credential digest');
   const expected = Buffer.from(hash, 'hex');
@@ -38,6 +43,14 @@ export function registerMobileReview(app: Express) {
         await tx.insert(aiQuestions).values({
           userId: user.id, question: 'С чего начать знакомство с картой дня?',
           answer: 'Демонстрационный пример. Рассмотрите карту и выберите одну деталь, которая привлекла внимание.',
+        });
+        const cards = ['fool','magician','empress','emperor','lovers','chariot','strength','hermit','justice','world']
+          .map((cardId, position) => ({ cardId, position, reversed: position === 1 }));
+        await tx.insert(tarotReadings).values({
+          userId: user.id, spread:'celtic', day:'2026-01-02', locale:'ru', cards,
+          interpretation:{ intro:'Демонстрационный Кельтский крест.',
+            cards:cards.map((card, i) => ({ title:TAROT_SPREADS.celtic.positions[i][0], text:getTarotCard(card.cardId)!.kw[card.reversed ? 1 : 0] })),
+            synthesis:'От первого шага к завершению: посмотрите, как меняются темы десяти позиций.' },
         });
         return user.id;
       });

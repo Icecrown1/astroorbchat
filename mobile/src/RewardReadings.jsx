@@ -58,7 +58,8 @@ function LunarForecast({ period, startTime }) {
   const forecast = useMemo(() => {
     const start = new Date(startTime);
     const end = new Date(start);
-    if (period === 'week') end.setDate(end.getDate() + 7);
+    if (period === 'day') end.setDate(end.getDate() + 1);
+    else if (period === 'week') end.setDate(end.getDate() + 7);
     else end.setMonth(end.getMonth() + 1);
     const events = [];
     for (let q = SearchMoonQuarter(start); q.time.date < end; q = NextMoonQuarter(q)) {
@@ -93,7 +94,8 @@ function DailySign({ sign, token }) {
     return () => { active = false; };
   }, [sign, attempt]);
   return <article className="result-body"><h3>Гороскоп на день · {signs[sign]}</h3>
-    {failed ? <><p>Прогноз уже открыт. Проверь связь, чтобы загрузить текст.</p>
+    {failed ? <><p>Текст для знака сейчас недоступен. Ваш просмотр сохранён.</p>
+      <LunarForecast period="day" startTime={new Date().setHours(0, 0, 0, 0)} />
       <button type="button" onClick={() => setAttempt(n => n + 1)}>Повторить загрузку</button></> :
       report ? <><p>{report.intro}</p>
         {Object.entries({ work: 'Работа', love: 'Отношения', care: 'Забота о себе', advice: 'Совет' }).map(([key, heading]) =>
