@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
-run = "npm run android:sandbox"
+run = "bash scripts/run-replit-android-sandbox.sh"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "ci", "--include=dev"]
-run = ["npm", "run", "android:sandbox"]
+run = ["bash", "scripts/run-replit-android-sandbox.sh"]
 
 [[ports]]
 localPort = 5000
@@ -36,5 +36,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run android:sandbox"
+args = "bash scripts/run-replit-android-sandbox.sh"
 waitForPort = 5000
