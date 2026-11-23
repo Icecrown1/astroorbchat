@@ -14,6 +14,8 @@ for (let i=1;i<=52;i++) {
 }
 assert.equal(new Set(Array.from({length:52},(_,i)=>cardMeaning(i+1))).size,52);
 assert.equal(calendarNumber('2000-12-31'),0);
+assert.equal(compactCard(birthPositions(40).cosmicLesson),'6♥');
+assert.equal(compactCard(birthPositions(9).cosmicLesson),'4♥');
 assert.ok(calcMatrixFromISO('1999-02-11T00:00:00.000Z')?.ageDecades.length===8);
 assert.equal(yearSpread(29,19)?.periods.length,7);
 const a=calendarNumber('2000-09-15')!, d=calendarNumber('2026-11-23')!;

@@ -95,6 +95,7 @@ export function SkyDial({ planets, aspects, cusps, angles, selected, house, onSe
         <line x1={p.x} y1={p.y} x2={tick.x} y2={tick.y} stroke="#765e41" strokeWidth=".9" />
         <circle cx={tick.x} cy={tick.y} r="1.8" fill="#765e41" />
         <circle cx={p.x} cy={p.y} r="13" fill={active ? '#af2717' : '#fff4df'} stroke={active ? '#9d1c0f' : '#83684d'} />
+        {planet.retrograde === true && <text x={p.x+9} y={p.y+8} fontSize="8" fill="#781e15" stroke="#fff8ec" strokeWidth="2" paintOrder="stroke">℞</text>}
         <text {...p} fontSize="18" fill={active ? '#fff' : '#382619'}>{planetGlyph[planet.name] || planet.name[0]}{'\uFE0E'}</text>
         <circle cx={p.x} cy={p.y} r="14" fill="transparent" />
       </g>;

@@ -321,7 +321,7 @@ h2,h3,.index-copy strong,.cover-tile strong {letter-spacing:-.015em;line-height:
 .tool-carousel .cover-tile img {width:78%;height:80%;object-fit:contain;bottom:-6%;right:-3%}
 .tool-carousel .cover-tile strong {max-width:95%;font-size:1rem}
 .unvisited {border-color:#ad863f;box-shadow:inset 0 0 0 1px #c69d54,0 1px 5px #ad863f45}
-.camp-tabs {display:grid;grid-template-columns:1fr 1fr;gap:.4rem}.camp-tabs button[aria-pressed=false] {color:var(--ink);background:transparent;border:1px solid var(--rule)}
+.camp-tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem}.camp-tabs button {min-width:0;padding-inline:.35rem;overflow-wrap:anywhere}.camp-reading {grid-template-columns:minmax(0,1fr)}.camp-indices {min-width:0;overflow-wrap:anywhere}.camp-tabs button[aria-pressed=false] {color:var(--ink);background:transparent;border:1px solid var(--rule)}
 
 .chakra-table {width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
 .chakra-table th,.chakra-table td {padding:.35rem .15rem;border-bottom:1px solid var(--light-rule);text-align:center}
@@ -331,7 +331,7 @@ h2,h3,.index-copy strong,.cover-tile strong {letter-spacing:-.015em;line-height:
 .camp-position h4,.camp-reading h3,.camp-indices h3 {margin:.65rem 0 .4rem}
 .camp-reading p,.camp-indices p {line-height:1.55}
 .camp-current {border-left:3px solid #ae7b33;padding:.45rem .8rem;background:#f5ead4}
-.camp-indices table {border-collapse:collapse;width:100%;font-size:.9rem}
+.camp-indices table {table-layout:fixed;border-collapse:collapse;width:100%;font-size:.9rem}
 .camp-indices th,.camp-indices td {padding:.5rem .2rem;border-bottom:1px solid #d9c9b3}
 .camp-indices th:first-child {text-align:left}
 .camp-indices td {text-align:center;font-variant-numeric:tabular-nums}

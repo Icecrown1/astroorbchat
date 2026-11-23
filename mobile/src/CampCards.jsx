@@ -27,6 +27,7 @@ function Profile({date,card}) {
       {layout.periods.map(p=><Position key={p.planet} title={p.planet} card={p.horizontal}>{planetContexts[p.planet]}</Position>)}
       <Position title="Плутон" card={layout.pluto}>Обстоятельства, в которых привычный способ действия приходится пересматривать.</Position>
       <Position title="Плутон · результат" card={layout.result}>Что может стать опорой после такой перемены.</Position>
+      <Position title="Космический урок" card={layout.cosmicLesson}>Так в системе Кэмпа называется сквозная тема жизни. Эту карту читают вместе с картой рождения.</Position>
       {layout.firstKarma===card ? <p>Карта сохраняет место в жизненном и духовном раскладах.</p> : <>
         <Position title="Первая кармическая карта" card={layout.firstKarma}>Повторяющийся сюжет, который может требовать внимания.</Position>
         <Position title="Вторая кармическая карта" card={layout.secondKarma}>Опыт, к которому можно обращаться, когда сюжет повторяется.</Position></>}

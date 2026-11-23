@@ -158,6 +158,7 @@ async function checkReadings() {
     assert.deepEqual(values,['6','6','0','-1','5','5']);
   });
   await step('free-table',async()=>{
+    adb('shell','am','force-stop',pkg);launch();await connect();await page('home');
     await pick('tarot','Таро');await tap(`${buttons}.find(b=>b.textContent.includes('Разложить другому'))`);await click('Вытянуть три карты бесплатно');
     await selector('.card-table button');assert.equal(await js("document.querySelectorAll('.card-table button').length"),3);
   });

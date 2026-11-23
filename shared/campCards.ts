@@ -156,6 +156,7 @@ export function birthPositions(card: number) {
     firstKarma: seat + 1,
     secondKarma: life[card - 1],
     moon: life[(seat + 51) % 52],
+    cosmicLesson: life[(seat + 10) % 52],
     ...readBoard(life, card, card),
   };
 }
