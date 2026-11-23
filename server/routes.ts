@@ -1,4 +1,6 @@
 import { guestReadingId, previousGuestReading, saveGuestReading } from './guestTable';
+import { registerCampIndices } from './campIndices';
+import { registerTarotQuestionHelp, questionHelpCost } from './tarotQuestionHelp';
 import { registerReadingFeedback } from './readingFeedback';
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -58,6 +60,8 @@ interface StoredNatalChart extends NatalChartResult {
 const SERVER_START_TIME = new Date().toISOString();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  registerCampIndices(app);
+  await registerTarotQuestionHelp(app);
   await registerReadingFeedback(app);
   // Version endpoint (public - no auth required)
   app.get("/api/version", (req, res) => {
@@ -5465,7 +5469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           dailyDone: !!daily,
           dailyReadingId: daily?.id || null,
-          guestTable:true, readingFeedback:true,
+          guestTable:true, readingFeedback:true, questionHelpCost: process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "disabled" ? questionHelpCost : null,
           costs: { yesno: ORB_COSTS.tarot_yesno, three: ORB_COSTS.tarot_three, celtic: ORB_COSTS.tarot_celtic },
         },
       });

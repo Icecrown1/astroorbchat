@@ -34,7 +34,7 @@ const tools = [
   ['horoscope', 'Гороскоп', 'Прогноз на день, неделю или месяц', 'lion'],
   ['dates', 'Важные даты', 'События личного календаря', 'glass'],
   ['solar', 'Соляр', 'Личный прогноз на год', 'sphere'],
-  ['camp', 'Карты Кэмпа', 'Карта рождения', 'hand'],
+  ['camp', 'Карты Кэмпа', 'Карта рождения', 'camp'],
   ['guest-natal', 'Карты близких', 'Натальные карты семьи и друзей', 'portrait'],
 ];
 const featured = [...tools.slice(1), tools[0]];
@@ -294,11 +294,15 @@ function App() {
       {screen === 'stars' && <Stars account={account} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <Frontispiece title="Таро" art="hand" />
-        <div className="mode-switch" aria-label="Вариант расклада">
-          <button type="button" aria-pressed={source === 'online'} onClick={() => setTarotSource('online')}>С ИИ</button>
-          <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
+        <div className="tarot-choices">
+          <button type="button" className="spread-choice" aria-pressed={source==='friends'} onClick={()=>setTarotSource('friends')}>
+            <img src={plate('hand')} alt=""/><span><strong>Разложить другому</strong><small>Только карты бесплатно · разбор по желанию</small></span></button>
+          <button type="button" className="secondary-button" aria-pressed={source!=='friends'} onClick={()=>setTarotSource(account.token?'online':'offline')}>Разложить себе</button>
         </div>
-        <button className="secondary-button" aria-pressed={source==='friends'} onClick={()=>setTarotSource('friends')}>Разложить другому</button>
+        {source !== 'friends' && <div className="mode-switch" aria-label="Как открыть расклад">
+          <button type="button" aria-pressed={source==='offline'} onClick={()=>setTarotSource('offline')}>Только карты · бесплатно</button>
+          <button type="button" aria-pressed={source==='online'} onClick={()=>setTarotSource('online')}>С расшифровкой</button>
+        </div>}
         {source === 'friends' ? <FriendsTarot account={account} openAccount={openAccount}/> : source === 'online'
           ? <OnlineTarot onReadingComplete={onReadingComplete} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
           : <Tarot onReadingComplete={onReadingComplete} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
@@ -324,7 +328,7 @@ function App() {
       <div key={'oracle' + profileKey} hidden={screen !== 'oracle'}>
         <Oracle account={account} openAccount={openAccount} openNatal={openNatal} />
       </div>
-      <div hidden={!['matrix', 'pair'].includes(screen)}><Matrix key={profileKey + (screen === 'pair' ? 'pair' : 'matrix')} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} /></div>
+      {['matrix', 'pair'].includes(screen) && <Matrix key={profileKey + (screen === 'pair' ? 'pair' : 'matrix')} initialMode={screen === 'pair' ? 'pair' : null} account={account} openAccount={openAccount} />}
       {screen === 'history' && <section className="tarot-screen">
         <Frontispiece title="История раскладов" art="books" />
         <AccountHistory account={account} />

@@ -326,3 +326,18 @@ h2,h3,.index-copy strong,.cover-tile strong {letter-spacing:-.015em;line-height:
 .chakra-table {width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
 .chakra-table th,.chakra-table td {padding:.35rem .15rem;border-bottom:1px solid var(--light-rule);text-align:center}
 .chakra-table th:first-child {text-align:left}
+
+.camp-position {padding:.65rem 0;border-top:1px solid #dbcbb6}
+.camp-position h4,.camp-reading h3,.camp-indices h3 {margin:.65rem 0 .4rem}
+.camp-reading p,.camp-indices p {line-height:1.55}
+.camp-current {border-left:3px solid #ae7b33;padding:.45rem .8rem;background:#f5ead4}
+.camp-indices table {border-collapse:collapse;width:100%;font-size:.9rem}
+.camp-indices th,.camp-indices td {padding:.5rem .2rem;border-bottom:1px solid #d9c9b3}
+.camp-indices th:first-child {text-align:left}
+.camp-indices td {text-align:center;font-variant-numeric:tabular-nums}
+.tarot-choices {display:grid;gap:.6rem}
+.tarot-choices .spread-choice {width:100%;text-align:left;color:#241c15;background:#fff8ee;border:1px solid #b68c49}
+.tarot-choices small {display:block;margin-top:.25rem}
+.question-help {padding:.65rem 0}
+.question-help button {margin-top:.5rem}
+.sky-dial g[role=button] {cursor:pointer}

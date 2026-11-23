@@ -1,3 +1,5 @@
+import { QuestionHelp as PaidQuestionHelp } from "../../shared/QuestionHelp";
+import { onlineRequest } from "./onlineApi";
 import { useState } from "react";
 import { arcanaMetaByN } from "../../shared/matrixArcanaMeta";
 import { calcMatrixFromISO } from "../../shared/matrix";
@@ -8,7 +10,7 @@ import {
   chakraTable,
   chakras,
   histories,
-  tarotQuestions,
+
 } from "../../shared/readingThemes";
 import { drawCards } from "../../shared/tarot";
 import { SpreadGallery } from "./SpreadGallery";
@@ -169,26 +171,15 @@ export function MatrixYears({ core, date }) {
   );
 }
 
-export function QuestionHelp({ onChoose }) {
-  return (
-    <details>
-      <summary>Помочь с вопросом</summary>
-      {tarotQuestions.map((q) => (
-        <button
-          className="secondary-button"
-          type="button"
-          key={q}
-          onClick={() => onChoose(q)}
-        >
-          {q}
-        </button>
-      ))}
-    </details>
-  );
+export function QuestionHelp({ account, onChoose }) {
+  return <PaidQuestionHelp available={account?.tarotStatus?.questionHelpCost===1 && Boolean(account.token)} onChoose={onChoose}
+    request={situation=>onlineRequest('/api/tarot/question-help',{token:account.token,data:{situation}})}
+    afterCharge={()=>account.refreshProfile(account.token)} />;
 }
 
 export function FriendsTarot({ account, openAccount }) {
   const [cards, setCards] = useState([]);
+  const [withReading, setWithReading] = useState(false);
   const [question, setQuestion] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [tableId, setTableId] = useState(null);
@@ -218,7 +209,12 @@ export function FriendsTarot({ account, openAccount }) {
         Передай телефон тому, кто задаёт вопрос. Можно просто вытянуть три карты
         и разобрать их вместе.
       </p>
-      <QuestionHelp onChoose={setQuestion} />
+      <div className="mode-switch">
+        <button type="button" aria-pressed={!withReading} onClick={()=>setWithReading(false)}>Только карты · бесплатно</button>
+        <button type="button" aria-pressed={withReading} onClick={()=>setWithReading(true)}>С расшифровкой{Number.isInteger(cost) ? ' · '+cost+' ★' : ''}</button>
+      </div>
+      {!withReading && <p>Подходит тем, кто сам читает карты Таро.</p>}
+      {withReading && <><QuestionHelp account={account} onChoose={setQuestion} />
       <label>
         Вопрос на столе
         <textarea
@@ -226,14 +222,14 @@ export function FriendsTarot({ account, openAccount }) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
         />
-      </label>
+      </label></>}
       <button disabled={account.busy} onClick={deal}>
         {cards.length ? "Разложить заново" : "Вытянуть три карты бесплатно"}
       </button>
       {cards.length > 0 && (
         <>
           <SpreadGallery cards={cards} spread="three" cardsOnly />
-          {result ? (
+          {withReading && (result ? (
             <article>
               <h3>Разбор для гостя</h3>
               <p>{result.interpretation?.intro}</p>
@@ -267,10 +263,10 @@ export function FriendsTarot({ account, openAccount }) {
               {account.error && <p role="alert">{account.error}</p>}
             </>
           ) : (
-            !account.token && (
+            account.token ? <p>Разбор этих карт пока недоступен на подключённом сервере.</p> : (
               <button onClick={openAccount}>Войти в профиль</button>
             )
-          )}
+          ))}
         </>
       )}
     </section>

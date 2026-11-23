@@ -1,3 +1,4 @@
+import { natalAspects } from '@shared/readingThemes';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -341,6 +342,9 @@ export default function MyNatalChart() {
             </p>
             <div className="bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-lg p-4">
               {locale === 'ru' && <details><summary>Как читать колесо</summary><p>Куспид отмечает начало дома. Линии между планетами показывают аспекты: ☌ соединение, ⚹ секстиль, □ квадрат, △ тригон, ☍ оппозиция. Символ ℞ обозначает видимое обратное движение планеты.</p></details>}
+              {locale === 'ru' && <details><summary>Что означают аспекты в этой карте</summary>
+                {natalAspects(chartData.planets.map((p:any)=>({name:p.name,position:p.position ?? p.longitude}))).map(a=><p key={a.planet1+a.planet2}><b>{a.glyph} {a.ru} · {a.angle}°</b> {a.text}</p>)}
+              </details>}
               <ChartCanvas
                 planets={chartData.planets}
                 aspects={chartData.aspects || []}

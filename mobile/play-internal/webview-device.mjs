@@ -138,6 +138,30 @@ async function checkInterstitialExit() {
     }
   }
 }
+async function checkReadings() {
+  const setDate=async(index,value)=>js(`(()=>{
+    const el=[...document.querySelectorAll('input[type=date]')].filter(e=>e.getClientRects().length)[${index}];
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});
+    el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));
+  })()`);
+  adb('wait-for-device');adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
+  record('pageBytes',Number(adb('shell','getconf','PAGE_SIZE')));assert.equal(results.pageBytes,16384);
+  adb('install',join(process.env.RUNNER_TEMP,'candidate-9.apk'));launch();await connect();
+  await step('matrix',async()=>{
+    await pick('matrix','Матрица судьбы');await setDate(0,'1999-02-11');await click('Рассчитать матрицу');
+    await until(async()=>(await readout()).includes('Аркан личного года'),'matrix failed to render');
+  });
+  await step('camp',async()=>{
+    await pick('camp','Карты Кэмпа');await setDate(0,'1999-02-11');await click('Совместимость');await setDate(1,'2000-12-22');
+    await until(async()=>(await readout()).includes('Привлекательность'),'indices not visible',20000);
+    const values=await js("[...document.querySelectorAll('.camp-indices td')].map(e=>e.textContent)");
+    assert.deepEqual(values,['6','6','0','-1','5','5']);
+  });
+  await step('free-table',async()=>{
+    await pick('tarot','Таро');await tap(`${buttons}.find(b=>b.textContent.includes('Разложить другому'))`);await click('Вытянуть три карты бесплатно');
+    await selector('.card-table button');assert.equal(await js("document.querySelectorAll('.card-table button').length"),3);
+  });
+}
 async function checkFullSuite() {
 try {
   adb('shell','input','keyevent','KEYCODE_WAKEUP');adb('shell','wm','dismiss-keyguard');
@@ -249,7 +273,8 @@ try {
 } finally {socket?.close();}
 }
 try {
-  if (process.env.INTERSTITIAL_ONLY === '1') await checkInterstitialExit();
+  if(process.env.READINGS_ONLY==='1') await checkReadings();
+  else if (process.env.INTERSTITIAL_ONLY === '1') await checkInterstitialExit();
   else await checkFullSuite();
 } finally { socket?.close(); }
 if(Object.entries(results).some(([k,v])=>k!=='pageBytes'&&v!=='pass'))process.exitCode=1;

@@ -54,7 +54,7 @@ export async function registerMobileInternalRoutes(app: Express, aiEnabled: bool
     });
   }
   app.get([
-    '/api/cities/search', '/api/tarot/history', '/api/tarot/status', '/api/natal/me',
+    '/api/camp/indices/:first/:second', '/api/cities/search', '/api/tarot/history', '/api/tarot/status', '/api/natal/me',
     '/api/natal/external', '/api/natal/external/:id', '/api/astrology/house-influence-status',
     '/api/astrology/horoscope/history', '/api/astrology/compatibility/history',
     '/api/astrology/ask/history', '/api/astrology/important-dates',
@@ -69,6 +69,6 @@ export async function registerMobileInternalRoutes(app: Express, aiEnabled: bool
     '/api/astrology/house-influence', '/api/astrology/solar', '/api/astrology/horoscope',
     '/api/astrology/horoscope/weekly-plan', '/api/astrology/horoscope/monthly-plan',
     '/api/astrology/compatibility', '/api/astrology/ask', '/api/astrology/important-dates/interpret',
-    '/api/matrix/section', '/api/matrix/pair',
+    '/api/tarot/question-help', '/api/matrix/section', '/api/matrix/pair',
   ], generated);
 }

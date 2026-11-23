@@ -1,4 +1,4 @@
-import { tarotQuestions } from '@shared/readingThemes';
+import { QuestionHelp } from '@shared/QuestionHelp';
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -180,7 +180,7 @@ export default function Tarot() {
   const partnerBirthIso = fullDate(partnerBirth);
   const fmtDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(ru ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; costs: Record<string, number> } }>({
+  const { data: statusData } = useQuery<{ ok: boolean; data: { dailyDone: boolean; questionHelpCost?: number; costs: Record<string, number> } }>({
     queryKey: [`/api/tarot/status?locale=${locale}`],
   });
   const dailyDone = statusData?.data?.dailyDone ?? false;
@@ -600,7 +600,10 @@ export default function Tarot() {
             )}
 
             <div className="anim-fade-up">
-              {ru && <details><summary>Помочь с вопросом</summary>{tarotQuestions.map(q=><Button key={q} type="button" variant="ghost" onClick={()=>{setQuestion(q);setQuestionError(false);}}>{q}</Button>)}</details>}
+              {ru && <QuestionHelp available={statusData?.data?.questionHelpCost===1}
+                request={async situation=>(await apiRequest('POST','/api/tarot/question-help',{situation})).data}
+                afterCharge={()=>queryClient.invalidateQueries({queryKey:['/api/user/me']})}
+                onChoose={q=>{setQuestion(q);setQuestionError(false);}}/>}
               <Input
                 id="tarot-question"
                 value={question}

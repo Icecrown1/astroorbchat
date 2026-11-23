@@ -6,6 +6,7 @@ if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password)
 }
 
 const messages = {
+  insufficient_orbs:'Недостаточно звёзд.', in_progress:'in_progress',
   mail_unconfigured: 'Отправитель писем пока не подключён. Можно использовать ящик тестовой Mini App.',
   pilot_disabled:'Доступ к пилоту отключён.',session_revoked:'Доступ отключён. Войдите снова.',
   otp_wait:'Запросите новый код позже.',identity_conflict:'Эта почта или профиль уже связаны с другой учётной записью.',

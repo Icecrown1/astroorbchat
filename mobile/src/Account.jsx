@@ -47,7 +47,7 @@ function ServerReading({ reading, open, token }) {
   return <details><summary><strong>{spreads[reading.spread] || 'Расклад'}</strong>{date}</summary>{body}</details>;
 }
 
-function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
+function OnlineSpreadForm({ account, status, profile, busy, draw, initialSpread }) {
   const [spread, setSpread] = useState(initialSpread ?? 'daily');
   const [question, setQuestion] = useState('');
   const [allowReversed, setAllowReversed] = useState(true);
@@ -75,7 +75,7 @@ function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
       <p>{spread === 'daily' ? 'Одна карта на сегодня · бесплатно' : spread === 'yesno' ? 'Одна карта на твой вопрос' : spread === 'three' ? 'Три стороны одной ситуации' : 'Десять позиций для подробного разбора'}</p>
       </div></div>
       {paid && <>
-        <QuestionHelp onChoose={setQuestion}/>
+        <QuestionHelp account={account} onChoose={setQuestion}/>
         <label htmlFor="tarot-question">Твой вопрос</label>
         <textarea id="tarot-question" value={question} onChange={event => setQuestion(event.target.value)}
           required maxLength={300} rows={3} disabled={busy} />
@@ -345,7 +345,7 @@ export function OnlineTarot({ account, openAccount, openHistory, initialSpread, 
       <ServerReading key={opened.id} reading={opened} open token={token} />
       {rewardsEnabled && opened.spread === 'three' && <ClarifyingCard entry={opened} source="online" />}
       <button className="secondary-button" type="button" onClick={() => setOpened(null)}>Выбрать другой расклад</button>
-    </> : profile && <OnlineSpreadForm status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
+    </> : profile && <OnlineSpreadForm account={account} status={tarotStatus} profile={profile} busy={busy} initialSpread={nextSpread}
       draw={async data => {
         const result = await draw(data);
         if (result) {

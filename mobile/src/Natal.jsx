@@ -1,3 +1,4 @@
+import { houseTopics, retrogradeText } from '../../shared/natalLanguage';
 import { natalAspects } from '../../shared/readingThemes';
 import { ReadingFeedback } from './ReadingFeedback';
 import { rewardsEnabled } from './playInternal';
@@ -37,6 +38,7 @@ function planetHouse(position, cusps) {
 }
 
 export function NatalWheel({ chart, account, guest = false, example = false }) {
+  const [aspectKey,setAspectKey] = useState('');
   const [selected, setSelected] = useState('Sun');
   const [view, setView] = useState('planets');
   const [houseNumber, setHouseNumber] = useState(1);
@@ -47,6 +49,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
   );
 
   function selectPlanet(name) {
+    setAspectKey('');
     setSelected(name);
     setView('planets');
   }
@@ -60,6 +63,8 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
   const aspects = useMemo(()=>natalAspects(planets),[planets]);
   const current = planets.find(planet => planet.name === selected) ?? planets[0];
 
+  const picked=aspects.find(a=>a.planet1+'-'+a.planet2===aspectKey);
+  function selectAspect(a) {setAspectKey(a.planet1+'-'+a.planet2);setView('planets');}
   if (!current) return <p>В этой карте пока нет положений планет.</p>;
   const interpretation = guest ? data.interpretation : chart.professionalInterpretation?.ru;
   const currentHouse = validHouses ? planetHouse(current.position, cusps) : null;
@@ -69,8 +74,10 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
   return <>
     <ChartViewport className="natal-wheel" label="Колесо натальной карты">
       <SkyDial planets={planets} aspects={aspects} angles={data.angles}
-        cusps={validHouses ? cusps : null} selected={current.name} house={view === 'houses' ? houseNumber : null} onSelect={selectPlanet} />
+        onAspect={selectAspect} picked={aspectKey} cusps={validHouses ? cusps : null} selected={current.name} house={view === 'houses' ? houseNumber : null} onSelect={selectPlanet} />
     </ChartViewport>
+    {picked && <article className="ledger" aria-live="polite"><h3>{picked.glyph} {picked.ru} · {translatePlanet(picked.planet1,'ru')} и {translatePlanet(picked.planet2,'ru')}</h3>
+      <small>Угол аспекта {picked.angle}° · отклонение {picked.orb.toFixed(1)}°</small><p>{picked.text}</p></article>}
     {validHouses && <div className="mode-switch" role="group" aria-label="Разделы натальной карты">
       <button type="button" aria-pressed={view === 'planets'} onClick={() => setView('planets')}>Планеты</button>
       <button type="button" aria-pressed={view === 'houses'} onClick={() => setView('houses')}>Дома</button>
@@ -85,7 +92,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
             </select></label>
             <p aria-live="polite">{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p></div>
           </div>
-          {current.retrograde === true && <p>℞ Ретроградное движение. При рождении эта планета видимо двигалась назад относительно звёзд. В астрологии это повод присмотреться к тому, что ты предпочитаешь обдумать про себя.</p>}
+          {current.retrograde === true && <p>℞ Ретроградное движение. {retrogradeText(current.name)}</p>}
           <details><summary>Аспекты выбранной планеты</summary><small>Основные углы, допуск до 6°</small>
             {aspects.filter(a=>a.planet1===current.name || a.planet2===current.name).map(a=><p key={a.planet1+a.planet2}><b>{a.glyph} {a.ru}</b> · {translatePlanet(a.planet1===current.name?a.planet2:a.planet1,'ru')} · орбис {a.orb.toFixed(1)}°. {a.text}</p>)}
             {!aspects.some(a=>a.planet1===current.name || a.planet2===current.name) && <p>В пределах этого допуска основных аспектов нет.</p>}
@@ -105,7 +112,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
           </select></label><p>{positionLabel({ sign: zodiacSigns[Math.floor(cusp / 30)], degree_in_sign: cusp % 30 })}</p></div>
         </div>
         <div aria-live="polite">
-          <p>Куспид — начало дома. Его положение зависит от времени, места рождения и системы домов.</p>
+          <p>Куспид — градус, с которого начинается {houseNumber}-й дом. Его тема — {houseTopics[houseNumber-1]}. Планета после этой границы попадает в этот дом до начала следующего. Точное время рождения важно, поскольку оно меняет положение границ.</p>
           {members.length === 0 && <p>В этом доме нет планет.</p>}
         </div>
         {rewardsEnabled && (!guest || example) && <RewardHouse number={houseNumber}

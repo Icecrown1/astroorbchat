@@ -80,7 +80,7 @@ function MatrixResult({ core, title, date, centerTitle = 'Центр — зон�
           }[nodeId]}
         />
       </div>
-      {centerTitle !== 'Центр пары' && <MatrixYears core={core} date={date}/>}
+      {centerTitle !== 'Центр пары' && Array.isArray(core.ageDecades) && core.ageDecades.length === 8 && <MatrixYears core={core} date={date}/>}
       <ReadingFeedback topic="matrix"/>
       {rewardsEnabled && <RewardUnlock id={`matrix-practice:${number}`} title="Практика аркана">
         {() => <article className="result-body"><h3>Практика · {arcanaMetaByN(number).ru}</h3><p>{arcanaPractice[number - 1]}</p></article>}
@@ -180,9 +180,10 @@ function MatrixReading({ content }) {
 }
 
 async function getMatrix(token, guestId) {
-  const matrix = guestId
+  const response = guestId
     ? await onlineRequest(`/api/matrix/guest/${encodeURIComponent(guestId)}?locale=ru`, { token })
     : await onlineRequest('/api/matrix/me?locale=ru', { token, envelope: true });
+  const matrix = response?.data ?? response;
   if (!matrix?.core || !Array.isArray(matrix.sections)) throw new Error('Не удалось загрузить матрицу.');
   return matrix;
 }
@@ -195,6 +196,9 @@ function AccountMatrix({ account, openAccount, guest }) {
   const [mustCheck, setMustCheck] = useState(false);
   const [pending, setPending] = useState(null);
   const [ownError, setOwnError] = useState(false);
+  const birth = String(guest?.birthDate ?? profile?.birthdayDate ?? '').slice(0, 10);
+  const localCore = calcMatrixFromISO(birth);
+  const core = localCore ?? matrix?.core;
   const section = matrix?.sections.find(item => item.id === selected);
   const cost = section ? sectionCost(section) : 0;
   const needsSubscription = cost > 0 && (profile?.tier ?? profile?.billingTier) === 'free';
@@ -270,12 +274,13 @@ function AccountMatrix({ account, openAccount, guest }) {
   </div>;
 
   return <div className="matrix-screen">
+    {core && <MatrixResult key={birth} core={core} date={birth} title={guest?.name} />}
     {!matrix && <div className="profile-card">
-      <p>Возьмём дату рождения из профиля и покажем сохранённые разборы.</p>
-      <button type="button" disabled={busy} onClick={load}>{busy ? 'Загружаем…' : 'Открыть мою матрицу'}</button>
+      <p>{localCore ? 'Сохранённые разборы можно загрузить из профиля.' : 'Загрузи дату из профиля или выбери «По дате».'}</p>
+      <button type="button" disabled={busy} onClick={load}>{busy ? 'Загружаем…' : 'Загрузить сохранённые разборы'}</button>
     </div>}
     {matrix && <>
-      <MatrixResult core={matrix.core} date={guest?.birthDate ?? account.profile?.birthdayDate} title={guest?.name} />
+
       <section className="matrix-screen" aria-label="Разборы матрицы">
         <h2>Разборы матрицы</h2>
         <div className="matrix-section-list" role="group" aria-label="Разделы разбора">

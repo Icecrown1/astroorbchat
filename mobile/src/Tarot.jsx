@@ -6,11 +6,7 @@ import { SpreadGallery } from './SpreadGallery';
 import { plate } from './Editorial';
 
 const storageKey = 'astroorbi.readings.v1';
-const threePositions = [
-  ['Ситуация', 'Что в этой теме сейчас важнее всего?'],
-  ['Слепая зона', 'Что стоит рассмотреть внимательнее?'],
-  ['Следующий шаг', 'Какой небольшой шаг ты можешь сделать?'],
-];
+const localSpreads = { daily:'Карта дня', yesno:'Да / Нет', three:'Три карты', celtic:'Кельтский крест' };
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
 
 function todayKey() {
@@ -22,7 +18,7 @@ function readEntries() {
   try {
     const entries = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
     return Array.isArray(entries) ? entries.filter(entry =>
-      entry && (entry.kind === 'daily' || entry.kind === 'three')
+      entry && Object.hasOwn(localSpreads, entry.kind)
       && typeof entry.id === 'string' && Number.isFinite(Date.parse(entry.createdAt))
       && Array.isArray(entry.cards) && entry.cards.length === TAROT_SPREADS[entry.kind].cards
       && entry.cards.every(card => card && getTarotCard(card.cardId) && typeof card.reversed === 'boolean')
@@ -47,7 +43,7 @@ export function useReadings() {
     };
   }, []);
 
-  const lastSpread = entries.find(entry => entry.kind === 'three');
+
   const daily = entries.find(entry => entry.day === day);
 
   function create(kind) {
@@ -58,7 +54,7 @@ export function useReadings() {
       kind,
       day: kind === 'daily' ? currentDay : null,
       createdAt: new Date().toISOString(),
-      cards: drawCards(TAROT_SPREADS[kind].cards, { allowReversed: kind === 'three' }),
+      cards: drawCards(TAROT_SPREADS[kind].cards, { allowReversed: kind !== 'daily' }),
     };
 
     // Keep today's draw even if more than 30 spreads are generated in one day.
@@ -77,38 +73,30 @@ export function useReadings() {
     setDay(currentDay);
   }
 
-  return { entries, daily, lastSpread, hasDaily: Boolean(daily), storageError, create };
+  return { entries, daily, hasDaily: Boolean(daily), storageError, create };
 }
 
 function Reading({ entry }) {
-  const positions = entry.kind === 'daily'
-    ? [['Тема дня', 'Где сегодня ты замечаешь эту тему?']]
-    : threePositions;
-  return <SpreadGallery key={entry.id} cards={entry.cards} spread={entry.kind}
-    labels={positions.map(([label]) => label)} descriptions={positions.map(([, prompt]) => prompt)}
-    keywords={entry.cards.map(({ cardId, reversed }) => getTarotCard(cardId).kw[reversed ? 1 : 0])} />;
+  return <SpreadGallery key={entry.id} cards={entry.cards} spread={entry.kind} cardsOnly />;
 }
 
 export function Tarot({ readings, mode, setMode, onReadingComplete }) {
-  const entry = mode === 'daily' ? readings.daily : readings.lastSpread;
+  const entry = mode === 'daily' ? readings.daily : readings.entries.find(item=>item.kind===mode);
 
   return (
     <section className="tarot-screen">
-      <div className="mode-switch" aria-label="Виды раскладов">
-        <button type="button" aria-pressed={mode === 'daily'} onClick={() => setMode('daily')}>Карта дня</button>
-        <button type="button" aria-pressed={mode === 'three'} onClick={() => setMode('three')}>Три карты</button>
-      </div>
+      <label>Выбери расклад<select value={mode} onChange={e=>setMode(e.target.value)}>{Object.entries(localSpreads).map(([id,title])=><option key={id} value={id}>{title}</option>)}</select></label>
       {!entry && (
         <div className="tarot-empty">
           <img src={plate('hand')} alt="" />
-          <p>{mode === 'daily' ? 'Твоя карта откроется один раз за день.' : 'Подумай о ситуации. Три карты подскажут вопросы, с которых можно начать.'}</p>
+          <p>{mode === 'daily' ? 'Твоя карта откроется один раз за день.' : 'Можно открыть карты и прочитать расклад самостоятельно.'}</p>
         </div>
       )}
       <div aria-live="polite">{entry && <Reading entry={entry} />}</div>
-      {rewardsEnabled && mode === 'three' && entry && <ClarifyingCard entry={entry} source="offline" />}
-      {(mode === 'three' || !entry) && (
+
+      {(mode !== 'daily' || !entry) && (
         <button type="button" onClick={() => { readings.create(mode); onReadingComplete(); }}>
-          {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть три карты'}
+          {mode === 'daily' ? 'Вытянуть карту дня' : entry ? 'Сделать новый расклад' : 'Вытянуть карты бесплатно'}
         </button>
       )}
       {readings.storageError && <p role="alert">Не удалось сохранить расклад на устройстве.</p>}
@@ -129,7 +117,7 @@ export function History({ entries, openTarot }) {
       {entries.map(entry => (
         <details key={entry.id}>
           <summary>
-            <strong>{entry.kind === 'daily' ? 'Карта дня' : 'Три карты'}</strong>
+            <strong>{localSpreads[entry.kind]}</strong>
             <time dateTime={entry.createdAt}>{dateFormat.format(new Date(entry.createdAt))}</time>
           </summary>
           <Reading entry={entry} />

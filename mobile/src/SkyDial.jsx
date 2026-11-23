@@ -46,7 +46,7 @@ function placeLabels(planets) {
   return ordered.map((planet, i) => ({ ...planet, labelAngle: offsets[i] + i * spacing }));
 }
 
-export function SkyDial({ planets, aspects, cusps, angles, selected, house, onSelect }) {
+export function SkyDial({ planets, aspects, cusps, angles, selected, house, onSelect, picked, onAspect }) {
   const clip = useId();
   const current = planets.find(p => p.name === selected);
   const selectedSign = current ? Math.floor((current.position % 360 + 360) % 360 / 30) : -1;
@@ -67,17 +67,23 @@ export function SkyDial({ planets, aspects, cusps, angles, selected, house, onSe
       return <g key={i}><path d={sector(start,end,110,129)} fill={house === i+1 ? '#b52b17' : 'none'} stroke="#af9170" strokeWidth=".65" />
         <text {...point(start+((end-start+360)%360)/2,119.5)} fill={house === i+1 ? '#fff5e4' : '#463629'} fontSize="11">{i+1}</text></g>;
     })}
-    <image href={plate('sun')} x="132" y="132" width="96" height="96" clipPath={`url(#${clip})`} className="dial-sun" />
-    {Array.isArray(aspects) && aspects.map((aspect,i) => {
+    {Array.isArray(aspects) && aspects.map(aspect => {
       const a=byName.get(aspect.planet1), b=byName.get(aspect.planet2);
       if (!a || !b) return null;
-      const p=point(a.position,66), q=point(b.position,66);
-      const active=a.name===selected || b.name===selected;
-      return <g key={i}><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={active ? '#aa361d' : '#89765e'}
-        strokeWidth={active ? 1.2 : .7} opacity={active ? .8 : .52} strokeDasharray={['square','opposition'].includes(aspect.type) ? '3 2' : undefined} />
-        {active && <text x={p.x*.68+q.x*.32} y={p.y*.68+q.y*.32} fontSize="10" stroke="#fff3dd" strokeWidth="2.5" paintOrder="stroke" fill="#592b12">{aspect.glyph}</text>}</g>;
+      const key=a.name+'-'+b.name;
+      const p=point(a.position,70), q=point(b.position,70);
+      const active=key===picked, nearby=a.name===selected || b.name===selected;
+      const stroke=({square:'#ac3628',opposition:'#88233e',sextile:'#287064',trine:'#345e88',conjunction:'#775020'})[aspect.type];
+      const x=p.x*.62+q.x*.38,y=p.y*.62+q.y*.38;
+      const label=aspect.ru+' · '+translatePlanet(a.name,'ru')+' и '+translatePlanet(b.name,'ru');
+      return <g key={key} role="button" tabIndex="0" aria-pressed={active} aria-label={label} onClick={()=>onAspect?.(aspect)}
+        onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onAspect?.(aspect);}}}>
+        <title>{label}</title><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={stroke} strokeWidth={active?2.7:nearby?1.5:.8}/>
+        <line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke="transparent" strokeWidth="7"/>
+        <circle cx={x} cy={y} r={active?7:5} fill="#fff6e7"/>
+        <text x={x} y={y} fontSize={active?14:11} fill={stroke}>{aspect.glyph}</text>
+      </g>;
     })}
-
     {Object.entries({ASC:angles?.Ascendant,MC:angles?.MC}).map(([key,item]) => Number.isFinite(item?.longitude) &&
       <text key={key} {...point(item.longitude,173)} className="dial-angle">{key}</text>)}
     {placeLabels(planets).map(planet => {

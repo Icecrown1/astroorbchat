@@ -1,15 +1,10 @@
+import { describeAspect } from './natalLanguage';
 import {
   arcanaOfYear,
   calcMatrixFromISO,
   reduce22,
   type MatrixCore,
 } from "./matrix";
-
-export const tarotQuestions = [
-  "Что мне стоит учесть перед этим решением?",
-  "Как начать разговор, который я давно откладываю?",
-  "Что в этой ситуации зависит от меня?",
-];
 
 export function ageMarkers(core: MatrixCore) {
   const decades = [...core.ageDecades, { age: 80, arcana: core.a }];
@@ -57,7 +52,7 @@ export const suitQuestions: Record<string, string> = {
 };
 export const jemison = {
   date: "1956-10-17",
-  text: "Мэй Джемисон родилась 17 октября 1956 года. До подготовки в NASA она работала врачом. В 1992 году стала специалистом миссии на шаттле Endeavour. Какой навык из прежней роли пригодился тебе в совершенно новом деле?",
+  text: "Мэй Джемисон родилась 17 октября 1956 года. До подготовки в NASA она работала врачом. В 1992 году стала специалистом миссии на шаттле Endeavour.",
   source:
     "https://starchild.gsfc.nasa.gov/docs/StarChild/whos_who_level2/jemison.html",
 };
@@ -111,6 +106,7 @@ export function natalAspects(planets: { name: string; position: number }[]) {
       if (aspect)
         result.push({
           ...aspect,
+          text: describeAspect(aspect.type,a.name,b.name),
           planet1: a.name,
           planet2: b.name,
           orb: Math.abs(distance - aspect.angle),
@@ -179,6 +175,6 @@ export const histories = [
     name: "Кэтрин Джонсон",
     date: "1918-08-26",
     source: "https://science.nasa.gov/people/katherine-johnson/",
-    text: "Перед орбитальным полётом 1962 года Джон Гленн попросил Кэтрин Джонсон перепроверить расчёты компьютера. Когда ко второму мнению прислушались в твоей жизни?",
+    text: "Перед орбитальным полётом 1962 года Джон Гленн попросил Кэтрин Джонсон перепроверить расчёты компьютера.",
   },
 ];
