@@ -4,6 +4,27 @@ import { indexSource, readIndices } from '../../shared/campIndices';
 import { compactCard, linkStory } from '../../shared/campReadings';
 import { onlineRequest } from './onlineApi';
 
+const valid = data => Array.isArray(data) && data.length === 2 && data.every(row =>
+  ['attraction','tension','compatibility'].every(k => Number.isInteger(row?.[k]) && Math.abs(row[k]) <= 10));
+
+async function fetchScores(a, b, url) {
+  const fromServer = async () => {
+    const data = await onlineRequest('/api/camp/indices/'+a+'/'+b);
+    if (!valid(data)) throw new Error('invalid_scores');
+    return data;
+  };
+  if (!Capacitor.isNativePlatform()) return fromServer();
+  const fromSource = async () => {
+    const response = await CapacitorHttp.get({url, responseType:'text', connectTimeout:6000, readTimeout:8000, disableRedirects:true});
+    if (response.status !== 200) throw new Error('source_unavailable');
+    return readIndices(response.data);
+  };
+  if (import.meta.env.MODE === 'play-internal' || import.meta.env.MODE === 'auth-pilot') {
+    return fromServer().catch(fromSource);
+  }
+  return fromSource().catch(fromServer);
+}
+
 export function CampIndices({ a, b }) {
   const [scores, setScores] = useState(null);
   const [attempt, retry] = useState(0);
@@ -17,15 +38,8 @@ export function CampIndices({ a, b }) {
       try {
         let saved;
         try { saved = JSON.parse(localStorage.getItem(key)); } catch {}
-        const valid = data => Array.isArray(data) && data.length === 2 && data.every(row => ['attraction','tension','compatibility'].every(k => Number.isInteger(row?.[k]) && Math.abs(row[k])<=10));
         if (valid(saved?.scores) && Date.now()-saved.time < 7*86400000) { setScores(saved.scores); return; }
-        let data;
-        if (Capacitor.isNativePlatform()) {
-          const response = await CapacitorHttp.get({ url, responseType:'text', connectTimeout:6000, readTimeout:8000, disableRedirects:true });
-          if (response.status !== 200) throw new Error();
-          data = readIndices(response.data);
-        } else data = await onlineRequest('/api/camp/indices/'+a+'/'+b);
-        if (!valid(data)) throw new Error();
+        const data = await fetchScores(a,b,url);
         if (active) setScores(data);
         try { localStorage.setItem(key, JSON.stringify({time:Date.now(), scores:data})); } catch {}
       } catch { if (active) setFailed(true); }
