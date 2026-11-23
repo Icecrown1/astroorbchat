@@ -340,6 +340,7 @@ export default function MyNatalChart() {
                 : 'Click on a planet for detailed interpretation'}
             </p>
             <div className="bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-lg p-4">
+              {locale === 'ru' && <details><summary>Как читать колесо</summary><p>Куспид отмечает начало дома. Линии между планетами показывают аспекты: ☌ соединение, ⚹ секстиль, □ квадрат, △ тригон, ☍ оппозиция. Символ ℞ обозначает видимое обратное движение планеты.</p></details>}
               <ChartCanvas
                 planets={chartData.planets}
                 aspects={chartData.aspects || []}

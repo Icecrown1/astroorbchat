@@ -1,3 +1,5 @@
+import { guestReadingId, previousGuestReading, saveGuestReading } from './guestTable';
+import { registerReadingFeedback } from './readingFeedback';
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
@@ -56,6 +58,7 @@ interface StoredNatalChart extends NatalChartResult {
 const SERVER_START_TIME = new Date().toISOString();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await registerReadingFeedback(app);
   // Version endpoint (public - no auth required)
   app.get("/api/version", (req, res) => {
     res.json({
@@ -851,6 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         longitude: data.longitude,
         latitude: data.latitude,
         degree_in_sign: data.degree_in_sign,
+        retrograde: data.retrograde,
       }));
       
       res.json({
@@ -911,6 +915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         longitude: data.longitude,
         latitude: data.latitude,
         degree_in_sign: data.degree_in_sign,
+        retrograde: data.retrograde,
       }));
 
       // Генерируем AI интерпретацию
@@ -5317,8 +5322,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tz = user.timezone || 'Europe/Moscow';
       const day = dayjs().tz(tz).format('YYYY-MM-DD');
 
+      const guestTable = req.body.readingFor === 'guest';
+      let tableCards: {cardId:string; reversed:boolean; position:number}[] | undefined;
+      let tableId='';
+      let subscriptionActive=false;
+      if (guestTable) {
+        if(typeof req.body.tableId!=='string' || !/^[0-9a-f-]{36}$/i.test(req.body.tableId)){
+          return res.status(400).json({ok:false,error:'invalid_table'});
+        }
+        tableId=guestReadingId(userId,req.body.tableId);
+        const previous=await previousGuestReading(tableId,userId);
+        if(previous)return res.json({ok:true,data:previous});
+        const cards = req.body.tableCards;
+        if (forOther || spreadId !== 'three' || !Array.isArray(cards) || cards.length !== 3 ||
+            !cards.every(c => typeof c?.cardId === 'string' && getTarotCard(c.cardId) && typeof c.reversed === 'boolean') ||
+            new Set(cards.map(c => c.cardId)).size !== 3) {
+          return res.status(400).json({ok:false,error:'invalid_table'});
+        }
+        tableCards=cards.map((c,position)=>({position,cardId:c.cardId,reversed:c.reversed}));
+        forOther={name:locale==='ru'?'гость':'guest',gender:'other'};
+      }
+
       // Карта дня: кэш на день
-      if (forOther) {
+      if (guestTable) {
+        const access=await canAccessFeature(storage,userId,'tarot_three');
+        subscriptionActive=access.tier!=='free';
+        if (!access.allowed && !(access.tier==='free' && Number(user.referralOrbs)>=access.cost)) {
+          return res.status(402).json({ok:false,error:'insufficient_orbs',cost:access.cost});
+        }
+      } else if (forOther) {
         // проверок доступа и кэша нет — это инструмент админа
       } else if (spreadId === 'daily') {
         const existing = await storage.getTarotDailyReading(userId, day, locale);
@@ -5337,7 +5369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const drawn = drawCards(spread.cards, { allowReversed: spreadId === 'daily' ? false : allowReversed });
+      const drawn = tableCards ?? drawCards(spread.cards, { allowReversed: spreadId === 'daily' ? false : allowReversed });
       // Да/Нет: вердикт детерминирован полярностью карты (GPT его только объясняет — иначе вечное «не однозначно»)
       const { yesNoVerdict, getCardAstro, sunSignFromDate } = await import('@shared/tarot');
       const forcedVerdict = spreadId === 'yesno' ? yesNoVerdict(drawn[0].cardId, drawn[0].reversed) : undefined;
@@ -5405,9 +5437,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const saved = await storage.saveTarotReading({
-        userId, spread: spreadId, question, locale, cards: drawn, interpretation, day,
-      });
+      const reading={userId, spread:spreadId, question, locale, cards:drawn, interpretation, day};
+      const saved=guestTable ? await saveGuestReading({...reading,id:tableId},subscriptionActive) : await storage.saveTarotReading(reading);
+      if(!saved)return res.status(402).json({ok:false,error:'insufficient_orbs'});
       res.json({ ok: true, data: { ...saved, cached: false } });
     } catch (error: any) {
       console.error('[TAROT] /draw error:', error);
@@ -5433,6 +5465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           dailyDone: !!daily,
           dailyReadingId: daily?.id || null,
+          guestTable:true, readingFeedback:true,
           costs: { yesno: ORB_COSTS.tarot_yesno, three: ORB_COSTS.tarot_three, celtic: ORB_COSTS.tarot_celtic },
         },
       });

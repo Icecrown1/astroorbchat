@@ -21,6 +21,7 @@ export interface NatalChartResult {
   planets: Record<string, {
     longitude: number;
     latitude: number;
+    retrograde?: boolean;
     sign: string;
     degree_in_sign: number;
   }>;
@@ -63,6 +64,7 @@ export interface TransitsResult {
   planets: Record<string, {
     longitude: number;
     latitude: number;
+    retrograde?: boolean;
     sign: string;
     degree_in_sign: number;
   }>;

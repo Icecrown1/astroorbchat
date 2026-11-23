@@ -1,3 +1,5 @@
+import { QuestionHelp } from './ReadingTools';
+import { ReadingFeedback } from './ReadingFeedback';
 import { PilotAccess } from './PilotAccess';
 import { authPilot, mechanics, playInternal, rewardsEnabled } from './playInternal';
 import { useEffect, useRef, useState } from 'react';
@@ -37,6 +39,7 @@ function ServerReading({ reading, open, token }) {
     </SpreadGallery>
     {rewardsEnabled && !open && reading.spread === 'three' && <ClarifyingCard entry={reading} source="online" earnedOnly />}
     {interpretation?.advice && <div className="reading-section"><h3>Совет</h3><p>{interpretation.advice}</p></div>}
+    <ReadingFeedback topic="tarot"/>
     <ReportReading token={token} kind="tarot" reading={reading} />
   </div>;
   const date = <time dateTime={reading.createdAt}>{dateFormat.format(new Date(reading.createdAt))}</time>;
@@ -72,6 +75,7 @@ function OnlineSpreadForm({ status, profile, busy, draw, initialSpread }) {
       <p>{spread === 'daily' ? 'Одна карта на сегодня · бесплатно' : spread === 'yesno' ? 'Одна карта на твой вопрос' : spread === 'three' ? 'Три стороны одной ситуации' : 'Десять позиций для подробного разбора'}</p>
       </div></div>
       {paid && <>
+        <QuestionHelp onChoose={setQuestion}/>
         <label htmlFor="tarot-question">Твой вопрос</label>
         <textarea id="tarot-question" value={question} onChange={event => setQuestion(event.target.value)}
           required maxLength={300} rows={3} disabled={busy} />

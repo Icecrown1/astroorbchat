@@ -1,7 +1,7 @@
 import { getTarotCard, TAROT_SPREADS } from '../../shared/tarot';
 import { CardButton } from './CardViewer';
 
-export function SpreadGallery({ cards, spread, labels, descriptions = [], titles = [], keywords = [], children }) {
+export function SpreadGallery({ cards, spread, labels, descriptions = [], titles = [], keywords = [], cardsOnly = false, children }) {
   if (!cards?.length) return children ?? null;
   const celtic = spread === 'celtic' && cards.length === TAROT_SPREADS.celtic.cards;
   const positions = cards.map(({ cardId, reversed }, i) => {
@@ -17,7 +17,7 @@ export function SpreadGallery({ cards, spread, labels, descriptions = [], titles
       </CardButton>)}
     </div>
     {children}
-    <div className="card-meanings">{positions.map(({ cardId, reversed, label }, i) => {
+    {!cardsOnly && <div className="card-meanings">{positions.map(({ cardId, reversed, label }, i) => {
       const card = getTarotCard(cardId);
       const key = keywords[i] || (!descriptions[i] && card?.kw[reversed ? 1 : 0]);
       return <article className="card-meaning" key={i}>
@@ -27,6 +27,6 @@ export function SpreadGallery({ cards, spread, labels, descriptions = [], titles
         {key && <p className="card-key">{key}</p>}
         {descriptions[i] && <p>{descriptions[i]}</p>}
       </article>;
-    })}</div>
+    })}</div>}
   </section>;
 }

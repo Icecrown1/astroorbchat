@@ -1,3 +1,6 @@
+import { CampCards } from './CampCards';
+import { FriendsTarot } from './ReadingTools';
+import { FeedbackSession } from './ReadingFeedback';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Frontispiece, IndexRow, NavIcon, PlateInk, plate } from './Editorial';
@@ -31,21 +34,28 @@ const tools = [
   ['horoscope', 'Гороскоп', 'Прогноз на день, неделю или месяц', 'lion'],
   ['dates', 'Важные даты', 'События личного календаря', 'glass'],
   ['solar', 'Соляр', 'Личный прогноз на год', 'sphere'],
+  ['camp', 'Карты Кэмпа', 'Карта рождения', 'hand'],
   ['guest-natal', 'Карты близких', 'Натальные карты семьи и друзей', 'portrait'],
 ];
-const featured = tools.slice(1, 5);
+const featured = [...tools.slice(1), tools[0]];
+function visitStamp(id) {
+  return ['tarot','horoscope'].includes(id) ? new Date().toLocaleDateString('sv-SE') : 'seen';
+}
+function hasVisited(id) {
+  try { return localStorage.getItem('orbi.visit.'+id) === visitStamp(id); } catch { return false; }
+}
 
 function Home({ navigate, online, hasDaily }) {
   return <div className="home">
     {mechanics && <p>Тест механик · профиль на устройстве, примеры ИИ-ответов и покупок</p>}
-    <section className="daily-cover" style={{ backgroundImage: `url(${editorialHero})` }}>
+    <section className={'daily-cover' + (hasVisited('tarot') ? '' : ' unvisited')} style={{ backgroundImage: `url(${editorialHero})` }}>
       <h1>Карта<br />дня</h1>
       <button type="button" onClick={() => navigate('tarot', 'daily', online ? 'online' : 'offline')}>
         {hasDaily && !online ? 'Посмотреть карту' : 'Открыть бесплатно'} <span aria-hidden="true">→</span>
       </button>
     </section>
-    <div className="cover-grid">{featured.map(([id, name, , art]) =>
-      <button key={id} type="button" className={'cover-tile tile-' + art} onClick={() => navigate(id)}>
+    <div className="tool-carousel" aria-label="Инструменты">{featured.map(([id, name, , art]) =>
+      <button key={id} type="button" className={'cover-tile tile-' + art + (hasVisited(id) ? '' : ' unvisited')} onClick={() => navigate(id)}>
         <img src={plate(art)} alt="" /><strong>{name}</strong>
       </button>)}</div>
     <button className="catalog-link" type="button" onClick={() => navigate('tools')}>Все инструменты <span aria-hidden="true">→</span></button>
@@ -249,6 +259,9 @@ function App() {
   }
 
   function navigate(next, mode, requestedSource) {
+    if (tools.some(([id])=>id===next)) {
+      try { localStorage.setItem('orbi.visit.'+next,visitStamp(next)); } catch {}
+    }
     if (mode) setTarotMode(mode);
     if (requestedSource) setTarotSource(requestedSource);
     if (next === screen) return;
@@ -263,7 +276,7 @@ function App() {
   }
 
   return (
-    <CardViewerContext.Provider value={openCards}><PreviewRewards.Provider value={rewards}><div className="page" data-screen={screen}>
+    <FeedbackSession.Provider value={account}><CardViewerContext.Provider value={openCards}><PreviewRewards.Provider value={rewards}><div className="page" data-screen={screen}>
       <PlateInk />
       <header className="app-header">
         {depth > 0 && !destinations.some(([id]) => id === screen) && <button type="button" className="back-button" aria-label="Назад"
@@ -277,6 +290,7 @@ function App() {
       {authPilot && screen==='home' && !account.token && <button className="secondary-button" onClick={openAccount}>Войти по почте или коду Mini App</button>}
       {screen === 'home' && <Home navigate={navigate} online={Boolean(account.token)} hasDaily={readings.hasDaily} />}
       {screen === 'tools' && <Tools navigate={navigate} />}
+      {screen === 'camp' && <CampCards/>}
       {screen === 'stars' && <Stars account={account} openAccount={openAccount} />}
       {screen === 'tarot' && <section className="tarot-screen">
         <Frontispiece title="Таро" art="hand" />
@@ -284,7 +298,8 @@ function App() {
           <button type="button" aria-pressed={source === 'online'} onClick={() => setTarotSource('online')}>С ИИ</button>
           <button type="button" aria-pressed={source === 'offline'} onClick={() => setTarotSource('offline')}>Офлайн</button>
         </div>
-        {source === 'online'
+        <button className="secondary-button" aria-pressed={source==='friends'} onClick={()=>setTarotSource('friends')}>Разложить другому</button>
+        {source === 'friends' ? <FriendsTarot account={account} openAccount={openAccount}/> : source === 'online'
           ? <OnlineTarot onReadingComplete={onReadingComplete} account={account} openAccount={openAccount} openHistory={openHistory} initialSpread={tarotMode} />
           : <Tarot onReadingComplete={onReadingComplete} readings={readings} mode={tarotMode} setMode={setTarotMode} />}
       </section>}
@@ -330,7 +345,7 @@ function App() {
       {adType && adEligible && <AdPreview rewarded={adType.type === 'rewarded'}
         rewardName={adType.title} remaining={adType.remaining} onEarn={grantReward.current} onDismiss={() => window.history.back()} />}
       {viewer && <CardViewer viewer={viewer} onDismiss={() => window.history.back()} />}
-    </div></PreviewRewards.Provider></CardViewerContext.Provider>
+    </div></PreviewRewards.Provider></CardViewerContext.Provider></FeedbackSession.Provider>
   );
 }
 

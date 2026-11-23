@@ -1,3 +1,4 @@
+import { tarotQuestions } from '@shared/readingThemes';
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -599,6 +600,7 @@ export default function Tarot() {
             )}
 
             <div className="anim-fade-up">
+              {ru && <details><summary>Помочь с вопросом</summary>{tarotQuestions.map(q=><Button key={q} type="button" variant="ghost" onClick={()=>{setQuestion(q);setQuestionError(false);}}>{q}</Button>)}</details>}
               <Input
                 id="tarot-question"
                 value={question}

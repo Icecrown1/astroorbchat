@@ -1,3 +1,5 @@
+import { natalAspects } from '../../shared/readingThemes';
+import { ReadingFeedback } from './ReadingFeedback';
 import { rewardsEnabled } from './playInternal';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { SkyDial, planetGlyph } from './SkyDial';
@@ -55,6 +57,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
     return entries.map(planet => ({ ...planet, position: planet.position ?? planet.longitude }))
       .filter(planet => Number.isFinite(planet.position));
   }, [data.planets]);
+  const aspects = useMemo(()=>natalAspects(planets),[planets]);
   const current = planets.find(planet => planet.name === selected) ?? planets[0];
 
   if (!current) return <p>В этой карте пока нет положений планет.</p>;
@@ -65,7 +68,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
 
   return <>
     <ChartViewport className="natal-wheel" label="Колесо натальной карты">
-      <SkyDial planets={planets} aspects={data.aspects} angles={data.angles}
+      <SkyDial planets={planets} aspects={aspects} angles={data.angles}
         cusps={validHouses ? cusps : null} selected={current.name} house={view === 'houses' ? houseNumber : null} onSelect={selectPlanet} />
     </ChartViewport>
     {validHouses && <div className="mode-switch" role="group" aria-label="Разделы натальной карты">
@@ -82,6 +85,11 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
             </select></label>
             <p aria-live="polite">{[positionLabel(current), currentHouse && `${currentHouse}-й дом`].filter(Boolean).join(' · ')}</p></div>
           </div>
+          {current.retrograde === true && <p>℞ Ретроградное движение. При рождении эта планета видимо двигалась назад относительно звёзд. В астрологии это повод присмотреться к тому, что ты предпочитаешь обдумать про себя.</p>}
+          <details><summary>Аспекты выбранной планеты</summary><small>Основные углы, допуск до 6°</small>
+            {aspects.filter(a=>a.planet1===current.name || a.planet2===current.name).map(a=><p key={a.planet1+a.planet2}><b>{a.glyph} {a.ru}</b> · {translatePlanet(a.planet1===current.name?a.planet2:a.planet1,'ru')} · орбис {a.orb.toFixed(1)}°. {a.text}</p>)}
+            {!aspects.some(a=>a.planet1===current.name || a.planet2===current.name) && <p>В пределах этого допуска основных аспектов нет.</p>}
+          </details>
           {rewardsEnabled && (!guest || example) && <RewardPlanet planet={current}
             position={positionLabel(current)} house={currentHouse} example={example} />}
           {!guest && <NatalReadings planet={current.name} houseNumber={currentHouse} account={account} savedHouses={chart.houseInfluences?.ru} />}
@@ -97,6 +105,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
           </select></label><p>{positionLabel({ sign: zodiacSigns[Math.floor(cusp / 30)], degree_in_sign: cusp % 30 })}</p></div>
         </div>
         <div aria-live="polite">
+          <p>Куспид — начало дома. Его положение зависит от времени, места рождения и системы домов.</p>
           {members.length === 0 && <p>В этом доме нет планет.</p>}
         </div>
         {rewardsEnabled && (!guest || example) && <RewardHouse number={houseNumber}
@@ -114,6 +123,7 @@ export function NatalWheel({ chart, account, guest = false, example = false }) {
         <ReadingText text={interpretationText(interpretation)} />
       </details>
     )}
+    <ReadingFeedback topic="natal"/>
   </>;
 }
 

@@ -143,6 +143,7 @@ export function calcMatrixFromISO(iso: string): MatrixCore | null {
   const month = +m[2];
   const day = +m[3];
   if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  if (new Date(Date.UTC(year, month - 1, day)).getUTCDate() !== day) return null;
   return calcMatrix({ day, month, year });
 }
 

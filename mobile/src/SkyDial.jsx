@@ -67,15 +67,17 @@ export function SkyDial({ planets, aspects, cusps, angles, selected, house, onSe
       return <g key={i}><path d={sector(start,end,110,129)} fill={house === i+1 ? '#b52b17' : 'none'} stroke="#af9170" strokeWidth=".65" />
         <text {...point(start+((end-start+360)%360)/2,119.5)} fill={house === i+1 ? '#fff5e4' : '#463629'} fontSize="11">{i+1}</text></g>;
     })}
+    <image href={plate('sun')} x="132" y="132" width="96" height="96" clipPath={`url(#${clip})`} className="dial-sun" />
     {Array.isArray(aspects) && aspects.map((aspect,i) => {
       const a=byName.get(aspect.planet1), b=byName.get(aspect.planet2);
       if (!a || !b) return null;
       const p=point(a.position,66), q=point(b.position,66);
       const active=a.name===selected || b.name===selected;
-      return <line key={i} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={active ? '#aa361d' : '#89765e'}
-        strokeWidth={active ? 1.2 : .7} opacity={active ? .8 : .52} strokeDasharray={['square','opposition'].includes(aspect.type) ? '3 2' : undefined} />;
+      return <g key={i}><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={active ? '#aa361d' : '#89765e'}
+        strokeWidth={active ? 1.2 : .7} opacity={active ? .8 : .52} strokeDasharray={['square','opposition'].includes(aspect.type) ? '3 2' : undefined} />
+        {active && <text x={p.x*.68+q.x*.32} y={p.y*.68+q.y*.32} fontSize="10" stroke="#fff3dd" strokeWidth="2.5" paintOrder="stroke" fill="#592b12">{aspect.glyph}</text>}</g>;
     })}
-    <image href={plate('sun')} x="132" y="132" width="96" height="96" clipPath={`url(#${clip})`} className="dial-sun" />
+
     {Object.entries({ASC:angles?.Ascendant,MC:angles?.MC}).map(([key,item]) => Number.isFinite(item?.longitude) &&
       <text key={key} {...point(item.longitude,173)} className="dial-angle">{key}</text>)}
     {placeLabels(planets).map(planet => {

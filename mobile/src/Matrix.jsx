@@ -1,3 +1,5 @@
+import { MatrixYears } from './ReadingTools';
+import { ReadingFeedback } from './ReadingFeedback';
 import { playInternal, rewardsEnabled } from './playInternal';
 import { RewardUnlock } from './RewardUnlock';
 import { Fragment, useState } from 'react';
@@ -55,7 +57,7 @@ const arcanaPractice = [
   'Выбери небольшой эксперимент, в котором можно ошибиться и попробовать снова.',
 ];
 
-function MatrixResult({ core, title, centerTitle = 'Центр — зона комфорта' }) {
+function MatrixResult({ core, title, date, centerTitle = 'Центр — зона комфорта' }) {
   const [selected, setSelected] = useState(null);
   const nodeId = selected?.id ?? 'e';
   const heading = title ?? 'Твоя матрица';
@@ -78,6 +80,8 @@ function MatrixResult({ core, title, centerTitle = 'Центр — зона ко
           }[nodeId]}
         />
       </div>
+      {centerTitle !== 'Центр пары' && <MatrixYears core={core} date={date}/>}
+      <ReadingFeedback topic="matrix"/>
       {rewardsEnabled && <RewardUnlock id={`matrix-practice:${number}`} title="Практика аркана">
         {() => <article className="result-body"><h3>Практика · {arcanaMetaByN(number).ru}</h3><p>{arcanaPractice[number - 1]}</p></article>}
       </RewardUnlock>}
@@ -125,7 +129,7 @@ export function Matrix({ account, openAccount, initialMode = null }) {
           <button type="submit">Рассчитать матрицу</button>
           {error && <p role="alert">{error}</p>}
         </form>
-        {result && <MatrixResult key={date} core={result} />}
+        {result && <MatrixResult key={date} date={date} core={result} />}
       </div>
       <div hidden={source !== 'account'}>
         <AccountMatrix key={accountKey} account={account} openAccount={openAccount} />
@@ -271,7 +275,7 @@ function AccountMatrix({ account, openAccount, guest }) {
       <button type="button" disabled={busy} onClick={load}>{busy ? 'Загружаем…' : 'Открыть мою матрицу'}</button>
     </div>}
     {matrix && <>
-      <MatrixResult core={matrix.core} title={guest?.name} />
+      <MatrixResult core={matrix.core} date={guest?.birthDate ?? account.profile?.birthdayDate} title={guest?.name} />
       <section className="matrix-screen" aria-label="Разборы матрицы">
         <h2>Разборы матрицы</h2>
         <div className="matrix-section-list" role="group" aria-label="Разделы разбора">

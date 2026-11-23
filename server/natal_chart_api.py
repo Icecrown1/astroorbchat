@@ -81,10 +81,10 @@ def calculate_natal_chart(birth_data):
     # Юлианский день
     jd_ut = swe.julday(year, month, day, decimal_hour, swe.GREG_CAL)
     delta_t = swe.deltat(jd_ut)
-    jd_tt = jd_ut + delta_t / 86400.0
+    jd_tt = jd_ut + delta_t
     
     print(f"  Julian Day (UT): {jd_ut}", file=sys.stderr)
-    print(f"  Delta T: {delta_t} sec", file=sys.stderr)
+    print(f"  Delta T: {delta_t * 86400} sec", file=sys.stderr)
     print(f"  Julian Day (TT): {jd_tt}", file=sys.stderr)
     
     # Рассчитываем позиции планет
@@ -109,7 +109,7 @@ def calculate_natal_chart(birth_data):
                     'degree_in_sign': round(lon % 30, 4)
                 }
             else:
-                position, _ = swe.calc(jd_tt, planet_id, swe.FLG_SWIEPH)
+                position = swe.calc_ut(jd_ut, planet_id, swe.FLG_SWIEPH | swe.FLG_SPEED)[0]
                 lon = position[0]
                 
                 # Сохраняем долготу North Node для расчета South Node
@@ -119,6 +119,7 @@ def calculate_natal_chart(birth_data):
                 planets_data[planet_name] = {
                     'longitude': round(lon, 4),
                     'latitude': round(position[1], 4),
+                    'retrograde': position[3] < 0,
                     'sign': get_zodiac_sign(lon),
                     'degree_in_sign': round(lon % 30, 4)
                 }
@@ -127,7 +128,7 @@ def calculate_natal_chart(birth_data):
     
     # Рассчитываем дома и углы
     house_code = HOUSE_SYSTEMS.get(house_system, b'P')
-    cusps, ascmc = swe.houses(jd_tt, latitude, longitude, house_code)
+    cusps, ascmc = swe.houses(jd_ut, latitude, longitude, house_code)
     
     print(f"[NATAL CALC] HOUSES & ANGLES:", file=sys.stderr)
     print(f"  Ascendant: {ascmc[0]:.4f}° = {get_zodiac_sign(ascmc[0])} {ascmc[0] % 30:.2f}°", file=sys.stderr)
@@ -156,7 +157,7 @@ def calculate_natal_chart(birth_data):
         }
     }
     
-    house_cusps = [round(cusp, 4) for cusp in cusps]
+    house_cusps = [round(cusp, 4) for cusp in cusps[-12:]]
     
     return {
         'planets': planets_data,

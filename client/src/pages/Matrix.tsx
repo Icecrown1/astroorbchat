@@ -1,3 +1,4 @@
+import { yearsAround, chakraTable, chakras } from '@shared/readingThemes';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -403,6 +404,8 @@ export default function Matrix() {
             )}
 
             <Card className="p-4 anim-fade-up wheel-nebula">
+              {ru && <details><summary>Арканы личных лет</summary>{yearsAround(core,new Date().getFullYear()).map(r=><p key={r.year}>{r.year} · аркан {r.arcana}</p>)}</details>}
+              {ru && <details><summary>Символическая таблица чакр</summary><table><thead><tr>{['Чакра','Физика','Энергия','Эмоции'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{chakraTable(core).map((row,i)=><tr key={i}><th>{chakras[i]}</th>{row.map((v,j)=><td key={j}>{v}</td>)}</tr>)}</tbody></table></details>}
               <MatrixOctagram core={core} zone={zone} onNodeTap={(n) => { haptic.impact('light'); setTapped(n); }} activeNodeId={tapped?.id} />
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 {ru ? 'Нажмите на любую точку матрицы' : 'Tap any point of the matrix'}

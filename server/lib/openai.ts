@@ -1,3 +1,4 @@
+import { natalAspects } from '@shared/readingThemes';
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
@@ -179,7 +180,12 @@ export async function getAstrologyInterpretation(
       angles: JSON.stringify(data.angles, null, 2),
       houses: JSON.stringify(data.houses?.cusps || [], null, 2),
       houseSystem: data.houses?.system || 'Placidus',
-      aspects: JSON.stringify(data.aspects, null, 2)
+      aspects: JSON.stringify(type === 'natal' && !data.aspects?.length
+        ? natalAspects(Object.entries(data.planets ?? {}).flatMap(([key,value]) => {
+            const p=value as {name?:string; longitude?:number; position?:number};
+            const position=p?.longitude ?? p?.position;
+            return typeof position==='number' && Number.isFinite(position) ? [{name:p.name ?? key,position}] : [];
+          })) : data.aspects, null, 2)
     },
     solar: {
       chart: JSON.stringify(data.chart, null, 2),

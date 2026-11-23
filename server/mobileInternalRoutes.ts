@@ -60,7 +60,7 @@ export async function registerMobileInternalRoutes(app: Express, aiEnabled: bool
     '/api/astrology/ask/history', '/api/astrology/important-dates',
     '/api/matrix/me', '/api/matrix/guests', '/api/matrix/guest/:id', '/api/matrix/pairs',
   ], serve);
-  app.post(['/api/user/update', '/api/natal/init', '/api/astrology/solar/check', '/api/matrix/guest'], serve);
+  app.post(['/api/reading-feedback','/api/user/update', '/api/natal/init', '/api/astrology/solar/check', '/api/matrix/guest'], serve);
   app.patch('/api/user/push', serve);
   app.delete('/api/natal/external/:id', serve);
   app.get('/api/public/sign-horoscope/:sign', generated);
