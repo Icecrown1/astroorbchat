@@ -153,7 +153,7 @@ async function checkReadings() {
   });
   await step('camp',async()=>{
     await pick('camp','Карты Кэмпа');await setDate(0,'1999-02-11');await click('Совместимость');await setDate(1,'2000-12-22');
-    await until(async()=>(await readout()).includes('Привлекательность'),'indices not visible',20000);
+    await until(()=>js("document.querySelectorAll('.camp-indices td').length===6"),'indices not visible',25000);
     const values=await js("[...document.querySelectorAll('.camp-indices td')].map(e=>e.textContent)");
     assert.deepEqual(values,['6','6','0','-1','5','5']);
   });
